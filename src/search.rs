@@ -95,11 +95,12 @@ fn ext_filter(lower: &str) -> Option<&str> {
         .or_else(|| lower.strip_prefix('.').filter(|e| !e.is_empty() && !e.contains('.')))
 }
 
-/// Adds `alt` (already normalised) and, if it starts with an Arabic article
-/// that leaves at least 3 letters, the bare word too.
-fn push_alt(alts: &mut Vec<String>, alt: String) {
-    let bare =
-        ARTICLES.iter().find_map(|p| alt.strip_prefix(p)).filter(|rest| rest.chars().count() >= 3).map(str::to_string);
+/// Adds `alt` (already normalised) and, unless `exact` (a quoted phrase), the
+/// bare word too when it starts with an Arabic article that leaves at least 3 letters.
+fn push_alt(alts: &mut Vec<String>, alt: String, exact: bool) {
+    let bare = (!exact)
+        .then(|| ARTICLES.iter().find_map(|p| alt.strip_prefix(p)).filter(|rest| rest.chars().count() >= 3).map(str::to_string))
+        .flatten();
     for a in std::iter::once(alt).chain(bare) {
         if !alts.contains(&a) {
             alts.push(a);
@@ -119,6 +120,8 @@ impl Query {
                 if let Some(ext) = ext_filter(&lower) {
                     let exts = ext.split([',', ';']).filter(|e| !e.is_empty());
                     q.exts.extend(exts.map(str::to_string));
+                    // A filter between two words ends any pending `|`.
+                    join = false;
                     continue;
                 }
                 let folder =
@@ -126,6 +129,7 @@ impl Query {
                 if let Some(p) = folder {
                     q.dirs_only = true;
                     if tok.len() == p.len() {
+                        join = false;
                         continue;
                     }
                     pieces = vec![&tok[p.len()..]];
@@ -136,6 +140,7 @@ impl Query {
                     let n = normalize(word);
                     if !n.trim().is_empty() {
                         q.excludes.push(n);
+                        join = false;
                         continue;
                     }
                 } else if tok.contains('|') {
@@ -146,7 +151,7 @@ impl Query {
             for p in &pieces {
                 let n = normalize(p);
                 if !n.trim().is_empty() {
-                    push_alt(&mut alts, n);
+                    push_alt(&mut alts, n, quoted);
                 }
             }
             let join_prev = join || pieces.first() == Some(&"") && pieces.len() > 1;
@@ -208,11 +213,14 @@ impl Query {
         self.exts.is_empty() || (!e.is_dir && self.exts.contains(&e.ext()))
     }
 
+    /// Type and folder filters on an entry.
+    fn kind_ok(&self, e: &Entry) -> bool {
+        (!self.dirs_only || e.is_dir) && self.ext_ok(e)
+    }
+
     /// Type, folder and excluded-word filters on an entry's name.
     fn entry_ok(&self, e: &Entry) -> bool {
-        (!self.dirs_only || e.is_dir)
-            && self.ext_ok(e)
-            && !self.excludes.iter().any(|x| e.norm_name.contains(x.as_str()))
+        self.kind_ok(e) && !self.excludes.iter().any(|x| e.norm_name.contains(x.as_str()))
     }
 }
 
@@ -281,7 +289,7 @@ pub fn search_content(
         .par_iter()
         .enumerate()
         .filter(|(_, e)| !e.is_dir && e.size > 0 && e.size <= MAX_CONTENT_SIZE)
-        .filter(|(_, e)| extract::is_supported(&e.ext()) && q.entry_ok(e))
+        .filter(|(_, e)| extract::is_supported(&e.ext()) && q.kind_ok(e))
         .filter(|(_, e)| in_scope(&e.path, &scope_lower))
         .map(|(i, _)| i as u32)
         .collect();
@@ -475,4 +483,20 @@ mod tests {
         let s = match_text(text, &Query::parse("تفاصيل هذا")).unwrap();
         assert!(s.starts_with("هذا"), "{s}");
     }
+
+    #[test]
+    fn review_fixes() {
+        // A filter or exclude between `|` and the next word ends the OR.
+        let q = Query::parse("عقد | ext:pdf تقرير");
+        assert_eq!(q.terms.len(), 2);
+        assert_eq!(Query::parse("a | !b c").terms.len(), 2);
+        // Quoted phrases keep their article.
+        assert_eq!(Query::parse("\"التقرير السنوي\"").terms[0].alts, vec!["التقرير السنوي"]);
+        // Excludes in content search apply to the text, not the file name.
+        let q = Query::parse("عقد !قديم");
+        let e = entry(r"C:\Docs\قديم - عقد.docx", false);
+        assert!(q.kind_ok(&e) && !q.entry_ok(&e));
+        assert!(match_text("هذا عقد الإيجار", &q).is_some());
+    }
+
 }

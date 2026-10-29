@@ -264,7 +264,12 @@ impl App {
 
     fn start_scan(&self) {
         let mut st = self.state.borrow_mut();
-        if st.scan.is_some() || st.loading.is_some() {
+        if st.loading.is_some() {
+            drop(st);
+            self.set_status("انتظر حتى يكتمل تحميل الفهرس، ثم حدّثه.");
+            return;
+        }
+        if st.scan.is_some() {
             return;
         }
         let progress = Arc::new(ScanProgress::default());
@@ -376,20 +381,24 @@ impl App {
         let Some(res) = self.name_result.lock().ok().and_then(|mut r| r.take()) else { return };
         let mut st = self.state.borrow_mut();
         st.name_running = false;
+        if st.content.is_some() || self.content_mode() {
+            // A document search took over meanwhile; leave it alone.
+            st.name_pending = false;
+            return;
+        }
         if st.name_pending {
             // The query changed meanwhile: these results are already stale.
             drop(st);
             self.search_names();
             return;
         }
-        if st.content.is_some() || self.content_mode() {
-            return;
-        }
         st.rows = res.hits.into_iter().map(|entry| Row { entry, snippet: None }).collect();
         st.rows_index = res.index;
         let n = st.rows.len();
         let busy = st.scan.is_some() || st.loading.is_some();
+        let loading = st.loading.is_some();
         drop(st);
+        self.clear_selection();
         self.refresh_list();
         if res.empty {
             if !busy {
@@ -397,7 +406,11 @@ impl App {
             }
             return;
         }
-        let tail = if busy { " (الفهرسة ما زالت جارية)" } else { "" };
+        let tail = match (loading, busy) {
+            (true, _) => " (جاري تحميل الفهرس…)",
+            (false, true) => " (الفهرسة ما زالت جارية)",
+            _ => "",
+        };
         match res.converted {
             Some(alt) => self.set_status(&format!(
                 "لا نتائج لـ «{}»، عرض نتائج «{}»: {} نتيجة في {} ملي ثانية{tail}",
@@ -428,6 +441,7 @@ impl App {
         st.rows.clear();
         st.rows_index = index;
         drop(st);
+        self.clear_selection();
         self.refresh_list();
         self.stop_btn.set_enabled(true);
         self.set_status("جاري البحث داخل المستندات…");
@@ -531,6 +545,14 @@ impl App {
     }
 
     // ---------------------------------------------------------------- results
+
+    /// Drops the selection, so a row number never points at a different file
+    /// after the results change.
+    fn clear_selection(&self) {
+        for i in self.list.selected_items() {
+            self.list.select_item(i, false);
+        }
+    }
 
     fn refresh_list(&self) {
         let n = self.state.borrow().rows.len();
@@ -842,7 +864,7 @@ fn fmt_num(n: usize) -> String {
     let s = n.to_string();
     let mut out = String::new();
     for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(c);
@@ -850,8 +872,11 @@ fn fmt_num(n: usize) -> String {
     digits(out)
 }
 
+/// Quotes a CSV cell, and stops Excel from reading a cell that starts with
+/// `= + - @` as a formula by prefixing an apostrophe.
 fn csv_field(s: &str) -> String {
-    if s.contains([',', '"', '\n', '\r']) { format!("\"{}\"", s.replace('"', "\"\"")) } else { s.to_string() }
+    let s = if s.starts_with(['=', '+', '-', '@', '\t', '\r']) { format!("'{s}") } else { s.to_string() };
+    if s.contains([',', '"', '\n', '\r']) { format!("\"{}\"", s.replace('"', "\"\"")) } else { s }
 }
 
 /// "قبل 5 دقائق" with the right Arabic plural for the count.
@@ -1002,7 +1027,11 @@ impl Drop for AppUi {
 
 impl NativeUi<AppUi> for App {
     fn build_ui(mut app: App) -> Result<AppUi, nwg::NwgError> {
-        let settings = Settings::load();
+        let mut settings = Settings::load();
+        // A size saved on a bigger screen must still fit this one.
+        let (max_w, max_h) = work_area();
+        settings.width = settings.width.min(max_w);
+        settings.height = settings.height.min(max_h);
         ARABIC_DIGITS.store(settings.arabic_digits, Ordering::Relaxed);
 
         let family = ui_font_family();
@@ -1286,6 +1315,21 @@ fn ui_font_family() -> String {
         .to_string()
 }
 
+/// The usable screen size (without the taskbar) in logical pixels.
+fn work_area() -> (u32, u32) {
+    use winapi::um::winuser::{SPI_GETWORKAREA, SystemParametersInfoW};
+    let mut r = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+    let ok = unsafe { SystemParametersInfoW(SPI_GETWORKAREA, 0, &mut r as *mut RECT as _, 0) } != 0;
+    if !ok || r.right <= r.left {
+        return (u32::MAX, u32::MAX);
+    }
+    let scale = nwg::scale_factor();
+    // Leave room for the window frame and title bar.
+    let w = ((r.right - r.left) as f64 / scale) as u32;
+    let h = ((r.bottom - r.top) as f64 / scale) as u32;
+    (w.saturating_sub(16).max(400), h.saturating_sub(40).max(300))
+}
+
 /// Lets the user interface win when a background thread competes for the CPU.
 fn background_priority() {
     use winapi::um::processthreadsapi::{GetCurrentThread, SetThreadPriority};
@@ -1317,10 +1361,18 @@ fn activate_running_copy() -> bool {
     if mutex.is_null() || unsafe { GetLastError() } != ERROR_ALREADY_EXISTS {
         return false;
     }
+    // The first copy may still be creating its window; give it a few seconds.
     let (class, title) = (shell::wide("NativeWindowsGuiWindow"), shell::wide(TITLE));
-    let hwnd = unsafe { FindWindowW(class.as_ptr(), title.as_ptr()) };
+    let mut hwnd = std::ptr::null_mut();
+    for _ in 0..50 {
+        hwnd = unsafe { FindWindowW(class.as_ptr(), title.as_ptr()) };
+        if !hwnd.is_null() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
     if hwnd.is_null() {
-        return false;
+        return true;
     }
     unsafe {
         ShowWindow(hwnd, if IsIconic(hwnd) != 0 { SW_RESTORE } else { SW_SHOW });

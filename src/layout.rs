@@ -42,11 +42,16 @@ const KEYS: &[(char, &str)] = &[
 /// Shifted keys that produce Arabic letters, used only for Arabic → Latin.
 const SHIFTED: &[(char, &str)] = &[('T', "لإ"), ('G', "لأ"), ('B', "لآ"), ('Y', "إ"), ('H', "أ"), ('N', "آ")];
 
-/// Tokens that are search filters, not words, and are never converted.
+/// Tokens that are search filters, not words, and are never converted. A
+/// `.ext` token counts when it is the last one or names a known file type
+/// (`.pdf`), so that `.` typed for ز elsewhere is still converted.
 fn is_filter(tok: &str, last: bool) -> bool {
     let lower = tok.to_ascii_lowercase();
+    let known = |e: &str| crate::search::KINDS.iter().any(|(_, exts)| exts.contains(&e));
     ["ext:", "*.", "folder:", "مجلد:"].iter().any(|p| lower.starts_with(p))
-        || last && tok.strip_prefix('.').is_some_and(|e| !e.is_empty() && e.chars().all(|c| c.is_ascii_alphanumeric()))
+        || lower
+            .strip_prefix('.')
+            .is_some_and(|e| !e.is_empty() && e.chars().all(|c| c.is_ascii_alphanumeric()) && (last || known(e)))
 }
 
 fn latin_to_arabic(tok: &str) -> String {
@@ -156,4 +161,10 @@ mod tests {
         assert_eq!(convert_layout("abc تقرير"), None);
         assert_eq!(convert_layout("ڤيديو"), None); // letter not on the layout
     }
+
+    #[test]
+    fn known_extension_anywhere_is_kept() {
+        assert_eq!(convert_layout(".pdf hgjrvdv").as_deref(), Some(".pdf التقرير"));
+    }
+
 }
