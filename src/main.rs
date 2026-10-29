@@ -3,7 +3,12 @@
 
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
+#[cfg(windows)]
+mod dragdrop;
+#[cfg(windows)]
+mod draw;
 mod extract;
+mod history;
 #[cfg(windows)]
 mod icon;
 mod index;
@@ -13,6 +18,9 @@ mod search;
 mod settings;
 #[cfg(windows)]
 mod ui;
+// Not cfg(windows): the pure update logic is unit-tested on every platform;
+// the network/installer parts inside are Windows-only.
+mod update;
 
 #[cfg(windows)]
 fn main() {

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::ops::Deref;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -25,7 +25,8 @@ use winapi::um::winuser::{
 
 use crate::index::{self, Entry, Index, ScanProgress};
 use crate::layout;
-use crate::search::{self, ContentHit, ContentProgress, Query};
+use crate::history::{History, SavedSearch};
+use crate::search::{self, ContentHit, ContentProgress, Query, SortKey};
 use crate::settings::Settings;
 
 /// Mirrors the whole window so it reads right-to-left.
@@ -83,8 +84,40 @@ struct State {
     name_running: bool,
     /// The query changed while a search was running; search again when it ends.
     name_pending: bool,
+    /// The query behind the current rows, used to underline the matches.
+    shown_query: Option<Query>,
+    /// Recent and saved searches and how often files were opened.
+    history: History,
     settings: Settings,
 }
+
+/// What a background update thread reports back.
+enum UpdateEvent {
+    /// Result of a check; `manual` checks also report "up to date" and errors.
+    Checked { manual: bool, result: Result<Option<crate::update::Release>, String> },
+    Installed(Result<(), String>),
+}
+
+/// The pop-up menu of saved and recent searches and what each item does.
+#[derive(Default)]
+struct HistoryMenu {
+    menu: nwg::Menu,
+    items: Vec<(nwg::MenuItem, HistoryAction)>,
+    separators: Vec<nwg::MenuSeparator>,
+}
+
+enum HistoryAction {
+    Saved(SavedSearch),
+    Recent(String),
+    SaveCurrent,
+    ClearRecent,
+    ClearSaved,
+    Nothing,
+}
+
+/// Id of the global "show the program" hotkey, Ctrl+Alt+F.
+const HOTKEY_ID: i32 = 1;
+const HOTKEY_TEXT: &str = "Ctrl+Alt+F";
 
 /// The outcome of a background filename search.
 struct NameResult {
@@ -104,6 +137,7 @@ pub struct App {
     query_font: nwg::Font,
     query: nwg::TextInput,
     search_btn: nwg::Button,
+    history_btn: nwg::Button,
     kind_combo: nwg::ComboBox<&'static str>,
     content_chk: nwg::CheckBox,
     scope_label: nwg::Label,
@@ -123,6 +157,14 @@ pub struct App {
     /// Wakes the UI thread when a background filename search finishes.
     name_notice: nwg::Notice,
     name_result: Arc<Mutex<Option<NameResult>>>,
+    /// Wakes the UI thread when an update check or download finishes.
+    update_notice: nwg::Notice,
+    update_result: Arc<Mutex<Option<UpdateEvent>>>,
+    /// Bytes downloaded / total of a running update download.
+    update_progress: Arc<(AtomicU64, AtomicU64)>,
+    update_busy: Cell<bool>,
+    /// Timer ticks since start, to delay the automatic update check.
+    ticks: Cell<u32>,
     /// Built on first use: each one starts a COM file dialog, which is slow.
     folder_dialog: RefCell<Option<nwg::FileDialog>>,
     export_dialog: RefCell<Option<nwg::FileDialog>>,
@@ -131,8 +173,13 @@ pub struct App {
     menu_folder: nwg::MenuItem,
     menu_copy: nwg::MenuItem,
     menu_copy_all: nwg::MenuItem,
+    menu_copy_file: nwg::MenuItem,
+    menu_rename: nwg::MenuItem,
+    menu_delete: nwg::MenuItem,
     options_menu: nwg::Menu,
+    menu_hotkey: nwg::MenuItem,
     menu_digits: nwg::MenuItem,
+    menu_update: nwg::MenuItem,
     menu_export: nwg::MenuItem,
     menu_hide: nwg::MenuItem,
     tray_icon: nwg::Icon,
@@ -140,6 +187,13 @@ pub struct App {
     tray_menu: nwg::Menu,
     tray_show: nwg::MenuItem,
     tray_exit: nwg::MenuItem,
+    /// The recent/saved searches menu, rebuilt each time it opens.
+    history_menu: RefCell<HistoryMenu>,
+    /// True while the user edits a file name in the list (F2).
+    renaming: Cell<bool>,
+    /// The file whose name is being edited, fixed when the edit starts so a
+    /// change of the results meanwhile can't redirect the rename.
+    renaming_path: RefCell<Option<String>>,
     /// System image-list index of the icon for each extension.
     icons: RefCell<HashMap<String, i32>>,
     tray_hint_shown: Cell<bool>,
@@ -170,9 +224,12 @@ impl App {
         let query_h = 38;
         let btn_w = 120;
 
-        // Row 1: a large query box + search button.
+        // Row 1: a large query box, the search button and the history menu.
+        let hist_w = 90;
         self.query.set_position(m, m);
-        self.query.set_size((w - 3 * m - btn_w).max(100) as u32, query_h as u32);
+        self.query.set_size((w - 4 * m - btn_w - hist_w).max(100) as u32, query_h as u32);
+        self.history_btn.set_position(w - 2 * m - btn_w - hist_w, m);
+        self.history_btn.set_size(hist_w as u32, query_h as u32);
         self.search_btn.set_position(w - m - btn_w, m);
         self.search_btn.set_size(btn_w as u32, query_h as u32);
 
@@ -272,6 +329,8 @@ impl App {
     }
 
     fn start_scan(&self) {
+        // An edit still waiting to be saved must not land after the new scan.
+        flush_index_save();
         let mut st = self.state.borrow_mut();
         if st.loading.is_some() {
             drop(st);
@@ -352,6 +411,9 @@ impl App {
         st.name_pending = false;
         let index = st.index.clone();
         let scope = st.scope.clone();
+        let (sort, desc) = (SortKey::from_column(st.settings.sort_col.max(-1) as usize), st.settings.sort_desc);
+        let sort = if st.settings.sort_col < 0 { SortKey::Relevance } else { sort };
+        let boosted = if sort == SortKey::Relevance { st.history.boosted(&index, index::now_secs()) } else { Vec::new() };
         drop(st);
 
         let text = self.query.text();
@@ -378,6 +440,12 @@ impl App {
                     converted = Some(alt);
                 }
             }
+            if sort == SortKey::Relevance {
+                // Files the user opens often come first.
+                search::promote(&mut hits, &boosted);
+            } else {
+                search::sort_hits(&index.entries, &mut hits, sort, desc);
+            }
             let ms = started.elapsed().as_millis() as usize;
             if let Ok(mut r) = slot.lock() {
                 *r = Some(NameResult { index, hits, text, converted, empty: q.is_empty(), ms });
@@ -403,6 +471,7 @@ impl App {
         }
         st.rows = res.hits.into_iter().map(|entry| Row { entry, snippet: None }).collect();
         st.rows_index = res.index;
+        st.shown_query = Some(self.parse_query(res.converted.as_deref().unwrap_or(&res.text)));
         let n = st.rows.len();
         let busy = st.scan.is_some() || st.loading.is_some();
         let loading = st.loading.is_some();
@@ -440,6 +509,8 @@ impl App {
             return;
         }
         let mut st = self.state.borrow_mut();
+        st.shown_query = Some(self.parse_query(&self.query.text()));
+        st.history.add_recent(&self.query.text());
         let index = st.index.clone();
         let scope = st.scope.clone();
         let progress = Arc::new(ContentProgress::default());
@@ -479,6 +550,145 @@ impl App {
         self.poll_load();
         self.poll_scan();
         self.poll_content();
+        self.poll_update_progress();
+        // Look for a new version about 10 s after start (off the busy
+        // startup) and then every hour, for copies that live in the tray.
+        let t = self.ticks.get().wrapping_add(1);
+        self.ticks.set(t);
+        if t % 18_000 == 50 {
+            self.maybe_check_for_update();
+        }
+    }
+
+    // ---------------------------------------------------------------- updates
+
+    /// Looks for a newer release on GitHub in the background. The automatic
+    /// check runs at most once a day and stays silent unless it finds one.
+    fn check_for_update(&self, manual: bool) {
+        if self.update_busy.replace(true) {
+            if manual {
+                self.set_status("جاري التحقق من التحديثات…");
+            }
+            return;
+        }
+        if manual {
+            self.set_status("جاري التحقق من التحديثات…");
+        }
+        let slot = self.update_result.clone();
+        let notice = self.update_notice.sender();
+        std::thread::spawn(move || {
+            background_priority();
+            let result = crate::update::check_latest();
+            if let Ok(mut s) = slot.lock() {
+                *s = Some(UpdateEvent::Checked { manual, result });
+            }
+            notice.notice();
+        });
+    }
+
+    fn maybe_check_for_update(&self) {
+        let last = self.state.borrow().settings.update_check;
+        if crate::update::should_check_now(last, index::now_secs().max(0) as u64) {
+            self.check_for_update(false);
+        }
+    }
+
+    fn on_update_event(&self) {
+        let Some(event) = self.update_result.lock().ok().and_then(|mut s| s.take()) else { return };
+        match event {
+            UpdateEvent::Checked { manual, result } => {
+                self.update_busy.set(false);
+                // A failed check (no network yet, rate limit) is retried at
+                // the next hourly tick instead of a day later.
+                if result.is_ok() {
+                    let mut st = self.state.borrow_mut();
+                    st.settings.update_check = index::now_secs().max(0) as u64;
+                    st.settings.save();
+                }
+                match result {
+                    Ok(Some(rel)) => self.offer_update(rel),
+                    Ok(None) if manual => {
+                        let v = env!("CARGO_PKG_VERSION");
+                        self.set_status(&format!("لديك أحدث إصدار ({v})."));
+                        nwg::modal_info_message(&self.window, TITLE, &format!("لديك أحدث إصدار من البرنامج ({v})."));
+                    }
+                    Err(e) if manual => {
+                        self.set_status("تعذر التحقق من التحديثات.");
+                        nwg::modal_error_message(&self.window, TITLE, &format!("تعذر التحقق من التحديثات:\n{e}"));
+                    }
+                    _ => {}
+                }
+            }
+            UpdateEvent::Installed(Ok(())) => {
+                self.set_status("اكتمل التحديث. جاري إعادة التشغيل…");
+                match crate::update::restart_new_version() {
+                    Ok(()) => self.on_close(),
+                    Err(e) => {
+                        self.update_busy.set(false);
+                        nwg::modal_info_message(
+                            &self.window,
+                            TITLE,
+                            &format!("تم تثبيت الإصدار الجديد، لكن تعذرت إعادة التشغيل تلقائياً ({e}).\nأغلق البرنامج وافتحه من جديد."),
+                        );
+                    }
+                }
+            }
+            UpdateEvent::Installed(Err(e)) => {
+                self.update_busy.set(false);
+                self.set_status("تعذر التحديث.");
+                nwg::modal_error_message(&self.window, TITLE, &format!("تعذر تنزيل التحديث أو تثبيته:\n{e}\n\nالإصدار الحالي يعمل كما هو."));
+            }
+        }
+    }
+
+    fn offer_update(&self, rel: crate::update::Release) {
+        // An automatic check must not pop up over a hidden window; show it.
+        if !self.window.visible() {
+            self.show_window();
+        }
+        let current = env!("CARGO_PKG_VERSION");
+        let notes = if rel.notes.trim().is_empty() { String::new() } else { format!("\n\nالجديد:\n{}", rel.notes.trim()) };
+        let text = format!(
+            "يتوفر إصدار جديد من بحث سريع: {} (لديك {current}).{notes}\n\nهل تريد التحديث الآن؟ سيُعاد تشغيل البرنامج بعد التنزيل.",
+            rel.version
+        );
+        let params = nwg::MessageParams {
+            title: TITLE,
+            content: &text,
+            buttons: nwg::MessageButtons::YesNo,
+            icons: nwg::MessageIcons::Question,
+        };
+        if nwg::modal_message(&self.window, &params) != nwg::MessageChoice::Yes {
+            self.set_status(&format!("الإصدار {} متاح. يمكنك التحديث لاحقاً من «خيارات».", rel.version));
+            return;
+        }
+        self.update_busy.set(true);
+        self.save_settings();
+        let total = rel.exe_size;
+        self.update_progress.0.store(0, Ordering::Relaxed);
+        self.update_progress.1.store(total, Ordering::Relaxed);
+        let progress = self.update_progress.clone();
+        let slot = self.update_result.clone();
+        let notice = self.update_notice.sender();
+        std::thread::spawn(move || {
+            let result = crate::update::download_and_install(&rel, |done, total| {
+                progress.0.store(done, Ordering::Relaxed);
+                progress.1.store(total, Ordering::Relaxed);
+            });
+            progress.1.store(0, Ordering::Relaxed);
+            if let Ok(mut s) = slot.lock() {
+                *s = Some(UpdateEvent::Installed(result));
+            }
+            notice.notice();
+        });
+    }
+
+    fn poll_update_progress(&self) {
+        let total = self.update_progress.1.load(Ordering::Relaxed);
+        if total > 0 && self.update_busy.get() {
+            let done = self.update_progress.0.load(Ordering::Relaxed);
+            self.set_status(&format!("جاري تنزيل التحديث… {}٪", (done * 100 / total).min(100)));
+        }
     }
 
     fn poll_scan(&self) {
@@ -520,7 +730,10 @@ impl App {
             st.content = None;
         }
         drop(st);
-        if changed {
+        if done {
+            self.sort_rows_in_place();
+        }
+        if changed || done {
             self.refresh_list();
         }
         if done {
@@ -601,9 +814,31 @@ impl App {
         self.status.set_text(1, &text);
     }
 
+    /// Remembers that a result was used: its search goes into the history and
+    /// the file ranks higher next time.
+    fn note_use(&self, path: &str) {
+        let text = self.query.text();
+        let mut st = self.state.borrow_mut();
+        st.history.add_recent(&text);
+        st.history.record_open(path, index::now_secs());
+        st.history.save();
+    }
+
+    /// Keeps a search that found something in the recent list, so it can be
+    /// picked again from the history menu.
+    fn remember_query(&self) {
+        let text = self.query.text();
+        let mut st = self.state.borrow_mut();
+        if !st.rows.is_empty() {
+            st.history.add_recent(&text);
+            st.history.save();
+        }
+    }
+
     fn open_selected(&self) {
         match self.selected_path() {
             Some(p) => {
+                self.note_use(&p);
                 if !shell::open(&p) {
                     nwg::modal_error_message(&self.window, "خطأ", &format!("تعذر فتح الملف:\n{p}"));
                 }
@@ -614,7 +849,10 @@ impl App {
 
     fn open_folder(&self) {
         match self.selected_path() {
-            Some(p) => shell::reveal(&p),
+            Some(p) => {
+                self.note_use(&p);
+                shell::reveal(&p);
+            }
             None => self.set_status("اختر ملفاً من القائمة أولاً."),
         }
     }
@@ -642,6 +880,396 @@ impl App {
         nwg::Clipboard::set_data_text(&self.window, &paths.join("\r\n"));
         drop(st);
         self.set_status(&format!("تم نسخ {} مسار.", fmt_num(n)));
+    }
+
+    /// Puts the selected file itself on the clipboard, ready to paste into
+    /// Explorer, an e-mail or a chat.
+    fn copy_file(&self) {
+        let Some(p) = self.selected_path() else {
+            self.set_status("اختر ملفاً من القائمة أولاً.");
+            return;
+        };
+        let ok = self.window.handle.hwnd().is_some_and(|h| crate::dragdrop::copy_files(h, std::slice::from_ref(&p)));
+        self.set_status(if ok { "تم نسخ الملف. الصقه حيث تريد بـ Ctrl+V." } else { "تعذر نسخ الملف." });
+    }
+
+    fn drag_row(&self, row: usize) {
+        let path = {
+            let st = self.state.borrow();
+            st.rows.get(row).and_then(|r| st.rows_index.entries.get(r.entry as usize)).map(|e| e.path.to_string())
+        };
+        if let (Some(p), Some(h)) = (path, self.list.handle.hwnd()) {
+            crate::dragdrop::drag_files_from(h, std::slice::from_ref(&p));
+        }
+    }
+
+    // ---------------------------------------------------------------- sorting
+
+    fn sort_key(&self) -> (SortKey, bool) {
+        let st = self.state.borrow();
+        let col = st.settings.sort_col;
+        (if col < 0 { SortKey::Relevance } else { SortKey::from_column(col as usize) }, st.settings.sort_desc)
+    }
+
+    /// A click on a column header sorts by it; a second click reverses the
+    /// order, and a third goes back to best match first.
+    fn on_column_click(&self, col: usize) {
+        let key = SortKey::from_column(col);
+        if key == SortKey::Relevance {
+            return;
+        }
+        {
+            let mut st = self.state.borrow_mut();
+            let s = &mut st.settings;
+            if s.sort_col == col as i32 {
+                if s.sort_desc {
+                    s.sort_col = -1;
+                    s.sort_desc = false;
+                } else {
+                    s.sort_desc = true;
+                }
+            } else {
+                s.sort_col = col as i32;
+                s.sort_desc = false;
+            }
+        }
+        self.show_sort_arrow();
+        if self.content_mode() || self.state.borrow().content.is_some() {
+            self.sort_rows_in_place();
+            self.clear_selection();
+            self.refresh_list();
+        } else {
+            self.search_names();
+        }
+    }
+
+    fn show_sort_arrow(&self) {
+        let (key, desc) = self.sort_key();
+        for c in 0..COLUMNS.len() {
+            let arrow = match key.column() {
+                Some(k) if k == c => {
+                    Some(if desc { nwg::ListViewColumnSortArrow::Down } else { nwg::ListViewColumnSortArrow::Up })
+                }
+                _ => None,
+            };
+            self.list.set_column_sort_arrow(c, arrow);
+        }
+    }
+
+    /// Sorts the current rows (used for document-search results).
+    fn sort_rows_in_place(&self) {
+        let (key, desc) = self.sort_key();
+        let mut st = self.state.borrow_mut();
+        let mut hits: Vec<u32> = st.rows.iter().map(|r| r.entry).collect();
+        if key == SortKey::Relevance {
+            // Document hits have no score; path order is the neutral order.
+            hits.sort_unstable();
+        } else {
+            search::sort_hits(&st.rows_index.entries, &mut hits, key, desc);
+        }
+        let mut snippets: HashMap<u32, Option<String>> = st.rows.drain(..).map(|r| (r.entry, r.snippet)).collect();
+        st.rows = hits.into_iter().map(|entry| Row { entry, snippet: snippets.remove(&entry).flatten() }).collect();
+    }
+
+    // ---------------------------------------------------------------- rename & delete
+
+    /// Results of a running document search point into the index, so the
+    /// index must not change under them.
+    fn index_busy(&self) -> bool {
+        let st = self.state.borrow();
+        let msg = if st.content.is_some() {
+            "انتظر انتهاء البحث داخل المستندات أو أوقفه أولاً."
+        } else if st.scan.is_some() || st.loading.is_some() {
+            "انتظر حتى تكتمل الفهرسة."
+        } else {
+            return false;
+        };
+        drop(st);
+        self.set_status(msg);
+        true
+    }
+
+    fn start_rename(&self) {
+        let Some(row) = self.list.selected_item() else {
+            self.set_status("اختر ملفاً من القائمة أولاً.");
+            return;
+        };
+        if self.index_busy() {
+            return;
+        }
+        if let Some(h) = self.list.handle.hwnd() {
+            self.list.set_focus();
+            unsafe { SendMessageW(h, winapi::um::commctrl::LVM_EDITLABELW, row, 0) };
+        }
+    }
+
+    /// Starts an in-place rename. Returns true to refuse it.
+    fn begin_rename(&self, row: usize) -> bool {
+        if self.index_busy() {
+            return true;
+        }
+        let path = {
+            let st = self.state.borrow();
+            st.rows.get(row).and_then(|r| st.rows_index.entries.get(r.entry as usize)).map(|e| e.path.to_string())
+        };
+        let refuse = path.is_none();
+        *self.renaming_path.borrow_mut() = path;
+        self.renaming.set(!refuse);
+        refuse
+    }
+
+    /// Finishes an in-place rename. Returns true to accept the new label.
+    fn finish_rename(&self, new_name: Option<String>) -> bool {
+        self.renaming.set(false);
+        let old = self.renaming_path.borrow_mut().take();
+        let Some(new_name) = new_name.map(|n| n.trim().to_string()) else { return false };
+        let Some(old) = old else { return false };
+        let old_name = old.rsplit('\\').next().unwrap_or(&old).to_string();
+        if new_name.is_empty() || new_name == old_name {
+            return false;
+        }
+        if new_name.contains(['\\', '/', ':', '*', '?', '"', '<', '>', '|']) {
+            self.set_status("لا يمكن أن يحتوي الاسم على أي من هذه الرموز: \\ / : * ? \" < > |");
+            return false;
+        }
+        // Windows drops a trailing dot or space and reserves device names.
+        let stem = new_name.split('.').next().unwrap_or("").trim_end().to_ascii_uppercase();
+        let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+            || (stem.len() == 4
+                && (stem.starts_with("COM") || stem.starts_with("LPT"))
+                && stem.as_bytes()[3].is_ascii_digit());
+        if new_name.ends_with(['.', ' ']) || reserved {
+            self.set_status("هذا الاسم غير مسموح في ويندوز.");
+            return false;
+        }
+        let new = match old.rfind('\\') {
+            Some(i) => format!("{}\\{new_name}", &old[..i]),
+            None => new_name.clone(),
+        };
+        // fs::rename replaces an existing file, so check first. Changing only
+        // the letter case of the same file is fine.
+        if std::path::Path::new(&new).exists() && new.to_lowercase() != old.to_lowercase() {
+            nwg::modal_info_message(&self.window, TITLE, &format!("يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد."));
+            return false;
+        }
+        if let Err(e) = std::fs::rename(&old, &new) {
+            nwg::modal_error_message(&self.window, "خطأ", &format!("تعذر تغيير الاسم:\n{e}"));
+            return false;
+        }
+        self.update_index(|idx| {
+            idx.rename_path(&old, &new);
+        });
+        {
+            let mut st = self.state.borrow_mut();
+            st.history.rename_path(&old, &new);
+            st.history.save();
+        }
+        self.set_status(&format!("تم تغيير الاسم إلى «{new_name}»."));
+        // The list is refreshed from the updated index; the edit box text is not needed.
+        false
+    }
+
+    fn delete_selected(&self) {
+        let Some(p) = self.selected_path() else {
+            self.set_status("اختر ملفاً من القائمة أولاً.");
+            return;
+        };
+        if self.index_busy() {
+            return;
+        }
+        if !shell::recycle(&p) {
+            self.set_status("لم يُحذف الملف.");
+            return;
+        }
+        self.update_index(|idx| {
+            idx.remove_path(&p);
+        });
+        {
+            let mut st = self.state.borrow_mut();
+            st.history.forget_path(&p);
+            st.history.save();
+        }
+        self.set_status("نُقل الملف إلى سلة المحذوفات.");
+    }
+
+    /// Applies a change to the index, saves it in the background and shows
+    /// the results again.
+    fn update_index(&self, change: impl FnOnce(&mut Index)) {
+        let mut st = self.state.borrow_mut();
+        // Paths of the current rows, to find them again after the change.
+        let row_paths: Vec<(String, Option<String>)> = st
+            .rows
+            .iter()
+            .filter_map(|r| st.rows_index.entries.get(r.entry as usize).map(|e| (e.path.to_string(), r.snippet.clone())))
+            .collect();
+        st.rows_index = Arc::default();
+        // A save still waiting holds the index too; it is about to be stale.
+        PENDING_SAVE.lock().map(|mut p| p.take()).ok();
+        let mut idx = std::mem::take(&mut st.index);
+        let inner = Arc::get_mut(&mut idx);
+        let mut owned = match inner {
+            Some(i) => std::mem::take(i),
+            None => Index { entries: idx.entries.clone(), roots: idx.roots.clone(), built_at: idx.built_at },
+        };
+        change(&mut owned);
+        let idx = Arc::new(owned);
+        st.index = idx.clone();
+        st.rows_index = idx.clone();
+        st.rows = row_paths
+            .into_iter()
+            .filter_map(|(p, snippet)| idx.find(&p).map(|i| Row { entry: i as u32, snippet }))
+            .collect();
+        drop(st);
+        // Several quick edits only need the last state written; on_close
+        // writes it at once if it is still waiting.
+        if let Ok(mut p) = PENDING_SAVE.lock() {
+            *p = Some(idx);
+        }
+        std::thread::spawn(|| {
+            background_priority();
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            flush_index_save();
+        });
+        self.clear_selection();
+        self.refresh_list();
+        if !self.content_mode() {
+            self.search_names();
+        }
+    }
+
+    // ---------------------------------------------------------------- history
+
+    fn show_history_menu(&self) {
+        let st = self.state.borrow();
+        let mut hm = HistoryMenu::default();
+        let w = &self.window;
+        if nwg::Menu::builder().popup(true).parent(w).build(&mut hm.menu).is_err() {
+            return;
+        }
+        let add = |hm: &mut HistoryMenu, text: &str, action: HistoryAction, disabled: bool| {
+            let mut item = nwg::MenuItem::default();
+            if nwg::MenuItem::builder().text(text).disabled(disabled).parent(&hm.menu).build(&mut item).is_ok() {
+                hm.items.push((item, action));
+            }
+        };
+        let sep = |hm: &mut HistoryMenu| {
+            let mut s = nwg::MenuSeparator::default();
+            if nwg::MenuSeparator::builder().parent(&hm.menu).build(&mut s).is_ok() {
+                hm.separators.push(s);
+            }
+        };
+        if !st.history.saved.is_empty() {
+            add(&mut hm, "البحوث المحفوظة", HistoryAction::Nothing, true);
+            for s in &st.history.saved {
+                add(&mut hm, &format!("★  {}", s.name), HistoryAction::Saved(s.clone()), false);
+            }
+            sep(&mut hm);
+        }
+        if st.history.recent.is_empty() {
+            add(&mut hm, "لا توجد عمليات بحث سابقة بعد", HistoryAction::Nothing, true);
+        } else {
+            add(&mut hm, "عمليات البحث الأخيرة", HistoryAction::Nothing, true);
+            for q in st.history.recent.iter().take(15) {
+                add(&mut hm, q, HistoryAction::Recent(q.clone()), false);
+            }
+        }
+        sep(&mut hm);
+        let has_query = !self.query.text().trim().is_empty();
+        add(&mut hm, "حفظ البحث الحالي", HistoryAction::SaveCurrent, !has_query);
+        add(&mut hm, "مسح عمليات البحث الأخيرة", HistoryAction::ClearRecent, st.history.recent.is_empty());
+        add(&mut hm, "حذف كل البحوث المحفوظة", HistoryAction::ClearSaved, st.history.saved.is_empty());
+        drop(st);
+        *self.history_menu.borrow_mut() = hm;
+        self.show_menu(&self.history_menu.borrow().menu);
+    }
+
+    /// Runs the history-menu item behind `handle`; false if it is not one.
+    fn on_history_item(&self, handle: nwg::ControlHandle) -> bool {
+        let action = {
+            let hm = self.history_menu.borrow();
+            let Some((_, a)) = hm.items.iter().find(|(i, _)| i.handle == handle) else { return false };
+            match a {
+                HistoryAction::Saved(s) => HistoryAction::Saved(s.clone()),
+                HistoryAction::Recent(q) => HistoryAction::Recent(q.clone()),
+                HistoryAction::SaveCurrent => HistoryAction::SaveCurrent,
+                HistoryAction::ClearRecent => HistoryAction::ClearRecent,
+                HistoryAction::ClearSaved => HistoryAction::ClearSaved,
+                HistoryAction::Nothing => HistoryAction::Nothing,
+            }
+        };
+        match action {
+            HistoryAction::Saved(s) => self.apply_saved(&s),
+            HistoryAction::Recent(q) => {
+                self.query.set_text(&q);
+                self.focus_query();
+                self.on_search();
+            }
+            HistoryAction::SaveCurrent => {
+                let text = self.query.text().trim().to_string();
+                let mut st = self.state.borrow_mut();
+                let saved = SavedSearch {
+                    name: text.clone(),
+                    query: text.clone(),
+                    kind: self.kind(),
+                    scope: st.scope.clone(),
+                    content: self.content_mode(),
+                };
+                st.history.add_saved(saved);
+                st.history.save();
+                drop(st);
+                self.set_status(&format!("حُفظ البحث «{text}». تجده في قائمة «السجل»."));
+            }
+            HistoryAction::ClearRecent => {
+                let mut st = self.state.borrow_mut();
+                st.history.recent.clear();
+                st.history.save();
+            }
+            HistoryAction::ClearSaved => {
+                let mut st = self.state.borrow_mut();
+                st.history.saved.clear();
+                st.history.save();
+            }
+            HistoryAction::Nothing => {}
+        }
+        true
+    }
+
+    fn apply_saved(&self, s: &SavedSearch) {
+        self.kind_combo.set_selection(Some(s.kind.min(search::KINDS.len() - 1)));
+        self.state.borrow_mut().settings.kind = self.kind();
+        self.content_chk.set_check_state(if s.content {
+            nwg::CheckBoxState::Checked
+        } else {
+            nwg::CheckBoxState::Unchecked
+        });
+        self.scope_input.set_text(if s.scope.is_empty() { "كل الأقراص" } else { &s.scope });
+        self.state.borrow_mut().scope = s.scope.clone();
+        self.query.set_text(&s.query);
+        self.focus_query();
+        self.on_search();
+    }
+
+    // ---------------------------------------------------------------- hotkey
+
+    fn register_hotkey(&self) {
+        use winapi::um::winuser::{MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, RegisterHotKey};
+        let Some(h) = self.window.handle.hwnd() else { return };
+        let ok = unsafe { RegisterHotKey(h, HOTKEY_ID, (MOD_CONTROL | MOD_ALT | MOD_NOREPEAT) as u32, 'F' as u32) } != 0;
+        if !ok {
+            self.menu_hotkey.set_enabled(false);
+            log("hotkey Ctrl+Alt+F is taken by another program");
+        }
+    }
+
+    /// The global hotkey shows the window, or hides it if it is already in front.
+    fn on_hotkey(&self) {
+        use winapi::um::winuser::GetForegroundWindow;
+        let front = self.window.handle.hwnd().is_some_and(|h| unsafe { GetForegroundWindow() } == h);
+        if front && self.window.visible() {
+            self.hide_to_tray();
+        } else {
+            self.show_window();
+        }
     }
 
     /// Saves the result list as a CSV file that Excel opens with Arabic intact.
@@ -736,6 +1364,20 @@ impl App {
         i
     }
 
+    /// Byte ranges of the query's matches in a row's file name.
+    fn match_ranges(&self, row: usize) -> Vec<(usize, usize)> {
+        let Ok(st) = self.state.try_borrow() else { return Vec::new() };
+        let Some(q) = &st.shown_query else { return Vec::new() };
+        let Some(e) = st.rows.get(row).and_then(|r| st.rows_index.entries.get(r.entry as usize)) else {
+            return Vec::new();
+        };
+        search::match_ranges(e.name(), q)
+    }
+
+    fn custom_draw(&self, l: LPARAM) -> Option<isize> {
+        crate::draw::handle_custom_draw(l, |row| self.match_ranges(row), |row| self.cell_text(row, COL_NAME))
+    }
+
     fn set_status(&self, text: &str) {
         self.status.set_text(0, text);
     }
@@ -747,8 +1389,12 @@ impl App {
         if (ctrl && key == 'F' as u32) || key == VK_F3 as u32 {
             self.focus_query();
         } else if handle == self.query.handle && key == VK_DOWN as u32 {
-            // Down arrow moves from the search box into the results.
+            // Down arrow moves from the search box into the results, or
+            // opens the search history when there are none.
             if self.state.borrow().rows.is_empty() {
+                if self.query.text().trim().is_empty() {
+                    self.show_history_menu();
+                }
                 return;
             }
             if self.list.selected_item().is_none() {
@@ -758,26 +1404,44 @@ impl App {
         } else if handle == self.list.handle && key == VK_UP as u32 && self.list.selected_item() == Some(0) {
             self.focus_query();
         } else if handle == self.list.handle && ctrl && key == 'C' as u32 {
-            self.copy_path();
+            if unsafe { GetKeyState(winapi::um::winuser::VK_SHIFT) } < 0 {
+                self.copy_path();
+            } else {
+                self.copy_file();
+            }
+        } else if handle == self.list.handle && key == winapi::um::winuser::VK_F2 as u32 {
+            self.start_rename();
+        } else if handle == self.list.handle && key == winapi::um::winuser::VK_DELETE as u32 {
+            self.delete_selected();
+        } else if ctrl && key == 'H' as u32 {
+            self.show_history_menu();
         }
     }
 
     fn on_enter(&self) {
+        if self.renaming.get() {
+            return;
+        }
         let ctrl = unsafe { GetKeyState(VK_CONTROL) } < 0;
         if ctrl {
             self.open_folder();
         } else if self.list.focus() {
             self.open_selected();
         } else {
+            self.remember_query();
             self.on_search();
         }
     }
 
     /// Esc clears the search box; a second Esc hides the window to the tray.
     fn on_escape(&self) {
+        if self.renaming.get() {
+            return;
+        }
         if self.state.borrow().content.is_some() {
             self.on_stop();
         } else if !self.query.text().is_empty() {
+            self.remember_query();
             self.query.set_text("");
             self.focus_query();
         } else {
@@ -795,6 +1459,7 @@ impl App {
     // ---------------------------------------------------------------- tray & options
 
     fn hide_to_tray(&self) {
+        self.remember_query();
         self.window.set_visible(false);
         if !self.tray_hint_shown.replace(true) {
             self.tray.show(
@@ -846,12 +1511,17 @@ impl App {
     }
 
     fn on_close(&self) {
+        flush_index_save();
+        self.remember_query();
         self.save_settings();
         self.cancel_content();
         if let Some(job) = &self.state.borrow().scan {
             job.progress.cancel.store(true, Ordering::Relaxed);
         }
         self.tray.set_visibility(false);
+        if let Some(h) = self.window.handle.hwnd() {
+            unsafe { winapi::um::winuser::UnregisterHotKey(h, HOTKEY_ID) };
+        }
         nwg::stop_thread_dispatch();
     }
 }
@@ -872,6 +1542,18 @@ fn ltr_path(path: &str) -> String {
         }
     }
     s
+}
+
+/// Reads a NUL-terminated UTF-16 string.
+///
+/// # Safety
+/// `p` must point to a NUL-terminated UTF-16 buffer.
+unsafe fn wide_to_string(p: *const u16) -> String {
+    let mut n = 0;
+    while unsafe { *p.add(n) } != 0 {
+        n += 1;
+    }
+    String::from_utf16_lossy(unsafe { std::slice::from_raw_parts(p, n) })
 }
 
 /// Swaps ASCII digits for Arabic-Indic ones when the user asked for them.
@@ -960,6 +1642,21 @@ mod shell {
             )
         };
         r as isize > 32
+    }
+
+    /// Moves a file or folder to the Recycle Bin, with Windows' own
+    /// confirmation. True if it is gone.
+    pub fn recycle(path: &str) -> bool {
+        use winapi::um::shellapi::{FO_DELETE, FOF_ALLOWUNDO, SHFILEOPSTRUCTW, SHFileOperationW};
+        // The list of paths ends with two NULs.
+        let mut from: Vec<u16> = path.encode_utf16().collect();
+        from.extend([0, 0]);
+        let mut op: SHFILEOPSTRUCTW = unsafe { std::mem::zeroed() };
+        op.wFunc = FO_DELETE as u32;
+        op.pFrom = from.as_ptr();
+        op.fFlags = FOF_ALLOWUNDO;
+        let r = unsafe { SHFileOperationW(&mut op) };
+        r == 0 && op.fAnyOperationsAborted == 0 && !std::path::Path::new(path).exists()
     }
 
     /// Opens Explorer with the file selected.
@@ -1108,6 +1805,7 @@ impl NativeUi<AppUi> for App {
             .focus(true)
             .build(&mut app.query)?;
         nwg::Button::builder().parent(w).font(f).text("بحث").build(&mut app.search_btn)?;
+        nwg::Button::builder().parent(w).font(f).text("السجل").build(&mut app.history_btn)?;
         let kinds: Vec<&'static str> = search::KINDS.iter().map(|(label, _)| *label).collect();
         let kind = settings.kind.min(kinds.len().saturating_sub(1));
         nwg::ComboBox::builder()
@@ -1141,6 +1839,7 @@ impl NativeUi<AppUi> for App {
                     | nwg::ListViewFlags::SINGLE_SELECTION.bits()
                     | nwg::ListViewFlags::ALWAYS_SHOW_SELECTION.bits()
                     | LVS_OWNERDATA
+                    | winapi::um::commctrl::LVS_EDITLABELS
                     | LVS_SHAREIMAGELISTS,
             )
         };
@@ -1193,12 +1892,16 @@ impl NativeUi<AppUi> for App {
             .active(true)
             .build(&mut app.timer)?;
         nwg::Notice::builder().parent(w).build(&mut app.name_notice)?;
+        nwg::Notice::builder().parent(w).build(&mut app.update_notice)?;
         phase("controls");
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.menu)?;
         nwg::MenuItem::builder().text("فتح الملف\tEnter").parent(&app.menu).build(&mut app.menu_open)?;
         nwg::MenuItem::builder().text("فتح المجلد الذي يحتويه\tCtrl+Enter").parent(&app.menu).build(&mut app.menu_folder)?;
-        nwg::MenuItem::builder().text("نسخ المسار\tCtrl+C").parent(&app.menu).build(&mut app.menu_copy)?;
+        nwg::MenuItem::builder().text("نسخ الملف\tCtrl+C").parent(&app.menu).build(&mut app.menu_copy_file)?;
+        nwg::MenuItem::builder().text("نسخ المسار\tCtrl+Shift+C").parent(&app.menu).build(&mut app.menu_copy)?;
         nwg::MenuItem::builder().text("نسخ مسارات كل النتائج").parent(&app.menu).build(&mut app.menu_copy_all)?;
+        nwg::MenuItem::builder().text("تغيير الاسم\tF2").parent(&app.menu).build(&mut app.menu_rename)?;
+        nwg::MenuItem::builder().text("نقل إلى سلة المحذوفات\tDelete").parent(&app.menu).build(&mut app.menu_delete)?;
 
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.options_menu)?;
         nwg::MenuItem::builder()
@@ -1208,6 +1911,14 @@ impl NativeUi<AppUi> for App {
             .build(&mut app.menu_digits)?;
         nwg::MenuItem::builder().text("تصدير النتائج إلى Excel (CSV)").parent(&app.options_menu).build(&mut app.menu_export)?;
         nwg::MenuItem::builder().text("إخفاء إلى شريط المهام\tEsc").parent(&app.options_menu).build(&mut app.menu_hide)?;
+        nwg::MenuItem::builder()
+            .text(&format!("إظهار البرنامج من أي مكان\t{HOTKEY_TEXT}"))
+            .parent(&app.options_menu)
+            .build(&mut app.menu_hotkey)?;
+        nwg::MenuItem::builder()
+            .text(&format!("التحقق من التحديثات (الإصدار {})", env!("CARGO_PKG_VERSION")))
+            .parent(&app.options_menu)
+            .build(&mut app.menu_update)?;
 
         // Tray icon, so a hidden window comes back instantly.
         app.tray_icon.handle = crate::icon::load_icon(true) as _;
@@ -1217,7 +1928,7 @@ impl NativeUi<AppUi> for App {
         nwg::TrayNotification::builder()
             .parent(w)
             .icon(Some(&app.tray_icon))
-            .tip(Some(TITLE))
+            .tip(Some(&format!("{TITLE} ({HOTKEY_TEXT})")))
             .build(&mut app.tray)?;
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.tray_menu)?;
         nwg::MenuItem::builder().text("إظهار بحث سريع").parent(&app.tray_menu).build(&mut app.tray_show)?;
@@ -1225,6 +1936,7 @@ impl NativeUi<AppUi> for App {
 
         phase("tray");
         app.state.get_mut().settings = settings.clone();
+        app.state.get_mut().history = History::load();
         let ui = AppUi { inner: Rc::new(app), handlers: Default::default(), raw_handlers: Default::default() };
 
         // Regular events.
@@ -1246,10 +1958,13 @@ impl NativeUi<AppUi> for App {
                 E::OnKeyPress => app.on_key(handle, data.on_key()),
                 E::OnTimerTick if handle == app.timer => app.on_tick(),
                 E::OnNotice if handle == app.name_notice => app.on_names_found(),
+                E::OnNotice if handle == app.update_notice => app.on_update_event(),
                 E::OnComboxBoxSelection if handle == app.kind_combo => app.on_kind_changed(),
                 E::OnButtonClick => {
                     if handle == app.search_btn {
                         app.on_search();
+                    } else if handle == app.history_btn {
+                        app.show_history_menu();
                     } else if handle == app.content_chk {
                         app.on_query_changed();
                     } else if handle == app.scope_btn {
@@ -1275,10 +1990,12 @@ impl NativeUi<AppUi> for App {
                 E::OnListViewItemActivated if handle == app.list => app.open_selected(),
                 E::OnListViewItemChanged if handle == app.list => app.show_selected_path(),
                 E::OnListViewRightClick if handle == app.list => app.show_menu(&app.menu),
+                E::OnListViewColumnClick if handle == app.list => app.on_column_click(data.on_list_view_item_index().1),
                 E::OnMousePress(nwg::MousePressEvent::MousePressLeftUp) if handle == app.tray => app.show_window(),
                 E::OnContextMenu if handle == app.tray => app.show_menu(&app.tray_menu),
                 E::OnMenuItemSelected => {
-                    if handle == app.menu_open {
+                    if app.on_history_item(handle) {
+                    } else if handle == app.menu_open {
                         app.open_selected();
                     } else if handle == app.menu_folder {
                         app.open_folder();
@@ -1286,6 +2003,16 @@ impl NativeUi<AppUi> for App {
                         app.copy_path();
                     } else if handle == app.menu_copy_all {
                         app.copy_all_paths();
+                    } else if handle == app.menu_copy_file {
+                        app.copy_file();
+                    } else if handle == app.menu_rename {
+                        app.start_rename();
+                    } else if handle == app.menu_delete {
+                        app.delete_selected();
+                    } else if handle == app.menu_hotkey {
+                        app.set_status(&format!("اضغط {HOTKEY_TEXT} من أي برنامج لإظهار بحث سريع أو إخفائه."));
+                    } else if handle == app.menu_update {
+                        app.check_for_update(true);
                     } else if handle == app.menu_digits {
                         app.toggle_digits();
                     } else if handle == app.menu_export {
@@ -1306,15 +2033,39 @@ impl NativeUi<AppUi> for App {
         // Virtual list: answer LVN_GETDISPINFO with the text and icon of each cell.
         let weak = Rc::downgrade(&ui.inner);
         let list_hwnd = ui.list.handle.hwnd().unwrap_or(std::ptr::null_mut());
-        let raw = nwg::bind_raw_event_handler(&ui.window.handle, 0x1_0001, move |_hwnd: HWND, msg: UINT, _w: WPARAM, l: LPARAM| {
+        let raw = nwg::bind_raw_event_handler(&ui.window.handle, 0x1_0001, move |_hwnd: HWND, msg: UINT, w: WPARAM, l: LPARAM| {
+            if msg == winapi::um::winuser::WM_HOTKEY && w as i32 == HOTKEY_ID {
+                weak.upgrade()?.on_hotkey();
+                return Some(0);
+            }
             if msg != WM_NOTIFY {
                 return None;
             }
             let hdr = unsafe { &*(l as *const NMHDR) };
-            if hdr.hwndFrom != list_hwnd || hdr.code != LVN_GETDISPINFOW {
+            if hdr.hwndFrom != list_hwnd {
                 return None;
             }
             let app = weak.upgrade()?;
+            use winapi::um::commctrl::{LVN_BEGINDRAG, LVN_BEGINLABELEDITW, LVN_ENDLABELEDITW, NM_CUSTOMDRAW, NMLISTVIEW};
+            match hdr.code {
+                LVN_GETDISPINFOW => {}
+                LVN_BEGINLABELEDITW => {
+                    let info = unsafe { &*(l as *const NMLVDISPINFOW) };
+                    return Some(app.begin_rename(info.item.iItem as usize) as isize);
+                }
+                LVN_ENDLABELEDITW => {
+                    let info = unsafe { &*(l as *const NMLVDISPINFOW) };
+                    let text = (!info.item.pszText.is_null()).then(|| unsafe { wide_to_string(info.item.pszText) });
+                    return Some(app.finish_rename(text) as isize);
+                }
+                LVN_BEGINDRAG => {
+                    let nm = unsafe { &*(l as *const NMLISTVIEW) };
+                    app.drag_row(nm.iItem as usize);
+                    return Some(0);
+                }
+                NM_CUSTOMDRAW => return app.custom_draw(l),
+                _ => return None,
+            }
             let info = unsafe { &mut *(l as *mut NMLVDISPINFOW) };
             let item = &mut info.item;
             if item.mask & LVIF_TEXT != 0 && !item.pszText.is_null() && item.cchTextMax > 0 {
@@ -1335,6 +2086,8 @@ impl NativeUi<AppUi> for App {
         })?;
         ui.raw_handlers.borrow_mut().push(raw);
 
+        ui.register_hotkey();
+        ui.show_sort_arrow();
         phase("events");
         ui.layout();
         phase("layout");
@@ -1458,7 +2211,7 @@ fn activate_running_copy() -> bool {
     use winapi::um::synchapi::CreateMutexW;
     use winapi::um::winuser::{FindWindowW, SW_SHOW};
 
-    let name = shell::wide("Local\\BahthSari.SingleInstance");
+    let name = shell::wide(crate::update::SINGLE_INSTANCE_MUTEX);
     // The mutex lives as long as this process; Windows frees it on exit.
     let mutex = unsafe { CreateMutexW(std::ptr::null_mut(), 0, name.as_ptr()) };
     if mutex.is_null() || unsafe { GetLastError() } != ERROR_ALREADY_EXISTS {
@@ -1484,10 +2237,29 @@ fn activate_running_copy() -> bool {
     true
 }
 
+/// The edited index waiting to be written to disk (see `update_index`).
+static PENDING_SAVE: Mutex<Option<Arc<Index>>> = Mutex::new(None);
+
+fn flush_index_save() {
+    let idx = PENDING_SAVE.lock().ok().and_then(|mut p| p.take());
+    if let Some(idx) = idx {
+        let _ = idx.save(&index::cache_path());
+    }
+}
+
 pub fn run() {
+    if std::env::args().any(|a| a == "--updated") {
+        // The previous version is still closing; let it go first. A big
+        // index can take a while to free, so wait up to a minute.
+        for _ in 0..6 {
+            crate::update::wait_for_previous_instance_exit();
+        }
+    }
     if activate_running_copy() {
         return;
     }
+    // Only the copy that keeps running tidies up after an update.
+    crate::update::cleanup_old();
     phase("single-instance");
     unsafe {
         winapi::um::objbase::CoInitialize(std::ptr::null_mut());

@@ -80,9 +80,7 @@ fn skip_dir(name: &str) -> bool {
         || name.eq_ignore_ascii_case("$Recycle.Bin")
         || name.eq_ignore_ascii_case("$WinREAgent")
         || name.eq_ignore_ascii_case("WinSxS")
-        || [".git", ".svn", ".hg", "node_modules", "__pycache__"]
-            .iter()
-            .any(|d| name.eq_ignore_ascii_case(d))
+        || [".git", ".svn", ".hg", "node_modules", "__pycache__"].iter().any(|d| name.eq_ignore_ascii_case(d))
 }
 
 impl Index {
@@ -108,10 +106,7 @@ impl Index {
             return None;
         }
         let mut index = cache.index;
-        index
-            .entries
-            .par_iter_mut()
-            .for_each(|e| e.norm_name = normalize(file_name(&e.path)).into());
+        index.entries.par_iter_mut().for_each(|e| e.norm_name = normalize(file_name(&e.path)).into());
         Some(index)
     }
 
@@ -119,6 +114,10 @@ impl Index {
         if let Some(dir) = path.parent() {
             fs::create_dir_all(dir)?;
         }
+        // Saves can come from several threads (scan end, rename, delete);
+        // they share one temp file, so they take turns.
+        static SAVE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _turn = SAVE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         // Write to a temp file first so a crash never leaves a broken cache.
         let tmp = path.with_extension("tmp");
         {
@@ -132,6 +131,87 @@ impl Index {
                 .map_err(std::io::Error::other)?;
         }
         fs::rename(tmp, path)
+    }
+
+    /// Position of the entry with exactly this path (binary search).
+    pub fn find(&self, path: &str) -> Option<usize> {
+        self.entries.binary_search_by(|e| (*e.path).cmp(path)).ok()
+    }
+
+    /// Index ranges of `path` itself and everything below it. Descendants
+    /// start with `path` plus a separator, so in byte order they form one run
+    /// per separator; siblings like `C:\ab` or `C:\a b` fall outside it.
+    fn subtree(&self, path: &str) -> Vec<std::ops::Range<usize>> {
+        // A path ending in a separator (a drive root) is its own prefix.
+        let (mut ranges, prefixes) = if path.ends_with(['\\', '/']) {
+            (Vec::new(), vec![path.to_string()])
+        } else {
+            (self.find(path).map(|i| i..i + 1).into_iter().collect(), vec![format!("{path}\\"), format!("{path}/")])
+        };
+        for p in prefixes {
+            let start = self.entries.partition_point(|e| *e.path < *p);
+            let len = self.entries[start..].partition_point(|e| e.path.starts_with(&p));
+            if len > 0 {
+                ranges.push(start..start + len);
+            }
+        }
+        ranges.sort_unstable_by_key(|r| r.start);
+        ranges
+    }
+
+    /// Removes `path` and, for a folder, everything inside it. Returns how
+    /// many entries were removed. Entry indices held elsewhere become stale.
+    pub fn remove_path(&mut self, path: &str) -> usize {
+        let ranges = self.subtree(path);
+        let mut removed = 0;
+        for r in ranges.into_iter().rev() {
+            removed += r.len();
+            self.entries.drain(r);
+        }
+        removed
+    }
+
+    /// Renames `old` to `new`, moving everything inside it along for a
+    /// folder, and keeps the entries sorted. An entry already at `new` is
+    /// replaced. Returns false when `old` is not in the index. Entry indices
+    /// held elsewhere become stale.
+    pub fn rename_path(&mut self, old: &str, new: &str) -> bool {
+        if old == new {
+            return self.find(old).is_some();
+        }
+        let ranges = self.subtree(old);
+        if ranges.is_empty() {
+            return false;
+        }
+        let mut moved = Vec::with_capacity(ranges.iter().map(|r| r.len()).sum());
+        for r in ranges.into_iter().rev() {
+            moved.extend(self.entries.drain(r));
+        }
+        for e in &mut moved {
+            let renamed_self = e.path.len() == old.len();
+            e.path = format!("{new}{}", &e.path[old.len()..]).into();
+            if renamed_self {
+                e.norm_name = normalize(e.name()).into();
+            }
+        }
+        self.remove_path(new);
+        moved.par_sort_unstable_by(|a, b| a.path.cmp(&b.path));
+        // Merge the two sorted runs in one pass instead of re-sorting everything.
+        let rest = std::mem::take(&mut self.entries);
+        let mut merged = Vec::with_capacity(rest.len() + moved.len());
+        let mut a = rest.into_iter().peekable();
+        let mut b = moved.into_iter().peekable();
+        loop {
+            let take_a = match (a.peek(), b.peek()) {
+                (Some(x), Some(y)) => x.path <= y.path,
+                (Some(_), None) => true,
+                (None, Some(_)) => false,
+                (None, None) => break,
+            };
+            merged.extend(if take_a { a.next() } else { b.next() });
+        }
+        self.entries = merged;
+        true
     }
 }
 
@@ -154,20 +234,11 @@ fn walk<'s>(s: &rayon::Scope<'s>, dir: PathBuf, out: &'s Mutex<Vec<Entry>>, prog
         let (size, mtime) = match ent.metadata() {
             Ok(m) => (
                 if ft.is_dir() { 0 } else { m.len() },
-                m.modified()
-                    .ok()
-                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                    .map_or(0, |d| d.as_secs() as i64),
+                m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs() as i64),
             ),
             Err(_) => (0, 0),
         };
-        local.push(Entry {
-            path: path_str.into(),
-            size,
-            mtime,
-            is_dir: ft.is_dir(),
-            norm_name: Box::default(),
-        });
+        local.push(Entry { path: path_str.into(), size, mtime, is_dir: ft.is_dir(), norm_name: Box::default() });
         if ft.is_dir() && !ent.file_name().to_str().is_some_and(skip_dir) {
             s.spawn(move |s| walk(s, path, out, progress));
         }
@@ -179,9 +250,7 @@ fn walk<'s>(s: &rayon::Scope<'s>, dir: PathBuf, out: &'s Mutex<Vec<Entry>>, prog
 }
 
 pub fn now_secs() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs() as i64)
+    std::time::SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)
 }
 
 /// Where the index cache lives: `%LOCALAPPDATA%\BahthSari\index.bin`.
@@ -248,5 +317,85 @@ mod tests {
         assert_eq!(loaded.entries.len(), 4);
         assert!(loaded.entries.iter().any(|e| &*e.norm_name == "تقرير المبيعات.txt"));
         fs::remove_dir_all(&root).unwrap();
+    }
+
+    fn index_of(paths: &[&str]) -> Index {
+        let mut entries: Vec<Entry> = paths
+            .iter()
+            .map(|p| Entry {
+                path: (*p).into(),
+                size: 1,
+                mtime: 0,
+                is_dir: !p.contains('.'),
+                norm_name: normalize(file_name(p)).into(),
+            })
+            .collect();
+        entries.sort_by(|a, b| a.path.cmp(&b.path));
+        Index { entries, ..Index::default() }
+    }
+
+    fn paths(idx: &Index) -> Vec<&str> {
+        idx.entries.iter().map(|e| &*e.path).collect()
+    }
+
+    const TREE: &[&str] = &[
+        r"C:\a",
+        r"C:\a\x.txt",
+        r"C:\a\sub",
+        r"C:\a\sub\y.txt",
+        r"C:\a b.txt",
+        r"C:\a-c",
+        r"C:\ab",
+        r"C:\ab\z.txt",
+        r"C:\b.txt",
+    ];
+
+    #[test]
+    fn find_by_path() {
+        let idx = index_of(TREE);
+        for p in TREE {
+            assert_eq!(idx.entries[idx.find(p).unwrap()].path.as_ref(), *p);
+        }
+        assert_eq!(idx.find(r"C:\nope"), None);
+    }
+
+    #[test]
+    fn remove_folder_and_file() {
+        let mut idx = index_of(TREE);
+        assert_eq!(idx.remove_path(r"C:\a"), 4);
+        assert_eq!(paths(&idx), vec![r"C:\a b.txt", r"C:\a-c", r"C:\ab", r"C:\ab\z.txt", r"C:\b.txt"]);
+        assert_eq!(idx.remove_path(r"C:\b.txt"), 1);
+        assert_eq!(idx.remove_path(r"C:\b.txt"), 0);
+        assert_eq!(idx.remove_path(r"C:\"), 4);
+        assert!(idx.entries.is_empty());
+        let mut idx = index_of(&["/home/u", "/home/u/f.txt", "/home/u2"]);
+        assert_eq!(idx.remove_path("/home/u"), 2);
+    }
+
+    #[test]
+    fn rename_folder_moves_children() {
+        let mut idx = index_of(TREE);
+        assert!(idx.rename_path(r"C:\a", r"C:\zz"));
+        let mut want: Vec<String> = TREE.iter().map(|p| p.replacen(r"C:\a\", r"C:\zz\", 1)).collect();
+        want[0] = r"C:\zz".into();
+        want.sort();
+        assert_eq!(paths(&idx), want);
+        let e = &idx.entries[idx.find(r"C:\zz").unwrap()];
+        assert_eq!(&*e.norm_name, "zz");
+        assert_eq!(&*idx.entries[idx.find(r"C:\zz\sub\y.txt").unwrap()].norm_name, "y.txt");
+        assert!(!idx.rename_path(r"C:\a", r"C:\q"));
+    }
+
+    #[test]
+    fn rename_file_keeps_order_and_replaces_target() {
+        let mut idx = index_of(TREE);
+        assert!(idx.rename_path(r"C:\b.txt", r"C:\A\تقرير.TXT"));
+        assert!(idx.entries.windows(2).all(|w| w[0].path < w[1].path));
+        assert_eq!(&*idx.entries[idx.find(r"C:\A\تقرير.TXT").unwrap()].norm_name, "تقرير.txt");
+        // Renaming onto an existing path replaces it instead of duplicating it.
+        assert!(idx.rename_path(r"C:\ab\z.txt", r"C:\a\x.txt"));
+        assert_eq!(idx.entries.len(), TREE.len() - 1);
+        assert!(idx.find(r"C:\ab\z.txt").is_none());
+        assert!(idx.entries.windows(2).all(|w| w[0].path < w[1].path));
     }
 }

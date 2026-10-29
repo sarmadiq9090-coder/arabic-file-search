@@ -15,11 +15,16 @@ pub struct Settings {
     pub arabic_digits: bool,
     /// Selected entry of the file-type filter.
     pub kind: usize,
+    /// Column the results are sorted by, or -1 for best match first.
+    pub sort_col: i32,
+    pub sort_desc: bool,
+    /// When the program last looked for a new version (seconds since 1970).
+    pub update_check: u64,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0 }
+        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0 }
     }
 }
 
@@ -36,6 +41,9 @@ impl Settings {
                 "columns" => s.columns = value.split(',').filter_map(|w| w.trim().parse().ok()).collect(),
                 "arabic_digits" => s.arabic_digits = value == "1",
                 "kind" => s.kind = value.parse().unwrap_or(0),
+                "sort_col" => s.sort_col = value.parse().unwrap_or(-1).clamp(-1, 3),
+                "sort_desc" => s.sort_desc = value == "1",
+                "update_check" => s.update_check = value.parse().unwrap_or(0),
                 _ => {}
             }
         }
@@ -45,13 +53,16 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let cols: Vec<String> = self.columns.iter().map(i32::to_string).collect();
         format!(
-            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\n",
+            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\n",
             self.width,
             self.height,
             self.maximized as u8,
             cols.join(","),
             self.arabic_digits as u8,
-            self.kind
+            self.kind,
+            self.sort_col,
+            self.sort_desc as u8,
+            self.update_check
         )
     }
 
@@ -79,7 +90,7 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3 };
+        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000 };
         assert_eq!(Settings::parse(&s.to_text()), s);
         assert_eq!(Settings::parse("garbage\nwidth=abc"), Settings::default());
     }

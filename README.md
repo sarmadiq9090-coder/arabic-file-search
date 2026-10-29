@@ -4,7 +4,7 @@
 
 # بحث سريع — برنامج بحث عن الملفات لويندوز
 
-**الإصدار الحالي: 0.2.2** · [التحميل](../../releases/latest) · [سجل التغييرات](CHANGELOG.md)
+**الإصدار الحالي: 0.3.0** · [التحميل](../../releases/latest) · [سجل التغييرات](CHANGELOG.md)
 
 برنامج مفتوح المصدر مكتوب بلغة **Rust** للبحث السريع عن الملفات على جهازك، يدعم **اللغة العربية بالكامل**، ويبحث **داخل المستندات** أيضاً.
 
@@ -12,7 +12,16 @@
 
 - **بحث فوري بالاسم**: يفهرس كل الأقراص مرة واحدة ويحفظ الفهرس، ثم تظهر النتائج أثناء الكتابة (ملي ثوانٍ حتى مع ملايين الملفات).
 - **دعم كامل للعربية**: واجهة من اليمين لليسار بخط Segoe UI، والبحث يتجاهل الفروق بين (أ إ آ ا)، (ة ه)، (ى ي)، والتشكيل والتطويل، والأرقام العربية (٠١٢٣).
-- **البحث داخل المستندات**: txt و docx و pptx و xlsx و xls و pdf و odt و ods و rtf و doc وملفات النصوص البرمجية وغيرها. يُظهر مقتطفاً من النص المطابق.
+- **البحث داخل المستندات**: txt و docx و pptx و xlsx و xls و pdf و odt و ods و rtf و doc، ورسائل البريد eml وmsg (Outlook)، وكتب epub، وملفات النصوص البرمجية وغيرها. يُظهر مقتطفاً من النص المطابق.
+- **إصلاح العربية المعكوسة في PDF**: الأسطر المخزّنة بترتيب بصري معكوس («يف» بدل «في») تُكتشف وتُقلب فتصبح قابلة للبحث.
+- **اختصار عام Ctrl+Alt+F**: يُظهر البرنامج من أي مكان ومربع البحث جاهز، ويُخفيه إذا كان ظاهراً.
+- **تلوين الجزء المطابق**: خط تحت الحروف المطابقة في اسم كل نتيجة، حتى مع التوحيد العربي (أحمد تطابق احمد).
+- **ترتيب النتائج** بالنقر على عنوان العمود (الاسم، المسار، الحجم، التاريخ): نقرة تصاعدي، ثانية تنازلي، ثالثة تعود لأفضل تطابق. ويُحفظ آخر ترتيب.
+- **سجل البحث والبحوث المحفوظة**: زر «السجل» (أو Ctrl+H، أو السهم للأسفل في مربع بحث فارغ) يعرض آخر عمليات البحث، ويحفظ البحث الحالي باسم لتشغيله بنقرة.
+- **الملفات الأكثر فتحاً أولاً**: ما تفتحه كثيراً أو مؤخراً يظهر في أعلى النتائج.
+- **إعادة التسمية بـ F2 والحذف بـ Delete** (إلى سلة المحذوفات)، مع تحديث الفهرس فوراً.
+- **سحب الملفات وإفلاتها** من القائمة إلى واتساب أو البريد أو Word أو المستكشف، وCtrl+C ينسخ الملف نفسه للصقه في أي مكان.
+- **تحديث تلقائي**: يتحقق البرنامج مرة يومياً من وجود إصدار أحدث على GitHub، ويعرض تثبيته بنقرة ثم يعيد التشغيل.
 - **المسار الكامل** لكل ملف، مع الحجم وتاريخ التعديل.
 - **فتح الملف** بنقرة مزدوجة أو Enter، و**فتح المجلد** مع تحديد الملف، و**نسخ المسار**، وقائمة بالزر الأيمن.
 - **تحديد نطاق البحث**: كل الأقراص أو مجلد معيّن.
@@ -22,7 +31,7 @@
 - **تصدير النتائج** إلى CSV يفتحه Excel بالعربية، ونسخ مسارات كل النتائج.
 - **أيقونات أنواع الملفات** في القائمة، وتواريخ نسبية («اليوم»، «أمس»، «قبل 5 دقائق»)، وخيار الأرقام العربية.
 - **فتح فوري**: تظهر النافذة قبل اكتمال تحميل الفهرس، ونسخة واحدة فقط من البرنامج، وEsc يخفيه إلى شريط المهام.
-- **لوحة المفاتيح**: السهم للأسفل ينقل إلى النتائج، Ctrl+Enter يفتح المجلد، Ctrl+C ينسخ المسار، Ctrl+F يعود لمربع البحث، Esc يمسح البحث.
+- **لوحة المفاتيح**: السهم للأسفل ينقل إلى النتائج، Ctrl+Enter يفتح المجلد، Ctrl+C ينسخ الملف، Ctrl+Shift+C ينسخ المسار، F2 لإعادة التسمية، Delete للحذف، Ctrl+H للسجل، Ctrl+F يعود لمربع البحث، Esc يمسح البحث، Ctrl+Alt+F يُظهر البرنامج من أي مكان.
 
 ## طريقة البحث
 
@@ -61,7 +70,7 @@ cargo build --release
 ## ملاحظات
 
 - ملفات PDF الممسوحة ضوئياً (صور بلا نص) لا يمكن البحث داخلها.
-- بعض ملفات PDF تخزّن العربية بترتيب معكوس فقد لا تُطابق.
+- ملفات PDF التي تخزّن العربية بترتيب معكوس تُصحَّح تلقائياً، لكن النصوص القصيرة جداً بلا كلمات شائعة قد تبقى كما هي.
 - دعم ملفات doc القديمة تقريبي.
 
 ## هيكل الكود
@@ -71,7 +80,11 @@ cargo build --release
 | `src/ui.rs` | الواجهة (Win32 أصلية عبر native-windows-gui، قائمة افتراضية سريعة) |
 | `src/index.rs` | فهرسة الأقراص بالتوازي وحفظ الفهرس |
 | `src/search.rs` | تحليل الاستعلام والبحث بالاسم وداخل المحتوى |
-| `src/extract.rs` | استخراج النص من المستندات |
+| `src/extract.rs` و`src/extract/` | استخراج النص من المستندات، والبريد (eml وmsg)، وepub، وتصحيح ترتيب العربية في PDF |
+| `src/history.rs` | سجل البحث والبحوث المحفوظة والملفات الأكثر فتحاً |
+| `src/draw.rs` | رسم خط تحت الجزء المطابق في القائمة |
+| `src/dragdrop.rs` | السحب والإفلات ونسخ الملفات إلى الحافظة |
+| `src/update.rs` | التحديث التلقائي من إصدارات GitHub |
 | `src/normalize.rs` | توحيد الحروف العربية للمطابقة |
 | `src/layout.rs` | تصحيح الكتابة بلوحة المفاتيح الخطأ (عربي ↔ إنجليزي) |
 | `src/settings.rs` | حفظ تفضيلات المستخدم (حجم النافذة، الأعمدة، الأرقام) |
@@ -87,6 +100,6 @@ MIT — انظر ملف [LICENSE](LICENSE).
 
 ## English
 
-**Bahth Sari'** is a fast, open-source Windows file search tool written in Rust with full Arabic support. It indexes all local drives into a cached in-memory index for instant filename search, and can search inside documents (txt, docx, pptx, xlsx/xls, pdf, odt/ods, rtf, doc, source files). Arabic matching ignores hamza forms, ta marbuta, alef maqsura, diacritics and tatweel. Double-click to open a file, open its folder, or copy its full path.
+**Bahth Sari'** is a fast, open-source Windows file search tool written in Rust with full Arabic support. It indexes all local drives into a cached in-memory index for instant filename search, and can search inside documents (txt, docx, pptx, xlsx/xls, pdf, odt/ods, rtf, doc, eml/msg, epub, source files). Version 0.3 adds a global hotkey (Ctrl+Alt+F), match highlighting, column sorting, search history and saved searches, frequently-opened files first, F2 rename / Delete to Recycle Bin, drag & drop, fixing of reversed Arabic text in PDFs, and automatic updates from GitHub Releases. Arabic matching ignores hamza forms, ta marbuta, alef maqsura, diacritics and tatweel. Double-click to open a file, open its folder, or copy its full path.
 
 Build: `cargo build --release` on Windows (output `target\release\bahth.exe`). License: MIT.

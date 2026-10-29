@@ -99,7 +99,13 @@ fn ext_filter(lower: &str) -> Option<&str> {
 /// bare word too when it starts with an Arabic article that leaves at least 3 letters.
 fn push_alt(alts: &mut Vec<String>, alt: String, exact: bool) {
     let bare = (!exact)
-        .then(|| ARTICLES.iter().find_map(|p| alt.strip_prefix(p)).filter(|rest| rest.chars().count() >= 3).map(str::to_string))
+        .then(|| {
+            ARTICLES
+                .iter()
+                .find_map(|p| alt.strip_prefix(p))
+                .filter(|rest| rest.chars().count() >= 3)
+                .map(str::to_string)
+        })
         .flatten();
     for a in std::iter::once(alt).chain(bare) {
         if !alts.contains(&a) {
@@ -356,6 +362,157 @@ fn snippet_at(text: &str, pos: usize) -> String {
     s
 }
 
+/// How the result list is ordered.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum SortKey {
+    /// The order [`search_names`] returned (best matches first).
+    #[default]
+    Relevance,
+    Name,
+    Path,
+    Size,
+    Date,
+}
+
+impl SortKey {
+    /// The key for a result-list column: 0 name, 1 path, 2 size, 3 date.
+    pub fn from_column(col: usize) -> SortKey {
+        match col {
+            0 => SortKey::Name,
+            1 => SortKey::Path,
+            2 => SortKey::Size,
+            3 => SortKey::Date,
+            _ => SortKey::Relevance,
+        }
+    }
+
+    /// The column this key sorts by, `None` for relevance.
+    pub fn column(self) -> Option<usize> {
+        match self {
+            SortKey::Name => Some(0),
+            SortKey::Path => Some(1),
+            SortKey::Size => Some(2),
+            SortKey::Date => Some(3),
+            SortKey::Relevance => None,
+        }
+    }
+}
+
+/// ASCII-case-insensitive byte order. Non-ASCII letters (Arabic has no
+/// case) compare by their UTF-8 bytes, which keeps the order total and lets
+/// [`sort_key`] stay consistent with it.
+fn cmp_caseless(a: &str, b: &str) -> std::cmp::Ordering {
+    a.bytes().map(|c| c.to_ascii_lowercase()).cmp(b.bytes().map(|c| c.to_ascii_lowercase()))
+}
+
+/// The first 16 bytes of `bytes`, big-endian and zero-padded, so that
+/// comparing keys agrees with comparing the byte strings whenever keys differ.
+fn sort_key(bytes: impl Iterator<Item = u8>) -> u128 {
+    let mut k = [0u8; 16];
+    for (d, s) in k.iter_mut().zip(bytes) {
+        *d = s;
+    }
+    u128::from_be_bytes(k)
+}
+
+/// Sorts `hits` (indices into `entries`) by `key`. Ties keep index order,
+/// which is path order since the index is sorted by path. `Path` ignores
+/// ASCII case; `Size` lists folders before files; `descending` reverses the
+/// whole order (ties stay ascending). [`SortKey::Relevance`] leaves `hits` untouched.
+///
+/// Each hit gets a 16-byte key computed once, so the sort compares plain
+/// integers and only touches the entries again when two keys are equal.
+pub fn sort_hits(entries: &[Entry], hits: &mut [u32], key: SortKey, descending: bool) {
+    use std::cmp::Ordering;
+    let Some(&first) = hits.first() else { return };
+    let e = |i: u32| &entries[i as usize];
+    // Paths share long prefixes ("C:\Users\…"), so path keys start after the common one.
+    let skip = match key {
+        SortKey::Relevance => return,
+        SortKey::Path => {
+            let f = e(first).path.as_bytes();
+            hits.par_iter()
+                .map(|&i| e(i).path.bytes().zip(f).take_while(|(x, y)| x.eq_ignore_ascii_case(y)).count())
+                .min()
+                .unwrap_or(0)
+        }
+        _ => 0,
+    };
+    let key_of = |x: &Entry| -> u128 {
+        match key {
+            SortKey::Name => sort_key(x.norm_name.bytes()),
+            SortKey::Path => sort_key(x.path.as_bytes()[skip..].iter().map(u8::to_ascii_lowercase)),
+            SortKey::Size => ((!x.is_dir as u128) << 64) | x.size as u128,
+            SortKey::Date => (x.mtime as u64 ^ (1 << 63)) as u128,
+            SortKey::Relevance => 0,
+        }
+    };
+    let tie: fn(&Entry, &Entry) -> Ordering = match key {
+        SortKey::Name => |a, b| a.norm_name.cmp(&b.norm_name),
+        SortKey::Path => |a, b| cmp_caseless(&a.path, &b.path),
+        _ => |_, _| Ordering::Equal,
+    };
+    let mut keyed: Vec<(u128, u32)> = hits.par_iter().map(|&i| (key_of(e(i)), i)).collect();
+    keyed.par_sort_unstable_by(|&(ka, a), &(kb, b)| {
+        let o = ka.cmp(&kb).then_with(|| tie(e(a), e(b)));
+        if descending { o.reverse() } else { o }.then(a.cmp(&b))
+    });
+    hits.par_iter_mut().zip(keyed.par_iter()).for_each(|(h, &(_, i))| *h = i);
+}
+
+/// Byte ranges `[start, end)` of `name` (the original, un-normalised name)
+/// covered by any occurrence of any alternative of any term, sorted and
+/// merged. Diacritics right after a match are included so the highlighted
+/// word stays whole. Excluded words are not highlighted.
+pub fn match_ranges(name: &str, q: &Query) -> Vec<(usize, usize)> {
+    let (norm, map) = normalize_with_map(name);
+    let src_end = |last: usize| {
+        let s = map[last] as usize;
+        let char_end = s + name[s..].chars().next().map_or(0, char::len_utf8);
+        // Characters between this one and the next mapped one were dropped by normalisation.
+        let next = map.get(last + 1).map_or(name.len(), |&n| n as usize);
+        char_end.max(next)
+    };
+    let mut ranges = Vec::new();
+    for alt in q.terms.iter().flat_map(|t| &t.alts).filter(|a| !a.is_empty()) {
+        let mut from = 0;
+        while let Some(p) = norm[from..].find(alt.as_str()) {
+            let s = from + p;
+            ranges.push((map[s] as usize, src_end(s + alt.len() - 1)));
+            // Step one char so overlapping occurrences are found too.
+            from = s + norm[s..].chars().next().map_or(1, char::len_utf8);
+        }
+    }
+    ranges.sort_unstable();
+    let mut merged: Vec<(usize, usize)> = Vec::with_capacity(ranges.len());
+    for (s, e) in ranges {
+        match merged.last_mut() {
+            Some(last) if s <= last.1 => last.1 = last.1.max(e),
+            _ => merged.push((s, e)),
+        }
+    }
+    merged
+}
+
+/// Moves the hits listed in `boosted` (entry index, score) to the front,
+/// highest score first, and keeps the rest in their current order.
+pub fn promote(hits: &mut Vec<u32>, boosted: &[(u32, f64)]) {
+    if boosted.is_empty() || hits.is_empty() {
+        return;
+    }
+    let scores: std::collections::HashMap<u32, f64> = boosted.iter().copied().collect();
+    let mut front: Vec<(f64, u32)> = Vec::new();
+    hits.retain(|i| match scores.get(i) {
+        Some(&s) => {
+            front.push((s, *i));
+            false
+        }
+        None => true,
+    });
+    front.sort_unstable_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
+    hits.splice(0..0, front.into_iter().map(|(_, i)| i));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -499,4 +656,131 @@ mod tests {
         assert!(match_text("هذا عقد الإيجار", &q).is_some());
     }
 
+    fn sized(path: &str, is_dir: bool, size: u64, mtime: i64) -> Entry {
+        Entry { size, mtime, ..entry(path, is_dir) }
+    }
+
+    #[test]
+    fn sort_keys_and_columns() {
+        for c in 0..4 {
+            assert_eq!(SortKey::from_column(c).column(), Some(c));
+        }
+        assert_eq!(SortKey::from_column(9), SortKey::Relevance);
+        assert_eq!(SortKey::default().column(), None);
+    }
+
+    #[test]
+    fn sort_matches_plain_comparison() {
+        // Long shared prefixes and names longer than the 16-byte key exercise the tie fallback.
+        let entries: Vec<Entry> = (0..3000u32)
+            .map(|i| {
+                let path = format!(
+                    r"C:\Data\{}\ملف طويل جدا {}{}.TXT",
+                    ["X", "x", "تقارير"][i as usize % 3],
+                    i % 7,
+                    i * 31 % 101
+                );
+                sized(&path, i % 5 == 0, (i % 13) as u64, (i % 17) as i64 - 8)
+            })
+            .collect();
+        let all: Vec<u32> = (0..entries.len() as u32).collect();
+        for key in [SortKey::Name, SortKey::Path, SortKey::Size, SortKey::Date] {
+            for desc in [false, true] {
+                let mut h = all.clone();
+                sort_hits(&entries, &mut h, key, desc);
+                let mut want = all.clone();
+                want.sort_by(|&a, &b| {
+                    let (x, y) = (&entries[a as usize], &entries[b as usize]);
+                    let o = match key {
+                        SortKey::Name => x.norm_name.cmp(&y.norm_name),
+                        SortKey::Path => x.path.to_ascii_lowercase().cmp(&y.path.to_ascii_lowercase()),
+                        SortKey::Size => y.is_dir.cmp(&x.is_dir).then(x.size.cmp(&y.size)),
+                        _ => x.mtime.cmp(&y.mtime),
+                    };
+                    if desc { o.reverse() } else { o }.then(a.cmp(&b))
+                });
+                assert_eq!(h, want, "{key:?} {desc}");
+            }
+        }
+    }
+
+    #[test]
+    fn sorting() {
+        let entries = vec![
+            sized(r"C:\a\Beta.txt", false, 30, 5),
+            sized(r"C:\a\alpha.txt", false, 10, 9),
+            sized(r"C:\b", true, 0, 1),
+            sized(r"c:\A\gamma.txt", false, 10, 2),
+        ];
+        let sorted = |key, desc| {
+            let mut h = vec![0, 1, 2, 3];
+            sort_hits(&entries, &mut h, key, desc);
+            h
+        };
+        assert_eq!(sorted(SortKey::Relevance, true), vec![0, 1, 2, 3]);
+        assert_eq!(sorted(SortKey::Name, false), vec![1, 2, 0, 3]);
+        assert_eq!(sorted(SortKey::Name, true), vec![3, 0, 2, 1]);
+        assert_eq!(sorted(SortKey::Path, false), vec![1, 0, 3, 2]);
+        assert_eq!(sorted(SortKey::Size, false), vec![2, 1, 3, 0]);
+        // Ties stay in index order even when descending.
+        assert_eq!(sorted(SortKey::Size, true), vec![0, 1, 3, 2]);
+        assert_eq!(sorted(SortKey::Date, false), vec![2, 3, 0, 1]);
+    }
+
+    #[test]
+    fn caseless_compare() {
+        use std::cmp::Ordering::*;
+        assert_eq!(cmp_caseless("ABC", "abc"), Equal);
+        assert_eq!(cmp_caseless("abc", "ABD"), Less);
+        assert_eq!(cmp_caseless("ab", "AB c"), Less);
+        assert_eq!(cmp_caseless("a", "ab"), Less);
+        assert_eq!(cmp_caseless("تقرير ب", "تقرير أ"), "ب".cmp("أ"));
+    }
+
+    #[test]
+    #[ignore = "benchmark: cargo test --release -- --ignored --nocapture"]
+    fn sort_two_million() {
+        let entries: Vec<Entry> = (0..2_000_000u32)
+            .map(|i| {
+                let path = format!(r"C:\Users\Saif\Documents\مشروع {}\ملف {}.txt", i % 977, i.wrapping_mul(2654435761));
+                sized(&path, i % 10 == 0, (i as u64 * 7919) % 100_000, (i as i64 * 104729) % 1_000_000)
+            })
+            .collect();
+        for key in [SortKey::Name, SortKey::Path, SortKey::Size, SortKey::Date] {
+            let mut hits: Vec<u32> = (0..entries.len() as u32).collect();
+            let t = std::time::Instant::now();
+            sort_hits(&entries, &mut hits, key, false);
+            println!("{key:?}: {:?}", t.elapsed());
+        }
+    }
+
+    fn highlighted<'a>(name: &'a str, q: &str) -> Vec<&'a str> {
+        match_ranges(name, &Query::parse(q)).into_iter().map(|(s, e)| &name[s..e]).collect()
+    }
+
+    #[test]
+    fn highlight_ranges() {
+        assert_eq!(highlighted("Report REPORT.pdf", "report"), vec!["Report", "REPORT"]);
+        assert_eq!(highlighted("التَّقرير السنوي.docx", "تقرير"), vec!["تَّقرير"]);
+        // The article alternative covers the whole word.
+        assert_eq!(highlighted("التقرير", "التقرير"), vec!["التقرير"]);
+        // Overlapping and adjacent matches merge; excludes are not highlighted.
+        assert_eq!(highlighted("aaa bc", "aa b|c !aaa"), vec!["aaa", "bc"]);
+        assert_eq!(highlighted("ملف ٢٠٢٤", "2024"), vec!["٢٠٢٤"]);
+        assert_eq!(highlighted("كـــتاب", "كتاب"), vec!["كـــتاب"]);
+        // A trailing diacritic is part of the word.
+        assert_eq!(highlighted("كتابٌ جديد", "كتاب"), vec!["كتابٌ"]);
+        assert!(highlighted("abc", "x").is_empty());
+        assert!(highlighted("abc", "ext:pdf").is_empty());
+    }
+
+    #[test]
+    fn promote_boosted() {
+        let mut hits = vec![5, 3, 9, 1, 7];
+        promote(&mut hits, &[(7, 1.0), (1, 3.0), (42, 9.0)]);
+        assert_eq!(hits, vec![1, 7, 5, 3, 9]);
+        let mut hits = vec![2, 1];
+        promote(&mut hits, &[]);
+        assert_eq!(hits, vec![2, 1]);
+    }
 }

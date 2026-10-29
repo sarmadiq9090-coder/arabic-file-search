@@ -16,6 +16,10 @@ use calamine::{Data, Reader, Sheets};
 use encoding_rs::{Encoding, UTF_16BE, UTF_16LE, WINDOWS_1252, WINDOWS_1256};
 use quick_xml::events::Event;
 
+mod bidi_fix;
+mod epub;
+mod mail;
+
 /// Files larger than this are never opened.
 const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
 /// Plain-text formats are read only up to this many bytes.
@@ -32,7 +36,8 @@ const TEXT_EXTS: &[&str] = &[
 ];
 
 const OTHER_EXTS: &[&str] = &[
-    "docx", "docm", "pptx", "odt", "odp", "ods", "xlsx", "xlsm", "xlsb", "xls", "pdf", "rtf", "doc",
+    "docx", "docm", "pptx", "odt", "odp", "ods", "xlsx", "xlsm", "xlsb", "xls", "pdf", "rtf",
+    "doc", "eml", "msg", "epub",
 ];
 
 /// Returns true if the extension (lowercase, no dot) is supported for content search.
@@ -76,6 +81,9 @@ fn extract_by_ext(path: &Path, ext: &str) -> Option<String> {
         "pdf" => extract_pdf(path),
         "rtf" => Some(rtf_to_text(&std::fs::read(path).ok()?)),
         "doc" => Some(extract_doc_heuristic(&std::fs::read(path).ok()?)),
+        "eml" => mail::extract_eml(path),
+        "msg" => mail::extract_msg(path),
+        "epub" => epub::extract_epub(path),
         _ => None,
     }
 }
@@ -450,11 +458,14 @@ fn extract_pdf(path: &Path) -> Option<String> {
     // though `extract_text` has an outer guard as well. (It does not print to
     // stdout in normal operation; in a GUI-subsystem build there is no console
     // to print to anyway.)
-    panic::catch_unwind(AssertUnwindSafe(|| {
+    let text = panic::catch_unwind(AssertUnwindSafe(|| {
         pdf_extract::extract_text_from_mem(&bytes)
     }))
     .ok()?
-    .ok()
+    .ok()?;
+    // Before `extract_text` folds presentation forms: their shapes are the
+    // best evidence of visual (reversed) Arabic line order.
+    Some(bidi_fix::fix_visual_order(text))
 }
 
 // ---------------------------------------------------------------------------
@@ -1018,7 +1029,7 @@ mod tests {
     #[test]
     fn supported_extensions() {
         for e in [
-            "txt", "docx", "pdf", "rtf", "doc", "xlsx", "ods", "pptx", "css",
+            "txt", "docx", "pdf", "rtf", "doc", "xlsx", "ods", "pptx", "css", "eml", "msg", "epub",
         ] {
             assert!(is_supported(e), "{e}");
         }
@@ -1281,5 +1292,23 @@ mod tests {
         assert!(extract_text(&write_file("broken.docx", b"not a zip")).is_none());
         assert!(extract_text(&write_file("broken.xlsx", b"not a zip")).is_none());
         assert!(extract_text(&write_file("empty.txt", b"")).is_none());
+        assert!(extract_text(&write_file("broken.msg", b"not a cfb")).is_none());
+        assert!(extract_text(&write_file("broken.epub", b"not a zip")).is_none());
+        assert!(extract_text(&write_file("broken.eml", b"\x00\x01\x02")).is_none());
+    }
+
+    #[test]
+    fn eml_and_epub_from_disk() {
+        let eml = write_file(
+            "m.eml",
+            b"Subject: =?utf-8?B?2YXYsdit2KjYpw==?=\r\n\r\nbody text\r\n",
+        );
+        let text = extract_text(&eml).unwrap();
+        assert!(
+            text.contains("مرحبا") && text.contains("body text"),
+            "{text}"
+        );
+        let epub = write_zip("b.epub", &[("ch.xhtml", "<p>كتاب</p>")]);
+        assert!(extract_text(&epub).unwrap().contains("كتاب"));
     }
 }
