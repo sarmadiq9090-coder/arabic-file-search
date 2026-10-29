@@ -1,5 +1,8 @@
 //! Text normalisation used for matching, so that Arabic queries find words
-//! regardless of hamza forms, tashkeel (diacritics), tatweel, or letter case.
+//! regardless of hamza forms, tashkeel (diacritics), tatweel, presentation
+//! forms, Persian/Urdu letter variants, or letter case.
+
+use unicode_normalization::char::decompose_compatible;
 
 /// Maps a single character to its normalised form. `None` means the
 /// character is dropped entirely (diacritics, tatweel, bidi marks).
@@ -9,19 +12,38 @@ fn map_char(c: char) -> Option<char> {
         // Tashkeel (harakat), superscript alef, Quranic marks and tatweel.
         '\u{064B}'..='\u{065F}' | '\u{0670}' | '\u{06D6}'..='\u{06ED}' | '\u{0640}' => None,
         // Invisible direction / joiner marks.
-        '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' | '\u{FEFF}' => {
-            None
-        }
+        '\u{061C}' | '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' | '\u{FEFF}' => None,
         // All alef forms to bare alef.
         'أ' | 'إ' | 'آ' | 'ٱ' | 'ٲ' | 'ٳ' => Some('ا'),
         'ة' => Some('ه'),
         'ى' | 'ئ' | 'ی' => Some('ي'),
         'ؤ' => Some('و'),
-        'ک' => Some('ك'),
+        'ک' | 'ڪ' => Some('ك'),
+        // Persian/Urdu heh forms.
+        'ە' | 'ہ' | 'ھ' | 'ۀ' => Some('ه'),
         // Arabic-Indic and Persian digits to ASCII digits.
         '\u{0660}'..='\u{0669}' => char::from_u32(c as u32 - 0x0660 + '0' as u32),
         '\u{06F0}'..='\u{06F9}' => char::from_u32(c as u32 - 0x06F0 + '0' as u32),
         _ => Some(c),
+    }
+}
+
+/// Arabic presentation forms (contextual shapes and ligatures), which some
+/// PDFs and old software store instead of the base letters.
+#[inline]
+fn is_presentation_form(c: char) -> bool {
+    matches!(c, '\u{FB50}'..='\u{FDFF}' | '\u{FE70}'..='\u{FEFE}')
+}
+
+/// Pushes the mapped, lower-cased form of a single character.
+#[inline]
+fn push_mapped(out: &mut String, c: char) {
+    if let Some(m) = map_char(c) {
+        if m.is_ascii() {
+            out.push(m.to_ascii_lowercase());
+        } else {
+            out.extend(m.to_lowercase());
+        }
     }
 }
 
@@ -30,12 +52,22 @@ fn map_char(c: char) -> Option<char> {
 #[inline]
 fn push_norm(out: &mut String, c: char) -> usize {
     let before = out.len();
-    if let Some(m) = map_char(c) {
-        if m.is_ascii() {
-            out.push(m.to_ascii_lowercase());
-        } else {
-            out.extend(m.to_lowercase());
-        }
+    if is_presentation_form(c) {
+        // Compatibility decomposition (as NFKC does), e.g. ﻻ → لا, ﷲ → الله.
+        // Isolated harakat forms decompose to a space plus the mark: drop them.
+        let mut first = true;
+        let mut drop = false;
+        decompose_compatible(c, |d| {
+            if first && d == ' ' {
+                drop = true;
+            }
+            first = false;
+            if !drop {
+                push_mapped(out, d);
+            }
+        });
+    } else {
+        push_mapped(out, c);
     }
     out.len() - before
 }
@@ -89,5 +121,38 @@ mod tests {
         assert_eq!(map.len(), n.len());
         let pos = n.find("تقرير").unwrap();
         assert!(src[map[pos] as usize..].starts_with('ت'));
+    }
+
+    #[test]
+    fn presentation_forms_to_base_letters() {
+        // "التقرير" written with contextual shapes, as some PDFs store it.
+        assert_eq!(normalize("\u{FE8D}\u{FEDF}\u{FE98}\u{FED8}\u{FEAE}\u{FEF3}\u{FEAE}"), "التقرير");
+        assert_eq!(normalize("\u{FEFB}"), "لا");
+        assert_eq!(normalize("\u{FEF7}\u{FEF9}\u{FEF5}"), "لالالا");
+        assert_eq!(normalize("\u{FDF2}"), "الله");
+        assert_eq!(normalize("\u{FB8E}"), "ك"); // keheh
+        assert_eq!(normalize("\u{FE70}\u{FE7C}"), ""); // isolated harakat
+    }
+
+    #[test]
+    fn presentation_form_map_is_per_byte() {
+        let src = "a\u{FEFB}\u{FDF2}b";
+        let (n, map) = normalize_with_map(src);
+        assert_eq!(n, "aلااللهb");
+        assert_eq!(map.len(), n.len());
+        let lig = src.find('\u{FEFB}').unwrap() as u32;
+        let allah = src.find('\u{FDF2}').unwrap() as u32;
+        let b = n.find('b').unwrap();
+        assert_eq!(map[1..5], [lig; 4]);
+        assert!(map[5..b].iter().all(|&m| m == allah));
+        assert_eq!(map[b] as usize, src.len() - 1);
+    }
+
+    #[test]
+    fn persian_urdu_folding() {
+        assert_eq!(normalize("ە ہ ھ ۀ"), "ه ه ه ه");
+        assert_eq!(normalize("ڪتاب"), "كتاب");
+        assert_eq!(normalize("کتابی"), "كتابي");
+        assert_eq!(normalize("ملف\u{061C}ات"), "ملفات");
     }
 }

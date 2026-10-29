@@ -1,0 +1,2 @@
+// Application icon (resource id 1). The manifest is embedded separately by embed-manifest in build.rs.
+1 ICON "bahth.ico"

@@ -80,6 +80,9 @@ fn skip_dir(name: &str) -> bool {
         || name.eq_ignore_ascii_case("$Recycle.Bin")
         || name.eq_ignore_ascii_case("$WinREAgent")
         || name.eq_ignore_ascii_case("WinSxS")
+        || [".git", ".svn", ".hg", "node_modules", "__pycache__"]
+            .iter()
+            .any(|d| name.eq_ignore_ascii_case(d))
 }
 
 impl Index {
@@ -215,6 +218,14 @@ pub fn list_drives() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn skipped_dirs() {
+        for d in ["node_modules", ".GIT", "__pycache__", ".svn", ".Hg", "$Recycle.Bin"] {
+            assert!(skip_dir(d), "{d}");
+        }
+        assert!(!skip_dir("git") && !skip_dir("Documents"));
+    }
 
     #[test]
     fn build_save_load_roundtrip() {
