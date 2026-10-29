@@ -1269,8 +1269,8 @@ mod tests {
     fn runs_of_matching_items() {
         let runs = |s: &str| runs_where(s.as_bytes(), |b| b != b' ').collect::<Vec<_>>();
         assert_eq!(runs("ab  c d"), vec![0..2, 4..5, 6..7]);
-        assert_eq!(runs("  "), vec![]);
-        assert_eq!(runs(""), vec![]);
+        assert_eq!(runs("  "), Vec::<Range<usize>>::new());
+        assert_eq!(runs(""), Vec::<Range<usize>>::new());
         assert_eq!(runs("abc"), vec![0..3]);
     }
 

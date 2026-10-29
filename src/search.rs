@@ -3,9 +3,10 @@
 // Only the Windows UI and the tests use this module.
 
 use rayon::prelude::*;
+use regex::{Regex, RegexBuilder};
 use std::path::Path;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
 
 use crate::extract;
 use crate::index::Entry;
@@ -27,6 +28,175 @@ impl Term {
     fn matches(&self, hay: &str) -> bool {
         self.alts.iter().any(|a| hay.contains(a.as_str()))
     }
+
+    /// True when an alternative occurs in `hay` as a whole word.
+    fn matches_word(&self, hay: &str) -> bool {
+        self.alts.iter().any(|a| word_matches(hay, a).next().is_some())
+    }
+
+    /// Every occurrence `(start, end)` of every alternative in `hay`, sorted,
+    /// with overlapping ones (an article form and its bare word) merged.
+    fn spans(&self, hay: &str, whole_word: bool) -> Vec<(usize, usize)> {
+        let mut spans: Vec<(usize, usize)> = Vec::new();
+        for a in self.alts.iter().filter(|a| !a.is_empty()) {
+            if whole_word {
+                spans.extend(word_matches(hay, a).map(|s| (s, s + a.len())));
+            } else {
+                spans.extend(hay.match_indices(a.as_str()).map(|(s, _)| (s, s + a.len())));
+            }
+        }
+        merge_spans(spans)
+    }
+}
+
+/// Sorts `spans` and merges the ones that overlap or touch.
+fn merge_spans(mut spans: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
+    spans.sort_unstable();
+    let mut merged: Vec<(usize, usize)> = Vec::with_capacity(spans.len());
+    for (s, e) in spans {
+        match merged.last_mut() {
+            Some(last) if s <= last.1 => last.1 = last.1.max(e),
+            _ => merged.push((s, e)),
+        }
+    }
+    merged
+}
+
+/// Letters and digits make up words; anything else (spaces, punctuation,
+/// `_`, `-`, `.`) separates them. Unicode-aware, so Arabic works.
+fn is_word_char(c: char) -> bool {
+    c.is_alphanumeric()
+}
+
+/// Start offsets of the occurrences of `w` in `hay` that are whole words.
+fn word_matches<'a>(hay: &'a str, w: &'a str) -> impl Iterator<Item = usize> + 'a {
+    hay.match_indices(w).map(|(s, _)| s).filter(move |&s| {
+        !w.is_empty()
+            && !hay[..s].chars().next_back().is_some_and(is_word_char)
+            && !hay[s + w.len()..].chars().next().is_some_and(is_word_char)
+    })
+}
+
+/// The words of `hay` as (byte offset, word), split on non-word characters.
+fn split_words(hay: &str) -> impl Iterator<Item = (usize, &str)> {
+    let mut rest = hay.char_indices().peekable();
+    std::iter::from_fn(move || {
+        while rest.next_if(|&(_, c)| !is_word_char(c)).is_some() {}
+        let (start, _) = *rest.peek()?;
+        let mut end = start;
+        while let Some((i, c)) = rest.next_if(|&(_, c)| is_word_char(c)) {
+            end = i + c.len_utf8();
+        }
+        Some((start, &hay[start..end]))
+    })
+}
+
+/// A `regex:` pattern, matched case-insensitively against the original
+/// (un-normalised) file name or document text.
+#[derive(Debug, Clone)]
+pub struct Pattern {
+    /// The pattern as typed.
+    pub source: String,
+    /// `None` when the pattern is invalid: it then matches nothing.
+    re: Option<Regex>,
+}
+
+impl PartialEq for Pattern {
+    fn eq(&self, other: &Pattern) -> bool {
+        self.source == other.source
+    }
+}
+
+impl Pattern {
+    /// Compiles `source`, with limits so a hostile pattern can't eat memory.
+    fn new(source: &str) -> Pattern {
+        let re = RegexBuilder::new(source)
+            .case_insensitive(true)
+            .multi_line(true)
+            .size_limit(1 << 20)
+            .dfa_size_limit(4 << 20)
+            .build()
+            .ok();
+        Pattern { source: source.to_string(), re }
+    }
+
+    fn is_valid(&self) -> bool {
+        self.re.is_some()
+    }
+
+    fn is_match(&self, hay: &str) -> bool {
+        self.re.as_ref().is_some_and(|r| r.is_match(hay))
+    }
+
+    /// Non-empty matches as `(start, end)` byte ranges of `hay`.
+    fn ranges<'a>(&'a self, hay: &'a str) -> impl Iterator<Item = (usize, usize)> + 'a {
+        self.re.iter().flat_map(move |r| r.find_iter(hay)).filter(|m| !m.is_empty()).map(|m| (m.start(), m.end()))
+    }
+}
+
+/// A proximity search, `"a b"~5`: every word occurs within `dist` words of
+/// the others, in any order.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Near {
+    /// One term per word; each word may carry its article-less form.
+    pub words: Vec<Term>,
+    pub dist: u32,
+}
+
+impl Near {
+    /// For each word of `hay` that contains one of the terms: (word number,
+    /// term number, byte offset of the match), in text order.
+    fn hits(&self, hay: &str) -> Vec<(u32, usize, usize)> {
+        let mut hits = Vec::new();
+        for (n, (off, word)) in split_words(hay).enumerate() {
+            for (t, term) in self.words.iter().enumerate() {
+                if let Some(p) = term.find_in(word) {
+                    hits.push((n as u32, t, off + p));
+                }
+            }
+        }
+        hits
+    }
+
+    /// Byte offset in `hay` of the first window holding every word within
+    /// `dist` words, if there is one.
+    fn find(&self, hay: &str) -> Option<usize> {
+        let hits = self.hits(hay);
+        let mut counts = vec![0u32; self.words.len()];
+        let (mut covered, mut left) = (0, 0);
+        for &(n, t, _) in &hits {
+            counts[t] += 1;
+            covered += usize::from(counts[t] == 1);
+            while covered == self.words.len() {
+                let (first, lt, off) = hits[left];
+                if n - first <= self.dist {
+                    return Some(off);
+                }
+                counts[lt] -= 1;
+                covered -= usize::from(counts[lt] == 0);
+                left += 1;
+            }
+        }
+        None
+    }
+
+    /// Byte offsets of every word occurrence that has each of the other words
+    /// within `dist` words of it (exact for two words, which is the usual case).
+    fn all(&self, hay: &str) -> Vec<usize> {
+        let hits = self.hits(hay);
+        let mut by_term: Vec<Vec<u32>> = vec![Vec::new(); self.words.len()];
+        for &(n, t, _) in &hits {
+            by_term[t].push(n);
+        }
+        let close = |list: &[u32], n: u32| {
+            let i = list.partition_point(|&m| m + self.dist < n);
+            list.get(i).is_some_and(|&m| m <= n + self.dist)
+        };
+        hits.iter()
+            .filter(|&&(n, t, _)| by_term.iter().enumerate().all(|(o, list)| o == t || close(list, n)))
+            .map(|&(_, _, off)| off)
+            .collect()
+    }
 }
 
 /// A parsed search query.
@@ -35,12 +205,28 @@ impl Term {
 /// `a|b` (or `a | b`) matches either, `!word` or `-word` excludes, `ext:pdf`,
 /// `*.pdf` or `.pdf` restricts the file type and `folder:` / `مجلد:` keeps
 /// only folders. A leading Arabic article (`ال`, `وال`, `لل`…) is optional.
+///
+/// Filters: `size:>10mb` / `حجم:` (size), `dm:today` / `تاريخ:` (modified
+/// date), `regex:` / `re:` (regular expression), `ww:` / `كلمة:` (whole word)
+/// and `"a b"~5` (words near each other).
 #[derive(Debug, Default, PartialEq)]
 pub struct Query {
     pub terms: Vec<Term>,
     pub excludes: Vec<String>,
     pub exts: Vec<String>,
     pub dirs_only: bool,
+    /// Inclusive size range in bytes from `size:`. Folders never pass it.
+    pub size: Option<(u64, u64)>,
+    /// Modification-time range `[from, to)` in Unix seconds from `dm:`.
+    pub mtime: Option<(i64, i64)>,
+    /// `regex:` patterns; all must match.
+    pub regexes: Vec<Pattern>,
+    /// `ww:` terms, matched as whole words.
+    pub words: Vec<Term>,
+    /// `"a b"~N` proximity searches.
+    pub near: Vec<Near>,
+    /// Problems found while parsing (in Arabic), for the UI to show.
+    pub warnings: Vec<String>,
 }
 
 /// File-type presets for the type filter: (label, extensions). An empty list
@@ -71,18 +257,79 @@ pub const FOLDER_PREFIXES: [&str; 2] = ["folder:", "مجلد:"];
 /// Arabic prefixes stripped to also match the bare word, longest first.
 const ARTICLES: [&str; 6] = ["وال", "بال", "كال", "فال", "لل", "ال"];
 
-/// Splits the input into (token, quoted) pairs.
-fn tokenize(input: &str) -> Vec<(String, bool)> {
+/// Prefixes of the filters that take a value (ASCII case ignored).
+const SIZE_PREFIXES: [&str; 2] = ["size:", "حجم:"];
+const DATE_PREFIXES: [&str; 3] = ["dm:", "datemodified:", "تاريخ:"];
+const REGEX_PREFIXES: [&str; 2] = ["regex:", "re:"];
+const WORD_PREFIXES: [&str; 3] = ["ww:", "wholeword:", "كلمة:"];
+
+/// Largest `~N` accepted for a proximity search.
+const MAX_NEAR: u32 = 10_000;
+
+/// One piece of the input.
+struct Token {
+    text: String,
+    quoted: bool,
+    /// `N` of a `"quoted"~N` proximity suffix.
+    near: Option<u32>,
+}
+
+/// The value of an ASCII, Arabic-Indic or Persian digit.
+fn digit_value(c: char) -> Option<u32> {
+    match c {
+        '0'..='9' => Some(c as u32 - '0' as u32),
+        '\u{0660}'..='\u{0669}' => Some(c as u32 - 0x0660),
+        '\u{06F0}'..='\u{06F9}' => Some(c as u32 - 0x06F0),
+        _ => None,
+    }
+}
+
+/// Parses a `~N` suffix at the start of `rest` (followed by a space or the
+/// end), returning N and what follows it.
+fn near_suffix(rest: &str) -> Option<(u32, &str)> {
+    let digits = rest.strip_prefix('~')?;
+    let end = digits.find(|c| digit_value(c).is_none()).unwrap_or(digits.len());
+    let after = &digits[end..];
+    if end == 0 || !after.is_empty() && !after.starts_with(char::is_whitespace) {
+        return None;
+    }
+    let n = digits[..end].chars().filter_map(digit_value).fold(0u32, |n, d| n.saturating_mul(10).saturating_add(d));
+    Some((n.clamp(1, MAX_NEAR), after))
+}
+
+/// Length of the value-filter prefix `tok` starts with, if any.
+fn value_prefix(tok: &str) -> Option<usize> {
+    [&SIZE_PREFIXES[..], &DATE_PREFIXES, &REGEX_PREFIXES, &WORD_PREFIXES]
+        .into_iter()
+        .find_map(|list| prefix_len(tok, list))
+}
+
+/// Splits the input into tokens. A filter value may be quoted to hold
+/// spaces (`regex:"a b"`), and a quoted phrase may end in `~N`.
+fn tokenize(input: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut rest = input.trim();
     while !rest.is_empty() {
         if let Some(stripped) = rest.strip_prefix('"') {
             let end = stripped.find('"').unwrap_or(stripped.len());
-            tokens.push((stripped[..end].to_string(), true));
-            rest = stripped.get(end + 1..).unwrap_or("").trim_start();
+            let text = stripped[..end].to_string();
+            rest = stripped.get(end + 1..).unwrap_or("");
+            let near = near_suffix(rest).map(|(n, after)| {
+                rest = after;
+                n
+            });
+            tokens.push(Token { text, quoted: true, near });
+            rest = rest.trim_start();
         } else {
-            let end = rest.find(char::is_whitespace).unwrap_or(rest.len());
-            tokens.push((rest[..end].to_string(), false));
+            let mut end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+            if let Some(len) = value_prefix(rest)
+                && let Some(value) = rest[len..].strip_prefix('"')
+            {
+                // Up to the closing quote, then to the next space.
+                let close = value.find('"').map_or(rest.len(), |i| len + 2 + i);
+                end = close + rest[close..].find(char::is_whitespace).unwrap_or(rest.len() - close);
+            }
+            tokens.push(Token { text: rest[..end].to_string(), quoted: false, near: None });
             rest = rest[end..].trim_start();
         }
     }
@@ -97,12 +344,288 @@ fn ext_filter(lower: &str) -> Option<&str> {
         .or_else(|| lower.strip_prefix('.').filter(|e| !e.is_empty() && !e.contains('.')))
 }
 
+/// Length of the prefix from `list` that `tok` starts with, if any.
+fn prefix_len(tok: &str, list: &[&str]) -> Option<usize> {
+    list.iter().find(|p| tok.get(..p.len()).is_some_and(|h| h.eq_ignore_ascii_case(p))).map(|p| p.len())
+}
+
 /// Length of the folder prefix `tok` starts with, if any.
 fn folder_prefix(tok: &str) -> Option<usize> {
-    FOLDER_PREFIXES
-        .iter()
-        .find(|p| tok.get(..p.len()).is_some_and(|h| h.eq_ignore_ascii_case(p)))
-        .map(|p| p.len())
+    prefix_len(tok, &FOLDER_PREFIXES)
+}
+
+/// A filter value with one pair of surrounding quotes removed.
+fn unquote(v: &str) -> &str {
+    let v = v.strip_prefix('"').unwrap_or(v);
+    v.strip_suffix('"').unwrap_or(v)
+}
+
+/// Splits a comparison off the front: `>=`, `<=`, `>`, `<` or `=`.
+fn split_op(v: &str) -> (&str, &str) {
+    for op in [">=", "<=", ">", "<", "="] {
+        if let Some(rest) = v.strip_prefix(op) {
+            return (op, rest);
+        }
+    }
+    ("", v)
+}
+
+/// The value with Arabic digits, case and letter forms folded and `٫` as `.`.
+fn fold_value(v: &str) -> String {
+    normalize(unquote(v)).replace('\u{066B}', ".")
+}
+
+// ------------------------------------------------------------------ sizes
+
+const KB: u64 = 1024;
+const MB: u64 = 1024 * KB;
+const GB: u64 = 1024 * MB;
+
+/// Named sizes as in Everything: (names, inclusive range).
+const NAMED_SIZES: &[(&[&str], (u64, u64))] = &[
+    (&["empty", "فارغ"], (0, 0)),
+    (&["tiny", "صغير_جدا"], (1, 10 * KB)),
+    (&["small", "صغير"], (10 * KB + 1, 100 * KB)),
+    (&["medium", "متوسط"], (100 * KB + 1, MB)),
+    (&["large", "كبير"], (MB + 1, 16 * MB)),
+    (&["huge", "كبير_جدا"], (16 * MB + 1, 128 * MB)),
+    (&["gigantic", "ضخم"], (128 * MB + 1, u64::MAX)),
+];
+
+/// A size such as `10`, `1.5mb` or `10م`, in bytes.
+fn size_value(v: &str) -> Option<u64> {
+    let split = v.find(|c: char| !c.is_ascii_digit() && c != '.').unwrap_or(v.len());
+    let (num, unit) = (&v[..split], v[split..].trim());
+    let unit = match unit {
+        "" | "b" | "ب" => 1,
+        "k" | "kb" | "ك" => KB,
+        "m" | "mb" | "م" => MB,
+        "g" | "gb" | "ج" => GB,
+        "t" | "tb" | "ت" => 1024 * GB,
+        _ => return None,
+    };
+    let n: f64 = num.parse().ok().filter(|n: &f64| n.is_finite())?;
+    let bytes = (n * unit as f64).round();
+    (bytes <= u64::MAX as f64).then_some(bytes as u64)
+}
+
+/// Parses a `size:` value into an inclusive byte range.
+fn parse_size(v: &str) -> Option<(u64, u64)> {
+    let v = fold_value(v).replace(' ', "_");
+    if let Some(&(_, range)) = NAMED_SIZES.iter().find(|(names, _)| names.contains(&v.as_str())) {
+        return Some(range);
+    }
+    if let Some((a, b)) = v.split_once("..") {
+        let lo = if a.is_empty() { 0 } else { size_value(a)? };
+        let hi = if b.is_empty() { u64::MAX } else { size_value(b)? };
+        return (lo <= hi && !(a.is_empty() && b.is_empty())).then_some((lo, hi));
+    }
+    let (op, rest) = split_op(&v);
+    let n = size_value(rest)?;
+    match op {
+        ">=" => Some((n, u64::MAX)),
+        ">" => Some((n.checked_add(1)?, u64::MAX)),
+        "<=" => Some((0, n)),
+        "<" => Some((0, n.checked_sub(1)?)),
+        _ => Some((n, n)),
+    }
+}
+
+// ------------------------------------------------------------------ dates
+
+const DAY: i64 = 86_400;
+
+/// First day of the week for `dm:thisweek`: 0 is Sunday, 6 is Saturday
+/// (the usual start in Arabic calendars).
+const WEEK_START: i64 = 6;
+
+/// Local offset from UTC in seconds for calendar words such as `dm:today`.
+static UTC_OFFSET: AtomicI32 = AtomicI32::new(0);
+
+/// Sets the local time zone's offset from UTC (east positive), used by
+/// [`Query::parse`] to work out where "today", "this week"… start.
+#[cfg_attr(not(test), allow(dead_code))] // for the UI and the CLI; not called there yet
+pub fn set_utc_offset_secs(secs: i32) {
+    UTC_OFFSET.store(secs, Ordering::Relaxed);
+}
+
+/// The offset set by [`set_utc_offset_secs`] (0 until it is called).
+pub fn utc_offset_secs() -> i32 {
+    UTC_OFFSET.load(Ordering::Relaxed)
+}
+
+fn now_secs() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() as i64)
+}
+
+/// Days since 1970-01-01 of a proleptic Gregorian date (H. Hinnant's algorithm).
+fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let (m, d) = (m as i64, d as i64);
+    let doy = (153 * if m > 2 { m - 3 } else { m + 9 } + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
+/// The (year, month, day) of a day number from [`days_from_civil`].
+fn civil_from_days(z: i64) -> (i64, u32, u32) {
+    let z = z + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    (yoe + era * 400 + i64::from(m <= 2), m, d)
+}
+
+fn days_in_month(y: i64, m: u32) -> u32 {
+    match m {
+        2 if y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    }
+}
+
+/// Calendar words: (names, what they mean). Arabic names are compared after
+/// normalisation, so hamza and ta marbuta forms don't matter.
+#[derive(Clone, Copy)]
+enum Span {
+    Day(i64),
+    Week(i64),
+    Month(i64),
+    Year(i64),
+}
+
+const DATE_WORDS: &[(&[&str], Span)] = &[
+    (&["today", "اليوم"], Span::Day(0)),
+    (&["yesterday", "أمس", "البارحة"], Span::Day(-1)),
+    (&["thisweek", "هذا_الأسبوع"], Span::Week(0)),
+    (&["lastweek", "الأسبوع_الماضي"], Span::Week(-1)),
+    (&["thismonth", "هذا_الشهر"], Span::Month(0)),
+    (&["lastmonth", "الشهر_الماضي"], Span::Month(-1)),
+    (&["thisyear", "هذه_السنة", "هذا_العام"], Span::Year(0)),
+    (&["lastyear", "السنة_الماضية", "العام_الماضي"], Span::Year(-1)),
+];
+
+/// Times are worked out in local time; `off` is the offset from UTC.
+struct Clock {
+    now: i64,
+    off: i64,
+}
+
+impl Clock {
+    /// Unix time at which local day number `day` starts.
+    fn day_start(&self, day: i64) -> i64 {
+        day * DAY - self.off
+    }
+
+    fn today(&self) -> i64 {
+        (self.now + self.off).div_euclid(DAY)
+    }
+
+    /// Unix time at the start of the month `months` after (y, m).
+    fn month_start(&self, y: i64, m: u32, months: i64) -> i64 {
+        let total = y * 12 + i64::from(m) - 1 + months;
+        self.day_start(days_from_civil(total.div_euclid(12), (total.rem_euclid(12) + 1) as u32, 1))
+    }
+
+    /// The same local time `months` months ago, the day clamped to the month.
+    fn months_ago(&self, months: i64) -> i64 {
+        let local = self.now + self.off;
+        let (y, m, d) = civil_from_days(local.div_euclid(DAY));
+        let total = y * 12 + i64::from(m) - 1 - months;
+        let (y, m) = (total.div_euclid(12), (total.rem_euclid(12) + 1) as u32);
+        self.day_start(days_from_civil(y, m, d.min(days_in_month(y, m)))) + local.rem_euclid(DAY)
+    }
+
+    fn span(&self, span: Span) -> (i64, i64) {
+        let today = self.today();
+        let (y, m, _) = civil_from_days(today);
+        match span {
+            Span::Day(k) => (self.day_start(today + k), self.day_start(today + k + 1)),
+            Span::Week(k) => {
+                // 1970-01-01 was a Thursday (4).
+                let start = today - (today + 4 - WEEK_START).rem_euclid(7) + 7 * k;
+                (self.day_start(start), self.day_start(start + 7))
+            }
+            Span::Month(k) => (self.month_start(y, m, k), self.month_start(y, m, k + 1)),
+            Span::Year(k) => (self.month_start(y + k, 1, 0), self.month_start(y + k + 1, 1, 0)),
+        }
+    }
+
+    /// One date as a `[start, end)` range: a calendar word, `2024`,
+    /// `2024-05`, `2024-05-12`, or a recent period `7d`, `3w`, `2m`, `1y`.
+    fn point(&self, v: &str) -> Option<(i64, i64)> {
+        let key: String = v.chars().filter(|c| !matches!(c, '_' | '-' | ' ')).collect();
+        let is_word = |w: &&str| normalize(w).replace('_', "") == key;
+        if let Some(&(_, span)) = DATE_WORDS.iter().find(|(names, _)| names.iter().any(is_word)) {
+            return Some(self.span(span));
+        }
+        if let Some(num) = v.strip_suffix(['d', 'w', 'm', 'y'])
+            && let Ok(n) = num.parse::<u32>()
+        {
+            let n = i64::from(n.min(100_000));
+            let from = match v.as_bytes()[num.len()] {
+                b'd' => self.now - n * DAY,
+                b'w' => self.now - n * 7 * DAY,
+                b'm' => self.months_ago(n),
+                _ => self.months_ago(n * 12),
+            };
+            return Some((from, i64::MAX));
+        }
+        let parts: Vec<&str> = v.split(['-', '/', '.']).collect();
+        let num = |i: usize, digits: std::ops::RangeInclusive<usize>| {
+            parts.get(i).filter(|p| digits.contains(&p.len()) && p.bytes().all(|b| b.is_ascii_digit()))?.parse::<u32>().ok()
+        };
+        let y = i64::from(num(0, 4..=4)?);
+        match parts.len() {
+            1 => Some((self.month_start(y, 1, 0), self.month_start(y + 1, 1, 0))),
+            2 => {
+                let m = num(1, 1..=2).filter(|m| (1..=12).contains(m))?;
+                Some((self.month_start(y, m, 0), self.month_start(y, m, 1)))
+            }
+            3 => {
+                let m = num(1, 1..=2).filter(|m| (1..=12).contains(m))?;
+                let d = num(2, 1..=2).filter(|&d| d >= 1 && d <= days_in_month(y, m))?;
+                let day = days_from_civil(y, m, d);
+                Some((self.day_start(day), self.day_start(day + 1)))
+            }
+            _ => None,
+        }
+    }
+
+    /// Parses a `dm:` value into a `[from, to)` range of Unix seconds.
+    fn parse(&self, v: &str) -> Option<(i64, i64)> {
+        let v = fold_value(v);
+        let (from, to) = if let Some((a, b)) = v.split_once("..") {
+            let from = if a.is_empty() { i64::MIN } else { self.point(a)?.0 };
+            let to = if b.is_empty() { i64::MAX } else { self.point(b)?.1 };
+            (from, to)
+        } else {
+            let (op, rest) = split_op(&v);
+            let (start, end) = self.point(rest)?;
+            match op {
+                ">=" => (start, i64::MAX),
+                ">" => (end, i64::MAX),
+                "<=" => (i64::MIN, end),
+                "<" => (i64::MIN, start),
+                _ => (start, end),
+            }
+        };
+        (from < to).then_some((from, to))
+    }
+}
+
+/// Narrows an optional range to its overlap with `new`.
+fn intersect<T: Ord + Copy>(old: Option<(T, T)>, new: (T, T)) -> Option<(T, T)> {
+    Some(old.map_or(new, |(a, b)| (a.max(new.0), b.min(new.1))))
 }
 
 /// The word after `!`, or after `-` when a letter follows (so `-` alone and
@@ -136,13 +659,39 @@ fn push_alt(alts: &mut Vec<String>, alt: String, exact: bool) {
 }
 
 impl Query {
+    /// Parses `input`. Calendar words in `dm:` use the current time and the
+    /// offset from [`set_utc_offset_secs`].
     pub fn parse(input: &str) -> Query {
+        Query::parse_at(input, now_secs(), utc_offset_secs())
+    }
+
+    /// Parses `input` as if the time were `now` (Unix seconds) in a time zone
+    /// `utc_offset` seconds east of UTC.
+    pub fn parse_at(input: &str, now: i64, utc_offset: i32) -> Query {
+        let clock = Clock { now, off: i64::from(utc_offset) };
         let mut q = Query::default();
         // Set by a trailing or standalone `|`: the next term joins the last one.
         let mut join = false;
-        for (tok, quoted) in tokenize(input) {
+        for Token { text: tok, quoted, near } in tokenize(input) {
+            if let Some(dist) = near {
+                let mut words = Vec::new();
+                for w in split_words(&normalize(&tok)).map(|(_, w)| w) {
+                    let mut alts = Vec::new();
+                    push_alt(&mut alts, w.to_string(), false);
+                    words.push(Term { alts });
+                }
+                if words.len() >= 2 {
+                    q.near.push(Near { words, dist });
+                    join = false;
+                    continue;
+                }
+            }
             let mut pieces: Vec<&str> = vec![&tok];
             if !quoted {
+                if q.value_filter(&tok, &clock) {
+                    join = false;
+                    continue;
+                }
                 let lower = tok.to_lowercase();
                 if let Some(ext) = ext_filter(&lower) {
                     let exts = ext.split([',', ';']).filter(|e| !e.is_empty());
@@ -190,11 +739,77 @@ impl Query {
         q
     }
 
-    /// True when nothing that narrows the results was typed: no terms, no
-    /// excludes and no extensions. `dirs_only` alone does not count, so an
-    /// empty box never lists the whole disk.
+    /// Handles a `size:`, `dm:`, `regex:` or `ww:` token. Returns false when
+    /// `tok` is not one, or its value can't be understood: then it is searched
+    /// for as a plain word and a warning says so.
+    fn value_filter(&mut self, tok: &str, clock: &Clock) -> bool {
+        if let Some(len) = prefix_len(tok, &SIZE_PREFIXES) {
+            let v = &tok[len..];
+            if v.is_empty() {
+                return true;
+            }
+            match parse_size(v) {
+                Some(range) => self.size = intersect(self.size, range),
+                None => {
+                    self.warnings.push(format!("لم أفهم الحجم «{v}»، فبحثت عن «{tok}» كنص عادي."));
+                    return false;
+                }
+            }
+        } else if let Some(len) = prefix_len(tok, &DATE_PREFIXES) {
+            let v = &tok[len..];
+            if v.is_empty() {
+                return true;
+            }
+            match clock.parse(v) {
+                Some(range) => self.mtime = intersect(self.mtime, range),
+                None => {
+                    self.warnings.push(format!("لم أفهم التاريخ «{v}»، فبحثت عن «{tok}» كنص عادي."));
+                    return false;
+                }
+            }
+        } else if let Some(len) = prefix_len(tok, &REGEX_PREFIXES) {
+            let v = unquote(&tok[len..]);
+            if !v.is_empty() {
+                let p = Pattern::new(v);
+                if !p.is_valid() {
+                    self.warnings.push(format!("التعبير النمطي «{v}» غير صحيح، فلن يطابق أي شيء."));
+                }
+                self.regexes.push(p);
+            }
+        } else if let Some(len) = prefix_len(tok, &WORD_PREFIXES) {
+            let mut alts = Vec::new();
+            for w in unquote(&tok[len..]).split('|').map(normalize).filter(|w| !w.trim().is_empty()) {
+                push_unique(&mut alts, w);
+            }
+            if !alts.is_empty() {
+                self.words.push(Term { alts });
+            }
+        } else {
+            return false;
+        }
+        true
+    }
+
+    /// True when nothing that narrows the results was typed: no terms,
+    /// excludes, extensions or other filters. `dirs_only` alone does not
+    /// count, so an empty box never lists the whole disk.
     pub fn is_empty(&self) -> bool {
-        self.terms.is_empty() && self.exts.is_empty() && self.excludes.is_empty()
+        self.terms.is_empty()
+            && self.exts.is_empty()
+            && self.excludes.is_empty()
+            && self.size.is_none()
+            && self.mtime.is_none()
+            && !self.has_text_filters()
+    }
+
+    /// True when the query has something to look for inside a text: terms,
+    /// regular expressions, whole words or proximity searches.
+    pub fn has_text_criteria(&self) -> bool {
+        !self.terms.is_empty() || self.has_text_filters()
+    }
+
+    fn has_text_filters(&self) -> bool {
+        !self.regexes.is_empty() || !self.words.is_empty() || !self.near.is_empty()
     }
 
     /// Applies a type preset from [`KINDS`]. Index 0 does nothing,
@@ -229,14 +844,28 @@ impl Query {
         self.exts.is_empty() || (!e.is_dir && self.exts.contains(&e.ext()))
     }
 
-    /// Type and folder filters on an entry.
-    fn kind_ok(&self, e: &Entry) -> bool {
-        (!self.dirs_only || e.is_dir) && self.ext_ok(e)
+    /// Size and date filters. Folders have no size, so `size:` drops them.
+    fn meta_ok(&self, e: &Entry) -> bool {
+        self.size.is_none_or(|(lo, hi)| !e.is_dir && (lo..=hi).contains(&e.size))
+            && self.mtime.is_none_or(|(from, to)| (from..to).contains(&e.mtime))
     }
 
-    /// Type, folder and excluded-word filters on an entry's name.
+    /// Type, folder, size and date filters on an entry.
+    fn kind_ok(&self, e: &Entry) -> bool {
+        (!self.dirs_only || e.is_dir) && self.ext_ok(e) && self.meta_ok(e)
+    }
+
+    /// Regex, whole-word and proximity filters on an entry's name.
+    fn name_ok(&self, e: &Entry) -> bool {
+        self.words.iter().all(|w| w.matches_word(&e.norm_name))
+            && self.near.iter().all(|n| n.find(&e.norm_name).is_some())
+            && self.regexes.iter().all(|r| r.is_match(e.name()))
+    }
+
+    /// Every filter on an entry's name: type, folder, size, date, excluded
+    /// words, regex, whole word and proximity.
     fn entry_ok(&self, e: &Entry) -> bool {
-        self.kind_ok(e) && !self.excludes.iter().any(|x| e.norm_name.contains(x.as_str()))
+        self.kind_ok(e) && !self.excludes.iter().any(|x| e.norm_name.contains(x.as_str())) && self.name_ok(e)
     }
 }
 
@@ -277,11 +906,20 @@ pub fn search_names(entries: &[Entry], q: &Query, scope: &str) -> Vec<u32> {
 }
 
 /// One content-search result.
+#[cfg_attr(not(test), allow(dead_code))] // `count` and `lines` are not shown by the UI yet
 pub struct ContentHit {
     pub index: u32,
     /// A short piece of the document text around the first match.
     pub snippet: String,
+    /// How many matches of the query the document holds.
+    pub count: u32,
+    /// Up to [`MAX_LINES`] matching lines: (1-based line number, the line
+    /// cut to about 200 characters around its first match).
+    pub lines: Vec<(u32, String)>,
 }
+
+/// Most matching lines kept per document in [`ContentHit::lines`].
+pub const MAX_LINES: usize = 50;
 
 #[derive(Default)]
 pub struct ContentProgress {
@@ -311,7 +949,7 @@ pub fn search_content(
         .collect();
     progress.total.store(candidates.len(), Ordering::Relaxed);
 
-    if q.terms.is_empty() {
+    if !q.has_text_criteria() {
         progress.done.store(true, Ordering::Relaxed);
         return;
     }
@@ -326,10 +964,10 @@ pub fn search_content(
             }
             let entry = &entries[i as usize];
             if let Some(text) = extract::extract_text(Path::new(&*entry.path))
-                && let Some(snippet) = match_text(&text, q)
+                && let Some(hit) = content_hit(i, &text, q)
                 && let Ok(mut h) = hits.lock()
             {
-                h.push(ContentHit { index: i, snippet });
+                h.push(hit);
             }
             progress.checked.fetch_add(1, Ordering::Relaxed);
         })
@@ -341,27 +979,130 @@ pub fn search_content(
     progress.done.store(true, Ordering::Relaxed);
 }
 
-/// If `text` matches every term and contains no excluded word, returns a
-/// snippet around the earliest match.
-pub fn match_text(text: &str, q: &Query) -> Option<String> {
-    let (norm, map) = normalize_with_map(text);
+/// Where `q` matches `text` (whose normalised form is `norm`, with `map`
+/// from [`normalize_with_map`]): sorted byte offsets in `text`. With `all`
+/// false only the first match of each part of the query is listed, which is
+/// enough for a snippet and stops early. `None` when the text doesn't match
+/// every term and filter, contains an excluded word, or the query has
+/// nothing to look for.
+fn text_matches(text: &str, norm: &str, map: &[u32], q: &Query, all: bool) -> Option<Vec<usize>> {
     if q.excludes.iter().any(|x| norm.contains(x.as_str())) {
         return None;
     }
-    let mut first: Option<usize> = None;
-    for t in &q.terms {
-        let pos = t.find_in(&norm)?;
-        first = Some(first.map_or(pos, |f| f.min(pos)));
+    // Offsets into `norm`, and into `text` for regex matches.
+    let mut at: Vec<usize> = Vec::new();
+    let mut src: Vec<usize> = Vec::new();
+    for (t, whole) in q.terms.iter().map(|t| (t, false)).chain(q.words.iter().map(|t| (t, true))) {
+        if all {
+            let spans = t.spans(norm, whole);
+            if spans.is_empty() {
+                return None;
+            }
+            at.extend(spans.iter().map(|&(s, _)| s));
+        } else if whole {
+            at.push(t.alts.iter().filter_map(|a| word_matches(norm, a).next()).min()?);
+        } else {
+            at.push(t.find_in(norm)?);
+        }
     }
-    let pos = map[first?] as usize;
-    Some(snippet_at(text, pos))
+    for n in &q.near {
+        if all {
+            let hits = n.all(norm);
+            if hits.is_empty() {
+                return None;
+            }
+            at.extend(hits);
+        } else {
+            at.push(n.find(norm)?);
+        }
+    }
+    for r in &q.regexes {
+        let re = r.re.as_ref()?;
+        let first = re.find(text)?.start();
+        let before = src.len();
+        if all {
+            src.extend(r.ranges(text).map(|(s, _)| s));
+        }
+        if src.len() == before {
+            // Only empty matches (`^`), or the first match is enough.
+            src.push(first);
+        }
+    }
+    src.extend(at.into_iter().map(|p| map[p] as usize));
+    if src.is_empty() {
+        return None;
+    }
+    src.sort_unstable();
+    src.dedup();
+    Some(src)
+}
+
+/// If `text` matches every term and filter and contains no excluded word,
+/// returns a snippet around the earliest match.
+#[cfg_attr(not(test), allow(dead_code))] // for the UI and the CLI; not called there yet
+pub fn match_text(text: &str, q: &Query) -> Option<String> {
+    let (norm, map) = normalize_with_map(text);
+    let at = text_matches(text, &norm, &map, q, false)?;
+    Some(snippet_at(text, at[0]))
+}
+
+/// Counts the matches of `q` in `text` and returns them with up to `max`
+/// matching lines (1-based line number, the line around its first match).
+/// `(0, [])` when the text doesn't match the query.
+#[cfg_attr(not(test), allow(dead_code))] // for the UI and the CLI; not called there yet
+pub fn all_matches(text: &str, q: &Query, max: usize) -> (u32, Vec<(u32, String)>) {
+    let (norm, map) = normalize_with_map(text);
+    match text_matches(text, &norm, &map, q, true) {
+        Some(at) => (u32::try_from(at.len()).unwrap_or(u32::MAX), matching_lines(text, &at, max)),
+        None => (0, Vec::new()),
+    }
+}
+
+/// A content hit for entry `index` if `text` matches, normalising the text
+/// only once. Documents that don't match stop at the cheap first-match check.
+fn content_hit(index: u32, text: &str, q: &Query) -> Option<ContentHit> {
+    let (norm, map) = normalize_with_map(text);
+    let first = text_matches(text, &norm, &map, q, false)?[0];
+    let at = text_matches(text, &norm, &map, q, true).unwrap_or_else(|| vec![first]);
+    Some(ContentHit {
+        index,
+        snippet: snippet_at(text, first),
+        count: u32::try_from(at.len()).unwrap_or(u32::MAX),
+        lines: matching_lines(text, &at, MAX_LINES),
+    })
+}
+
+/// The first `max` distinct lines holding a match at one of the sorted
+/// byte offsets `at`, each cut to about 200 characters around that match.
+fn matching_lines(text: &str, at: &[usize], max: usize) -> Vec<(u32, String)> {
+    let mut lines = Vec::new();
+    let (mut line_no, mut counted, mut line_end) = (1u32, 0, 0);
+    for &p in at {
+        if lines.len() >= max {
+            break;
+        }
+        if p < line_end {
+            continue; // another match in a line already listed
+        }
+        line_no += text.as_bytes()[counted..p].iter().filter(|&&b| b == b'\n').count() as u32;
+        counted = p;
+        let start = text[..p].rfind('\n').map_or(0, |i| i + 1);
+        line_end = text[p..].find('\n').map_or(text.len(), |i| p + i);
+        lines.push((line_no, excerpt(&text[start..line_end], p - start, 60, 140)));
+    }
+    lines
 }
 
 /// About 40 characters either side of byte offset `pos`, on one line.
 fn snippet_at(text: &str, pos: usize) -> String {
-    const CONTEXT: usize = 40;
-    let start = text[..pos].char_indices().rev().nth(CONTEXT).map_or(0, |(i, _)| i);
-    let end = text[pos..].char_indices().nth(CONTEXT * 2).map_or(text.len(), |(i, _)| pos + i);
+    excerpt(text, pos, 40, 80)
+}
+
+/// `before` characters before byte offset `pos` and `after` from it, with
+/// white space collapsed and `…` where text was cut.
+fn excerpt(text: &str, pos: usize, before: usize, after: usize) -> String {
+    let start = text[..pos].char_indices().rev().nth(before).map_or(0, |(i, _)| i);
+    let end = text[pos..].char_indices().nth(after).map_or(text.len(), |(i, _)| pos + i);
     let mut s: String = text[start..end].split_whitespace().collect::<Vec<_>>().join(" ");
     if start > 0 {
         s.insert(0, '…');
@@ -471,9 +1212,10 @@ pub fn sort_hits(entries: &[Entry], hits: &mut [u32], key: SortKey, descending: 
 }
 
 /// Byte ranges `[start, end)` of `name` (the original, un-normalised name)
-/// covered by any occurrence of any alternative of any term, sorted and
-/// merged. Diacritics right after a match are included so the highlighted
-/// word stays whole. Excluded words are not highlighted.
+/// covered by any occurrence of any alternative of any term, whole word,
+/// proximity word or regex, sorted and merged. Diacritics right after a match
+/// are included so the highlighted word stays whole. Excluded words are not
+/// highlighted.
 pub fn match_ranges(name: &str, q: &Query) -> Vec<(usize, usize)> {
     let (norm, map) = normalize_with_map(name);
     let src_end = |last: usize| {
@@ -493,15 +1235,16 @@ pub fn match_ranges(name: &str, q: &Query) -> Vec<(usize, usize)> {
             from = s + norm[s..].chars().next().map_or(1, char::len_utf8);
         }
     }
-    ranges.sort_unstable();
-    let mut merged: Vec<(usize, usize)> = Vec::with_capacity(ranges.len());
-    for (s, e) in ranges {
-        match merged.last_mut() {
-            Some(last) if s <= last.1 => last.1 = last.1.max(e),
-            _ => merged.push((s, e)),
-        }
+    for t in q.words.iter() {
+        ranges.extend(t.spans(&norm, true).into_iter().map(|(s, e)| (map[s] as usize, src_end(e - 1))));
     }
-    merged
+    for t in q.near.iter().flat_map(|n| &n.words) {
+        ranges.extend(t.spans(&norm, false).into_iter().map(|(s, e)| (map[s] as usize, src_end(e - 1))));
+    }
+    for r in &q.regexes {
+        ranges.extend(r.ranges(name));
+    }
+    merge_spans(ranges)
 }
 
 /// Moves the hits listed in `boosted` (entry index, score) to the front,
@@ -762,6 +1505,12 @@ mod tests {
             sort_hits(&entries, &mut hits, key, false);
             println!("{key:?}: {:?}", t.elapsed());
         }
+        for input in ["ملف 12", "مشروع", "ملف .txt", "ملف size:>50kb", "size:<1kb", "ملف dm:>1970-01-05"] {
+            let q = Query::parse(input);
+            let t = std::time::Instant::now();
+            let n = search_names(&entries, &q, "").len();
+            println!("search {input}: {n} hits in {:?}", t.elapsed());
+        }
     }
 
     fn highlighted<'a>(name: &'a str, q: &str) -> Vec<&'a str> {
@@ -892,6 +1641,350 @@ mod tests {
         // No terms: only counts candidates. Cancelled: checks nothing.
         assert_eq!(run("ext:txt", false), (2, 0, vec![]));
         assert_eq!(run("تقرير", true), (2, 0, vec![]));
+        // Size filters narrow the candidates; regex alone searches the text.
+        assert_eq!(run("تقرير size:>100b", false).0, 0);
+        assert_eq!(run("تقرير حجم:<1ك", false).2.len(), 1);
+        assert_eq!(run("regex:السنو.", false).2.len(), 1);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    // ------------------------------------------------- size and date filters
+
+    /// 2024-05-15 (a Wednesday) 10:00 UTC.
+    const NOW: i64 = 1_715_767_200;
+
+    fn at(input: &str) -> Query {
+        Query::parse_at(input, NOW, 0)
+    }
+
+    fn utc(y: i64, m: u32, d: u32) -> i64 {
+        days_from_civil(y, m, d) * DAY
+    }
+
+    #[test]
+    fn civil_dates_round_trip() {
+        assert_eq!(days_from_civil(1970, 1, 1), 0);
+        assert_eq!(utc(2024, 5, 15) + 10 * 3600, NOW);
+        for z in [-800_000, -1, 0, 59, 60, 11_016, 19_858, 2_000_000] {
+            let (y, m, d) = civil_from_days(z);
+            assert_eq!(days_from_civil(y, m, d), z);
+        }
+        assert_eq!(civil_from_days(utc(2024, 2, 29) / DAY), (2024, 2, 29));
+        assert_eq!(days_in_month(2024, 2), 29);
+        assert_eq!(days_in_month(1900, 2), 28);
+        assert_eq!(days_in_month(2000, 2), 29);
+    }
+
+    #[test]
+    fn parse_sizes() {
+        assert_eq!(at("size:>10mb").size, Some((10 * MB + 1, u64::MAX)));
+        assert_eq!(at("size:>=2gb").size, Some((2 * GB, u64::MAX)));
+        assert_eq!(at("size:<500kb").size, Some((0, 500 * KB - 1)));
+        assert_eq!(at("size:<=1k").size, Some((0, KB)));
+        assert_eq!(at("SIZE:1mb..5mb").size, Some((MB, 5 * MB)));
+        assert_eq!(at("size:1.5mb").size, Some((MB * 3 / 2, MB * 3 / 2)));
+        assert_eq!(at("size:..1kb").size, Some((0, KB)));
+        assert_eq!(at("size:10").size, Some((10, 10)));
+        // Arabic prefix, units and digits.
+        assert_eq!(at("حجم:>10م").size, Some((10 * MB + 1, u64::MAX)));
+        assert_eq!(at("حجم:<٥٠٠ك").size, Some((0, 500 * KB - 1)));
+        assert_eq!(at("حجم:٢ج..٣ج").size, Some((2 * GB, 3 * GB)));
+        assert_eq!(at("حجم:١٫٥م").size, Some((MB * 3 / 2, MB * 3 / 2)));
+        // Named sizes.
+        assert_eq!(at("size:empty").size, Some((0, 0)));
+        assert_eq!(at("حجم:فارغ").size, Some((0, 0)));
+        assert_eq!(at("size:tiny").size, Some((1, 10 * KB)));
+        assert_eq!(at("حجم:صغير").size, at("size:small").size);
+        assert_eq!(at("حجم:كبير").size, Some((MB + 1, 16 * MB)));
+        assert_eq!(at("حجم:\"كبير جدا\"").size, at("size:huge").size);
+        assert_eq!(at("size:huge").size, Some((16 * MB + 1, 128 * MB)));
+        assert_eq!(at("size:gigantic").size, Some((128 * MB + 1, u64::MAX)));
+        // Two filters intersect.
+        assert_eq!(at("size:>1mb size:<2mb").size, Some((MB + 1, 2 * MB - 1)));
+        // A size filter alone narrows the results.
+        assert!(!at("size:>1mb").is_empty());
+        assert!(at("size:>1mb").warnings.is_empty());
+    }
+
+    #[test]
+    fn bad_filter_values_become_words() {
+        for input in ["size:>10xb", "size:5mb..1mb", "size:<0", "size:abc", "حجم:..", "dm:2024-13", "dm:soon", "تاريخ:2024-02-30"] {
+            let q = at(input);
+            assert_eq!(q.size, None, "{input}");
+            assert_eq!(q.mtime, None, "{input}");
+            assert_eq!(q.warnings.len(), 1, "{input}");
+            assert_eq!(alts(&q), vec![vec![normalize(input)]], "{input}");
+        }
+        assert!(at("size:abc").warnings[0].contains("الحجم"));
+        assert!(at("dm:soon").warnings[0].contains("التاريخ"));
+        // An empty value is ignored, like `ext:`.
+        let q = at("size: dm: regex: ww:");
+        assert!(q.is_empty() && q.warnings.is_empty());
+    }
+
+    #[test]
+    fn parse_calendar_dates() {
+        let day = |y, m, d| (utc(y, m, d), utc(y, m, d) + DAY);
+        assert_eq!(at("dm:today").mtime, Some(day(2024, 5, 15)));
+        assert_eq!(at("dm:yesterday").mtime, Some(day(2024, 5, 14)));
+        assert_eq!(at("تاريخ:اليوم").mtime, at("dm:today").mtime);
+        assert_eq!(at("تاريخ:أمس").mtime, at("dm:yesterday").mtime);
+        assert_eq!(at("تاريخ:امس").mtime, at("dm:yesterday").mtime);
+        // Weeks start on Saturday: 2024-05-11.
+        assert_eq!(at("dm:thisweek").mtime, Some((utc(2024, 5, 11), utc(2024, 5, 18))));
+        assert_eq!(at("dm:lastweek").mtime, Some((utc(2024, 5, 4), utc(2024, 5, 11))));
+        assert_eq!(at("تاريخ:هذا_الأسبوع").mtime, at("dm:thisweek").mtime);
+        assert_eq!(at("dm:thismonth").mtime, Some((utc(2024, 5, 1), utc(2024, 6, 1))));
+        assert_eq!(at("dm:lastmonth").mtime, Some((utc(2024, 4, 1), utc(2024, 5, 1))));
+        assert_eq!(at("تاريخ:هذا_الشهر").mtime, at("dm:thismonth").mtime);
+        assert_eq!(at("dm:thisyear").mtime, Some((utc(2024, 1, 1), utc(2025, 1, 1))));
+        assert_eq!(at("تاريخ:هذه_السنة").mtime, at("dm:thisyear").mtime);
+        assert_eq!(at("تاريخ:هذه_السنه").mtime, at("dm:thisyear").mtime);
+        assert_eq!(at("dm:lastyear").mtime, Some((utc(2023, 1, 1), utc(2024, 1, 1))));
+        // Quoted Arabic words may use a space instead of `_`.
+        assert_eq!(at("تاريخ:\"هذا الشهر\" عقد").mtime, at("dm:thismonth").mtime);
+        assert_eq!(alts(&at("تاريخ:\"هذا الشهر\" عقد")), vec![vec!["عقد"]]);
+    }
+
+    #[test]
+    fn parse_dates_in_local_time() {
+        // 01:00 on the 16th in UTC+3 is still the 15th in UTC.
+        let late = utc(2024, 5, 15) + 22 * 3600;
+        let q = Query::parse_at("dm:today", late, 3 * 3600);
+        assert_eq!(q.mtime, Some((utc(2024, 5, 16) - 3 * 3600, utc(2024, 5, 17) - 3 * 3600)));
+        let q = Query::parse_at("dm:2024-05-12", NOW, -5 * 3600);
+        assert_eq!(q.mtime, Some((utc(2024, 5, 12) + 5 * 3600, utc(2024, 5, 13) + 5 * 3600)));
+        // The global offset is what `parse` uses.
+        set_utc_offset_secs(7200);
+        assert_eq!(utc_offset_secs(), 7200);
+        let (from, to) = Query::parse("dm:today").mtime.unwrap();
+        assert_eq!((to - from, (from + 7200) % DAY), (DAY, 0));
+        set_utc_offset_secs(0);
+    }
+
+    #[test]
+    fn parse_explicit_dates() {
+        assert_eq!(at("dm:2024").mtime, Some((utc(2024, 1, 1), utc(2025, 1, 1))));
+        assert_eq!(at("dm:2024-05").mtime, Some((utc(2024, 5, 1), utc(2024, 6, 1))));
+        assert_eq!(at("dm:2024-12").mtime, Some((utc(2024, 12, 1), utc(2025, 1, 1))));
+        assert_eq!(at("dm:2024-05-12").mtime, Some((utc(2024, 5, 12), utc(2024, 5, 13))));
+        assert_eq!(at("dm:2024/5/2").mtime, Some((utc(2024, 5, 2), utc(2024, 5, 3))));
+        assert_eq!(at("dm:>2024-01-01").mtime, Some((utc(2024, 1, 2), i64::MAX)));
+        assert_eq!(at("dm:>=2024-01-01").mtime, Some((utc(2024, 1, 1), i64::MAX)));
+        assert_eq!(at("dm:<2023").mtime, Some((i64::MIN, utc(2023, 1, 1))));
+        assert_eq!(at("dm:<=2023").mtime, Some((i64::MIN, utc(2024, 1, 1))));
+        assert_eq!(at("dm:2024-01..2024-03").mtime, Some((utc(2024, 1, 1), utc(2024, 4, 1))));
+        assert_eq!(at("dm:2024-02-28..").mtime, Some((utc(2024, 2, 28), i64::MAX)));
+        assert_eq!(at("dm:2024-02-29").mtime, Some((utc(2024, 2, 29), utc(2024, 3, 1))));
+        // Arabic-Indic digits.
+        assert_eq!(at("تاريخ:٢٠٢٤-٠٥").mtime, at("dm:2024-05").mtime);
+        assert_eq!(at("dm:>٢٠٢٤-٠١-٠١").mtime, at("dm:>2024-01-01").mtime);
+        // Two filters intersect.
+        assert_eq!(at("dm:2024 dm:<2024-03").mtime, Some((utc(2024, 1, 1), utc(2024, 3, 1))));
+    }
+
+    #[test]
+    fn parse_recent_periods() {
+        assert_eq!(at("dm:7d").mtime, Some((NOW - 7 * DAY, i64::MAX)));
+        assert_eq!(at("dm:3w").mtime, Some((NOW - 21 * DAY, i64::MAX)));
+        assert_eq!(at("dm:2m").mtime, Some((utc(2024, 3, 15) + 10 * 3600, i64::MAX)));
+        assert_eq!(at("dm:1y").mtime, Some((utc(2023, 5, 15) + 10 * 3600, i64::MAX)));
+        assert_eq!(at("dm:٧d").mtime, at("dm:7d").mtime);
+        assert_eq!(at("dm:<7d").mtime, Some((i64::MIN, NOW - 7 * DAY)));
+        // Month arithmetic clamps the day: 31 March minus one month is 29 February.
+        let q = Query::parse_at("dm:1m", utc(2024, 3, 31), 0);
+        assert_eq!(q.mtime, Some((utc(2024, 2, 29), i64::MAX)));
+    }
+
+    #[test]
+    fn name_search_with_size_and_date() {
+        let entries = vec![
+            sized(r"C:\a\تقرير صغير.pdf", false, 2 * KB, utc(2024, 5, 15) + 100),
+            sized(r"C:\a\تقرير كبير.pdf", false, 20 * MB, utc(2024, 5, 14)),
+            sized(r"C:\a\تقرير", true, 0, utc(2024, 5, 15)),
+            sized(r"C:\a\فارغ.txt", false, 0, utc(2023, 1, 1)),
+        ];
+        let find = |s: &str| search_names(&entries, &at(s), "");
+        assert_eq!(find("تقرير size:>10mb"), vec![1]);
+        assert_eq!(find("تقرير حجم:<10ك"), vec![0]);
+        // Folders have no size.
+        assert_eq!(find("size:<1gb").len(), 3);
+        assert_eq!(find("size:empty"), vec![3]);
+        // Dates apply to folders too.
+        assert_eq!(find("تقرير dm:today"), vec![2, 0]);
+        assert_eq!(find("تاريخ:أمس"), vec![1]);
+        assert_eq!(find("dm:<2024"), vec![3]);
+        assert_eq!(find("dm:2024 size:>1kb ext:pdf").len(), 2);
+    }
+
+    // ------------------------------------------------- regex and whole word
+
+    #[test]
+    fn parse_regex_and_words() {
+        let q = at(r"regex:^IMG_\d+\.jpg$ re:a|b");
+        assert_eq!(q.regexes.iter().map(|r| r.source.as_str()).collect::<Vec<_>>(), vec![r"^IMG_\d+\.jpg$", "a|b"]);
+        assert!(q.terms.is_empty() && !q.is_empty() && q.has_text_criteria());
+        let q = at("regex:(abc");
+        assert_eq!(q.regexes.len(), 1);
+        assert_eq!(q.warnings.len(), 1);
+        assert!(q.warnings[0].contains("(abc"));
+        // A quoted value keeps its spaces.
+        assert_eq!(at(r#"regex:"a b" c"#).regexes[0].source, "a b");
+        assert_eq!(alts(&at(r#"regex:"a b" c"#)), vec![vec!["c"]]);
+        let q = at("ww:أحمد كلمة:عقد|إيجار");
+        let words: Vec<Vec<&str>> = q.words.iter().map(|t| t.alts.iter().map(String::as_str).collect()).collect();
+        assert_eq!(words, vec![vec!["احمد"], vec!["عقد", "ايجار"]]);
+        assert!(q.terms.is_empty() && !q.is_empty());
+        // A huge pattern hits the size limit instead of eating memory.
+        assert!(!Pattern::new(r"\w{1000}\w{1000}\w{1000}").is_valid());
+    }
+
+    #[test]
+    fn whole_words() {
+        assert_eq!(word_matches("عقد العقد عقد_2 عقدة", "عقد").collect::<Vec<_>>(), vec![0, "عقد العقد ".len()]);
+        assert!(word_matches("abc", "b").next().is_none());
+        assert_eq!(split_words("  a-bc_د.ه ").collect::<Vec<_>>(), vec![(2, "a"), (4, "bc"), (7, "د"), (10, "ه")]);
+        assert!(split_words(" .. ").next().is_none());
+    }
+
+    #[test]
+    fn name_search_with_regex_and_words() {
+        let entries = vec![
+            entry(r"C:\a\IMG_2041.JPG", false),
+            entry(r"C:\a\img-x.jpg", false),
+            entry(r"C:\a\عقد إيجار.docx", false),
+            entry(r"C:\a\العقود.docx", false),
+            entry(r"C:\a\عقد_2024.pdf", false),
+        ];
+        let find = |s: &str| search_names(&entries, &at(s), "");
+        assert_eq!(find(r"regex:^img_\d+\.jpg$"), vec![0]);
+        assert_eq!(find("re:jpg$ !x"), vec![0]);
+        // Regex sees the original name: the hamza is not folded.
+        assert_eq!(find("re:إيجار"), vec![2]);
+        assert!(find("re:ايجار").is_empty());
+        assert!(find("regex:(").is_empty());
+        assert_eq!(find("ww:عقد"), vec![4, 2]); // shorter name first
+        assert_eq!(find("كلمة:أيجار"), vec![2]);
+        assert!(find("ww:عق").is_empty());
+        assert_eq!(find("ww:2024 ext:pdf"), vec![4]);
+    }
+
+    #[test]
+    fn content_regex_and_words() {
+        let text = "رقم الفاتورة INV-2024-0042 بتاريخ اليوم.\nالعقدة ليست عقداً.";
+        let s = match_text(text, &at(r"regex:inv-\d{4}-\d+")).unwrap();
+        assert!(s.contains("INV-2024-0042"), "{s}");
+        assert!(match_text(text, &at(r"regex:^العقدة")).is_some());
+        assert!(match_text(text, &at("regex:[")).is_none());
+        assert!(match_text(text, &at("ww:فاتوره")).is_none());
+        assert!(match_text(text, &at("ww:الفاتوره")).is_some());
+        assert!(match_text(text, &at("ww:عقدا")).is_some());
+        assert!(match_text(text, &at("ww:عقد")).is_none());
+    }
+
+    #[test]
+    fn highlight_regex_words_and_near() {
+        assert_eq!(highlighted("IMG_2041.JPG", r"re:\d+"), vec!["2041"]);
+        assert_eq!(highlighted("عقد العقد.pdf", "ww:عقد"), vec!["عقد"]);
+        assert_eq!(highlighted("عَقْد إيجار", "ww:عقد"), vec!["عَقْد"]);
+        assert_eq!(highlighted("a ab", "re:a ww:ab"), vec!["a", "ab"]);
+        assert_eq!(highlighted("عقد شقة إيجار", r#""عقد ايجار"~3"#), vec!["عقد", "إيجار"]);
+        // Empty regex matches are not highlighted.
+        assert!(highlighted("abc", "re:^").is_empty());
+    }
+
+    // ------------------------------------------------------------ proximity
+
+    #[test]
+    fn parse_proximity() {
+        let q = at(r#""عقد الإيجار"~5 تقرير"#);
+        assert_eq!(q.near.len(), 1);
+        assert_eq!(q.near[0].dist, 5);
+        let words: Vec<Vec<&str>> = q.near[0].words.iter().map(|t| t.alts.iter().map(String::as_str).collect()).collect();
+        assert_eq!(words, vec![vec!["عقد"], vec!["الايجار", "ايجار"]]);
+        assert_eq!(alts(&q), vec![vec!["تقرير"]]);
+        assert_eq!(at(r#""a b"~٣"#).near[0].dist, 3);
+        // One word is a plain phrase; `~` without digits stays a word.
+        assert_eq!(alts(&at(r#""عقد"~5"#)), vec![vec!["عقد"]]);
+        let q = at(r#""a b"~x"#);
+        assert!(q.near.is_empty());
+        assert_eq!(alts(&q), vec![vec!["a b"], vec!["~x"]]);
+        assert_eq!(alts(&at(r#""a b"~5x"#)), vec![vec!["a b"], vec!["~5x"]]);
+    }
+
+    #[test]
+    fn proximity_matching() {
+        let q = at(r#""عقد إيجار"~3"#);
+        assert!(match_text("هذا عقد شقة سكنية إيجار سنوي", &q).is_some());
+        assert!(match_text("الإيجار الشهري لهذا العقد", &q).is_some()); // any order
+        assert!(match_text("عقد واحد اثنان ثلاثة أربعة إيجار", &q).is_none());
+        // A far pair doesn't count but a later close one does.
+        let s = match_text("عقد ١ ٢ ٣ ٤ ٥ نص طويل هنا ثم عقد إيجار", &q).unwrap();
+        assert!(s.starts_with("…") || s.contains("عقد إيجار"), "{s}");
+        let near = &q.near[0];
+        assert_eq!(near.find("x عقد ايجار"), Some(2));
+        assert_eq!(near.find("عقد 1 2 3 4 5 ايجار 6 عقد"), Some("عقد 1 2 3 4 5 ".len()));
+        // Three words: all within the distance of each other.
+        let q3 = at(r#""a b c"~2"#);
+        assert!(match_text("c x a b", &q3).is_none());
+        assert!(match_text("c a b", &q3).is_some());
+        // Name search uses the file name's words.
+        let entries = vec![entry(r"C:\عقد شقة إيجار.pdf", false), entry(r"C:\عقد 1 2 3 4 إيجار.pdf", false)];
+        assert_eq!(search_names(&entries, &q, ""), vec![0]);
+    }
+
+    // --------------------------------------------------- all matches in text
+
+    #[test]
+    fn all_matches_counts_and_lines() {
+        let text = "سطر أول فيه التقرير\n\nالتقرير والتقرير الثاني\r\nلا شيء\nتقرير أخير";
+        let (count, lines) = all_matches(text, &at("التقرير"), 50);
+        // "التقرير" and its bare form "تقرير" overlap and count once.
+        assert_eq!(count, 4);
+        assert_eq!(
+            lines,
+            vec![
+                (1, "سطر أول فيه التقرير".to_string()),
+                (3, "التقرير والتقرير الثاني".to_string()),
+                (5, "تقرير أخير".to_string())
+            ]
+        );
+        let (count, lines) = all_matches(text, &at("التقرير"), 2);
+        assert_eq!((count, lines.len()), (4, 2));
+        assert_eq!(all_matches(text, &at("غير موجود"), 50), (0, vec![]));
+        assert_eq!(all_matches(text, &at("تقرير !شيء"), 50), (0, vec![]));
+        // Every term must be present; all are counted.
+        assert_eq!(all_matches(text, &at("تقرير ثاني"), 50).0, 5);
+        assert_eq!(all_matches(text, &at("تقرير مفقود"), 50).0, 0);
+        // Regex, whole word and proximity matches count too.
+        assert_eq!(all_matches(text, &at("re:تقرير"), 50).0, 4);
+        assert_eq!(all_matches(text, &at("ww:تقرير"), 50), (1, vec![(5, "تقرير أخير".to_string())]));
+        assert_eq!(all_matches(text, &at(r#""التقرير الثاني"~1"#), 50).0, 2);
+    }
+
+    #[test]
+    fn all_matches_long_lines() {
+        let long = format!("{}مفتاح{}", "أ".repeat(500), "ب".repeat(500));
+        let text = format!("x\n{long}\n{}", "مفتاح ".repeat(3000));
+        let (count, lines) = all_matches(&text, &at("مفتاح"), 50);
+        assert_eq!(count, 3001);
+        assert_eq!(lines.len(), 2);
+        let (n, line) = &lines[0];
+        assert_eq!(*n, 2);
+        assert!(line.starts_with('…') && line.ends_with('…') && line.contains("مفتاح"), "{line}");
+        assert!(line.chars().count() <= 203, "{}", line.chars().count());
+        assert_eq!(lines[1].0, 3);
+    }
+
+    #[test]
+    fn content_hit_fields() {
+        let text = "عقد الإيجار\nبند ثانٍ\nنهاية العقد";
+        let hit = content_hit(7, text, &at("عقد")).unwrap();
+        assert_eq!(hit.index, 7);
+        assert_eq!(hit.snippet, match_text(text, &at("عقد")).unwrap());
+        assert_eq!(hit.count, 2);
+        assert_eq!(hit.lines, vec![(1, "عقد الإيجار".to_string()), (3, "نهاية العقد".to_string())]);
+        assert!(content_hit(0, text, &at("مفقود")).is_none());
+        assert!(content_hit(0, text, &at("ext:pdf")).is_none());
     }
 }
