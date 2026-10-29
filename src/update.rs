@@ -8,16 +8,20 @@
 //! All Windows functions block; call them from a background thread except
 //! `cleanup_old` and `wait_for_previous_instance_exit`, which are meant for
 //! startup.
+#![cfg(any(windows, test))]
 
 
 /// GitHub API endpoint for the newest published (non-draft, non-prerelease) release.
+#[cfg(windows)]
 pub const LATEST_URL: &str =
     "https://api.github.com/repos/sarmadiq9090-coder/arabic-file-search/releases/latest";
 /// Named mutex that keeps a single copy of the program running (ui.rs).
+#[cfg(windows)]
 pub const SINGLE_INSTANCE_MUTEX: &str = "Local\\BahthSari.SingleInstance";
 /// Name of the release asset that holds the program.
 pub const ASSET_NAME: &str = "bahth.exe";
 /// Upper bound for the JSON answer.
+#[cfg(windows)]
 pub const MAX_JSON: usize = 1 << 20;
 /// Upper bound for the downloaded program.
 pub const MAX_DOWNLOAD: u64 = 100 << 20;
@@ -199,7 +203,6 @@ pub fn split_https_url(url: &str) -> Result<(String, u16, String), String> {
 }
 
 #[cfg(windows)]
-#[allow(unused_imports)]
 pub use win::*;
 
 #[cfg(windows)]
