@@ -36,7 +36,8 @@ const OPTIONS: &[(&str, bool)] = &[
 /// True when `arg` (the first command-line argument) asks for the CLI rather
 /// than the GUI. Anything else, `--updated` included, starts the GUI.
 pub fn is_cli_arg(arg: &str) -> bool {
-    let name = arg.split_once('=').map_or(arg, |(n, _)| n);
+    // Only long options take `--name=value`, as in `parse_args`.
+    let name = if arg.starts_with("--") { arg.split_once('=').map_or(arg, |(n, _)| n) } else { arg };
     OPTIONS.iter().any(|&(o, _)| o == name)
 }
 
@@ -411,11 +412,19 @@ mod console {
                 };
                 let text = String::from_utf8_lossy(&self.buf[..valid]);
                 let wide: Vec<u16> = text.encode_utf16().collect();
-                for chunk in wide.chunks(8192) {
+                let mut rest = &wide[..];
+                while !rest.is_empty() {
+                    // At most 8192 units per call, never splitting a surrogate pair.
+                    let mut take = rest.len().min(8192);
+                    if take < rest.len() && (0xD800..0xDC00).contains(&rest[take - 1]) {
+                        take -= 1;
+                    }
                     let mut done = 0;
-                    if unsafe { WriteConsoleW(self.handle, chunk.as_ptr().cast(), chunk.len() as DWORD, &mut done, null_mut()) } == 0 {
+                    if unsafe { WriteConsoleW(self.handle, rest.as_ptr().cast(), take as DWORD, &mut done, null_mut()) } == 0 {
                         return Err(io::Error::last_os_error());
                     }
+                    // A short write continues from where it stopped.
+                    rest = &rest[(done as usize).clamp(1, take)..];
                 }
                 valid
             } else {
@@ -527,7 +536,7 @@ mod tests {
         for a in ["-s", "--search", "-n", "--max=3", "--count", "--json", "-h", "--help", "--version", "/?"] {
             assert!(is_cli_arg(a), "{a}");
         }
-        for a in ["--updated", "", "فاتورة", "-x", "--searchx", r"C:\file.txt"] {
+        for a in ["--updated", "", "فاتورة", "-x", "--searchx", "-n=5", r"C:\file.txt"] {
             assert!(!is_cli_arg(a), "{a}");
         }
     }
