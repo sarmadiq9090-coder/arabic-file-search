@@ -76,7 +76,22 @@ struct State {
     loading: Option<LoadJob>,
     scan: Option<ScanJob>,
     content: Option<ContentJob>,
+    /// A filename search is running on a background thread.
+    name_running: bool,
+    /// The query changed while a search was running; search again when it ends.
+    name_pending: bool,
     settings: Settings,
+}
+
+/// The outcome of a background filename search.
+struct NameResult {
+    index: Arc<Index>,
+    hits: Vec<u32>,
+    text: String,
+    /// The query re-typed in the other keyboard layout, when that found the hits.
+    converted: Option<String>,
+    empty: bool,
+    ms: usize,
 }
 
 #[derive(Default)]
@@ -102,6 +117,9 @@ pub struct App {
     options_btn: nwg::Button,
     status: nwg::StatusBar,
     timer: nwg::AnimationTimer,
+    /// Wakes the UI thread when a background filename search finishes.
+    name_notice: nwg::Notice,
+    name_result: Arc<Mutex<Option<NameResult>>>,
     folder_dialog: nwg::FileDialog,
     export_dialog: nwg::FileDialog,
     menu: nwg::Menu,
@@ -204,7 +222,14 @@ impl App {
         let slot: LoadJob = Arc::new(Mutex::new(None));
         let s = slot.clone();
         std::thread::spawn(move || {
+            background_priority();
+            let started = std::time::Instant::now();
             let idx = Index::load(&index::cache_path());
+            log(&format!(
+                "index load: {} entries in {} ms",
+                idx.as_ref().map_or(0, |i| i.entries.len()),
+                started.elapsed().as_millis()
+            ));
             if let Ok(mut slot) = s.lock() {
                 *slot = Some(idx);
             }
@@ -246,7 +271,10 @@ impl App {
         let result = Arc::new(Mutex::new(None));
         let (p, r) = (progress.clone(), result.clone());
         std::thread::spawn(move || {
+            background_priority();
+            let started = std::time::Instant::now();
             let idx = Index::build(&index::list_drives(), &p);
+            log(&format!("index build: {} entries in {} ms", idx.entries.len(), started.elapsed().as_millis()));
             let _ = idx.save(&index::cache_path());
             if let Ok(mut slot) = r.lock() {
                 *slot = Some(idx);
@@ -296,47 +324,89 @@ impl App {
         }
     }
 
+    /// Starts a filename search on a background thread, so typing never
+    /// waits for a search over millions of names. While one runs, later
+    /// keystrokes are folded into a single follow-up search.
     fn search_names(&self) {
         self.cancel_content();
-        let text = self.query.text();
-        let q = self.parse_query(&text);
         let mut st = self.state.borrow_mut();
-        let started = std::time::Instant::now();
-        let mut hits = search::search_names(&st.index.entries, &q, &st.scope);
-        // Typed with the wrong keyboard layout? ("hgjrvdv" → "التقرير")
-        let mut converted = None;
-        if hits.is_empty() && !q.is_empty()
-            && let Some(alt) = layout::convert_layout(&text)
-        {
-            let alt_hits = search::search_names(&st.index.entries, &self.parse_query(&alt), &st.scope);
-            if !alt_hits.is_empty() {
-                hits = alt_hits;
-                converted = Some(alt);
-            }
+        if st.name_running {
+            st.name_pending = true;
+            return;
         }
-        st.rows = hits.into_iter().map(|entry| Row { entry, snippet: None }).collect();
-        st.rows_index = st.index.clone();
+        st.name_running = true;
+        st.name_pending = false;
+        let index = st.index.clone();
+        let scope = st.scope.clone();
+        drop(st);
+
+        let text = self.query.text();
+        let kind = self.kind();
+        let parse = move |t: &str| {
+            let mut q = Query::parse(t);
+            q.apply_kind(kind);
+            q
+        };
+        let slot = self.name_result.clone();
+        let notice = self.name_notice.sender();
+        std::thread::spawn(move || {
+            let started = std::time::Instant::now();
+            let q = parse(&text);
+            let mut hits = search::search_names(&index.entries, &q, &scope);
+            // Typed with the wrong keyboard layout? ("hgjrvdv" → "التقرير")
+            let mut converted = None;
+            if hits.is_empty() && !q.is_empty()
+                && let Some(alt) = layout::convert_layout(&text)
+            {
+                let alt_hits = search::search_names(&index.entries, &parse(&alt), &scope);
+                if !alt_hits.is_empty() {
+                    hits = alt_hits;
+                    converted = Some(alt);
+                }
+            }
+            let ms = started.elapsed().as_millis() as usize;
+            if let Ok(mut r) = slot.lock() {
+                *r = Some(NameResult { index, hits, text, converted, empty: q.is_empty(), ms });
+            }
+            notice.notice();
+        });
+    }
+
+    fn on_names_found(&self) {
+        let Some(res) = self.name_result.lock().ok().and_then(|mut r| r.take()) else { return };
+        let mut st = self.state.borrow_mut();
+        st.name_running = false;
+        if st.name_pending {
+            // The query changed meanwhile: these results are already stale.
+            drop(st);
+            self.search_names();
+            return;
+        }
+        if st.content.is_some() || self.content_mode() {
+            return;
+        }
+        st.rows = res.hits.into_iter().map(|entry| Row { entry, snippet: None }).collect();
+        st.rows_index = res.index;
         let n = st.rows.len();
         let busy = st.scan.is_some() || st.loading.is_some();
         drop(st);
         self.refresh_list();
-        if q.is_empty() {
+        if res.empty {
             if !busy {
                 self.set_status("اكتب اسم الملف أو جزءاً منه للبحث.");
             }
             return;
         }
-        let ms = started.elapsed().as_millis() as usize;
         let tail = if busy { " (الفهرسة ما زالت جارية)" } else { "" };
-        match converted {
+        match res.converted {
             Some(alt) => self.set_status(&format!(
                 "لا نتائج لـ «{}»، عرض نتائج «{}»: {} نتيجة في {} ملي ثانية{tail}",
-                text.trim(),
+                res.text.trim(),
                 alt,
                 fmt_num(n),
-                fmt_num(ms)
+                fmt_num(res.ms)
             )),
-            None => self.set_status(&format!("وجدت {} نتيجة في {} ملي ثانية{tail}", fmt_num(n), fmt_num(ms))),
+            None => self.set_status(&format!("وجدت {} نتيجة في {} ملي ثانية{tail}", fmt_num(n), fmt_num(res.ms))),
         }
     }
 
@@ -1046,6 +1116,7 @@ impl NativeUi<AppUi> for App {
             .interval(Duration::from_millis(200))
             .active(true)
             .build(&mut app.timer)?;
+        nwg::Notice::builder().parent(w).build(&mut app.name_notice)?;
         nwg::FileDialog::builder()
             .title("اختر المجلد الذي تريد البحث فيه")
             .action(nwg::FileDialogAction::OpenDirectory)
@@ -1103,6 +1174,7 @@ impl NativeUi<AppUi> for App {
                 E::OnKeyEsc => app.on_escape(),
                 E::OnKeyPress => app.on_key(handle, data.on_key()),
                 E::OnTimerTick if handle == app.timer => app.on_tick(),
+                E::OnNotice if handle == app.name_notice => app.on_names_found(),
                 E::OnComboxBoxSelection if handle == app.kind_combo => app.on_kind_changed(),
                 E::OnButtonClick => {
                     if handle == app.search_btn {
@@ -1214,6 +1286,24 @@ fn ui_font_family() -> String {
         .to_string()
 }
 
+/// Lets the user interface win when a background thread competes for the CPU.
+fn background_priority() {
+    use winapi::um::processthreadsapi::{GetCurrentThread, SetThreadPriority};
+    use winapi::um::winbase::THREAD_PRIORITY_BELOW_NORMAL;
+    unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL as i32) };
+}
+
+/// Appends a timestamped line to `%LOCALAPPDATA%\BahthSari\log.txt`, kept short.
+fn log(line: &str) {
+    let path = index::cache_path().with_file_name("log.txt");
+    if std::fs::metadata(&path).is_ok_and(|m| m.len() > 64 * 1024) {
+        let _ = std::fs::remove_file(&path);
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let _ = writeln!(f, "{} {line}", index::now_secs());
+    }
+}
+
 /// If the program is already running, brings its window forward and returns true.
 fn activate_running_copy() -> bool {
     use winapi::shared::winerror::ERROR_ALREADY_EXISTS;
@@ -1251,8 +1341,12 @@ pub fn run() {
         return;
     }
     let _ = nwg::Font::set_global_family(&ui_font_family());
+    let started = std::time::Instant::now();
     let ui = match App::build_ui(App::default()) {
-        Ok(ui) => ui,
+        Ok(ui) => {
+            log(&format!("window ready in {} ms (v{})", started.elapsed().as_millis(), env!("CARGO_PKG_VERSION")));
+            ui
+        }
         Err(e) => {
             nwg::fatal_message(TITLE, &format!("تعذر إنشاء الواجهة: {e}"));
         }
