@@ -7,7 +7,7 @@ use std::io::Write;
 
 use winapi::shared::minwindef::LPARAM;
 
-use super::format::{csv_field, fmt_num, fmt_size, ltr_path};
+use super::format::{csv_field, digits, fmt_num, fmt_size, ltr_path};
 use super::shell;
 use super::{App, COL_DATE, COL_NAME, COL_PATH, COL_SIZE, COL_SNIPPET, COLUMNS, Row};
 use crate::index;
@@ -195,8 +195,37 @@ impl App {
         } else {
             search::sort_hits(&st.rows_index.entries, &mut hits, key, desc);
         }
-        let mut snippets: HashMap<u32, Option<String>> = st.rows.drain(..).map(|r| (r.entry, r.snippet)).collect();
-        st.rows = hits.into_iter().map(|entry| Row { entry, snippet: snippets.remove(&entry).flatten() }).collect();
+        let mut by_entry: HashMap<u32, Row> = st.rows.drain(..).map(|r| (r.entry, r)).collect();
+        st.rows = hits.into_iter().filter_map(|entry| by_entry.remove(&entry)).collect();
+    }
+
+    /// Opens a window listing every matching line of the selected document.
+    pub(super) fn show_matches(&self) {
+        let Some(row) = self.list.selected_item() else {
+            self.set_status("اختر ملفاً من القائمة أولاً.");
+            return;
+        };
+        let text = {
+            let st = self.state.borrow();
+            let (Some(r), Some(e)) = (st.rows.get(row), st.row_entry(row)) else { return };
+            let Some(m) = &r.matches else {
+                drop(st);
+                self.set_status("كل التطابقات متاحة لنتائج البحث داخل المستندات.");
+                return;
+            };
+            let mut t = format!("{}\r\nعدد التطابقات: {}\r\n", ltr_path(&e.path), digits(m.count.to_string()));
+            if m.lines.len() < m.count as usize {
+                t.push_str(&format!("(أول {} سطر)\r\n", digits(m.lines.len().to_string())));
+            }
+            for (line, s) in &m.lines {
+                t.push_str(&format!("\r\nسطر {}:  {}", digits(line.to_string()), s.replace(['\r', '\n'], " ")));
+            }
+            self.matches_window.set_text(&format!("كل التطابقات — {}", e.name()));
+            t
+        };
+        self.matches_text.set_text(&text);
+        self.matches_window.set_visible(true);
+        self.matches_text.set_focus();
     }
 
     /// Saves the result list as a CSV file that Excel opens with Arabic intact.
@@ -263,7 +292,14 @@ impl App {
             COL_PATH => ltr_path(&e.path),
             COL_SIZE => fmt_size(e),
             COL_DATE => shell::format_time(e.mtime, true),
-            COL_SNIPPET => r.snippet.clone().unwrap_or_default(),
+            COL_SNIPPET => {
+                let snippet = r.snippet.as_deref().unwrap_or_default();
+                match &r.matches {
+                    // "(12) …the first match…": how many places matched.
+                    Some(m) if m.count > 1 => format!("({}) {snippet}", digits(m.count.to_string())),
+                    _ => snippet.to_string(),
+                }
+            }
             _ => String::new(),
         }
     }

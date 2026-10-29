@@ -237,7 +237,8 @@ fn write_hits(entries: &[Entry], hits: &[u32], format: Format, out: &mut dyn Wri
             }
         }
         Format::Csv => {
-            out.write_all(b"path,size,modified\r\n")?;
+            // The UTF-8 BOM makes Excel read Arabic correctly from `--csv > file.csv`.
+            out.write_all("\u{FEFF}path,size,modified\r\n".as_bytes())?;
             for e in entries {
                 let size = if e.is_dir { String::new() } else { e.size.to_string() };
                 let fields = [csv_field(&e.path), size, iso_time(e.mtime)];
@@ -304,6 +305,7 @@ pub fn iso_time(secs: i64) -> String {
 /// with its code. Never touches the GUI's single-instance mutex or windows.
 #[cfg(windows)]
 pub fn run(args: &[String]) -> ! {
+    crate::search::init_local_utc_offset();
     let attached = console::attach();
     let code = match console::Writer::pair(attached) {
         Some((mut out, mut err)) => match parse_args(args) {
@@ -607,7 +609,7 @@ mod tests {
         let (_, out, _) = run_cli(&["-s", "report", "--sort", "path", "--csv"], Some(sample()));
         assert_eq!(
             out,
-            "path,size,modified\r\nC:\\docs\\reports,,2023-07-22T04:26:40Z\r\n\"C:\\old\\report, final.txt\",7,2022-04-15T05:20:00Z\r\n"
+            "\u{FEFF}path,size,modified\r\nC:\\docs\\reports,,2023-07-22T04:26:40Z\r\n\"C:\\old\\report, final.txt\",7,2022-04-15T05:20:00Z\r\n"
         );
     }
 

@@ -189,6 +189,26 @@ impl NativeUi<AppUi> for App {
         nwg::MenuItem::builder().text("نسخ مسارات كل النتائج").parent(&app.menu).build(&mut app.menu_copy_all)?;
         nwg::MenuItem::builder().text("تغيير الاسم\tF2").parent(&app.menu).build(&mut app.menu_rename)?;
         nwg::MenuItem::builder().text("نقل إلى سلة المحذوفات\tDelete").parent(&app.menu).build(&mut app.menu_delete)?;
+        nwg::MenuItem::builder().text("عرض كل التطابقات داخل الملف\tF4").parent(&app.menu).build(&mut app.menu_matches)?;
+
+        // Window with every matching line of one document (hidden until used).
+        nwg::Window::builder()
+            .title("كل التطابقات")
+            .size((720, 460))
+            .center(true)
+            .ex_flags(WS_EX_LAYOUTRTL)
+            .flags(nwg::WindowFlags::WINDOW | nwg::WindowFlags::RESIZABLE)
+            .icon(None)
+            .parent(Some(&app.window))
+            .build(&mut app.matches_window)?;
+        nwg::TextBox::builder()
+            .parent(&app.matches_window)
+            .font(f)
+            .readonly(true)
+            .flags(nwg::TextBoxFlags::VISIBLE | nwg::TextBoxFlags::VSCROLL | nwg::TextBoxFlags::AUTOVSCROLL)
+            .position((8, 8))
+            .size((704, 444))
+            .build(&mut app.matches_text)?;
 
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.options_menu)?;
         nwg::MenuItem::builder()
@@ -294,6 +314,8 @@ impl NativeUi<AppUi> for App {
                         app.copy_file();
                     } else if handle == app.menu_rename {
                         app.start_rename();
+                    } else if handle == app.menu_matches {
+                        app.show_matches();
                     } else if handle == app.menu_delete {
                         app.delete_selected();
                     } else if handle == app.menu_hotkey {
@@ -311,6 +333,29 @@ impl NativeUi<AppUi> for App {
                     } else if handle == app.tray_exit {
                         app.window.close();
                     }
+                }
+                _ => {}
+            }
+        });
+        ui.handlers.borrow_mut().push(handler);
+
+        // The "all matches" window only hides when closed, and its text fills it.
+        let weak = Rc::downgrade(&ui.inner);
+        let handler = nwg::full_bind_event_handler(&ui.matches_window.handle, move |evt, data, handle| {
+            let Some(app) = weak.upgrade() else { return };
+            if handle != app.matches_window {
+                return;
+            }
+            match evt {
+                nwg::Event::OnWindowClose => {
+                    if let nwg::EventData::OnWindowClose(d) = &data {
+                        d.close(false);
+                    }
+                    app.matches_window.set_visible(false);
+                }
+                nwg::Event::OnResize => {
+                    let (w, h) = app.matches_window.size();
+                    app.matches_text.set_size(w.saturating_sub(16), h.saturating_sub(16));
                 }
                 _ => {}
             }

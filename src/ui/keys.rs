@@ -62,6 +62,8 @@ impl App {
             } else {
                 self.copy_file();
             }
+        } else if handle == self.list.handle && key == winapi::um::winuser::VK_F4 as u32 {
+            self.show_matches();
         } else if handle == self.list.handle && key == winapi::um::winuser::VK_F2 as u32 {
             self.start_rename();
         } else if handle == self.list.handle && key == winapi::um::winuser::VK_DELETE as u32 {

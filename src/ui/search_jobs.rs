@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use super::files::flush_index_save;
 use super::format::fmt_num;
 use super::startup::{LOOP_STARTED, background_priority, log, log_phases, phase};
-use super::{App, ContentJob, LoadJob, Row, ScanJob};
+use super::{App, ContentJob, LoadJob, Matches, Row, ScanJob};
 use crate::index::{self, Index, ScanProgress};
 use crate::layout;
 use crate::search::{self, ContentHit, ContentProgress, Query, SortKey};
@@ -213,12 +213,13 @@ impl App {
             self.search_names();
             return;
         }
-        st.rows = res.hits.into_iter().map(|entry| Row { entry, snippet: None }).collect();
+        st.rows = res.hits.into_iter().map(|entry| Row { entry, snippet: None, matches: None }).collect();
         st.rows_index = res.index;
         st.shown_query = Some(self.parse_query(res.converted.as_deref().unwrap_or(&res.text)));
         let n = st.rows.len();
         let busy = st.scan.is_some() || st.loading.is_some();
         let loading = st.loading.is_some();
+        let warn = warnings_text(st.shown_query.as_ref());
         drop(st);
         self.clear_selection();
         self.refresh_list();
@@ -233,6 +234,7 @@ impl App {
             (false, true) => " (الفهرسة ما زالت جارية)",
             _ => "",
         };
+        let tail = format!("{tail}{warn}");
         match res.converted {
             Some(alt) => self.set_status(&format!(
                 "لا نتائج لـ «{}»، عرض نتائج «{}»: {} نتيجة في {} ملي ثانية{tail}",
@@ -248,7 +250,7 @@ impl App {
     pub(super) fn search_content(&self) {
         self.cancel_content();
         let q = self.parse_query(&self.query.text());
-        if q.terms.is_empty() {
+        if !q.has_text_criteria() {
             self.set_status("اكتب الكلمة أو العبارة التي تريد البحث عنها داخل المستندات.");
             return;
         }
@@ -268,7 +270,8 @@ impl App {
         self.clear_selection();
         self.refresh_list();
         self.stop_btn.set_enabled(true);
-        self.set_status("جاري البحث داخل المستندات…");
+        let warn = warnings_text(self.state.borrow().shown_query.as_ref());
+        self.set_status(&format!("جاري البحث داخل المستندات…{warn}"));
     }
 
     pub(super) fn cancel_content(&self) {
@@ -337,7 +340,11 @@ impl App {
         let checked = job.progress.checked.load(Ordering::Relaxed);
         let done = job.progress.done.load(Ordering::Relaxed);
         let changed = !new_hits.is_empty();
-        st.rows.extend(new_hits.into_iter().map(|h| Row { entry: h.index, snippet: Some(h.snippet) }));
+        st.rows.extend(new_hits.into_iter().map(|h| Row {
+            entry: h.index,
+            snippet: Some(h.snippet),
+            matches: Some(Box::new(Matches { count: h.count, lines: h.lines })),
+        }));
         let n = st.rows.len();
         if done {
             st.content = None;
@@ -395,5 +402,13 @@ impl App {
         if !self.query.text().trim().is_empty() && !self.content_mode() {
             self.search_names();
         }
+    }
+}
+
+/// " — تنبيه: …" for parts of the query that could not be understood, or "".
+fn warnings_text(q: Option<&Query>) -> String {
+    match q {
+        Some(q) if !q.warnings.is_empty() => format!(" — تنبيه: {}", q.warnings.join("، ")),
+        _ => String::new(),
     }
 }

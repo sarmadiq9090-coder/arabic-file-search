@@ -126,7 +126,7 @@ pub(super) fn log(line: &str) {
 }
 
 /// If the program is already running, brings its window forward and returns true.
-pub(super) fn activate_running_copy() -> bool {
+pub(super) fn activate_running_copy(updated: bool) -> bool {
     use winapi::shared::winerror::ERROR_ALREADY_EXISTS;
     use winapi::um::errhandlingapi::GetLastError;
     use winapi::um::synchapi::CreateMutexW;
@@ -149,8 +149,12 @@ pub(super) fn activate_running_copy() -> bool {
         std::thread::sleep(Duration::from_millis(100));
     }
     if hwnd.is_null() {
-        return true;
+        // Right after an update the old copy may hold the mutex without a
+        // window while it exits; never leave the user with no program then.
+        log(&format!("start: another copy holds the lock, no window found (updated={updated})"));
+        return !updated;
     }
+    log("start: another copy is running; brought it to the front");
     unsafe {
         ShowWindow(hwnd, if IsIconic(hwnd) != 0 { SW_RESTORE } else { SW_SHOW });
         SetForegroundWindow(hwnd);

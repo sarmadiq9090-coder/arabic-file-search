@@ -77,7 +77,13 @@ impl App {
             UpdateEvent::Installed(Ok(())) => {
                 self.set_status("اكتمل التحديث. جاري إعادة التشغيل…");
                 match crate::update::restart_new_version() {
-                    Ok(()) => self.on_close(),
+                    Ok(()) => {
+                        // Save everything, then leave at once so the new copy
+                        // gets the single-instance lock without waiting for
+                        // the index to be freed.
+                        self.on_close();
+                        std::process::exit(0);
+                    }
                     Err(e) => {
                         self.update_busy.set(false);
                         nwg::modal_info_message(

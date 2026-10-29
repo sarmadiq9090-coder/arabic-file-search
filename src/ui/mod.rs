@@ -69,6 +69,15 @@ const COLUMNS: [(&str, i32); 5] =
 struct Row {
     entry: u32,
     snippet: Option<String>,
+    /// Every match inside the document (document search only).
+    matches: Option<Box<Matches>>,
+}
+
+/// All the places a document matched, for the "all matches" window.
+struct Matches {
+    count: u32,
+    /// (1-based line number, the line around its first match).
+    lines: Vec<(u32, String)>,
 }
 
 struct ScanJob {
@@ -160,6 +169,10 @@ pub struct App {
     menu_copy_file: nwg::MenuItem,
     menu_rename: nwg::MenuItem,
     menu_delete: nwg::MenuItem,
+    menu_matches: nwg::MenuItem,
+    /// Lists every matching line of one document.
+    matches_window: nwg::Window,
+    matches_text: nwg::TextBox,
     options_menu: nwg::Menu,
     menu_hotkey: nwg::MenuItem,
     menu_digits: nwg::MenuItem,
@@ -346,14 +359,17 @@ impl App {
 }
 
 pub fn run() {
-    if std::env::args().any(|a| a == "--updated") {
+    crate::search::init_local_utc_offset();
+    let updated = std::env::args().any(|a| a == "--updated");
+    if updated {
         // The previous version is still closing; let it go first. A big
         // index can take a while to free, so wait up to a minute.
         for _ in 0..6 {
             crate::update::wait_for_previous_instance_exit();
         }
+        startup::log(&format!("start: relaunched after updating to {}", env!("CARGO_PKG_VERSION")));
     }
-    if activate_running_copy() {
+    if activate_running_copy(updated) {
         return;
     }
     // Only the copy that keeps running tidies up after an update.

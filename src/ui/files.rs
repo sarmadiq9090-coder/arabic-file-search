@@ -135,10 +135,10 @@ impl App {
     pub(super) fn update_index(&self, change: impl FnOnce(&mut Index)) {
         let mut st = self.state.borrow_mut();
         // Paths of the current rows, to find them again after the change.
-        let row_paths: Vec<(String, Option<String>)> = st
-            .rows
-            .iter()
-            .filter_map(|r| st.rows_index.entries.get(r.entry as usize).map(|e| (e.path.to_string(), r.snippet.clone())))
+        let rows = std::mem::take(&mut st.rows);
+        let row_paths: Vec<(String, Row)> = rows
+            .into_iter()
+            .filter_map(|r| st.rows_index.entries.get(r.entry as usize).map(|e| (e.path.to_string(), r)))
             .collect();
         st.rows_index = Arc::default();
         // A save still waiting holds the index too; it is about to be stale.
@@ -155,7 +155,7 @@ impl App {
         st.rows_index = idx.clone();
         st.rows = row_paths
             .into_iter()
-            .filter_map(|(p, snippet)| idx.find(&p).map(|i| Row { entry: i as u32, snippet }))
+            .filter_map(|(p, row)| idx.find(&p).map(|i| Row { entry: i as u32, ..row }))
             .collect();
         drop(st);
         // Several quick edits only need the last state written; on_close

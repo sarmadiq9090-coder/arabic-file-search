@@ -444,9 +444,24 @@ static UTC_OFFSET: AtomicI32 = AtomicI32::new(0);
 
 /// Sets the local time zone's offset from UTC (east positive), used by
 /// [`Query::parse`] to work out where "today", "this week"… start.
-#[cfg_attr(not(test), allow(dead_code))] // for the UI and the CLI; not called there yet
 pub fn set_utc_offset_secs(secs: i32) {
     UTC_OFFSET.store(secs, Ordering::Relaxed);
+}
+
+/// Reads the Windows time zone (with daylight saving) into
+/// [`set_utc_offset_secs`]. Call once at start-up.
+#[cfg(windows)]
+pub fn init_local_utc_offset() {
+    use winapi::um::timezoneapi::{GetTimeZoneInformation, TIME_ZONE_INFORMATION};
+    let mut tzi: TIME_ZONE_INFORMATION = unsafe { std::mem::zeroed() };
+    let bias = match unsafe { GetTimeZoneInformation(&mut tzi) } {
+        1 => tzi.Bias + tzi.StandardBias, // TIME_ZONE_ID_STANDARD
+        2 => tzi.Bias + tzi.DaylightBias, // TIME_ZONE_ID_DAYLIGHT
+        0 => tzi.Bias,                    // no daylight saving
+        _ => return,
+    };
+    // Bias is minutes to add to local time to get UTC.
+    set_utc_offset_secs(-bias * 60);
 }
 
 /// The offset set by [`set_utc_offset_secs`] (0 until it is called).
@@ -906,7 +921,6 @@ pub fn search_names(entries: &[Entry], q: &Query, scope: &str) -> Vec<u32> {
 }
 
 /// One content-search result.
-#[cfg_attr(not(test), allow(dead_code))] // `count` and `lines` are not shown by the UI yet
 pub struct ContentHit {
     pub index: u32,
     /// A short piece of the document text around the first match.

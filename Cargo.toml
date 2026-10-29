@@ -1,6 +1,6 @@
 [package]
 name = "bahth"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2024"
 description = "بحث سريع - برنامج بحث سريع عن الملفات وداخل المستندات لويندوز"
 
@@ -20,7 +20,7 @@ cfb = "0.15.0"
 regex = "1"
 
 [target.'cfg(windows)'.dependencies]
-native-windows-gui = { version = "1.0.13", default-features = false, features = ["list-view", "animation-timer", "clipboard", "menu", "file-dialog", "status-bar", "high-dpi", "tray-notification", "combobox", "notice"] }
+native-windows-gui = { version = "1.0.13", default-features = false, features = ["list-view", "animation-timer", "clipboard", "menu", "file-dialog", "status-bar", "high-dpi", "tray-notification", "combobox", "notice", "textbox"] }
 winapi = { version = "0.3", features = ["winuser", "consoleapi", "wincon", "processenv", "commctrl", "shellapi", "fileapi", "winbase", "combaseapi", "objbase", "timezoneapi", "minwinbase", "libloaderapi", "uxtheme", "synchapi", "errhandlingapi", "sysinfoapi", "winerror", "handleapi", "processthreadsapi", "wingdi", "oleidl", "ole2", "objidl", "unknwnbase", "guiddef", "windef", "minwindef", "usp10", "winhttp", "winnt"] }
 
 [build-dependencies]
