@@ -3,7 +3,7 @@
 use native_windows_gui as nwg;
 use std::sync::atomic::Ordering;
 
-use super::startup::background_priority;
+use super::startup::{background_priority, log};
 use super::{App, TITLE};
 use crate::index;
 
@@ -55,6 +55,11 @@ impl App {
                 self.update_busy.set(false);
                 // A failed check (no network yet, rate limit) is retried at
                 // the next hourly tick instead of a day later.
+                match &result {
+                    Ok(Some(rel)) => log(&format!("update: found {} (manual={manual})", rel.version)),
+                    Ok(None) => log(&format!("update: up to date (manual={manual})")),
+                    Err(e) => log(&format!("update: check failed (manual={manual}): {e}")),
+                }
                 if result.is_ok() {
                     let mut st = self.state.borrow_mut();
                     st.settings.update_check = index::now_secs().max(0) as u64;
@@ -95,6 +100,7 @@ impl App {
                 }
             }
             UpdateEvent::Installed(Err(e)) => {
+                log(&format!("update: install failed: {e}"));
                 self.update_busy.set(false);
                 self.set_status("تعذر التحديث.");
                 nwg::modal_error_message(&self.window, TITLE, &format!("تعذر تنزيل التحديث أو تثبيته:\n{e}\n\nالإصدار الحالي يعمل كما هو."));

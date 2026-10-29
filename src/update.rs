@@ -43,6 +43,38 @@ pub struct Release {
     pub sha256: Option<String>,
 }
 
+/// Web page that redirects to the newest release; used when the API refuses
+/// (it allows only 60 calls an hour per address without a login).
+#[cfg(windows)]
+pub const LATEST_PAGE_URL: &str = "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest";
+
+/// The tag in a ".../releases/tag/<tag>" address (where LATEST_PAGE_URL
+/// leads), if any.
+pub fn tag_from_release_url(url: &str) -> Option<String> {
+    let (_, rest) = url.split_once("/releases/tag/")?;
+    let tag = rest.split(['?', '#', '/']).next()?.trim();
+    (!tag.is_empty()).then(|| tag.to_string())
+}
+
+/// A release known only by its tag: the program is fetched from the usual
+/// download address, its size is learned while downloading.
+pub fn release_from_tag(tag: &str, current: &str) -> Option<Release> {
+    if !is_newer(tag, current) {
+        return None;
+    }
+    let version = tag.trim().trim_start_matches(['v', 'V']).to_string();
+    Some(Release {
+        exe_url: format!(
+            "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/{tag}/{ASSET_NAME}"
+        ),
+        version,
+        tag: tag.to_string(),
+        notes: String::new(),
+        exe_size: 0,
+        sha256: None,
+    })
+}
+
 /// Parses "v1.2.3" / "1.2" / "1.2.3.4" into numbers. Returns None for anything
 /// else, including prerelease or build suffixes ("1.2.3-beta", "1.2.3+x").
 pub fn parse_version(s: &str) -> Option<Vec<u64>> {
@@ -316,6 +348,7 @@ mod win {
         max: u64,
         on_length: &mut dyn FnMut(Option<u64>) -> Result<(), String>,
         sink: &mut dyn FnMut(&[u8]) -> Result<(), String>,
+        final_url: Option<&mut String>,
     ) -> Result<(), String> {
         let (host, port, path) = split_https_url(url)?;
         let session = open_session()?;
@@ -354,10 +387,20 @@ mod win {
                 _ => format!("فشل الطلب (خطأ {code})"),
             });
         }
+        if let Some(out) = final_url {
+            // Where the redirects ended up.
+            let mut buf = vec![0u16; 4096];
+            let mut len = (buf.len() * 2) as DWORD;
+            if unsafe { WinHttpQueryOption(request.0, WINHTTP_OPTION_URL, buf.as_mut_ptr() as LPVOID, &mut len) }
+                != FALSE
+            {
+                *out = String::from_utf16_lossy(&buf[..(len as usize / 2).min(buf.len())]);
+            }
+        }
         let status = query_number(&request, WINHTTP_QUERY_STATUS_CODE).unwrap_or(0);
         if status != 200 {
             return Err(match status {
-                403 | 429 => format!("رفض الخادم الطلب مؤقتاً (HTTP {status}). حاول لاحقاً."),
+                403 | 429 => format!("GitHub حدّ مؤقتاً عدد الطلبات من جهازك (HTTP {status}). حاول بعد ساعة."),
                 404 => "لا يوجد إصدار منشور بعد (HTTP 404)".into(),
                 _ => format!("رد غير متوقع من الخادم (HTTP {status})"),
             });
@@ -413,6 +456,21 @@ mod win {
     /// Asks GitHub for the latest release. Some(..) only when it is newer than
     /// this build and has a `bahth.exe` asset.
     pub fn check_latest() -> Result<Option<Release>, String> {
+        match check_latest_api() {
+            Ok(r) => Ok(r),
+            // The API limits calls per address; the web page does not.
+            Err(api_err) => check_latest_page().map_err(|_| api_err),
+        }
+    }
+
+    fn check_latest_page() -> Result<Option<Release>, String> {
+        let mut url = String::new();
+        http_get(LATEST_PAGE_URL, "text/html", 8 << 20, &mut |_| Ok(()), &mut |_| Ok(()), Some(&mut url))?;
+        let tag = tag_from_release_url(&url).ok_or("no release page")?;
+        Ok(release_from_tag(&tag, env!("CARGO_PKG_VERSION")))
+    }
+
+    fn check_latest_api() -> Result<Option<Release>, String> {
         let mut body = Vec::new();
         http_get(
             LATEST_URL,
@@ -423,6 +481,7 @@ mod win {
                 body.extend_from_slice(chunk);
                 Ok(())
             },
+            None,
         )?;
         let text = String::from_utf8(body).map_err(|_| "GitHub answer is not UTF-8".to_string())?;
         parse_release(&text, env!("CARGO_PKG_VERSION"))
@@ -444,30 +503,38 @@ mod win {
     }
 
     fn download_to(rel: &Release, new: &Path, progress: &dyn Fn(u64, u64)) -> Result<(), String> {
-        if rel.exe_size == 0 || rel.exe_size > MAX_DOWNLOAD {
+        if rel.exe_size > MAX_DOWNLOAD {
             return Err("the update has an invalid size".into());
         }
         let file = fs::File::create(new).map_err(|e| format!("cannot create {}: {e}", new.display()))?;
         let mut out = std::io::BufWriter::with_capacity(256 * 1024, file);
-        let total = rel.exe_size;
+        // 0 = unknown (release found without the API): taken from the
+        // download's Content-Length, which is then required.
+        let total = std::cell::Cell::new(rel.exe_size);
         let mut done: u64 = 0;
         let mut hasher = <sha2::Sha256 as sha2::Digest>::new();
-        progress(0, total);
+        progress(0, total.get());
         http_get(
             &rel.exe_url,
             "application/octet-stream",
-            total.min(MAX_DOWNLOAD),
+            if total.get() == 0 { MAX_DOWNLOAD } else { total.get().min(MAX_DOWNLOAD) },
             &mut |len| match len {
-                Some(n) if n != total => Err(format!("the server sent {n} bytes, expected {total}")),
+                Some(n) if total.get() == 0 => {
+                    total.set(n);
+                    Ok(())
+                }
+                None if total.get() == 0 => Err("the server did not say how big the update is".into()),
+                Some(n) if n != total.get() => Err(format!("the server sent {n} bytes, expected {}", total.get())),
                 _ => Ok(()),
             },
             &mut |chunk| {
                 out.write_all(chunk).map_err(|e| format!("cannot write the update: {e}"))?;
                 sha2::Digest::update(&mut hasher, chunk);
                 done += chunk.len() as u64;
-                progress(done, total);
+                progress(done, total.get());
                 Ok(())
             },
+            None,
         )?;
         let file = out.into_inner().map_err(|e| format!("cannot write the update: {e}"))?;
         file.sync_all().map_err(|e| format!("cannot write the update: {e}"))?;
@@ -480,8 +547,8 @@ mod win {
             }
         }
         let size = fs::metadata(new).map_err(|e| e.to_string())?.len();
-        if size != total {
-            return Err(format!("downloaded {size} bytes, expected {total}"));
+        if size != total.get() {
+            return Err(format!("downloaded {size} bytes, expected {}", total.get()));
         }
         let mut head = vec![0u8; 4096];
         let n = fs::File::open(new)
@@ -576,6 +643,20 @@ mod tests {
         {"name": "bahth.exe", "size": 4321000, "browser_download_url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.3.1/bahth.exe"}
       ]
     }"###;
+
+    #[test]
+    fn release_from_web_page_redirect() {
+        let url = "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/tag/v0.4.1";
+        assert_eq!(tag_from_release_url(url).as_deref(), Some("v0.4.1"));
+        assert_eq!(tag_from_release_url(&format!("{url}?x=1")).as_deref(), Some("v0.4.1"));
+        assert_eq!(tag_from_release_url("https://github.com/x/y/releases"), None);
+        let r = release_from_tag("v0.4.1", "0.4.0").unwrap();
+        assert_eq!(r.version, "0.4.1");
+        assert_eq!(r.exe_size, 0);
+        assert!(r.exe_url.ends_with("/releases/download/v0.4.1/bahth.exe"));
+        assert!(release_from_tag("v0.4.0", "0.4.0").is_none());
+        assert!(release_from_tag("v0.5.0-beta", "0.4.0").is_none());
+    }
 
     #[test]
     fn versions() {
