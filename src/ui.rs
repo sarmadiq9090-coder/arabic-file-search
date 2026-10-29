@@ -1035,10 +1035,11 @@ impl NativeUi<AppUi> for App {
         ARABIC_DIGITS.store(settings.arabic_digits, Ordering::Relaxed);
 
         let family = ui_font_family();
+        phase("settings");
         let scale = nwg::scale_factor();
-        nwg::Font::builder().family(&family).size_absolute((15.0 * scale).round() as u32).build(&mut app.font)?;
+        nwg::Font::builder().family(family).size_absolute((15.0 * scale).round() as u32).build(&mut app.font)?;
         nwg::Font::builder()
-            .family(&family)
+            .family(family)
             .size_absolute((19.0 * scale).round() as u32)
             .build(&mut app.query_font)?;
         let f = Some(&app.font);
@@ -1054,6 +1055,7 @@ impl NativeUi<AppUi> for App {
         if let Some(h) = w.handle.hwnd() {
             crate::icon::set_window_icon(h);
         }
+        phase("window");
 
         nwg::TextInput::builder()
             .parent(w)
@@ -1121,6 +1123,7 @@ impl NativeUi<AppUi> for App {
                 SendMessageW(h, LVM_SETIMAGELIST, LVSIL_SMALL as WPARAM, shell::system_image_list() as LPARAM);
             }
         }
+        phase("list");
         for (i, (title, width)) in COLUMNS.iter().enumerate() {
             let width = settings.columns.get(i).copied().filter(|w| (20..3000).contains(w)).unwrap_or(*width);
             app.list.insert_column(nwg::InsertListViewColumn {
@@ -1146,6 +1149,7 @@ impl NativeUi<AppUi> for App {
             .active(true)
             .build(&mut app.timer)?;
         nwg::Notice::builder().parent(w).build(&mut app.name_notice)?;
+        phase("controls");
         nwg::FileDialog::builder()
             .title("اختر المجلد الذي تريد البحث فيه")
             .action(nwg::FileDialogAction::OpenDirectory)
@@ -1156,6 +1160,7 @@ impl NativeUi<AppUi> for App {
             .filters("CSV(*.csv)")
             .build(&mut app.export_dialog)?;
 
+        phase("dialogs");
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.menu)?;
         nwg::MenuItem::builder().text("فتح الملف\tEnter").parent(&app.menu).build(&mut app.menu_open)?;
         nwg::MenuItem::builder().text("فتح المجلد الذي يحتويه\tCtrl+Enter").parent(&app.menu).build(&mut app.menu_folder)?;
@@ -1185,6 +1190,7 @@ impl NativeUi<AppUi> for App {
         nwg::MenuItem::builder().text("إظهار بحث سريع").parent(&app.tray_menu).build(&mut app.tray_show)?;
         nwg::MenuItem::builder().text("خروج").parent(&app.tray_menu).build(&mut app.tray_exit)?;
 
+        phase("tray");
         app.state.get_mut().settings = settings.clone();
         let ui = AppUi { inner: Rc::new(app), handlers: Default::default(), raw_handlers: Default::default() };
 
@@ -1194,7 +1200,10 @@ impl NativeUi<AppUi> for App {
             use nwg::Event as E;
             let Some(app) = weak.upgrade() else { return };
             match evt {
-                E::OnResize | E::OnWindowMaximize => app.layout(),
+                // Only the main window's own size matters: child controls
+                // report OnResize too, and re-laying out on each of those
+                // nests layouts inside layouts.
+                E::OnResize | E::OnWindowMaximize if handle == app.window => app.layout(),
                 E::OnWindowClose if handle == app.window => app.on_close(),
                 E::OnTextInput if handle == app.query => app.on_query_changed(),
                 // The dialog-style message loop turns Enter into IDOK and Esc
@@ -1298,21 +1307,58 @@ impl NativeUi<AppUi> for App {
         {
             unsafe { ShowWindow(h, SW_MAXIMIZE) };
         }
+        phase("events");
         ui.layout();
+        phase("shown");
         ui.start();
         Ok(ui)
     }
 }
 
 /// The first installed font from a list of fonts known to render Arabic well.
-fn ui_font_family() -> String {
+/// Each name is looked up directly: listing every font on the system takes
+/// seconds on a computer with many fonts installed.
+fn ui_font_family() -> &'static str {
+    static FAMILY: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
     const PREFERRED: [&str; 5] = ["Segoe UI", "Tahoma", "Arial", "Noto Sans Arabic", "Noto Naskh Arabic"];
-    let installed = nwg::Font::families();
-    PREFERRED
-        .iter()
-        .find(|f| installed.iter().any(|i| i.eq_ignore_ascii_case(f)))
-        .unwrap_or(&PREFERRED[0])
-        .to_string()
+    FAMILY.get_or_init(|| PREFERRED.iter().copied().find(|f| font_installed(f)).unwrap_or(PREFERRED[0]))
+}
+
+fn font_installed(name: &str) -> bool {
+    use winapi::shared::minwindef::{DWORD, LPARAM};
+    use winapi::um::wingdi::{DEFAULT_CHARSET, EnumFontFamiliesExW, LOGFONTW, TEXTMETRICW};
+    use winapi::um::winuser::{GetDC, ReleaseDC};
+
+    unsafe extern "system" fn found(_: *const LOGFONTW, _: *const TEXTMETRICW, _: DWORD, flag: LPARAM) -> i32 {
+        unsafe { *(flag as *mut bool) = true };
+        0 // one match is enough
+    }
+    let mut lf: LOGFONTW = unsafe { std::mem::zeroed() };
+    lf.lfCharSet = DEFAULT_CHARSET as u8;
+    for (dst, src) in lf.lfFaceName.iter_mut().take(31).zip(name.encode_utf16()) {
+        *dst = src;
+    }
+    let mut ok = false;
+    unsafe {
+        let hdc = GetDC(std::ptr::null_mut());
+        EnumFontFamiliesExW(hdc, &mut lf, Some(found), &mut ok as *mut bool as LPARAM, 0);
+        ReleaseDC(std::ptr::null_mut(), hdc);
+    }
+    ok
+}
+
+thread_local! {
+    /// Start-up phase timings, written to the log once the window is ready.
+    static PHASES: RefCell<(Option<std::time::Instant>, Vec<String>)> = const { RefCell::new((None, Vec::new())) };
+}
+
+/// Records how long start-up took to reach `name`.
+fn phase(name: &str) {
+    PHASES.with(|p| {
+        let mut p = p.borrow_mut();
+        let start = *p.0.get_or_insert_with(std::time::Instant::now);
+        p.1.push(format!("{name}={}", start.elapsed().as_millis()));
+    });
 }
 
 /// The usable screen size (without the taskbar) in logical pixels.
@@ -1340,6 +1386,9 @@ fn background_priority() {
 /// Appends a timestamped line to `%LOCALAPPDATA%\BahthSari\log.txt`, kept short.
 fn log(line: &str) {
     let path = index::cache_path().with_file_name("log.txt");
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
     if std::fs::metadata(&path).is_ok_and(|m| m.len() > 64 * 1024) {
         let _ = std::fs::remove_file(&path);
     }
@@ -1382,9 +1431,11 @@ fn activate_running_copy() -> bool {
 }
 
 pub fn run() {
+    phase("start");
     if activate_running_copy() {
         return;
     }
+    phase("single-instance");
     unsafe {
         winapi::um::objbase::CoInitialize(std::ptr::null_mut());
     }
@@ -1392,11 +1443,14 @@ pub fn run() {
         eprintln!("failed to initialise the UI: {e}");
         return;
     }
-    let _ = nwg::Font::set_global_family(&ui_font_family());
-    let started = std::time::Instant::now();
+    phase("init");
+    let _ = nwg::Font::set_global_family(ui_font_family());
+    phase("font");
     let ui = match App::build_ui(App::default()) {
         Ok(ui) => {
-            log(&format!("window ready in {} ms (v{})", started.elapsed().as_millis(), env!("CARGO_PKG_VERSION")));
+            phase("ready");
+            let marks = PHASES.with(|p| p.borrow().1.join(" "));
+            log(&format!("startup ms (v{}): {marks}", env!("CARGO_PKG_VERSION")));
             ui
         }
         Err(e) => {
