@@ -12,7 +12,8 @@ use std::path::Path;
 use encoding_rs::{Encoding, UTF_8, UTF_16BE, UTF_16LE};
 
 use super::{
-    MAX_FILE_SIZE, MAX_OUTPUT, MAX_TEXT_READ, codepage_encoding, decode_bytes, strip_html,
+    MAX_FILE_SIZE, MAX_OUTPUT, MAX_TEXT_READ, codepage_encoding, decode_bytes, read_capped,
+    strip_html,
 };
 
 /// Nested multipart / message/rfc822 depth limit.
@@ -25,13 +26,24 @@ const MAX_PARTS: usize = 4096;
 // ---------------------------------------------------------------------------
 
 pub(super) fn extract_eml(path: &Path) -> Option<String> {
-    let mut buf = Vec::new();
-    File::open(path)
-        .ok()?
-        .take(MAX_FILE_SIZE)
-        .read_to_end(&mut buf)
-        .ok()?;
-    eml_to_text(&buf)
+    eml_to_text(&read_capped(File::open(path).ok()?, MAX_FILE_SIZE)?)
+}
+
+/// Appends `v` trimmed plus a newline, unless it is blank.
+fn push_line(out: &mut String, v: &str) {
+    let v = v.trim();
+    if !v.is_empty() {
+        out.push_str(v);
+        out.push('\n');
+    }
+}
+
+/// Decodes with `enc` when known, else by guessing (see `decode_bytes`).
+fn decode_with(bytes: &[u8], enc: Option<&'static Encoding>) -> String {
+    match enc {
+        Some(enc) => enc.decode_without_bom_handling(bytes).0.into_owned(),
+        None => decode_bytes(bytes),
+    }
 }
 
 pub(super) fn eml_to_text(data: &[u8]) -> Option<String> {
@@ -52,12 +64,7 @@ fn eml_to_text_at(data: &[u8], depth: u32) -> Option<String> {
     let mut out = String::new();
     for name in ["subject", "from", "to"] {
         if let Some(v) = header_value(&headers, name) {
-            let v = decode_header_value(v);
-            let v = v.trim();
-            if !v.is_empty() {
-                out.push_str(v);
-                out.push('\n');
-            }
+            push_line(&mut out, &decode_header_value(v));
         }
     }
     let mut walk = Walk::default();
@@ -332,10 +339,7 @@ fn charset_encoding(charset: &str) -> Option<&'static Encoding> {
 }
 
 fn decode_charset(bytes: &[u8], charset: Option<&str>) -> String {
-    match charset.and_then(charset_encoding) {
-        Some(enc) => enc.decode_without_bom_handling(bytes).0.into_owned(),
-        None => decode_bytes(bytes),
-    }
+    decode_with(bytes, charset.and_then(charset_encoding))
 }
 
 /// Decodes a raw header value: 8-bit bytes via `decode_bytes`, then any
@@ -525,9 +529,8 @@ fn msg_to_text<F: Read + std::io::Seek>(mut comp: cfb::CompoundFile<F>) -> Optio
         if !wanted.contains(name) {
             continue;
         }
-        let mut buf = Vec::new();
         if let Ok(s) = comp.open_stream(p)
-            && s.take(MAX_TEXT_READ).read_to_end(&mut buf).is_ok()
+            && let Some(buf) = read_capped(s, MAX_TEXT_READ)
         {
             streams.push((name.clone(), buf));
         }
@@ -553,10 +556,6 @@ fn msg_to_text<F: Read + std::io::Seek>(mut comp: cfb::CompoundFile<F>) -> Optio
     // uses PR_INTERNET_CPID (MS-OXCMSG). Each falls back to the other.
     let enc8 = to_enc(find_long(0x3FFD).or_else(|| find_long(0x3FDE)));
     let enc_html = to_enc(find_long(0x3FDE)).or(enc8);
-    let decode8 = |b: &[u8]| match enc8 {
-        Some(enc) => enc.decode_without_bom_handling(b).0.into_owned(),
-        None => decode_bytes(b),
-    };
     let trim_nul = |s: String| s.trim_end_matches('\0').to_owned();
 
     let prop = |id: &str| -> Option<String> {
@@ -565,17 +564,13 @@ fn msg_to_text<F: Read + std::io::Seek>(mut comp: cfb::CompoundFile<F>) -> Optio
                 UTF_16LE.decode_without_bom_handling(b).0.into_owned(),
             ));
         }
-        read(&format!("__SUBSTG1.0_{id}001E")).map(|b| trim_nul(decode8(b)))
+        read(&format!("__SUBSTG1.0_{id}001E")).map(|b| trim_nul(decode_with(b, enc8)))
     };
 
     let mut out = String::new();
     for id in ["0037", "0C1A", "0E04"] {
         if let Some(v) = prop(id) {
-            let v = v.trim();
-            if !v.is_empty() {
-                out.push_str(v);
-                out.push('\n');
-            }
+            push_line(&mut out, &v);
         }
     }
     let body = prop("1000").filter(|b| !b.trim().is_empty()).or_else(|| {

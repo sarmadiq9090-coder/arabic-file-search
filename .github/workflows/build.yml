@@ -10,12 +10,27 @@ permissions:
   contents: write
 
 jobs:
+  # Quick feedback: the search, index, extraction and parsing logic is
+  # platform-independent and tested on Linux in about a minute.
+  linux-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test
+
   windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
       - name: Test
         run: cargo test --release
       - name: Build
@@ -24,8 +39,11 @@ jobs:
         with:
           name: bahth-windows
           path: target/release/bahth.exe
+      # The in-app updater downloads the asset named exactly `bahth.exe`.
+      # The release notes are written by hand: never touch the body.
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: target/release/bahth.exe
+          append_body: false

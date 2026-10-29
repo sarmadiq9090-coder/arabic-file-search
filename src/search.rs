@@ -1,5 +1,8 @@
 //! Query parsing, filename search over the index, and content search inside documents.
 
+// Only the Windows UI and the tests use this module.
+#![cfg(any(windows, test))]
+
 use rayon::prelude::*;
 use std::path::Path;
 use std::sync::Mutex;
@@ -8,9 +11,6 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crate::extract;
 use crate::index::Entry;
 use crate::normalize::{normalize, normalize_with_map};
-
-/// Documents bigger than this are skipped by the content search.
-const MAX_CONTENT_SIZE: u64 = 100 * 1024 * 1024;
 
 /// One search term: it matches when any of its alternatives is contained.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -66,6 +66,9 @@ pub const KIND_FOLDERS: usize = 7;
 /// An extension no file has, used when filters leave no allowed type.
 const NO_EXT: &str = "\0";
 
+/// Prefixes of a token that keeps only folders (ASCII case ignored).
+pub const FOLDER_PREFIXES: [&str; 2] = ["folder:", "مجلد:"];
+
 /// Arabic prefixes stripped to also match the bare word, longest first.
 const ARTICLES: [&str; 6] = ["وال", "بال", "كال", "فال", "لل", "ال"];
 
@@ -95,6 +98,27 @@ fn ext_filter(lower: &str) -> Option<&str> {
         .or_else(|| lower.strip_prefix('.').filter(|e| !e.is_empty() && !e.contains('.')))
 }
 
+/// Length of the folder prefix `tok` starts with, if any.
+fn folder_prefix(tok: &str) -> Option<usize> {
+    FOLDER_PREFIXES
+        .iter()
+        .find(|p| tok.get(..p.len()).is_some_and(|h| h.eq_ignore_ascii_case(p)))
+        .map(|p| p.len())
+}
+
+/// The word after `!`, or after `-` when a letter follows (so `-` alone and
+/// `2023-01` stay search words).
+fn exclude_word(tok: &str) -> Option<&str> {
+    tok.strip_prefix('!')
+        .or_else(|| tok.strip_prefix('-').filter(|w| w.starts_with(char::is_alphabetic)))
+}
+
+fn push_unique(alts: &mut Vec<String>, a: String) {
+    if !alts.contains(&a) {
+        alts.push(a);
+    }
+}
+
 /// Adds `alt` (already normalised) and, unless `exact` (a quoted phrase), the
 /// bare word too when it starts with an Arabic article that leaves at least 3 letters.
 fn push_alt(alts: &mut Vec<String>, alt: String, exact: bool) {
@@ -108,9 +132,7 @@ fn push_alt(alts: &mut Vec<String>, alt: String, exact: bool) {
         })
         .flatten();
     for a in std::iter::once(alt).chain(bare) {
-        if !alts.contains(&a) {
-            alts.push(a);
-        }
+        push_unique(alts, a);
     }
 }
 
@@ -130,19 +152,14 @@ impl Query {
                     join = false;
                     continue;
                 }
-                let folder =
-                    ["folder:", "مجلد:"].iter().find(|p| tok.get(..p.len()).is_some_and(|h| h.eq_ignore_ascii_case(p)));
-                if let Some(p) = folder {
+                if let Some(len) = folder_prefix(&tok) {
                     q.dirs_only = true;
-                    if tok.len() == p.len() {
+                    if tok.len() == len {
                         join = false;
                         continue;
                     }
-                    pieces = vec![&tok[p.len()..]];
-                } else if let Some(word) = tok
-                    .strip_prefix('!')
-                    .or_else(|| tok.strip_prefix('-').filter(|w| w.starts_with(char::is_alphabetic)))
-                {
+                    pieces = vec![&tok[len..]];
+                } else if let Some(word) = exclude_word(&tok) {
                     let n = normalize(word);
                     if !n.trim().is_empty() {
                         q.excludes.push(n);
@@ -167,13 +184,7 @@ impl Query {
                 continue;
             }
             match q.terms.last_mut() {
-                Some(last) if join_prev => {
-                    for a in alts {
-                        if !last.alts.contains(&a) {
-                            last.alts.push(a);
-                        }
-                    }
-                }
+                Some(last) if join_prev => alts.into_iter().for_each(|a| push_unique(&mut last.alts, a)),
                 _ => q.terms.push(Term { alts }),
             }
         }
@@ -294,7 +305,7 @@ pub fn search_content(
     let candidates: Vec<u32> = entries
         .par_iter()
         .enumerate()
-        .filter(|(_, e)| !e.is_dir && e.size > 0 && e.size <= MAX_CONTENT_SIZE)
+        .filter(|(_, e)| !e.is_dir && e.size > 0 && e.size <= extract::MAX_FILE_SIZE)
         .filter(|(_, e)| extract::is_supported(&e.ext()) && q.kind_ok(e))
         .filter(|(_, e)| in_scope(&e.path, &scope_lower))
         .map(|(i, _)| i as u32)
@@ -782,5 +793,106 @@ mod tests {
         let mut hits = vec![2, 1];
         promote(&mut hits, &[]);
         assert_eq!(hits, vec![2, 1]);
+    }
+
+    #[test]
+    fn parse_quotes_and_filters_edge_cases() {
+        // An unterminated quote runs to the end; empty quotes add nothing.
+        assert_eq!(alts(&Query::parse(r#"a "b c"#)), vec![vec!["a"], vec!["b c"]]);
+        assert!(Query::parse(r#""""#).is_empty());
+        assert_eq!(alts(&Query::parse(r#"a "" b"#)), vec![vec!["a"], vec!["b"]]);
+        // Inside quotes `|`, `!`, `ext:` and `مجلد:` are plain text.
+        assert_eq!(alts(&Query::parse(r#""a|b""#)), vec![vec!["a|b"]]);
+        let q = Query::parse(r#""!x" "ext:pdf" "مجلد:صور""#);
+        assert_eq!(alts(&q), vec![vec!["!x"], vec!["ext:pdf"], vec!["مجلد:صور"]]);
+        assert!(q.excludes.is_empty() && q.exts.is_empty() && !q.dirs_only);
+        // Quoted phrases are normalised like words.
+        assert_eq!(alts(&Query::parse(r#""أحمد عليّ""#)), vec![vec!["احمد علي"]]);
+        // Extension filters: case, empty lists and separators.
+        assert_eq!(Query::parse("EXT:PDF *.Docx").exts, vec!["pdf", "docx"]);
+        assert_eq!(Query::parse("ext:PDF,,DOCX;").exts, vec!["pdf", "docx"]);
+        assert!(Query::parse("ext:").is_empty());
+        assert!(Query::parse("*.").is_empty());
+        assert_eq!(alts(&Query::parse(".")), vec![vec!["."]]);
+        assert_eq!(alts(&Query::parse(".tar.gz")), vec![vec![".tar.gz"]]);
+        // Tabs and newlines separate words too.
+        assert_eq!(alts(&Query::parse("a\tb\nc")), vec![vec!["a"], vec!["b"], vec!["c"]]);
+    }
+
+    #[test]
+    fn parse_pipe_edge_cases() {
+        assert_eq!(alts(&Query::parse("a||b")), vec![vec!["a", "b"]]);
+        assert_eq!(alts(&Query::parse("a|a")), vec![vec!["a"]]);
+        assert_eq!(alts(&Query::parse("a | | b")), vec![vec!["a", "b"]]);
+        assert_eq!(alts(&Query::parse("a |")), vec![vec!["a"]]);
+        assert_eq!(alts(&Query::parse("|")), Vec::<Vec<&str>>::new());
+        // Each alternative gets its own article-less form.
+        assert_eq!(alts(&Query::parse("التقرير|عقد")), vec![vec!["التقرير", "تقرير", "عقد"]]);
+        // A folder token between `|` and the next word ends the OR as well.
+        assert_eq!(alts(&Query::parse("a | مجلد: b")), vec![vec!["a"], vec!["b"]]);
+    }
+
+    #[test]
+    fn parse_excludes_edge_cases() {
+        let q = Query::parse("!أحمد -Report");
+        assert_eq!(q.excludes, vec!["احمد", "report"]);
+        assert!(q.terms.is_empty());
+        // Excludes alone still narrow the results.
+        assert!(!q.is_empty());
+        // A bare `!` is a search word, and `-` before a digit is not an exclude.
+        assert_eq!(alts(&Query::parse("!")), vec![vec!["!"]]);
+        assert_eq!(alts(&Query::parse("-٢٠٢٣")), vec![vec!["-2023"]]);
+        assert!(Query::parse("-٢٠٢٣").excludes.is_empty());
+    }
+
+    #[test]
+    fn parse_folder_prefixes() {
+        for input in ["مجلد:التقارير", "folder:التقارير", "Folder:التقارير", "مجلد: التقارير"] {
+            let q = Query::parse(input);
+            assert!(q.dirs_only, "{input}");
+            assert_eq!(alts(&q), vec![vec!["التقارير", "تقارير"]], "{input}");
+        }
+        let q = Query::parse("مجلد:");
+        assert!(q.dirs_only && q.is_empty());
+        // Only a leading prefix counts.
+        let q = Query::parse("صور:مجلد:");
+        assert!(!q.dirs_only);
+        assert_eq!(alts(&q), vec![vec!["صور:مجلد:"]]);
+    }
+
+    #[test]
+    fn content_search_in_files() {
+        let dir = std::env::temp_dir().join(format!("bahth_content_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let files = [("تقرير.txt", "هذا التقرير السنوي"), ("اخر.txt", "لا شيء هنا"), ("صورة.png", "التقرير")];
+        let mut entries: Vec<Entry> = files
+            .iter()
+            .map(|(name, text)| {
+                let p = dir.join(name);
+                std::fs::write(&p, text).unwrap();
+                Entry { size: text.len() as u64, ..entry(p.to_str().unwrap(), false) }
+            })
+            .collect();
+        entries.push(entry(dir.to_str().unwrap(), true));
+        let run = |q: &str, cancel: bool| {
+            let progress = ContentProgress::default();
+            progress.cancel.store(cancel, Ordering::Relaxed);
+            let hits = Mutex::new(Vec::new());
+            search_content(&entries, &Query::parse(q), "", &progress, &hits);
+            assert!(progress.done.load(Ordering::Relaxed));
+            let hits: Vec<(u32, String)> = hits.into_inner().unwrap().into_iter().map(|h| (h.index, h.snippet)).collect();
+            (progress.total.load(Ordering::Relaxed), progress.checked.load(Ordering::Relaxed), hits)
+        };
+        // Only the two supported documents are candidates; the png is not.
+        let (total, checked, hits) = run("تقرير", false);
+        assert_eq!((total, checked), (2, 2));
+        assert_eq!(hits, vec![(0, "هذا التقرير السنوي".to_string())]);
+        assert!(run("تقرير !السنوي", false).2.is_empty());
+        assert_eq!(run("شيء|السنوي", false).2.len(), 2);
+        // No terms: only counts candidates. Cancelled: checks nothing.
+        assert_eq!(run("ext:txt", false), (2, 0, vec![]));
+        assert_eq!(run("تقرير", true), (2, 0, vec![]));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

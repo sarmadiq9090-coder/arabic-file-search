@@ -3,6 +3,9 @@
 //! The index is built by a parallel directory walk and cached on disk, so the
 //! next start-up is instant and filename searches never touch the disk.
 
+// Only the Windows UI and the tests use this module.
+#![cfg(any(windows, test))]
+
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -94,8 +97,8 @@ impl Index {
             }
         });
         let mut entries = out.into_inner().unwrap_or_default();
-        entries.par_sort_unstable_by(|a, b| a.path.cmp(&b.path));
-        entries.par_iter_mut().for_each(|e| e.norm_name = normalize(e.name()).into());
+        sort_by_path(&mut entries);
+        fill_norm_names(&mut entries);
         Index { entries, roots: roots.to_vec(), built_at: now_secs() }
     }
 
@@ -106,7 +109,7 @@ impl Index {
             return None;
         }
         let mut index = cache.index;
-        index.entries.par_iter_mut().for_each(|e| e.norm_name = normalize(file_name(&e.path)).into());
+        fill_norm_names(&mut index.entries);
         Some(index)
     }
 
@@ -195,24 +198,37 @@ impl Index {
             }
         }
         self.remove_path(new);
-        moved.par_sort_unstable_by(|a, b| a.path.cmp(&b.path));
-        // Merge the two sorted runs in one pass instead of re-sorting everything.
+        sort_by_path(&mut moved);
         let rest = std::mem::take(&mut self.entries);
-        let mut merged = Vec::with_capacity(rest.len() + moved.len());
-        let mut a = rest.into_iter().peekable();
-        let mut b = moved.into_iter().peekable();
-        loop {
-            let take_a = match (a.peek(), b.peek()) {
-                (Some(x), Some(y)) => x.path <= y.path,
-                (Some(_), None) => true,
-                (None, Some(_)) => false,
-                (None, None) => break,
-            };
-            merged.extend(if take_a { a.next() } else { b.next() });
-        }
-        self.entries = merged;
+        self.entries = merge_by_path(rest, moved);
         true
     }
+}
+
+fn sort_by_path(entries: &mut [Entry]) {
+    entries.par_sort_unstable_by(|a, b| a.path.cmp(&b.path));
+}
+
+/// Rebuilds the normalised names, which the cache does not store.
+fn fill_norm_names(entries: &mut [Entry]) {
+    entries.par_iter_mut().for_each(|e| e.norm_name = normalize(e.name()).into());
+}
+
+/// Merges two runs sorted by path in one pass (cheaper than re-sorting).
+fn merge_by_path(a: Vec<Entry>, b: Vec<Entry>) -> Vec<Entry> {
+    let mut merged = Vec::with_capacity(a.len() + b.len());
+    let mut a = a.into_iter().peekable();
+    let mut b = b.into_iter().peekable();
+    loop {
+        let take_a = match (a.peek(), b.peek()) {
+            (Some(x), Some(y)) => x.path <= y.path,
+            (Some(_), None) => true,
+            (None, Some(_)) => false,
+            (None, None) => break,
+        };
+        merged.extend(if take_a { a.next() } else { b.next() });
+    }
+    merged
 }
 
 fn walk<'s>(s: &rayon::Scope<'s>, dir: PathBuf, out: &'s Mutex<Vec<Entry>>, progress: &'s ScanProgress) {
@@ -254,6 +270,7 @@ pub fn now_secs() -> i64 {
 }
 
 /// Where the index cache lives: `%LOCALAPPDATA%\BahthSari\index.bin`.
+#[cfg(windows)]
 pub fn cache_path() -> PathBuf {
     let base = std::env::var_os("LOCALAPPDATA")
         .or_else(|| std::env::var_os("HOME"))
@@ -277,11 +294,6 @@ pub fn list_drives() -> Vec<String> {
             t == DRIVE_FIXED || t == DRIVE_REMOVABLE
         })
         .collect()
-}
-
-#[cfg(not(windows))]
-pub fn list_drives() -> Vec<String> {
-    vec!["/".to_string()]
 }
 
 #[cfg(test)]
@@ -397,5 +409,90 @@ mod tests {
         assert_eq!(idx.entries.len(), TREE.len() - 1);
         assert!(idx.find(r"C:\ab\z.txt").is_none());
         assert!(idx.entries.windows(2).all(|w| w[0].path < w[1].path));
+    }
+
+    const TREE_AR: &[&str] = &[
+        r"C:\تقارير",
+        r"C:\تقارير\٢٠٢٤.pdf",
+        r"C:\تقارير\فرعي",
+        r"C:\تقارير\فرعي\ملخص.docx",
+        r"C:\تقارير 2023.txt",
+        r"C:\تقاريرقديمة",
+        r"C:\تقاريرقديمة\قديم.txt",
+        r"D:\مستندات\عقد.pdf",
+    ];
+
+    fn is_sorted(idx: &Index) -> bool {
+        idx.entries.windows(2).all(|w| w[0].path < w[1].path)
+    }
+
+    #[test]
+    fn arabic_find_and_ext() {
+        let idx = index_of(TREE_AR);
+        for p in TREE_AR {
+            assert_eq!(&*idx.entries[idx.find(p).unwrap()].path, *p);
+        }
+        // Lookups are exact: no normalisation, no prefix matches.
+        assert_eq!(idx.find(r"C:\تقاريرر"), None);
+        assert_eq!(idx.find(r"C:\تقارير\"), None);
+        let e = &idx.entries[idx.find(r"C:\تقارير\٢٠٢٤.pdf").unwrap()];
+        assert_eq!((e.name(), e.ext().as_str(), &*e.norm_name), ("٢٠٢٤.pdf", "pdf", "2024.pdf"));
+        let dir = Entry { path: r"C:\مجلد.قديم".into(), size: 0, mtime: 0, is_dir: true, norm_name: Box::default() };
+        assert_eq!(dir.ext(), "");
+        let hidden = Entry { path: r"C:\.ملف".into(), is_dir: false, ..dir };
+        assert_eq!(hidden.ext(), "");
+    }
+
+    #[test]
+    fn arabic_remove_keeps_prefix_siblings() {
+        let mut idx = index_of(TREE_AR);
+        assert_eq!(idx.remove_path(r"C:\تقارير"), 4);
+        assert_eq!(paths(&idx), vec![r"C:\تقارير 2023.txt", r"C:\تقاريرقديمة", r"C:\تقاريرقديمة\قديم.txt", r"D:\مستندات\عقد.pdf"]);
+        assert_eq!(idx.remove_path(r"D:\مستندات"), 1);
+        assert_eq!(idx.remove_path(r"D:\مستندات"), 0);
+        assert_eq!(idx.entries.len(), 3);
+    }
+
+    #[test]
+    fn arabic_rename() {
+        let mut idx = index_of(TREE_AR);
+        // A folder moved under a new parent takes its children along.
+        assert!(idx.rename_path(r"C:\تقارير", r"C:\أرشيف\تقارير"));
+        assert!(is_sorted(&idx));
+        assert_eq!(idx.entries.len(), TREE_AR.len());
+        assert!(idx.find(r"C:\تقارير").is_none());
+        let e = &idx.entries[idx.find(r"C:\أرشيف\تقارير\فرعي\ملخص.docx").unwrap()];
+        assert_eq!(&*e.norm_name, "ملخص.docx");
+        assert_eq!(&*idx.entries[idx.find(r"C:\أرشيف\تقارير").unwrap()].norm_name, "تقارير");
+
+        // A renamed file gets a fresh normalised name.
+        assert!(idx.rename_path(r"D:\مستندات\عقد.pdf", r"D:\مستندات\عقد الإيجار.PDF"));
+        let e = &idx.entries[idx.find(r"D:\مستندات\عقد الإيجار.PDF").unwrap()];
+        assert_eq!((&*e.norm_name, e.ext().as_str()), ("عقد الايجار.pdf", "pdf"));
+
+        // Same name: true only when present. Missing source: nothing changes.
+        assert!(idx.rename_path(r"C:\تقاريرقديمة", r"C:\تقاريرقديمة"));
+        assert!(!idx.rename_path(r"C:\غير موجود", r"C:\غير موجود"));
+        let before = paths(&idx).iter().map(|p| p.to_string()).collect::<Vec<_>>();
+        assert!(!idx.rename_path(r"C:\غير موجود", r"C:\تقاريرقديمة"));
+        assert_eq!(paths(&idx), before);
+    }
+
+    #[test]
+    fn rename_folder_onto_existing_folder_replaces_its_subtree() {
+        let mut idx = index_of(TREE_AR);
+        assert!(idx.rename_path(r"C:\تقاريرقديمة", r"C:\تقارير"));
+        assert!(is_sorted(&idx));
+        assert_eq!(paths(&idx), vec![r"C:\تقارير", r"C:\تقارير 2023.txt", r"C:\تقارير\قديم.txt", r"D:\مستندات\عقد.pdf"]);
+    }
+
+    #[test]
+    fn merge_keeps_path_order() {
+        let a = index_of(&[r"C:\a", r"C:\c", r"C:\e"]).entries;
+        let b = index_of(&[r"C:\b", r"C:\d", r"C:\f", r"C:\g"]).entries;
+        let merged = merge_by_path(a, b);
+        let got: Vec<&str> = merged.iter().map(|e| &*e.path).collect();
+        assert_eq!(got, vec![r"C:\a", r"C:\b", r"C:\c", r"C:\d", r"C:\e", r"C:\f", r"C:\g"]);
+        assert!(merge_by_path(Vec::new(), Vec::new()).is_empty());
     }
 }

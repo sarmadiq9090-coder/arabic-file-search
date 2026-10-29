@@ -1,10 +1,11 @@
 //! EPUB: a zip whose `META-INF/container.xml` points at an OPF package file;
 //! the OPF spine gives the reading order of the XHTML content documents.
 
+use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::path::Path;
 
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
 
 use super::{MAX_OUTPUT, open_zip, read_zip_entry, strip_html};
 
@@ -28,10 +29,7 @@ pub(super) fn epub_to_text<R: Read + Seek>(zip: &mut zip::ZipArchive<R>) -> Opti
         items = zip
             .file_names()
             .filter_map(|n| n.ok().map(|n| n.into_owned()))
-            .filter(|n| {
-                let l = n.to_ascii_lowercase();
-                l.ends_with(".xhtml") || l.ends_with(".html") || l.ends_with(".htm")
-            })
+            .filter(|n| is_html_name(n))
             .take(MAX_ITEMS)
             .collect();
     }
@@ -39,7 +37,7 @@ pub(super) fn epub_to_text<R: Read + Seek>(zip: &mut zip::ZipArchive<R>) -> Opti
         return None;
     }
     let mut out = String::new();
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     for name in items {
         if out.len() > MAX_OUTPUT {
             break;
@@ -66,7 +64,7 @@ fn spine_items<R: Read + Seek>(zip: &mut zip::ZipArchive<R>) -> Option<Vec<Strin
     let base = opf_path.rfind('/').map_or("", |i| &opf_path[..=i]);
 
     // manifest: id -> (href, media-type); spine: idrefs.
-    let mut manifest: std::collections::HashMap<String, (String, String)> = std::collections::HashMap::new();
+    let mut manifest: HashMap<String, (String, String)> = HashMap::new();
     let mut spine: Vec<String> = Vec::new();
     let mut reader = quick_xml::Reader::from_str(&opf);
     loop {
@@ -75,16 +73,7 @@ fn spine_items<R: Read + Seek>(zip: &mut zip::ZipArchive<R>) -> Option<Vec<Strin
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) => e,
             Ok(_) => continue,
         };
-        let attr = |key: &str| {
-            e.attributes()
-                .flatten()
-                .find(|a| a.key.local_name().as_ref() == key)
-                .and_then(|a| {
-                    a.normalized_value(quick_xml::XmlVersion::Implicit1_0)
-                        .ok()
-                        .map(|v| v.into_owned())
-                })
-        };
+        let attr = |key: &str| attr_value(&e, key);
         match e.local_name().as_ref() {
             "item" if manifest.len() < MAX_ITEMS * 4 => {
                 if let (Some(id), Some(href)) = (attr("id"), attr("href")) {
@@ -102,13 +91,7 @@ fn spine_items<R: Read + Seek>(zip: &mut zip::ZipArchive<R>) -> Option<Vec<Strin
     let items = spine
         .iter()
         .filter_map(|idref| manifest.get(idref))
-        .filter(|(href, mt)| {
-            let h = href.to_ascii_lowercase();
-            mt.contains("html")
-                || h.ends_with(".xhtml")
-                || h.ends_with(".html")
-                || h.ends_with(".htm")
-        })
+        .filter(|(href, mt)| mt.contains("html") || is_html_name(href))
         .map(|(href, _)| {
             let href = href.split('#').next().unwrap_or(href);
             resolve(base, &percent_decode(href))
@@ -124,19 +107,28 @@ fn first_attr(xml: &str, elem: &str, attr: &str) -> Option<String> {
         match reader.read_event() {
             Ok(Event::Eof) | Err(_) => return None,
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == elem => {
-                return e
-                    .attributes()
-                    .flatten()
-                    .find(|a| a.key.local_name().as_ref() == attr)
-                    .and_then(|a| {
-                        a.normalized_value(quick_xml::XmlVersion::Implicit1_0)
-                            .ok()
-                            .map(|v| v.into_owned())
-                    });
+                return attr_value(&e, attr);
             }
             Ok(_) => {}
         }
     }
+}
+
+/// Value of the attribute with local name `key`, whitespace-normalised.
+fn attr_value(e: &BytesStart, key: &str) -> Option<String> {
+    e.attributes()
+        .flatten()
+        .find(|a| a.key.local_name().as_ref() == key)
+        .and_then(|a| {
+            a.normalized_value(quick_xml::XmlVersion::Implicit1_0)
+                .ok()
+                .map(|v| v.into_owned())
+        })
+}
+
+fn is_html_name(name: &str) -> bool {
+    let l = name.to_ascii_lowercase();
+    l.ends_with(".xhtml") || l.ends_with(".html") || l.ends_with(".htm")
 }
 
 /// Joins a relative href onto the OPF directory, resolving `.` and `..`.

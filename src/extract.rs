@@ -6,9 +6,13 @@
 //! `\ansicpg` / font charsets, and Arabic presentation forms (common in PDFs)
 //! are folded back to their base letters so searches for normal text match.
 
+// Only the Windows UI and the tests use this module.
+#![cfg(any(windows, test))]
+
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::{Read, Seek};
+use std::ops::Range;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::Path;
 
@@ -21,7 +25,7 @@ mod epub;
 mod mail;
 
 /// Files larger than this are never opened.
-const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
+pub const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
 /// Plain-text formats are read only up to this many bytes.
 const MAX_TEXT_READ: u64 = 20 * 1024 * 1024;
 /// Upper bound for a single decompressed zip member (zip-bomb guard).
@@ -92,14 +96,15 @@ fn extract_by_ext(path: &Path, ext: &str) -> Option<String> {
 // Plain text
 // ---------------------------------------------------------------------------
 
-fn read_text_file(path: &Path) -> Option<String> {
+/// Reads at most `cap` bytes from `r`.
+fn read_capped(r: impl Read, cap: u64) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
-    File::open(path)
-        .ok()?
-        .take(MAX_TEXT_READ)
-        .read_to_end(&mut buf)
-        .ok()?;
-    Some(decode_bytes(&buf))
+    r.take(cap).read_to_end(&mut buf).ok()?;
+    Some(buf)
+}
+
+fn read_text_file(path: &Path) -> Option<String> {
+    Some(decode_bytes(&read_capped(File::open(path).ok()?, MAX_TEXT_READ)?))
 }
 
 /// Decode bytes of unknown encoding: BOMs first, then a BOM-less UTF-16
@@ -245,9 +250,7 @@ fn open_zip(path: &Path) -> Option<Zip> {
 /// Reads one zip member as text (size-capped). Missing members yield None.
 fn read_zip_entry<R: Read + Seek>(zip: &mut zip::ZipArchive<R>, name: &str) -> Option<String> {
     let entry = zip.by_name(name).ok()?;
-    let mut buf = Vec::new();
-    entry.take(MAX_ZIP_ENTRY).read_to_end(&mut buf).ok()?;
-    Some(decode_bytes(&buf))
+    Some(decode_bytes(&read_capped(entry, MAX_ZIP_ENTRY)?))
 }
 
 /// Names of members whose name is `{prefix}{N}.xml`, sorted by N.
@@ -629,6 +632,51 @@ impl RtfOut {
     }
 }
 
+/// Lexes the RTF control word whose first letter is `data[i]`: the letters,
+/// an optional signed number and one optional delimiting space. Returns the
+/// word, its parameter (clamped to i32) and the position after it.
+fn rtf_control_word(data: &[u8], mut i: usize) -> (&str, Option<i32>, usize) {
+    let start = i;
+    while i < data.len() && data[i].is_ascii_alphabetic() {
+        i += 1;
+    }
+    let word = std::str::from_utf8(&data[start..i]).unwrap_or("");
+    let num_start = i;
+    if i < data.len() && data[i] == b'-' {
+        i += 1;
+    }
+    while i < data.len() && data[i].is_ascii_digit() {
+        i += 1;
+    }
+    let param = std::str::from_utf8(&data[num_start..i])
+        .ok()
+        .and_then(|s| s.parse::<i64>().ok())
+        .map(|n| n.clamp(i32::MIN as i64, i32::MAX as i64) as i32);
+    if i < data.len() && data[i] == b' ' {
+        i += 1;
+    }
+    (word, param, i)
+}
+
+/// The character a symbol control word (`\par`, `\emdash`…) stands for.
+fn rtf_word_char(word: &str) -> Option<char> {
+    Some(match word {
+        "par" | "line" | "sect" | "page" | "row" => '\n',
+        "tab" | "cell" => '\t',
+        "emdash" => '\u{2014}',
+        "endash" => '\u{2013}',
+        "lquote" => '\u{2018}',
+        "rquote" => '\u{2019}',
+        "ldblquote" => '\u{201C}',
+        "rdblquote" => '\u{201D}',
+        "bullet" => '\u{2022}',
+        "emspace" | "enspace" | "qmspace" => ' ',
+        "rtlmark" => '\u{200F}',
+        "ltrmark" => '\u{200E}',
+        _ => return None,
+    })
+}
+
 fn rtf_to_text(data: &[u8]) -> String {
     let mut out = RtfOut {
         text: String::new(),
@@ -685,26 +733,8 @@ fn rtf_to_text(data: &[u8]) -> String {
                 i += 1;
                 let Some(&c) = data.get(i) else { break };
                 if c.is_ascii_alphabetic() {
-                    // Control word: letters, optional signed number, optional space.
-                    let start = i;
-                    while i < data.len() && data[i].is_ascii_alphabetic() {
-                        i += 1;
-                    }
-                    let word = std::str::from_utf8(&data[start..i]).unwrap_or("");
-                    let num_start = i;
-                    if i < data.len() && data[i] == b'-' {
-                        i += 1;
-                    }
-                    while i < data.len() && data[i].is_ascii_digit() {
-                        i += 1;
-                    }
-                    let param: Option<i32> = std::str::from_utf8(&data[num_start..i])
-                        .ok()
-                        .and_then(|s| s.parse::<i64>().ok())
-                        .map(|n| n.clamp(i32::MIN as i64, i32::MAX as i64) as i32);
-                    if i < data.len() && data[i] == b' ' {
-                        i += 1;
-                    }
+                    let (word, param, next) = rtf_control_word(data, i);
+                    i = next;
                     let was_group_start = std::mem::take(&mut group_start);
 
                     if word == "bin" {
@@ -718,25 +748,18 @@ fn rtf_to_text(data: &[u8]) -> String {
                         continue;
                     }
                     if state.font_table {
-                        match word {
-                            "f" => table_font = param,
-                            "fcharset" => {
-                                if let (Some(f), Some(cp)) =
-                                    (table_font, param.and_then(charset_to_codepage))
-                                {
-                                    font_cp.retain(|(n, _)| *n != f);
-                                    font_cp.push((f, cp));
-                                }
+                        let cp = match word {
+                            "f" => {
+                                table_font = param;
+                                None
                             }
-                            "cpg" => {
-                                if let (Some(f), Some(Ok(cp))) =
-                                    (table_font, param.map(u16::try_from))
-                                {
-                                    font_cp.retain(|(n, _)| *n != f);
-                                    font_cp.push((f, cp));
-                                }
-                            }
-                            _ => {}
+                            "fcharset" => param.and_then(charset_to_codepage),
+                            "cpg" => param.and_then(|p| u16::try_from(p).ok()),
+                            _ => None,
+                        };
+                        if let (Some(f), Some(cp)) = (table_font, cp) {
+                            font_cp.retain(|(n, _)| *n != f);
+                            font_cp.push((f, cp));
                         }
                         continue;
                     }
@@ -761,19 +784,11 @@ fn rtf_to_text(data: &[u8]) -> String {
                             }
                             continue;
                         }
-                        "par" | "line" | "sect" | "page" | "row" => out.push_char('\n'),
-                        "tab" | "cell" => out.push_char('\t'),
-                        "emdash" => out.push_char('\u{2014}'),
-                        "endash" => out.push_char('\u{2013}'),
-                        "lquote" => out.push_char('\u{2018}'),
-                        "rquote" => out.push_char('\u{2019}'),
-                        "ldblquote" => out.push_char('\u{201C}'),
-                        "rdblquote" => out.push_char('\u{201D}'),
-                        "bullet" => out.push_char('\u{2022}'),
-                        "emspace" | "enspace" | "qmspace" => out.push_char(' '),
-                        "rtlmark" => out.push_char('\u{200F}'),
-                        "ltrmark" => out.push_char('\u{200E}'),
-                        _ => {}
+                        w => {
+                            if let Some(ch) = rtf_word_char(w) {
+                                out.push_char(ch);
+                            }
+                        }
                     }
                     continue;
                 }
@@ -847,6 +862,17 @@ fn is_doc_text_unit(u: u16) -> bool {
         | 0xFE70..=0xFEFF) // Arabic presentation forms B
 }
 
+/// Maximal runs of consecutive items for which `keep` holds, as index ranges.
+fn runs_where<T: Copy>(items: &[T], keep: impl Fn(T) -> bool) -> impl Iterator<Item = Range<usize>> {
+    let mut pos = 0;
+    std::iter::from_fn(move || {
+        let start = pos + items.get(pos..)?.iter().position(|&x| keep(x))?;
+        let len = items[start..].iter().position(|&x| !keep(x)).unwrap_or(items.len() - start);
+        pos = start + len;
+        Some(start..pos)
+    })
+}
+
 /// Best-effort text recovery from a binary Word 97-2003 file: collects runs of
 /// UTF-16LE text and runs of printable 8-bit text (decoded as windows-1256).
 fn extract_doc_heuristic(data: &[u8]) -> String {
@@ -857,16 +883,7 @@ fn extract_doc_heuristic(data: &[u8]) -> String {
         .chunks_exact(2)
         .map(|p| u16::from_le_bytes([p[0], p[1]]))
         .collect();
-    let mut start = 0;
-    while start < units.len() {
-        if !is_doc_text_unit(units[start]) {
-            start += 1;
-            continue;
-        }
-        let mut end = start;
-        while end < units.len() && is_doc_text_unit(units[end]) {
-            end += 1;
-        }
+    for Range { start, end } in runs_where(&units, is_doc_text_unit) {
         let run = &units[start..end];
         let letters = run
             .iter()
@@ -883,21 +900,11 @@ fn extract_doc_heuristic(data: &[u8]) -> String {
                 .collect();
             runs.push((start * 2, s));
         }
-        start = end;
     }
 
     // Single-byte runs (Word "compressed" pieces), decoded as windows-1256.
     let is_byte_text = |b: u8| matches!(b, 0x09 | 0x0D | 0x20..=0x7E | 0x80..=0xFF);
-    let mut start = 0;
-    while start < data.len() {
-        if !is_byte_text(data[start]) {
-            start += 1;
-            continue;
-        }
-        let mut end = start;
-        while end < data.len() && is_byte_text(data[end]) {
-            end += 1;
-        }
+    for Range { start, end } in runs_where(data, is_byte_text) {
         if end - start >= 5 {
             let (s, _) = WINDOWS_1256.decode_without_bom_handling(&data[start..end]);
             let total = s.chars().count();
@@ -911,7 +918,6 @@ fn extract_doc_heuristic(data: &[u8]) -> String {
                 runs.push((start, s.replace('\r', "\n")));
             }
         }
-        start = end;
     }
 
     runs.sort_by_key(|(pos, _)| *pos);
@@ -938,6 +944,19 @@ const FE80_FORM_COUNTS: [u8; 36] = [
     4, 2, 2, 4,
 ];
 
+/// For a code point in U+FE80..=U+FEF4: (index of its letter in
+/// [`FE80_LETTERS`], form index 0 isolated / 1 final / 2 initial / 3 medial).
+fn fe80_form(cp: u32) -> Option<(usize, usize)> {
+    let mut offset = cp.checked_sub(0xFE80)?;
+    for (k, &n) in FE80_FORM_COUNTS.iter().enumerate() {
+        if offset < n as u32 {
+            return Some((k, offset as usize));
+        }
+        offset -= n as u32;
+    }
+    None
+}
+
 /// Maps one Arabic presentation-form character to its base text.
 fn presentation_form_base(c: char) -> Option<&'static str> {
     let cp = c as u32;
@@ -961,15 +980,9 @@ fn presentation_form_base(c: char) -> Option<&'static str> {
             }
         }
         0xFE80..=0xFEF4 => {
-            let mut offset = cp - 0xFE80;
-            for (k, &n) in FE80_FORM_COUNTS.iter().enumerate() {
-                if offset < n as u32 {
-                    // Slice the k-th letter out (all are 2-byte UTF-8).
-                    return FE80_LETTERS.get(k * 2..k * 2 + 2);
-                }
-                offset -= n as u32;
-            }
-            None
+            let (k, _) = fe80_form(cp)?;
+            // Slice the k-th letter out (all are 2-byte UTF-8).
+            FE80_LETTERS.get(k * 2..k * 2 + 2)
         }
         0xFEF5 | 0xFEF6 => Some("لآ"),
         0xFEF7 | 0xFEF8 => Some("لأ"),
@@ -1240,6 +1253,35 @@ mod tests {
             normalize_arabic_forms("plain مرحبا"),
             Cow::Borrowed(_)
         ));
+    }
+
+    #[test]
+    fn fe80_table_covers_its_range() {
+        let total: u32 = FE80_FORM_COUNTS.iter().map(|&n| n as u32).sum();
+        assert_eq!(total, 0xFEF5 - 0xFE80);
+        assert_eq!(FE80_LETTERS.chars().count(), FE80_FORM_COUNTS.len());
+        assert_eq!(fe80_form(0xFE80), Some((0, 0)));
+        assert_eq!(fe80_form(0xFEF4), Some((35, 3)));
+        assert_eq!(fe80_form(0xFE7F), None);
+        assert_eq!(fe80_form(0xFEF5), None);
+    }
+
+    #[test]
+    fn runs_of_matching_items() {
+        let runs = |s: &str| runs_where(s.as_bytes(), |b| b != b' ').collect::<Vec<_>>();
+        assert_eq!(runs("ab  c d"), vec![0..2, 4..5, 6..7]);
+        assert_eq!(runs("  "), vec![]);
+        assert_eq!(runs(""), vec![]);
+        assert_eq!(runs("abc"), vec![0..3]);
+    }
+
+    #[test]
+    fn rtf_lexing() {
+        assert_eq!(rtf_control_word(b"\\u-1576 x", 1), ("u", Some(-1576), 8));
+        assert_eq!(rtf_control_word(b"par99999999999x", 0), ("par", Some(i32::MAX), 14));
+        assert_eq!(rtf_control_word(b"b", 0), ("b", None, 1));
+        assert_eq!(rtf_word_char("rdblquote"), Some('\u{201D}'));
+        assert_eq!(rtf_word_char("fonttbl"), None);
     }
 
     /// Builds a minimal valid one-page PDF with correct xref offsets.

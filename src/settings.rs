@@ -1,7 +1,10 @@
 //! User preferences kept between runs in a small `key=value` text file next to
 //! the index cache.
 
-use std::path::PathBuf;
+// Only the Windows UI and the tests use this module.
+#![cfg(any(windows, test))]
+
+use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Settings {
@@ -66,22 +69,34 @@ impl Settings {
         )
     }
 
-    pub fn load() -> Settings {
-        std::fs::read_to_string(path()).map(|t| Settings::parse(&t)).unwrap_or_default()
+    /// Reads `path`; a missing file gives the defaults.
+    pub fn load_from(path: &Path) -> Settings {
+        std::fs::read_to_string(path).map(|t| Settings::parse(&t)).unwrap_or_default()
     }
 
-    pub fn save(&self) {
-        let p = path();
-        if let Some(dir) = p.parent() {
-            let _ = std::fs::create_dir_all(dir);
+    pub fn save_to(&self, path: &Path) -> std::io::Result<()> {
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
         }
-        let _ = std::fs::write(p, self.to_text());
+        std::fs::write(path, self.to_text())
     }
-}
 
-/// `%LOCALAPPDATA%\BahthSari\settings.txt`.
-fn path() -> PathBuf {
-    crate::index::cache_path().with_file_name("settings.txt")
+    /// `%LOCALAPPDATA%\BahthSari\settings.txt`.
+    #[cfg(windows)]
+    fn path() -> std::path::PathBuf {
+        crate::index::cache_path().with_file_name("settings.txt")
+    }
+
+    #[cfg(windows)]
+    pub fn load() -> Settings {
+        Self::load_from(&Self::path())
+    }
+
+    /// Saves to the default location, ignoring errors (settings are a convenience).
+    #[cfg(windows)]
+    pub fn save(&self) {
+        let _ = self.save_to(&Self::path());
+    }
 }
 
 #[cfg(test)]
@@ -93,5 +108,40 @@ mod tests {
         let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000 };
         assert_eq!(Settings::parse(&s.to_text()), s);
         assert_eq!(Settings::parse("garbage\nwidth=abc"), Settings::default());
+    }
+
+    #[test]
+    fn bad_values_fall_back_or_clamp() {
+        let d = Settings::default();
+        let s = Settings::parse("width=50\nheight=99999\nsort_col=7\nkind=abc\nupdate_check=-1\nmaximized=yes");
+        assert_eq!((s.width, s.height, s.sort_col, s.kind, s.update_check, s.maximized), (400, 10_000, 3, 0, 0, false));
+        let s = Settings::parse("width=-5\nheight=\nsort_col=-9\nkind=-1\nsort_desc=true\narabic_digits=0");
+        assert_eq!((s.width, s.height, s.sort_col, s.kind, s.sort_desc, s.arabic_digits), (d.width, d.height, -1, 0, false, false));
+        // Unparsable column widths are dropped, the rest kept in order.
+        assert_eq!(Settings::parse("columns=100,x,, 200 ,-3,9999999999").columns, vec![100, 200, -3]);
+        assert!(Settings::parse("columns=").columns.is_empty());
+        // `=` inside a value makes it unparsable; the last duplicate key wins.
+        assert_eq!(Settings::parse("width=900=1").width, d.width);
+        assert_eq!(Settings::parse("width=900\nwidth=1000").width, 1000);
+    }
+
+    #[test]
+    fn tolerant_syntax() {
+        let s = Settings::parse("\u{FEFF}junk\r\n  width = 900 \r\nmaximized=1\r\n[section]\r\nunknown=5\r\n=1\r\n");
+        assert_eq!((s.width, s.maximized), (900, true));
+        assert_eq!(Settings { width: 900, maximized: true, ..Settings::default() }, s);
+        assert_eq!(Settings::parse(""), Settings::default());
+    }
+
+    #[test]
+    fn save_and_load_file() {
+        let dir = std::env::temp_dir().join(format!("bahth_settings_{}", std::process::id()));
+        let file = dir.join("sub").join("settings.txt");
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(Settings::load_from(&file), Settings::default());
+        let s = Settings { width: 1234, columns: vec![1, 2], sort_col: 0, ..Settings::default() };
+        s.save_to(&file).unwrap();
+        assert_eq!(Settings::load_from(&file), s);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

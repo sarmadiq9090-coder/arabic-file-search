@@ -2,6 +2,9 @@
 //! regardless of hamza forms, tashkeel (diacritics), tatweel, presentation
 //! forms, Persian/Urdu letter variants, or letter case.
 
+// Only the Windows UI and the tests use this module.
+#![cfg(any(windows, test))]
+
 use unicode_normalization::char::decompose_compatible;
 
 /// Maps a single character to its normalised form. `None` means the
@@ -154,5 +157,35 @@ mod tests {
         assert_eq!(normalize("ڪتاب"), "كتاب");
         assert_eq!(normalize("کتابی"), "كتابي");
         assert_eq!(normalize("ملف\u{061C}ات"), "ملفات");
+    }
+
+    const SAMPLES: &[&str] = &[
+        "",
+        "Report.PDF",
+        "الـتَّقرير السنويّ ٢٠٢٤",
+        "إسلام أحمد مستشفى مدرسة",
+        "\u{FE8D}\u{FEDF}\u{FE98}\u{FED8}\u{FEAE}\u{FEF3}\u{FEAE} \u{FEFB}\u{FDF2}",
+        "کتابی ۱۲۳ \u{200F}x\u{202B}y",
+        "ÄÖÜ ß İ",
+    ];
+
+    #[test]
+    fn normalize_is_idempotent() {
+        for s in SAMPLES {
+            let once = normalize(s);
+            assert_eq!(normalize(&once), once, "{s}");
+        }
+    }
+
+    #[test]
+    fn map_agrees_with_normalize() {
+        for s in SAMPLES {
+            let (n, map) = normalize_with_map(s);
+            assert_eq!(n, normalize(s), "{s}");
+            assert_eq!(map.len(), n.len(), "{s}");
+            // Offsets never go backwards and always start a source character.
+            assert!(map.windows(2).all(|w| w[0] <= w[1]), "{s}");
+            assert!(map.iter().all(|&m| s.is_char_boundary(m as usize) && (m as usize) < s.len()), "{s}");
+        }
     }
 }

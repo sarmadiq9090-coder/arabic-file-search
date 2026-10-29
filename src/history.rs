@@ -2,10 +2,13 @@
 //! small JSON file next to the index cache. Often and recently opened files
 //! are boosted to the top of the results.
 
+// Only the Windows UI and the tests use this module.
+#![cfg(any(windows, test))]
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::index::Index;
 
@@ -56,10 +59,12 @@ fn under(path: &str, root: &str) -> bool {
 
 impl History {
     /// `history.json` next to the index cache.
-    pub fn path() -> PathBuf {
+    #[cfg(windows)]
+    pub fn path() -> std::path::PathBuf {
         crate::index::cache_path().with_file_name("history.json")
     }
 
+    #[cfg(windows)]
     pub fn load() -> History {
         Self::load_from(&Self::path())
     }
@@ -70,6 +75,7 @@ impl History {
     }
 
     /// Saves to the default location, ignoring errors (history is a convenience).
+    #[cfg(windows)]
     pub fn save(&self) {
         let _ = self.save_to(&Self::path());
     }
@@ -107,11 +113,6 @@ impl History {
         if self.saved.len() > MAX_SAVED {
             self.saved.remove(0);
         }
-    }
-
-    #[allow(dead_code)] // kept for a future "remove one saved search" command
-    pub fn remove_saved(&mut self, name: &str) {
-        self.saved.retain(|s| s.name != name);
     }
 
     /// Counts an open of `path` at time `now` (Unix seconds). When more than
@@ -188,8 +189,6 @@ mod tests {
         h.add_saved(s("b", "2"));
         h.add_saved(s("a", "3"));
         assert_eq!(h.saved, vec![s("a", "3"), s("b", "2")]);
-        h.remove_saved("a");
-        assert_eq!(h.saved, vec![s("b", "2")]);
         for i in 0..40 {
             h.add_saved(s(&i.to_string(), ""));
         }

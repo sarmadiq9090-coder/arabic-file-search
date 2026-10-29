@@ -1,6 +1,9 @@
 //! Fixes text typed with the wrong keyboard layout: "hgjrvdv" typed on an
 //! English layout becomes "التقرير" (standard Arabic 101 layout), and back.
 
+// Only the Windows UI and the tests use this module.
+#![cfg(any(windows, test))]
+
 /// Unshifted keys of the Arabic (101) layout: (Latin key, Arabic output).
 const KEYS: &[(char, &str)] = &[
     ('q', "ض"),
@@ -47,8 +50,9 @@ const SHIFTED: &[(char, &str)] = &[('T', "لإ"), ('G', "لأ"), ('B', "لآ"), 
 /// (`.pdf`), so that `.` typed for ز elsewhere is still converted.
 fn is_filter(tok: &str, last: bool) -> bool {
     let lower = tok.to_ascii_lowercase();
-    let known = |e: &str| crate::search::KINDS.iter().any(|(_, exts)| exts.contains(&e));
-    ["ext:", "*.", "folder:", "مجلد:"].iter().any(|p| lower.starts_with(p))
+    use crate::search::{FOLDER_PREFIXES, KINDS};
+    let known = |e: &str| KINDS.iter().any(|(_, exts)| exts.contains(&e));
+    ["ext:", "*."].iter().chain(&FOLDER_PREFIXES).any(|p| lower.starts_with(p))
         || lower
             .strip_prefix('.')
             .is_some_and(|e| !e.is_empty() && e.chars().all(|c| c.is_ascii_alphanumeric()) && (last || known(e)))
@@ -165,6 +169,31 @@ mod tests {
     #[test]
     fn known_extension_anywhere_is_kept() {
         assert_eq!(convert_layout(".pdf hgjrvdv").as_deref(), Some(".pdf التقرير"));
+    }
+
+    fn round_trip(s: &str) -> Option<String> {
+        convert_layout(&convert_layout(s)?)
+    }
+
+    #[test]
+    fn round_trips() {
+        // Every unshifted key (g is never followed by h: "gh" reads back as لا → b).
+        let all_keys = "qwertyuiop[]asdfgjklh;'zxcvbnm,./`";
+        assert_eq!(round_trip(all_keys).as_deref(), Some(all_keys));
+        for s in ["hgjrvdv ext:pdf", "folder: lgtJ ,'kd", "b lhg", "hgjrvdv .pdf"] {
+            assert_eq!(round_trip(s).as_deref(), Some(s.to_lowercase().as_str()), "{s}");
+        }
+        // Shifted keys (أ إ آ لأ…) read back unshifted, so only plain letters round-trip.
+        for s in ["التقرير", "لا ملف", "عقد ايجار", "مجلد: ظرف"] {
+            assert_eq!(round_trip(s).as_deref(), Some(s), "{s}");
+        }
+    }
+
+    #[test]
+    fn converted_text_matches_after_normalising() {
+        use crate::normalize::normalize;
+        assert_eq!(normalize(&convert_layout("hgjrvdv").unwrap()), normalize("التقرير"));
+        assert_eq!(normalize(&convert_layout("lsjatn").unwrap()), normalize("مستشفى"));
     }
 
 }

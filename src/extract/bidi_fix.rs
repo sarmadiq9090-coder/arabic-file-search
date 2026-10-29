@@ -15,7 +15,7 @@
 //! Detection must run before presentation forms are folded to base letters,
 //! which is why this is applied inside `extract_pdf`.
 
-use super::{FE80_FORM_COUNTS, normalize_arabic_forms};
+use super::{fe80_form, normalize_arabic_forms};
 
 /// Frequent words whose reversed spelling is not itself a common word.
 /// (Ambiguous pairs such as مع/عم, لك/كل, قد/دق, لم/مل and palindromes like
@@ -105,16 +105,7 @@ fn shape(c: char) -> Option<Shape> {
     const SHAPES: [Shape; 4] = [Shape::Isolated, Shape::Final, Shape::Initial, Shape::Medial];
     let cp = c as u32;
     match cp {
-        0xFE80..=0xFEF4 => {
-            let mut offset = cp - 0xFE80;
-            for &n in &FE80_FORM_COUNTS {
-                if offset < n as u32 {
-                    return Some(SHAPES[offset as usize]);
-                }
-                offset -= n as u32;
-            }
-            None
-        }
+        0xFE80..=0xFEF4 => fe80_form(cp).map(|(_, form)| SHAPES[form]),
         // Lam-alef ligatures: isolated / final pairs.
         0xFEF5..=0xFEFC => Some(SHAPES[((cp - 0xFEF5) % 2) as usize]),
         _ => None,
