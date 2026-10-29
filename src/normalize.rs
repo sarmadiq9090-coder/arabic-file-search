@@ -1,0 +1,93 @@
+//! Text normalisation used for matching, so that Arabic queries find words
+//! regardless of hamza forms, tashkeel (diacritics), tatweel, or letter case.
+
+/// Maps a single character to its normalised form. `None` means the
+/// character is dropped entirely (diacritics, tatweel, bidi marks).
+#[inline]
+fn map_char(c: char) -> Option<char> {
+    match c {
+        // Tashkeel (harakat), superscript alef, Quranic marks and tatweel.
+        '\u{064B}'..='\u{065F}' | '\u{0670}' | '\u{06D6}'..='\u{06ED}' | '\u{0640}' => None,
+        // Invisible direction / joiner marks.
+        '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' | '\u{FEFF}' => {
+            None
+        }
+        // All alef forms to bare alef.
+        'أ' | 'إ' | 'آ' | 'ٱ' | 'ٲ' | 'ٳ' => Some('ا'),
+        'ة' => Some('ه'),
+        'ى' | 'ئ' | 'ی' => Some('ي'),
+        'ؤ' => Some('و'),
+        'ک' => Some('ك'),
+        // Arabic-Indic and Persian digits to ASCII digits.
+        '\u{0660}'..='\u{0669}' => char::from_u32(c as u32 - 0x0660 + '0' as u32),
+        '\u{06F0}'..='\u{06F9}' => char::from_u32(c as u32 - 0x06F0 + '0' as u32),
+        _ => Some(c),
+    }
+}
+
+/// Pushes the normalised (lower-cased) form of `c` into `out`.
+/// Returns how many bytes were appended.
+#[inline]
+fn push_norm(out: &mut String, c: char) -> usize {
+    let before = out.len();
+    if let Some(m) = map_char(c) {
+        if m.is_ascii() {
+            out.push(m.to_ascii_lowercase());
+        } else {
+            out.extend(m.to_lowercase());
+        }
+    }
+    out.len() - before
+}
+
+/// Normalises a string for matching.
+pub fn normalize(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        push_norm(&mut out, c);
+    }
+    out
+}
+
+/// Normalises a string and also returns, for every byte of the output, the
+/// byte offset in `s` of the character it came from. Used to cut a readable
+/// snippet out of the original text around a match.
+pub fn normalize_with_map(s: &str) -> (String, Vec<u32>) {
+    let mut out = String::with_capacity(s.len());
+    let mut map = Vec::with_capacity(s.len());
+    for (i, c) in s.char_indices() {
+        let n = push_norm(&mut out, c);
+        map.extend(std::iter::repeat_n(i as u32, n));
+    }
+    (out, map)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn arabic_variants_match() {
+        assert_eq!(normalize("أحمد"), normalize("احمد"));
+        assert_eq!(normalize("إسلام"), "اسلام");
+        assert_eq!(normalize("مَدْرَسَة"), "مدرسه");
+        assert_eq!(normalize("مستشفى"), normalize("مستشفي"));
+        assert_eq!(normalize("كـــتاب"), "كتاب");
+        assert_eq!(normalize("تقرير ٢٠٢٤"), "تقرير 2024");
+    }
+
+    #[test]
+    fn latin_case_insensitive() {
+        assert_eq!(normalize("Report.PDF"), "report.pdf");
+    }
+
+    #[test]
+    fn map_points_back_to_source() {
+        let src = "الـتَّقرير";
+        let (n, map) = normalize_with_map(src);
+        assert_eq!(n, "التقرير");
+        assert_eq!(map.len(), n.len());
+        let pos = n.find("تقرير").unwrap();
+        assert!(src[map[pos] as usize..].starts_with('ت'));
+    }
+}
