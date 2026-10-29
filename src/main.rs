@@ -13,6 +13,11 @@ mod icon;
 #[cfg(windows)]
 mod ui;
 
+// Command-line interface: parsing and output are platform independent; the
+// console glue inside is Windows-only.
+#[cfg(any(windows, test))]
+mod cli;
+
 // Platform-independent logic: used by the Windows UI and unit-tested on every
 // platform (the network/installer parts of `update` are Windows-only inside).
 #[cfg(any(windows, test))]
@@ -34,6 +39,10 @@ mod update;
 
 #[cfg(windows)]
 fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|a| cli::is_cli_arg(a)) {
+        cli::run(&args);
+    }
     ui::run();
 }
 

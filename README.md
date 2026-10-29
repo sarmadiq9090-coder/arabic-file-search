@@ -52,6 +52,19 @@
 حمّل `bahth.exe` من [أحدث إصدار](../../releases/latest) أو من نتائج GitHub Actions، وشغّله مباشرة (لا يحتاج تثبيت).
 أول تشغيل يفهرس الأقراص (قد يستغرق دقيقة أو أكثر)، ويُحفظ الفهرس في `%LOCALAPPDATA%\BahthSari\index.bin`. اضغط «تحديث الفهرس» لتحديثه.
 
+## سطر الأوامر
+
+يمكن البحث من موجّه الأوامر بنفس الملف `bahth.exe` وبنفس صيغة البحث، دون فتح الواجهة (يستخدم الفهرس المحفوظ، فافتح البرنامج مرة لبنائه):
+
+```
+bahth.exe -s "فاتورة ext:pdf"
+bahth.exe -s تقرير -n 20 --sort date --desc --scope "D:\العمل"
+bahth.exe -s عقد --count
+bahth.exe -s عقد --csv > نتائج.csv
+```
+
+الخيارات: `-n`/`--max` أقصى عدد، `--sort name|path|size|date` و`--desc` للترتيب، `--scope` مجلد البحث، `--count` العدد فقط، `--csv` (المسار والحجم والتاريخ بصيغة ISO)، `--json`، و`--help` للمساعدة. رمز الخروج 0 عند وجود نتائج، و1 عند عدمها، و2 عند الخطأ أو غياب الفهرس.
+
 ## البناء من المصدر
 
 1. ثبّت Rust من <https://rustup.rs> (مع أدوات Visual Studio C++ Build Tools عند الطلب).
@@ -79,6 +92,7 @@ cargo build --release
 |---|---|
 | `src/ui/` | الواجهة (Win32 أصلية عبر native-windows-gui، قائمة افتراضية سريعة): `mod.rs` الحالة والنافذة، `build.rs` بناء العناصر والأحداث، `search_jobs.rs` الفهرسة والبحث في الخلفية، `results.rs` النتائج والترتيب والنسخ، `files.rs` إعادة التسمية والحذف، `history_menu.rs` السجل، `updates.rs` التحديث، `keys.rs` لوحة المفاتيح، `startup.rs` التشغيل والسجل، `format.rs` و`shell.rs` أدوات مساعدة |
 | `src/index.rs` | فهرسة الأقراص بالتوازي وحفظ الفهرس |
+| `src/cli.rs` | البحث من سطر الأوامر (`bahth.exe -s …`) |
 | `src/search.rs` | تحليل الاستعلام والبحث بالاسم وداخل المحتوى |
 | `src/extract.rs` و`src/extract/` | استخراج النص من المستندات، والبريد (eml وmsg)، وepub، وتصحيح ترتيب العربية في PDF |
 | `src/history.rs` | سجل البحث والبحوث المحفوظة والملفات الأكثر فتحاً |
@@ -101,5 +115,7 @@ MIT — انظر ملف [LICENSE](LICENSE).
 ## English
 
 **Bahth Sari'** is a fast, open-source Windows file search tool written in Rust with full Arabic support. It indexes all local drives into a cached in-memory index for instant filename search, and can search inside documents (txt, docx, pptx, xlsx/xls, pdf, odt/ods, rtf, doc, eml/msg, epub, source files). Version 0.3 adds a global hotkey (Ctrl+Alt+F), match highlighting, column sorting, search history and saved searches, frequently-opened files first, F2 rename / Delete to Recycle Bin, drag & drop, fixing of reversed Arabic text in PDFs, and automatic updates from GitHub Releases. Arabic matching ignores hamza forms, ta marbuta, alef maqsura, diacritics and tatweel. Double-click to open a file, open its folder, or copy its full path.
+
+Command line: `bahth.exe -s "invoice ext:pdf" [-n N] [--sort name|path|size|date] [--desc] [--scope folder] [--count|--csv|--json]` prints matching paths from the saved index (exit code 0 found, 1 none, 2 error); see `bahth.exe --help`.
 
 Build: `cargo build --release` on Windows (output `target\release\bahth.exe`). License: MIT.

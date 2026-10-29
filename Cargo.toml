@@ -20,7 +20,7 @@ cfb = "0.15.0"
 
 [target.'cfg(windows)'.dependencies]
 native-windows-gui = { version = "1.0.13", default-features = false, features = ["list-view", "animation-timer", "clipboard", "menu", "file-dialog", "status-bar", "high-dpi", "tray-notification", "combobox", "notice"] }
-winapi = { version = "0.3", features = ["winuser", "commctrl", "shellapi", "fileapi", "winbase", "combaseapi", "objbase", "timezoneapi", "minwinbase", "libloaderapi", "uxtheme", "synchapi", "errhandlingapi", "sysinfoapi", "winerror", "handleapi", "processthreadsapi", "wingdi", "oleidl", "ole2", "objidl", "unknwnbase", "guiddef", "windef", "minwindef", "usp10", "winhttp", "winnt"] }
+winapi = { version = "0.3", features = ["winuser", "consoleapi", "wincon", "processenv", "commctrl", "shellapi", "fileapi", "winbase", "combaseapi", "objbase", "timezoneapi", "minwinbase", "libloaderapi", "uxtheme", "synchapi", "errhandlingapi", "sysinfoapi", "winerror", "handleapi", "processthreadsapi", "wingdi", "oleidl", "ole2", "objidl", "unknwnbase", "guiddef", "windef", "minwindef", "usp10", "winhttp", "winnt"] }
 
 [build-dependencies]
 embed-manifest = "1.5.1"
