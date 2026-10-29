@@ -3,7 +3,6 @@
 //! are boosted to the top of the results.
 
 // Only the Windows UI and the tests use this module.
-#![cfg(any(windows, test))]
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

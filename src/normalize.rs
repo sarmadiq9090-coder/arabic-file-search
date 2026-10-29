@@ -3,7 +3,6 @@
 //! forms, Persian/Urdu letter variants, or letter case.
 
 // Only the Windows UI and the tests use this module.
-#![cfg(any(windows, test))]
 
 use unicode_normalization::char::decompose_compatible;
 

@@ -4,7 +4,6 @@
 //! next start-up is instant and filename searches never touch the disk.
 
 // Only the Windows UI and the tests use this module.
-#![cfg(any(windows, test))]
 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};

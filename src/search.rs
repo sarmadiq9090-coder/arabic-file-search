@@ -1,7 +1,6 @@
 //! Query parsing, filename search over the index, and content search inside documents.
 
 // Only the Windows UI and the tests use this module.
-#![cfg(any(windows, test))]
 
 use rayon::prelude::*;
 use std::path::Path;

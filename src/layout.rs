@@ -2,7 +2,6 @@
 //! English layout becomes "التقرير" (standard Arabic 101 layout), and back.
 
 // Only the Windows UI and the tests use this module.
-#![cfg(any(windows, test))]
 
 /// Unshifted keys of the Arabic (101) layout: (Latin key, Arabic output).
 const KEYS: &[(char, &str)] = &[

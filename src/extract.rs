@@ -7,7 +7,6 @@
 //! are folded back to their base letters so searches for normal text match.
 
 // Only the Windows UI and the tests use this module.
-#![cfg(any(windows, test))]
 
 use std::borrow::Cow;
 use std::fs::File;

@@ -2,7 +2,6 @@
 //! the index cache.
 
 // Only the Windows UI and the tests use this module.
-#![cfg(any(windows, test))]
 
 use std::path::Path;
 
@@ -74,11 +73,15 @@ impl Settings {
         std::fs::read_to_string(path).map(|t| Settings::parse(&t)).unwrap_or_default()
     }
 
+    /// Writes a temp file and renames it over `path`, so a crash never
+    /// leaves half a settings file.
     pub fn save_to(&self, path: &Path) -> std::io::Result<()> {
         if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
+            let _ = std::fs::create_dir_all(dir);
         }
-        std::fs::write(path, self.to_text())
+        let tmp = path.with_extension("txt.tmp");
+        std::fs::write(&tmp, self.to_text())?;
+        std::fs::rename(tmp, path)
     }
 
     /// `%LOCALAPPDATA%\BahthSari\settings.txt`.

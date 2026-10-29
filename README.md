@@ -4,7 +4,7 @@
 
 # بحث سريع — برنامج بحث عن الملفات لويندوز
 
-**الإصدار الحالي: 0.3.0** · [التحميل](../../releases/latest) · [سجل التغييرات](CHANGELOG.md)
+**الإصدار الحالي: 0.3.1** · [التحميل](../../releases/latest) · [سجل التغييرات](CHANGELOG.md)
 
 برنامج مفتوح المصدر مكتوب بلغة **Rust** للبحث السريع عن الملفات على جهازك، يدعم **اللغة العربية بالكامل**، ويبحث **داخل المستندات** أيضاً.
 
@@ -63,7 +63,7 @@ cargo build --release
 
 3. الملف الناتج: `target\release\bahth.exe`
 
-للتشغيل المباشر: `cargo run --release` — وللاختبارات: `cargo test`.
+للتشغيل المباشر: `cargo run --release` — وللاختبارات: `cargo test` (تعمل أيضاً على لينكس). كل رفع إلى GitHub يُفحص آلياً: clippy دون تحذيرات، والاختبارات على لينكس وويندوز، وبناء bahth.exe.
 
 البناء من لينكس (cross-compile): `rustup target add x86_64-pc-windows-gnu` وثبّت `mingw-w64` ثم `cargo build --release --target x86_64-pc-windows-gnu`.
 
@@ -77,7 +77,7 @@ cargo build --release
 
 | الملف | الوظيفة |
 |---|---|
-| `src/ui.rs` | الواجهة (Win32 أصلية عبر native-windows-gui، قائمة افتراضية سريعة) |
+| `src/ui/` | الواجهة (Win32 أصلية عبر native-windows-gui، قائمة افتراضية سريعة): `mod.rs` الحالة والنافذة، `build.rs` بناء العناصر والأحداث، `search_jobs.rs` الفهرسة والبحث في الخلفية، `results.rs` النتائج والترتيب والنسخ، `files.rs` إعادة التسمية والحذف، `history_menu.rs` السجل، `updates.rs` التحديث، `keys.rs` لوحة المفاتيح، `startup.rs` التشغيل والسجل، `format.rs` و`shell.rs` أدوات مساعدة |
 | `src/index.rs` | فهرسة الأقراص بالتوازي وحفظ الفهرس |
 | `src/search.rs` | تحليل الاستعلام والبحث بالاسم وداخل المحتوى |
 | `src/extract.rs` و`src/extract/` | استخراج النص من المستندات، والبريد (eml وmsg)، وepub، وتصحيح ترتيب العربية في PDF |
