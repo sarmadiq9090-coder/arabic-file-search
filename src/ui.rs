@@ -11,9 +11,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use winapi::shared::minwindef::{LPARAM, UINT, WPARAM};
-use winapi::shared::windef::{HWND, POINT};
-use winapi::um::commctrl::{LVIF_TEXT, LVN_GETDISPINFOW, LVS_OWNERDATA, NMLVDISPINFOW};
-use winapi::um::winuser::{GetCursorPos, NMHDR, SendMessageW, VK_RETURN, WM_CHAR, WM_KEYDOWN, WM_NOTIFY, WM_SETFONT};
+use winapi::shared::windef::{HWND, POINT, RECT};
+use winapi::um::commctrl::{LVIF_TEXT, LVS_EX_DOUBLEBUFFER, LVN_GETDISPINFOW, LVS_OWNERDATA, NMLVDISPINFOW};
+use winapi::um::winuser::{GetCursorPos, GetWindowRect, NMHDR, SendMessageW, WM_NOTIFY, WM_SETFONT};
 
 use crate::index::{self, Entry, Index, ScanProgress};
 use crate::search::{self, ContentHit, ContentProgress, Query};
@@ -74,7 +74,6 @@ pub struct App {
     stop_btn: nwg::Button,
     status: nwg::StatusBar,
     timer: nwg::AnimationTimer,
-    enter_notice: nwg::Notice,
     folder_dialog: nwg::FileDialog,
     menu: nwg::Menu,
     menu_open: nwg::MenuItem,
@@ -84,8 +83,12 @@ pub struct App {
 }
 
 impl App {
-    fn scaled(&self, v: i32) -> i32 {
-        (v as f64 * nwg::scale_factor()).round() as i32
+    /// Height of the status bar in logical units (it sizes itself to its font).
+    fn status_height(&self) -> i32 {
+        let Some(hwnd) = self.status.handle.hwnd() else { return 26 };
+        let mut r = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        unsafe { GetWindowRect(hwnd, &mut r) };
+        ((r.bottom - r.top) as f64 / nwg::scale_factor()).round() as i32
     }
 
     // ---------------------------------------------------------------- layout
@@ -124,7 +127,7 @@ impl App {
         }
 
         // Bottom: action buttons above the status bar.
-        let status_h = 26;
+        let status_h = self.status_height();
         let y_btn = h - status_h - m - row_h;
         let mut x = m;
         for b in [&self.open_btn, &self.folder_btn, &self.copy_btn, &self.stop_btn] {
@@ -378,7 +381,7 @@ impl App {
         match self.selected_path() {
             Some(p) => {
                 nwg::Clipboard::set_data_text(&self.window, &p);
-                self.set_status(&format!("تم نسخ المسار: {p}"));
+                self.set_status(&format!("تم نسخ المسار: {}", ltr_path(&p)));
             }
             None => self.set_status("اختر ملفاً من القائمة أولاً."),
         }
@@ -549,8 +552,8 @@ impl Drop for AppUi {
 
 impl NativeUi<AppUi> for App {
     fn build_ui(mut app: App) -> Result<AppUi, nwg::NwgError> {
-        let font_px = (18.0 * nwg::scale_factor()).round() as u32;
-        nwg::Font::builder().family("Segoe UI").size(font_px).build(&mut app.font)?;
+        let font_px = (15.0 * nwg::scale_factor()).round() as u32;
+        nwg::Font::builder().family(&ui_font_family()).size_absolute(font_px).build(&mut app.font)?;
         let f = Some(&app.font);
 
         nwg::Window::builder()
@@ -600,8 +603,14 @@ impl NativeUi<AppUi> for App {
             .parent(w)
             .flags(list_flags)
             .list_style(nwg::ListViewStyle::Detailed)
-            .ex_flags(nwg::ListViewExFlags::FULL_ROW_SELECT | nwg::ListViewExFlags::GRID)
-            .double_buffer(true)
+            // Native double buffering (LVS_EX_DOUBLEBUFFER). nwg's own
+            // `double_buffer` paints through an unmirrored memory DC, which
+            // draws text backwards in a right-to-left window.
+            .ex_flags(unsafe {
+                nwg::ListViewExFlags::from_bits_unchecked(
+                    (nwg::ListViewExFlags::FULL_ROW_SELECT | nwg::ListViewExFlags::GRID).bits() | LVS_EX_DOUBLEBUFFER,
+                )
+            })
             .build(&mut app.list)?;
         if let Some(h) = app.list.handle.hwnd() {
             unsafe { SendMessageW(h, WM_SETFONT, app.font.handle as WPARAM, 1) };
@@ -611,10 +620,12 @@ impl NativeUi<AppUi> for App {
             app.list.insert_column(nwg::InsertListViewColumn {
                 index: Some(i as i32),
                 fmt: None,
-                width: Some(app.scaled(*width)),
+                width: Some(*width),
                 text: Some(title.to_string()),
             });
         }
+
+        app.list.set_headers_enabled(true);
 
         nwg::Button::builder().parent(w).font(f).text("فتح الملف").build(&mut app.open_btn)?;
         nwg::Button::builder().parent(w).font(f).text("فتح المجلد").build(&mut app.folder_btn)?;
@@ -627,7 +638,6 @@ impl NativeUi<AppUi> for App {
             .interval(Duration::from_millis(250))
             .active(true)
             .build(&mut app.timer)?;
-        nwg::Notice::builder().parent(w).build(&mut app.enter_notice)?;
         nwg::FileDialog::builder()
             .title("اختر المجلد الذي تريد البحث فيه")
             .action(nwg::FileDialogAction::OpenDirectory)
@@ -649,7 +659,15 @@ impl NativeUi<AppUi> for App {
                 E::OnResize | E::OnWindowMaximize => app.layout(),
                 E::OnWindowClose if handle == app.window => app.on_close(),
                 E::OnTextInput if handle == app.query => app.on_query_changed(),
-                E::OnNotice if handle == app.enter_notice => app.on_search(),
+                // The dialog-style message loop turns Enter into IDOK, which
+                // nwg reports as OnKeyEnter on the window.
+                E::OnKeyEnter => {
+                    if app.list.focus() {
+                        app.open_selected();
+                    } else {
+                        app.on_search();
+                    }
+                }
                 E::OnTimerTick if handle == app.timer => app.on_tick(),
                 E::OnButtonClick => {
                     if handle == app.search_btn {
@@ -717,25 +735,21 @@ impl NativeUi<AppUi> for App {
         })?;
         ui.raw_handlers.borrow_mut().push(raw);
 
-        // Enter in the query box starts a search.
-        let notice = ui.enter_notice.sender();
-        let raw = nwg::bind_raw_event_handler(&ui.query.handle, 0x1_0002, move |_hwnd, msg, w, _l| {
-            match msg {
-                WM_KEYDOWN if w as i32 == VK_RETURN => {
-                    notice.notice();
-                    Some(0)
-                }
-                // Swallow the matching character so the edit box does not beep.
-                WM_CHAR if w == '\r' as WPARAM => Some(0),
-                _ => None,
-            }
-        })?;
-        ui.raw_handlers.borrow_mut().push(raw);
-
         ui.layout();
         ui.start();
         Ok(ui)
     }
+}
+
+/// The first installed font from a list of fonts known to render Arabic well.
+fn ui_font_family() -> String {
+    const PREFERRED: [&str; 5] = ["Segoe UI", "Tahoma", "Arial", "Noto Sans Arabic", "Noto Naskh Arabic"];
+    let installed = nwg::Font::families();
+    PREFERRED
+        .iter()
+        .find(|f| installed.iter().any(|i| i.eq_ignore_ascii_case(f)))
+        .unwrap_or(&PREFERRED[0])
+        .to_string()
 }
 
 pub fn run() {
@@ -743,7 +757,7 @@ pub fn run() {
         eprintln!("failed to initialise the UI: {e}");
         return;
     }
-    let _ = nwg::Font::set_global_family("Segoe UI");
+    let _ = nwg::Font::set_global_family(&ui_font_family());
     let ui = match App::build_ui(App::default()) {
         Ok(ui) => ui,
         Err(e) => {
