@@ -19,7 +19,7 @@ use winapi::um::commctrl::{
     LVS_OWNERDATA, LVS_SHAREIMAGELISTS, LVSIL_SMALL, NMLVDISPINFOW, SB_SETPARTS,
 };
 use winapi::um::winuser::{
-    EM_SETSEL, GetCursorPos, GetKeyState, GetWindowRect, IsIconic, IsZoomed, NMHDR, SW_MAXIMIZE, SW_RESTORE,
+    EM_SETSEL, GetCursorPos, GetKeyState, GetWindowRect, IsIconic, IsZoomed, NMHDR, SW_RESTORE,
     SendMessageW, SetForegroundWindow, ShowWindow, VK_CONTROL, VK_DOWN, VK_F3, VK_UP, WM_NOTIFY, WM_SETFONT,
 };
 
@@ -41,6 +41,9 @@ const COL_DATE: usize = 3;
 const COL_SNIPPET: usize = 4;
 const COLUMNS: [(&str, i32); 5] =
     [("الاسم", 260), ("المسار الكامل", 460), ("الحجم", 90), ("تاريخ التعديل", 140), ("النص المطابق", 360)];
+
+/// Set once the message loop runs, so start-up timing ends at a real tick.
+static LOOP_STARTED: AtomicBool = AtomicBool::new(false);
 
 /// Show numbers with Arabic-Indic digits.
 static ARABIC_DIGITS: AtomicBool = AtomicBool::new(false);
@@ -120,8 +123,9 @@ pub struct App {
     /// Wakes the UI thread when a background filename search finishes.
     name_notice: nwg::Notice,
     name_result: Arc<Mutex<Option<NameResult>>>,
-    folder_dialog: nwg::FileDialog,
-    export_dialog: nwg::FileDialog,
+    /// Built on first use: each one starts a COM file dialog, which is slow.
+    folder_dialog: RefCell<Option<nwg::FileDialog>>,
+    export_dialog: RefCell<Option<nwg::FileDialog>>,
     menu: nwg::Menu,
     menu_open: nwg::MenuItem,
     menu_folder: nwg::MenuItem,
@@ -139,6 +143,7 @@ pub struct App {
     /// System image-list index of the icon for each extension.
     icons: RefCell<HashMap<String, i32>>,
     tray_hint_shown: Cell<bool>,
+    startup_logged: Cell<bool>,
     state: RefCell<State>,
 }
 
@@ -147,7 +152,11 @@ impl App {
     fn status_height(&self) -> i32 {
         let Some(hwnd) = self.status.handle.hwnd() else { return 26 };
         let mut r = RECT { left: 0, top: 0, right: 0, bottom: 0 };
-        unsafe { GetWindowRect(hwnd, &mut r) };
+        unsafe {
+            // Let the status bar fit itself to the window and its font first.
+            SendMessageW(hwnd, winapi::um::winuser::WM_SIZE, 0, 0);
+            GetWindowRect(hwnd, &mut r);
+        }
         ((r.bottom - r.top) as f64 / nwg::scale_factor()).round() as i32
     }
 
@@ -462,6 +471,11 @@ impl App {
 
     /// Polls background jobs a few times per second.
     fn on_tick(&self) {
+        // The first tick handled by the message loop, after the first paint.
+        if LOOP_STARTED.load(Ordering::Relaxed) && !self.startup_logged.replace(true) {
+            phase("first-tick");
+            log_phases();
+        }
         self.poll_load();
         self.poll_scan();
         self.poll_content();
@@ -525,9 +539,22 @@ impl App {
     // ---------------------------------------------------------------- scope
 
     fn choose_folder(&self) {
-        if self.folder_dialog.run(Some(&self.window))
-            && let Ok(dir) = self.folder_dialog.get_selected_item()
-        {
+        let mut slot = self.folder_dialog.borrow_mut();
+        if slot.is_none() {
+            let mut d = nwg::FileDialog::default();
+            let built = nwg::FileDialog::builder()
+                .title("اختر المجلد الذي تريد البحث فيه")
+                .action(nwg::FileDialogAction::OpenDirectory)
+                .build(&mut d);
+            if built.is_err() {
+                return;
+            }
+            *slot = Some(d);
+        }
+        let Some(dialog) = slot.as_ref() else { return };
+        let chosen = if dialog.run(Some(&self.window)) { dialog.get_selected_item().ok() } else { None };
+        drop(slot);
+        if let Some(dir) = chosen {
             let mut dir = dir.to_string_lossy().into_owned();
             if !dir.ends_with('\\') {
                 dir.push('\\');
@@ -623,10 +650,23 @@ impl App {
             self.set_status("لا توجد نتائج لتصديرها.");
             return;
         }
-        if !self.export_dialog.run(Some(&self.window)) {
-            return;
+        let mut slot = self.export_dialog.borrow_mut();
+        if slot.is_none() {
+            let mut d = nwg::FileDialog::default();
+            let built = nwg::FileDialog::builder()
+                .title("حفظ النتائج")
+                .action(nwg::FileDialogAction::Save)
+                .filters("CSV(*.csv)")
+                .build(&mut d);
+            if built.is_err() {
+                return;
+            }
+            *slot = Some(d);
         }
-        let Ok(path) = self.export_dialog.get_selected_item() else { return };
+        let Some(dialog) = slot.as_ref() else { return };
+        let chosen = if dialog.run(Some(&self.window)) { dialog.get_selected_item().ok() } else { None };
+        drop(slot);
+        let Some(path) = chosen else { return };
         let mut path = std::path::PathBuf::from(path);
         if path.extension().is_none() {
             path.set_extension("csv");
@@ -1049,7 +1089,11 @@ impl NativeUi<AppUi> for App {
             .size((settings.width as i32, settings.height as i32))
             .center(true)
             .ex_flags(WS_EX_LAYOUTRTL)
-            .flags(nwg::WindowFlags::MAIN_WINDOW | nwg::WindowFlags::VISIBLE)
+            .flags(if settings.maximized {
+                nwg::WindowFlags::MAIN_WINDOW | nwg::WindowFlags::VISIBLE | nwg::WindowFlags::MAXIMIZED
+            } else {
+                nwg::WindowFlags::MAIN_WINDOW | nwg::WindowFlags::VISIBLE
+            })
             .build(&mut app.window)?;
         let w = &app.window;
         if let Some(h) = w.handle.hwnd() {
@@ -1150,17 +1194,6 @@ impl NativeUi<AppUi> for App {
             .build(&mut app.timer)?;
         nwg::Notice::builder().parent(w).build(&mut app.name_notice)?;
         phase("controls");
-        nwg::FileDialog::builder()
-            .title("اختر المجلد الذي تريد البحث فيه")
-            .action(nwg::FileDialogAction::OpenDirectory)
-            .build(&mut app.folder_dialog)?;
-        nwg::FileDialog::builder()
-            .title("حفظ النتائج")
-            .action(nwg::FileDialogAction::Save)
-            .filters("CSV(*.csv)")
-            .build(&mut app.export_dialog)?;
-
-        phase("dialogs");
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.menu)?;
         nwg::MenuItem::builder().text("فتح الملف\tEnter").parent(&app.menu).build(&mut app.menu_open)?;
         nwg::MenuItem::builder().text("فتح المجلد الذي يحتويه\tCtrl+Enter").parent(&app.menu).build(&mut app.menu_folder)?;
@@ -1302,14 +1335,9 @@ impl NativeUi<AppUi> for App {
         })?;
         ui.raw_handlers.borrow_mut().push(raw);
 
-        if settings.maximized
-            && let Some(h) = ui.window.handle.hwnd()
-        {
-            unsafe { ShowWindow(h, SW_MAXIMIZE) };
-        }
         phase("events");
         ui.layout();
-        phase("shown");
+        phase("layout");
         ui.start();
         Ok(ui)
     }
@@ -1335,7 +1363,8 @@ fn font_installed(name: &str) -> bool {
     }
     let mut lf: LOGFONTW = unsafe { std::mem::zeroed() };
     lf.lfCharSet = DEFAULT_CHARSET as u8;
-    for (dst, src) in lf.lfFaceName.iter_mut().take(31).zip(name.encode_utf16()) {
+    // The last unit stays 0 as the terminator.
+    for (dst, src) in lf.lfFaceName.iter_mut().take(31).zip(shell::wide(name)) {
         *dst = src;
     }
     let mut ok = false;
@@ -1348,17 +1377,40 @@ fn font_installed(name: &str) -> bool {
 }
 
 thread_local! {
-    /// Start-up phase timings, written to the log once the window is ready.
-    static PHASES: RefCell<(Option<std::time::Instant>, Vec<String>)> = const { RefCell::new((None, Vec::new())) };
+    /// Start-up phase timings, written to the log after the first paint.
+    static PHASES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Milliseconds since Windows created this process, so the timings include
+/// loading the program before `main`.
+fn ms_since_process_start() -> u64 {
+    use winapi::shared::minwindef::FILETIME;
+    use winapi::um::processthreadsapi::{GetCurrentProcess, GetProcessTimes};
+    use winapi::um::sysinfoapi::GetSystemTimeAsFileTime;
+    let as_u64 = |f: &FILETIME| ((f.dwHighDateTime as u64) << 32) | f.dwLowDateTime as u64;
+    unsafe {
+        let zero = || std::mem::zeroed::<FILETIME>();
+        let (mut created, mut exited, mut kernel, mut user, mut now) = (zero(), zero(), zero(), zero(), zero());
+        if GetProcessTimes(GetCurrentProcess(), &mut created, &mut exited, &mut kernel, &mut user) == 0 {
+            return 0;
+        }
+        GetSystemTimeAsFileTime(&mut now);
+        as_u64(&now).saturating_sub(as_u64(&created)) / 10_000
+    }
 }
 
 /// Records how long start-up took to reach `name`.
 fn phase(name: &str) {
-    PHASES.with(|p| {
-        let mut p = p.borrow_mut();
-        let start = *p.0.get_or_insert_with(std::time::Instant::now);
-        p.1.push(format!("{name}={}", start.elapsed().as_millis()));
-    });
+    let ms = ms_since_process_start();
+    PHASES.with(|p| p.borrow_mut().push(format!("{name}={ms}")));
+}
+
+/// Writes the recorded phases to the log, off the UI thread.
+fn log_phases() {
+    let marks = PHASES.with(|p| std::mem::take(&mut *p.borrow_mut()).join(" "));
+    if !marks.is_empty() {
+        std::thread::spawn(move || log(&format!("startup ms (v{}): {marks}", env!("CARGO_PKG_VERSION"))));
+    }
 }
 
 /// The usable screen size (without the taskbar) in logical pixels.
@@ -1385,6 +1437,8 @@ fn background_priority() {
 
 /// Appends a timestamped line to `%LOCALAPPDATA%\BahthSari\log.txt`, kept short.
 fn log(line: &str) {
+    static LOCK: Mutex<()> = Mutex::new(());
+    let _guard = LOCK.lock();
     let path = index::cache_path().with_file_name("log.txt");
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
@@ -1431,7 +1485,6 @@ fn activate_running_copy() -> bool {
 }
 
 pub fn run() {
-    phase("start");
     if activate_running_copy() {
         return;
     }
@@ -1448,15 +1501,15 @@ pub fn run() {
     phase("font");
     let ui = match App::build_ui(App::default()) {
         Ok(ui) => {
-            phase("ready");
-            let marks = PHASES.with(|p| p.borrow().1.join(" "));
-            log(&format!("startup ms (v{}): {marks}", env!("CARGO_PKG_VERSION")));
+            phase("built");
             ui
         }
         Err(e) => {
             nwg::fatal_message(TITLE, &format!("تعذر إنشاء الواجهة: {e}"));
         }
     };
+    phase("loop");
+    LOOP_STARTED.store(true, Ordering::Relaxed);
     nwg::dispatch_thread_events();
     drop(ui);
 }
