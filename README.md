@@ -2,9 +2,9 @@
 
 <p align="center"><img src="assets/bahth-256.png" width="128" alt="أيقونة بحث سريع"></p>
 
-# بحث سريع — برنامج بحث عن الملفات لويندوز
+# InstaFind — بحث سريع: برنامج بحث عن الملفات لويندوز
 
-**الإصدار الحالي: 0.4.1** · [التحميل](../../releases/latest) · [سجل التغييرات](CHANGELOG.md)
+**الإصدار الحالي: 0.5.0** · [التحميل](../../releases/latest) · [سجل التغييرات](CHANGELOG.md)
 
 برنامج مفتوح المصدر مكتوب بلغة **Rust** للبحث السريع عن الملفات على جهازك، يدعم **اللغة العربية بالكامل**، ويبحث **داخل المستندات** أيضاً.
 
@@ -156,7 +156,7 @@ MIT — انظر ملف [LICENSE](LICENSE).
 
 ## English
 
-**Bahth Sari'** is a fast, open-source Windows file search tool written in Rust with full Arabic support. It indexes all local drives into a cached in-memory index for instant filename search, and can search inside documents (txt, docx, pptx, xlsx/xls, pdf, odt/ods, rtf, doc, eml/msg, epub, source files), including documents inside zip, 7z, tar and tar.gz archives (read in memory, with zip-bomb limits). Version 0.3 adds a global hotkey (Ctrl+Alt+F), match highlighting, column sorting, search history and saved searches, frequently-opened files first, F2 rename / Delete to Recycle Bin, drag & drop, fixing of reversed Arabic text in PDFs, and automatic updates from GitHub Releases. Arabic matching ignores hamza forms, ta marbuta, alef maqsura, diacritics and tatweel. Double-click to open a file, open its folder, or copy its full path.
+**InstaFind** (Arabic name: بحث سريع) is a fast, open-source Windows file search tool written in Rust with full Arabic support. It indexes all local drives into a cached in-memory index for instant filename search, and can search inside documents (txt, docx, pptx, xlsx/xls, pdf, odt/ods, rtf, doc, eml/msg, epub, source files), including documents inside zip, 7z, tar and tar.gz archives (read in memory, with zip-bomb limits). Version 0.3 adds a global hotkey (Ctrl+Alt+F), match highlighting, column sorting, search history and saved searches, frequently-opened files first, F2 rename / Delete to Recycle Bin, drag & drop, fixing of reversed Arabic text in PDFs, and automatic updates from GitHub Releases. Arabic matching ignores hamza forms, ta marbuta, alef maqsura, diacritics and tatweel. Double-click to open a file, open its folder, or copy its full path. Version 0.5 adds an English interface, live index updates, a persistent content index, OCR for images and scanned PDFs, search inside archives, typo-tolerant/Arabizi/root search, a Save-dialog quick switch (Ctrl+Alt+G), duplicate finder, folder sizes, thumbnails (Ctrl+T), find & replace in text files with undo, search from a phone over the home network (off by default, PIN-protected), start with Windows, and a Flow Launcher plugin.
 
 Command line: `bahth.exe -s "invoice ext:pdf" [-n N] [--sort name|path|size|date] [--desc] [--scope folder] [--count|--csv|--json]` prints matching paths from the saved index (exit code 0 found, 1 none, 2 error); see `bahth.exe --help`.
 
