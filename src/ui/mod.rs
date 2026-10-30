@@ -143,6 +143,8 @@ struct State {
     changes: Vec<Change>,
     /// Folders being walked because their contents are unknown.
     subtree_scans: Vec<SubtreeScan>,
+    /// Stats from the watcher, rescan pacing and index-copy pacing.
+    live: watching::Live,
     /// The running filename search refreshes results after a change on
     /// disk, rather than answering the user's typing.
     live_search: bool,
@@ -190,7 +192,7 @@ pub struct App {
     update_result: Arc<Mutex<Option<UpdateEvent>>>,
     /// Wakes the UI thread when the drive watcher has a batch of changes.
     watch_notice: nwg::Notice,
-    watch_inbox: Arc<Mutex<Vec<Change>>>,
+    watch_inbox: Arc<Mutex<watching::Inbox>>,
     /// Bytes downloaded / total of a running update download.
     update_progress: Arc<(AtomicU64, AtomicU64)>,
     update_busy: Cell<bool>,

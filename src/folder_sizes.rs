@@ -8,9 +8,12 @@
 //! entries up to their parents.
 //!
 //! The result is cached per index snapshot (`Arc<Index>`): when the index is
-//! replaced, the next request computes the sizes for the new one.
+//! replaced, the next request computes the sizes for the new one. Until then
+//! the folder totals of the last computed snapshot are kept by path
+//! ([`recent`]), so a folder's size does not blink away after every change.
 
 use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::{Arc, Mutex, Weak};
 
 use crate::index::{Entry, Index};
@@ -261,6 +264,38 @@ pub fn sort_hits_by_total(hits: &mut [u32], sizes: &FolderSizes, descending: boo
     });
 }
 
+/// Folder totals by path from one computed snapshot, to show while the
+/// sizes of a newer snapshot are not ready. Keyed by a hash of the path to
+/// stay small; a collision would only show another folder's old total.
+#[derive(Debug, Default)]
+pub struct RecentTotals(HashMap<u64, u64>);
+
+fn path_key(path: &str) -> u64 {
+    let mut h = DefaultHasher::new();
+    path.hash(&mut h);
+    h.finish()
+}
+
+impl RecentTotals {
+    pub fn new(entries: &[Entry], sizes: &FolderSizes) -> RecentTotals {
+        RecentTotals(
+            entries.iter().enumerate().filter(|(_, e)| e.is_dir).map(|(i, e)| (path_key(&e.path), sizes.total(i))).collect(),
+        )
+    }
+
+    pub fn get(&self, path: &str) -> Option<u64> {
+        self.0.get(&path_key(path)).copied()
+    }
+}
+
+static RECENT: Mutex<Option<Arc<RecentTotals>>> = Mutex::new(None);
+
+/// The folder totals of the most recently computed snapshot, if any.
+#[cfg_attr(not(windows), allow(dead_code))] // for the Size column
+pub fn recent() -> Option<Arc<RecentTotals>> {
+    RECENT.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
 /// The two most recent index snapshots and their sizes. Holding a `Weak`
 /// keeps the snapshot's allocation from being reused while it is cached,
 /// so comparing pointers is safe.
@@ -293,6 +328,9 @@ pub fn for_index(index: &Arc<Index>) -> Arc<FolderSizes> {
         cache.remove(0);
     }
     cache.push((Arc::downgrade(index), sizes.clone()));
+    drop(cache);
+    let recent = Arc::new(RecentTotals::new(&index.entries, &sizes));
+    *RECENT.lock().unwrap_or_else(|e| e.into_inner()) = Some(recent);
     sizes
 }
 
@@ -313,6 +351,25 @@ mod tests {
 
     fn at(v: &[Entry], path: &str) -> usize {
         v.iter().position(|e| &*e.path == path).unwrap()
+    }
+
+    #[test]
+    fn recent_totals_follow_paths_across_snapshots() {
+        let old = entries(&[
+            (r"C:\a", 0, true),
+            (r"C:\a\x.bin", 10, false),
+            (r"C:\a\y.bin", 5, false),
+            (r"C:\b", 0, true),
+        ]);
+        let recent = RecentTotals::new(&old, &FolderSizes::compute(&old));
+        assert_eq!(recent.get(r"C:\a"), Some(15));
+        assert_eq!(recent.get(r"C:\b"), Some(0));
+        assert_eq!(recent.get(r"C:\a\x.bin"), None, "files show their own size anyway");
+        assert_eq!(recent.get(r"C:\new"), None);
+        // A newer snapshot where entry positions moved: still found by path.
+        let new = entries(&[(r"C:\0", 0, true), (r"C:\a", 0, true), (r"C:\a\x.bin", 10, false)]);
+        let i = at(&new, r"C:\a");
+        assert_eq!(recent.get(&new[i].path), Some(15));
     }
 
     #[test]

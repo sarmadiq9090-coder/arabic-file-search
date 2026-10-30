@@ -63,6 +63,8 @@ mod thumb_cache;
 #[cfg(any(windows, test))]
 mod update;
 #[cfg(any(windows, test))]
+mod watch_pace;
+#[cfg(any(windows, test))]
 mod web;
 
 #[cfg(windows)]

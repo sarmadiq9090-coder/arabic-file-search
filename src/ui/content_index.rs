@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use super::App;
 use super::startup::log;
 use crate::content_cache::{self, ContentCache, WarmProgress};
-use crate::index;
+use crate::index::{self, Entry};
 
 /// The store in `%LOCALAPPDATA%\BahthSari\content\`, opened on first use
 /// (always from a background thread). `None` when it can't be opened.
@@ -58,6 +58,16 @@ impl App {
         drop(st);
         std::thread::spawn(move || {
             idle_priority();
+            // Only the documents are needed. Letting go of the index at once
+            // matters: while another holder shares it, every change found by
+            // the drive watcher has to copy the whole index.
+            let docs: Vec<Entry> = index
+                .entries
+                .iter()
+                .filter(|e| content_cache::is_document(e))
+                .map(|e| Entry { path: e.path.clone(), size: e.size, mtime: e.mtime, is_dir: false, norm_name: Box::default() })
+                .collect();
+            drop(index);
             // Let start-up and the first searches go first.
             for _ in 0..50 {
                 if cancel.load(Ordering::Relaxed) {
@@ -68,7 +78,7 @@ impl App {
             let Some(cache) = shared() else { return };
             let started = Instant::now();
             let progress = WarmProgress::default();
-            content_cache::warm(&index.entries, cache, &progress, &cancel);
+            content_cache::warm(&docs, cache, &progress, &cancel);
             let s = cache.stats();
             log(&format!(
                 "content index warm: {} of {} new documents in {} ms{}; stored {} ({} with text), {} KB{}",
