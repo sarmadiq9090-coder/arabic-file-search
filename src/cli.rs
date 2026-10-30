@@ -159,7 +159,7 @@ pub fn usage() -> String {
     }
     format!(
         "بحث سريع {v} — البحث من سطر الأوامر
-Bahth Sari' {v} — command-line search
+InstaFind {v} — command-line search
 
 الاستخدام / Usage:
   bahth.exe -s \"فاتورة ext:pdf\" [options]
@@ -185,7 +185,7 @@ Uses the saved index; open the program once to build or refresh it.
 
 fn usage_en() -> String {
     format!(
-        "Bahth Sari' {v} — command-line search
+        "InstaFind {v} — command-line search
 
 Usage:
   bahth.exe -s \"invoice ext:pdf\" [options]
@@ -208,11 +208,11 @@ Uses the saved index; open the program once to build or refresh it.
     )
 }
 
-pub const NO_INDEX_HINT_EN: &str = "No index yet: open Bahth Sari' once to build it, then try again.
+pub const NO_INDEX_HINT_EN: &str = "No index yet: open InstaFind once to build it, then try again.
 ";
 
 pub const NO_INDEX_HINT: &str = "لا يوجد فهرس بعد: افتح برنامج «بحث سريع» مرة واحدة لبنائه، ثم أعد المحاولة.
-No index yet: open Bahth Sari' once to build it, then try again.
+No index yet: open InstaFind once to build it, then try again.
 ";
 
 /// Windows line endings, like the rest of the output.

@@ -24,6 +24,20 @@ impl App {
         }
     }
 
+    /// Selects the row showing `path` again after the rows changed, or
+    /// nothing when it is no longer among them.
+    pub(super) fn reselect(&self, path: Option<String>) {
+        self.clear_selection();
+        let Some(path) = path else { return };
+        let row = {
+            let st = self.state.borrow();
+            (0..st.rows.len()).find(|&i| st.row_entry(i).is_some_and(|e| *e.path == *path))
+        };
+        if let Some(i) = row {
+            self.list.select_item(i, true);
+        }
+    }
+
     pub(super) fn refresh_list(&self) {
         let n = self.state.borrow().rows.len();
         self.list.set_item_count(n as u32);

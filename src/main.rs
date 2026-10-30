@@ -20,6 +20,8 @@ mod icon;
 mod ocr;
 #[cfg(windows)]
 mod ui;
+#[cfg(windows)]
+mod watch;
 
 // Command-line interface: parsing and output are platform independent; the
 // console glue inside is Windows-only.

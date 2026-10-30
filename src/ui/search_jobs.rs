@@ -61,6 +61,7 @@ impl App {
                 st.index = Arc::new(idx);
                 drop(st);
                 self.start_warm();
+                self.start_watching();
                 if self.query.text().trim().is_empty() || self.content_mode() {
                     self.set_status(&trf!("تم تحميل الفهرس ({} عنصر). اكتب للبحث.", "Index loaded ({} items). Type to search.", fmt_num(n)));
                 } else {
@@ -77,6 +78,8 @@ impl App {
     pub(super) fn start_scan(&self) {
         // An edit still waiting to be saved must not land after the new scan.
         flush_index_save();
+        // The scan sees every change; watching resumes when it is done.
+        self.stop_watching();
         let mut st = self.state.borrow_mut();
         if st.loading.is_some() {
             drop(st);
@@ -202,8 +205,10 @@ impl App {
 
     pub(super) fn on_names_found(&self) {
         let Some(res) = self.name_result.lock().ok().and_then(|mut r| r.take()) else { return };
+        let selected = self.selected_path();
         let mut st = self.state.borrow_mut();
         st.name_running = false;
+        let live = std::mem::take(&mut st.live_search);
         if st.content.is_some() || self.content_mode() {
             // A document search took over meanwhile; leave it alone.
             st.name_pending = false;
@@ -215,6 +220,7 @@ impl App {
             self.search_names();
             return;
         }
+        let old_n = st.rows.len();
         st.rows = res.hits.into_iter().map(|entry| Row { entry, snippet: None, matches: None }).collect();
         st.rows_index = res.index;
         st.shown_query = Some(self.parse_query(res.converted.as_deref().unwrap_or(&res.text)));
@@ -223,6 +229,16 @@ impl App {
         let loading = st.loading.is_some();
         let warn = warnings_text(st.shown_query.as_ref());
         drop(st);
+        if live {
+            // Files changed on disk: keep the selection, and say only that
+            // the count changed.
+            self.refresh_list();
+            self.reselect(selected);
+            if n != old_n && !res.empty {
+                self.set_status(&trf!("وجدت {} نتيجة (حُدِّثت تلقائياً){warn}", "Found {} results (updated automatically){warn}", fmt_num(n)));
+            }
+            return;
+        }
         self.clear_selection();
         self.refresh_list();
         if res.empty {
@@ -311,6 +327,7 @@ impl App {
         self.poll_load();
         self.poll_scan();
         self.poll_content();
+        self.apply_watched();
         self.poll_update_progress();
         // Look for a new version about 10 s after start (off the busy
         // startup) and then every hour, for copies that live in the tray.
@@ -338,6 +355,7 @@ impl App {
                 drop(st);
                 self.start_warm();
                 self.reindex_btn.set_enabled(true);
+                self.start_watching();
                 if self.query.text().trim().is_empty() || self.content_mode() {
                     self.set_status(&trf!("اكتملت الفهرسة: {} عنصر.", "Indexing complete: {} items.", fmt_num(n)));
                 } else {

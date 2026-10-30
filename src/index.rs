@@ -77,7 +77,7 @@ pub struct ScanProgress {
 }
 
 /// Folders that are never worth indexing and are slow or access-denied.
-fn skip_dir(name: &str) -> bool {
+pub fn skip_dir(name: &str) -> bool {
     name.eq_ignore_ascii_case("System Volume Information")
         || name.eq_ignore_ascii_case("$Recycle.Bin")
         || name.eq_ignore_ascii_case("$WinREAgent")
@@ -85,20 +85,64 @@ fn skip_dir(name: &str) -> bool {
         || [".git", ".svn", ".hg", "node_modules", "__pycache__"].iter().any(|d| name.eq_ignore_ascii_case(d))
 }
 
+/// True when `path` lies inside a folder the walker never enters. The folder
+/// itself is indexed (it is listed by its parent), so only ancestors count.
+pub fn skipped_path(path: &str) -> bool {
+    let mut parts: Vec<&str> = path.split(['\\', '/']).filter(|p| !p.is_empty()).collect();
+    parts.pop();
+    parts.into_iter().any(skip_dir)
+}
+
+/// One change on disk, as reported by the file watcher.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Change {
+    Added(String),
+    Removed(String),
+    Modified(String),
+    Renamed(String, String),
+    /// Changes under this folder were lost (the watch overflowed or broke);
+    /// it has to be walked again.
+    Rescan(String),
+}
+
+impl Change {
+    /// True when the change concerns `dir` or something inside it.
+    pub fn touches(&self, dir: &str) -> bool {
+        let under = |p: &str| p == dir || is_under(p, dir);
+        match self {
+            Change::Added(p) | Change::Removed(p) | Change::Modified(p) | Change::Rescan(p) => under(p),
+            Change::Renamed(a, b) => under(a) || under(b),
+        }
+    }
+}
+
+/// `path` is strictly inside the folder `dir`.
+fn is_under(path: &str, dir: &str) -> bool {
+    path.strip_prefix(dir).is_some_and(|rest| {
+        !rest.is_empty() && (dir.ends_with(['\\', '/']) || rest.starts_with(['\\', '/']))
+    })
+}
+
+/// What `apply_changes` did.
+#[derive(Debug, Default, PartialEq)]
+pub struct Applied {
+    /// Entries added, updated or removed.
+    pub changed: usize,
+    /// Folders whose contents are unknown (moved in from elsewhere, or a
+    /// watch that lost events) and need `scan_subtree`.
+    pub scan: Vec<String>,
+}
+
 impl Index {
     /// Scans all `roots` in parallel and returns the finished index.
     pub fn build(roots: &[String], progress: &ScanProgress) -> Index {
-        let out: Mutex<Vec<Entry>> = Mutex::new(Vec::with_capacity(500_000));
-        rayon::scope(|s| {
-            for root in roots {
-                let out = &out;
-                s.spawn(move |s| walk(s, PathBuf::from(root), out, progress));
-            }
-        });
-        let mut entries = out.into_inner().unwrap_or_default();
-        sort_by_path(&mut entries);
-        fill_norm_names(&mut entries);
-        Index { entries, roots: roots.to_vec(), built_at: now_secs() }
+        Index { entries: walk_all(roots, 500_000, progress), roots: roots.to_vec(), built_at: now_secs() }
+    }
+
+    /// Everything below `dir` (not `dir` itself), sorted, with the same rules
+    /// as a full scan. Used for folders that appear with unknown contents.
+    pub fn scan_subtree(dir: &str, progress: &ScanProgress) -> Vec<Entry> {
+        walk_all(&[dir.to_string()], 0, progress)
     }
 
     pub fn load(path: &Path) -> Option<Index> {
@@ -144,12 +188,23 @@ impl Index {
     /// start with `path` plus a separator, so in byte order they form one run
     /// per separator; siblings like `C:\ab` or `C:\a b` fall outside it.
     fn subtree(&self, path: &str) -> Vec<std::ops::Range<usize>> {
+        let mut ranges = self.descendants(path);
+        // A drive root is not an entry of its own.
+        if !path.ends_with(['\\', '/'])
+            && let Some(i) = self.find(path)
+        {
+            ranges.push(i..i + 1);
+        }
+        ranges.sort_unstable_by_key(|r| r.start);
+        ranges
+    }
+
+    /// Index ranges of everything below `path`, but not `path` itself.
+    fn descendants(&self, path: &str) -> Vec<std::ops::Range<usize>> {
         // A path ending in a separator (a drive root) is its own prefix.
-        let (mut ranges, prefixes) = if path.ends_with(['\\', '/']) {
-            (Vec::new(), vec![path.to_string()])
-        } else {
-            (self.find(path).map(|i| i..i + 1).into_iter().collect(), vec![format!("{path}\\"), format!("{path}/")])
-        };
+        let prefixes =
+            if path.ends_with(['\\', '/']) { vec![path.to_string()] } else { vec![format!("{path}\\"), format!("{path}/")] };
+        let mut ranges = Vec::new();
         for p in prefixes {
             let start = self.entries.partition_point(|e| *e.path < *p);
             let len = self.entries[start..].partition_point(|e| e.path.starts_with(&p));
@@ -202,6 +257,141 @@ impl Index {
         self.entries = merge_by_path(rest, moved);
         true
     }
+
+    /// Applies a batch of watcher changes. `stat` reports what is on disk now
+    /// (size, mtime, is_dir), or `None` for a path that is gone or is not
+    /// indexed (a link). Disk is the truth, so a file created and deleted
+    /// within one batch simply never appears.
+    ///
+    /// Each path is reconciled once and all inserts and removals are done in
+    /// one pass each, so a big batch on millions of entries stays cheap. Only
+    /// a folder renamed with contents is moved on its own, so its contents
+    /// come along without a scan. Entry indices held elsewhere become stale.
+    pub fn apply_changes(&mut self, changes: &[Change], stat: impl Fn(&str) -> Option<(u64, i64, bool)>) -> Applied {
+        let mut out = Applied::default();
+        // Paths whose entry must be made to match the disk.
+        let mut dirty: Vec<String> = Vec::with_capacity(changes.len());
+        for c in changes {
+            match c {
+                Change::Added(p) | Change::Modified(p) | Change::Removed(p) => {
+                    if !skipped_path(p) {
+                        dirty.push(p.clone());
+                    }
+                }
+                Change::Renamed(old, new) => {
+                    let (old_seen, new_seen) = (!skipped_path(old), !skipped_path(new));
+                    if old_seen && new_seen && !self.descendants(old).is_empty() {
+                        // Paths noted earlier in the batch move along too.
+                        for d in &mut dirty {
+                            if is_under(d, old) {
+                                *d = format!("{new}{}", &d[old.len()..]);
+                            }
+                        }
+                        if self.rename_path(old, new) {
+                            out.changed += 1;
+                        }
+                    }
+                    // Moved into the recycle bin and the like: just gone.
+                    if old_seen {
+                        dirty.push(old.clone());
+                    }
+                    if new_seen {
+                        dirty.push(new.clone());
+                    }
+                }
+                Change::Rescan(root) => out.scan.push(root.clone()),
+            }
+        }
+        dirty.sort_unstable();
+        dirty.dedup();
+
+        let mut upserts = Vec::new();
+        let mut gone = Vec::new();
+        for p in dirty {
+            match stat(&p) {
+                Some((size, mtime, is_dir)) => upserts.push((p, size, mtime, is_dir)),
+                None => gone.push(p),
+            }
+        }
+
+        // Removals: collect every range, then drop them all in one pass.
+        let mut ranges: Vec<std::ops::Range<usize>> = gone.iter().flat_map(|p| self.subtree(p)).collect();
+        if !ranges.is_empty() {
+            ranges.sort_unstable_by_key(|r| r.start);
+            let before = self.entries.len();
+            let (mut i, mut r) = (0, 0);
+            self.entries.retain(|_| {
+                while r < ranges.len() && ranges[r].end <= i {
+                    r += 1;
+                }
+                let keep = !(r < ranges.len() && ranges[r].contains(&i));
+                i += 1;
+                keep
+            });
+            out.changed += before - self.entries.len();
+        }
+
+        // Updates in place; new entries are gathered (already in path order,
+        // since `dirty` was sorted) and merged in once.
+        let mut fresh = Vec::new();
+        for (p, size, mtime, is_dir) in upserts {
+            match self.find(&p) {
+                Some(i) => {
+                    let e = &mut self.entries[i];
+                    if (e.size, e.mtime, e.is_dir) != (size, mtime, is_dir) {
+                        (e.size, e.mtime, e.is_dir) = (size, mtime, is_dir);
+                        out.changed += 1;
+                    }
+                }
+                None => {
+                    let norm_name = normalize(file_name(&p)).into();
+                    let e = Entry { path: p.into(), size, mtime, is_dir, norm_name };
+                    // A folder that just appeared may have been moved in
+                    // with contents; the walker would not enter skipped ones.
+                    if is_dir && !skip_dir(e.name()) {
+                        out.scan.push(e.path.to_string());
+                    }
+                    fresh.push(e);
+                }
+            }
+        }
+        if !fresh.is_empty() {
+            out.changed += fresh.len();
+            let rest = std::mem::take(&mut self.entries);
+            self.entries = merge_by_path(rest, fresh);
+        }
+        out.scan.sort_unstable();
+        out.scan.dedup();
+        out
+    }
+
+    /// Replaces everything below `dir` with `found` (from `scan_subtree`,
+    /// sorted by path). `dir`'s own entry is kept. Returns the new count of
+    /// entries below `dir`.
+    pub fn replace_subtree(&mut self, dir: &str, found: Vec<Entry>) -> usize {
+        for r in self.descendants(dir).into_iter().rev() {
+            self.entries.drain(r);
+        }
+        let n = found.len();
+        let rest = std::mem::take(&mut self.entries);
+        self.entries = merge_by_path(rest, found);
+        n
+    }
+}
+
+/// Walks `roots` in parallel; the result is sorted with names filled in.
+fn walk_all(roots: &[String], capacity: usize, progress: &ScanProgress) -> Vec<Entry> {
+    let out: Mutex<Vec<Entry>> = Mutex::new(Vec::with_capacity(capacity));
+    rayon::scope(|s| {
+        for root in roots {
+            let out = &out;
+            s.spawn(move |s| walk(s, PathBuf::from(root), out, progress));
+        }
+    });
+    let mut entries = out.into_inner().unwrap_or_default();
+    sort_by_path(&mut entries);
+    fill_norm_names(&mut entries);
+    entries
 }
 
 fn sort_by_path(entries: &mut [Entry]) {
@@ -483,6 +673,247 @@ mod tests {
         assert!(idx.rename_path(r"C:\تقاريرقديمة", r"C:\تقارير"));
         assert!(is_sorted(&idx));
         assert_eq!(paths(&idx), vec![r"C:\تقارير", r"C:\تقارير 2023.txt", r"C:\تقارير\قديم.txt", r"D:\مستندات\عقد.pdf"]);
+    }
+
+    /// A fake disk for `apply_changes`: path -> (size, mtime, is_dir).
+    type Disk = std::collections::HashMap<String, (u64, i64, bool)>;
+
+    fn disk_of(paths: &[&str]) -> Disk {
+        paths.iter().map(|p| (p.to_string(), (1, 0, !p.contains('.')))).collect()
+    }
+
+    fn apply(idx: &mut Index, disk: &Disk, changes: &[Change]) -> Applied {
+        idx.apply_changes(changes, |p| disk.get(p).copied())
+    }
+
+    fn added(p: &str) -> Change {
+        Change::Added(p.into())
+    }
+
+    #[test]
+    fn skipped_paths_match_the_walker() {
+        assert!(skipped_path(r"C:\p\node_modules\x.js"));
+        assert!(skipped_path(r"C:\$Recycle.Bin\S-1-5\$R1.txt"));
+        assert!(skipped_path(r"C:\Windows\WinSxS\amd64\a.dll"));
+        // The skipped folder itself is listed by its parent.
+        assert!(!skipped_path(r"C:\p\node_modules"));
+        assert!(!skipped_path(r"C:\Users\a.txt") && !skipped_path(r"C:\"));
+        assert!(skipped_path("/home/u/.git/HEAD") && !skipped_path("/home/u/.gitignore"));
+    }
+
+    #[test]
+    fn add_new_file_and_folder() {
+        let mut idx = index_of(TREE);
+        let mut disk = disk_of(TREE);
+        for p in [r"C:\a\new.txt", r"C:\a b", r"C:\zz.txt", r"C:\a\sub\node_modules"] {
+            disk.insert(p.into(), (5, 7, !p.contains('.') || p.ends_with("node_modules")));
+        }
+        let changes: Vec<Change> =
+            [r"C:\a\new.txt", r"C:\a b", r"C:\zz.txt", r"C:\a\sub\node_modules", r"C:\a\sub\node_modules\m.js"]
+                .iter()
+                .map(|p| added(p))
+                .collect();
+        let got = apply(&mut idx, &disk, &changes);
+        // New folders may hold files nobody reported, except skipped ones.
+        assert_eq!(got, Applied { changed: 4, scan: vec![r"C:\a b".into()] });
+        assert!(is_sorted(&idx));
+        let e = &idx.entries[idx.find(r"C:\a\new.txt").unwrap()];
+        assert_eq!((e.size, e.mtime, e.is_dir, &*e.norm_name), (5, 7, false, "new.txt"));
+        assert!(idx.find(r"C:\a\sub\node_modules\m.js").is_none());
+        // Added twice, or added and gone again before the batch: no change.
+        assert_eq!(apply(&mut idx, &disk, &[added(r"C:\zz.txt"), added(r"C:\gone.txt")]).changed, 0);
+        assert_eq!(idx.entries.len(), TREE.len() + 4);
+    }
+
+    #[test]
+    fn modify_updates_size_in_place() {
+        let mut idx = index_of(TREE);
+        let mut disk = disk_of(TREE);
+        disk.insert(r"C:\a\x.txt".into(), (4096, 1_700_000_000, false));
+        let got = apply(&mut idx, &disk, &[Change::Modified(r"C:\a\x.txt".into()), Change::Modified(r"C:\a".into())]);
+        assert_eq!(got.changed, 1);
+        let e = &idx.entries[idx.find(r"C:\a\x.txt").unwrap()];
+        assert_eq!((e.size, e.mtime), (4096, 1_700_000_000));
+        assert_eq!(idx.entries.len(), TREE.len());
+    }
+
+    #[test]
+    fn remove_folder_with_children() {
+        let mut idx = index_of(TREE);
+        let mut disk = disk_of(TREE);
+        for p in [r"C:\a", r"C:\a\x.txt", r"C:\a\sub", r"C:\a\sub\y.txt", r"C:\b.txt"] {
+            disk.remove(p);
+        }
+        // Windows reports the children first, then the folder; any order works.
+        let changes = [Change::Removed(r"C:\a".into()), Change::Removed(r"C:\a\sub\y.txt".into()), Change::Removed(r"C:\b.txt".into())];
+        assert_eq!(apply(&mut idx, &disk, &changes).changed, 5);
+        assert_eq!(paths(&idx), vec![r"C:\a b.txt", r"C:\a-c", r"C:\ab", r"C:\ab\z.txt"]);
+        // Removed but back on disk (deleted and re-created): kept.
+        assert_eq!(apply(&mut idx, &disk, &[Change::Removed(r"C:\ab\z.txt".into())]).changed, 0);
+        assert_eq!(idx.entries.len(), 4);
+    }
+
+    #[test]
+    fn rename_across_folders() {
+        let mut idx = index_of(TREE);
+        let mut disk = disk_of(TREE);
+        let mv = |disk: &mut Disk, old: &str, new: &str| {
+            let moved: Vec<(String, _)> = disk.iter().filter(|(p, _)| *p == old || p.starts_with(&format!("{old}\\"))).map(|(p, v)| (p.clone(), *v)).collect();
+            for (p, v) in moved {
+                disk.remove(&p);
+                disk.insert(format!("{new}{}", &p[old.len()..]), v);
+            }
+        };
+        // A folder with contents moves without a scan; so does a file.
+        mv(&mut disk, r"C:\a\sub", r"C:\ab\sub2");
+        mv(&mut disk, r"C:\b.txt", r"C:\a\b.txt");
+        let got = apply(
+            &mut idx,
+            &disk,
+            &[Change::Renamed(r"C:\a\sub".into(), r"C:\ab\sub2".into()), Change::Renamed(r"C:\b.txt".into(), r"C:\a\b.txt".into())],
+        );
+        assert!(got.scan.is_empty() && got.changed >= 2, "{got:?}");
+        assert!(is_sorted(&idx));
+        assert_eq!(idx.entries.len(), TREE.len());
+        assert!(idx.find(r"C:\a\sub").is_none() && idx.find(r"C:\b.txt").is_none());
+        assert_eq!(&*idx.entries[idx.find(r"C:\ab\sub2\y.txt").unwrap()].norm_name, "y.txt");
+        assert_eq!(&*idx.entries[idx.find(r"C:\ab\sub2").unwrap()].norm_name, "sub2");
+        assert!(idx.find(r"C:\a\b.txt").is_some());
+
+        // A file created in a folder that is renamed in the same batch.
+        disk.insert(r"C:\ab\sub2\late.txt".into(), (1, 0, false));
+        mv(&mut disk, r"C:\ab\sub2", r"C:\sub3");
+        apply(
+            &mut idx,
+            &disk,
+            &[added(r"C:\ab\sub2\late.txt"), Change::Renamed(r"C:\ab\sub2".into(), r"C:\sub3".into())],
+        );
+        assert!(idx.find(r"C:\sub3\late.txt").is_some() && idx.find(r"C:\sub3\y.txt").is_some());
+        assert!(!paths(&idx).iter().any(|p| p.contains("sub2")));
+
+        // Into the recycle bin is a delete; out of it, a folder to scan.
+        mv(&mut disk, r"C:\sub3", r"C:\$Recycle.Bin\S-1\$R1");
+        apply(&mut idx, &disk, &[Change::Renamed(r"C:\sub3".into(), r"C:\$Recycle.Bin\S-1\$R1".into())]);
+        assert!(!paths(&idx).iter().any(|p| p.contains("sub3") || p.contains("Recycle")));
+        mv(&mut disk, r"C:\$Recycle.Bin\S-1\$R1", r"C:\sub3");
+        let got = apply(&mut idx, &disk, &[Change::Renamed(r"C:\$Recycle.Bin\S-1\$R1".into(), r"C:\sub3".into())]);
+        assert_eq!(got.scan, vec![r"C:\sub3".to_string()]);
+        assert!(is_sorted(&idx));
+    }
+
+    #[test]
+    fn arabic_changes() {
+        let mut idx = index_of(TREE_AR);
+        let mut disk = disk_of(TREE_AR);
+        disk.insert(r"C:\تقارير\الربع الأول.xlsx".into(), (9, 1, false));
+        disk.remove(r"C:\تقارير\٢٠٢٤.pdf");
+        disk.insert(r"C:\تقارير\ملخص ٢٠٢٤.pdf".into(), (1, 0, false));
+        disk.insert(r"C:\تقارير\مجلد جديد".into(), (0, 0, true));
+        let got = apply(
+            &mut idx,
+            &disk,
+            &[
+                added(r"C:\تقارير\الربع الأول.xlsx"),
+                Change::Renamed(r"C:\تقارير\٢٠٢٤.pdf".into(), r"C:\تقارير\ملخص ٢٠٢٤.pdf".into()),
+                added(r"C:\تقارير\مجلد جديد"),
+            ],
+        );
+        assert_eq!(got.scan, vec![r"C:\تقارير\مجلد جديد".to_string()]);
+        assert!(is_sorted(&idx));
+        assert_eq!(&*idx.entries[idx.find(r"C:\تقارير\ملخص ٢٠٢٤.pdf").unwrap()].norm_name, "ملخص 2024.pdf");
+        assert_eq!(&*idx.entries[idx.find(r"C:\تقارير\الربع الأول.xlsx").unwrap()].norm_name, "الربع الاول.xlsx");
+        assert!(idx.find(r"C:\تقارير\٢٠٢٤.pdf").is_none());
+        // Removing a folder leaves its look-alike siblings alone.
+        for p in TREE_AR.iter().filter(|p| p.starts_with(r"C:\تقارير\") || **p == r"C:\تقارير") {
+            disk.remove(*p);
+        }
+        disk.retain(|p, _| !p.starts_with(r"C:\تقارير\"));
+        apply(&mut idx, &disk, &[Change::Removed(r"C:\تقارير".into())]);
+        assert_eq!(paths(&idx), vec![r"C:\تقارير 2023.txt", r"C:\تقاريرقديمة", r"C:\تقاريرقديمة\قديم.txt", r"D:\مستندات\عقد.pdf"]);
+    }
+
+    #[test]
+    fn rescan_is_passed_on_and_subtree_replaced() {
+        let mut idx = index_of(TREE);
+        let got = apply(&mut idx, &disk_of(TREE), &[Change::Rescan(r"C:\".into())]);
+        assert_eq!(got, Applied { changed: 0, scan: vec![r"C:\".into()] });
+        let found = index_of(&[r"C:\a\new", r"C:\a\new\q.txt"]).entries;
+        assert_eq!(idx.replace_subtree(r"C:\a", found), 2);
+        assert!(is_sorted(&idx) && idx.find(r"C:\a").is_some() && idx.find(r"C:\a\new\q.txt").is_some());
+        assert!(idx.find(r"C:\a\x.txt").is_none() && idx.find(r"C:\a\sub").is_none());
+        assert_eq!(idx.entries.len(), TREE.len() - 3 + 2);
+        assert!(Change::Renamed(r"C:\x".into(), r"C:\a\y".into()).touches(r"C:\a"));
+        assert!(!Change::Added(r"C:\ab\y".into()).touches(r"C:\a"));
+        assert!(Change::Added(r"C:\ab\y".into()).touches(r"C:\"));
+    }
+
+    #[test]
+    fn scan_subtree_walks_one_folder() {
+        let root = std::env::temp_dir().join(format!("bahth_sub_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("نقل/داخلي/node_modules/x")).unwrap();
+        fs::write(root.join("نقل/داخلي/ملف.txt"), "abc").unwrap();
+        fs::write(root.join("خارج.txt"), "").unwrap();
+        let dir = root.join("نقل");
+        let found = Index::scan_subtree(dir.to_str().unwrap(), &ScanProgress::default());
+        let names: Vec<&str> = found.iter().map(|e| e.name()).collect();
+        assert_eq!(names, vec!["داخلي", "node_modules", "ملف.txt"]);
+        assert_eq!(found[2].size, 3);
+        assert_eq!(&*found[2].norm_name, "ملف.txt");
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn big_batch_stays_fast() {
+        // 200k entries in 2,000 folders of 99 files, then 10k mixed changes.
+        let mut entries = Vec::with_capacity(200_000);
+        for d in 0..2000 {
+            entries.push(format!(r"C:\data\d{d:04}"));
+            for f in 0..99 {
+                entries.push(format!(r"C:\data\d{d:04}\f{f:03}.txt"));
+            }
+        }
+        let mut idx = index_of(&entries.iter().map(String::as_str).collect::<Vec<_>>());
+        let mut disk: Disk = entries.iter().map(|p| (p.clone(), (1, 0, !p.contains('.')))).collect();
+        let mut changes = Vec::new();
+        for i in 0..10_000 {
+            let d = (i * 7) % 2000;
+            match i % 4 {
+                0 => {
+                    let p = format!(r"C:\data\d{d:04}\new{i:05}.txt");
+                    disk.insert(p.clone(), (3, 3, false));
+                    changes.push(Change::Added(p));
+                }
+                1 => {
+                    let p = format!(r"C:\data\d{d:04}\f{:03}.txt", i % 99);
+                    disk.insert(p.clone(), (8, 8, false));
+                    changes.push(Change::Modified(p));
+                }
+                2 => {
+                    let p = format!(r"C:\data\d{d:04}\f{:03}.txt", (i + 50) % 99);
+                    disk.remove(&p);
+                    changes.push(Change::Removed(p));
+                }
+                _ => {
+                    let old = format!(r"C:\data\d{d:04}\f{:03}.txt", (i + 25) % 99);
+                    let new = format!(r"C:\data\d{:04}\moved{i:05}.txt", (d + 1) % 2000);
+                    if let Some(v) = disk.remove(&old) {
+                        disk.insert(new.clone(), v);
+                    }
+                    changes.push(Change::Renamed(old, new));
+                }
+            }
+        }
+        let started = std::time::Instant::now();
+        let got = apply(&mut idx, &disk, &changes);
+        let ms = started.elapsed().as_millis();
+        assert!(is_sorted(&idx));
+        let mut want: Vec<&String> = disk.keys().collect();
+        want.sort();
+        assert_eq!(paths(&idx), want.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        assert!(got.changed >= 7500 && got.scan.is_empty(), "{}", got.changed);
+        // A Vec::insert/remove per change would take many seconds here.
+        assert!(ms < 3000, "apply took {ms} ms");
     }
 
     #[test]

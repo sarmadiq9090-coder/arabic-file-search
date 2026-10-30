@@ -30,7 +30,7 @@ sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["comp
 
 [target.'cfg(windows)'.dependencies]
 native-windows-gui = { version = "1.0.13", default-features = false, features = ["list-view", "animation-timer", "clipboard", "menu", "file-dialog", "status-bar", "high-dpi", "tray-notification", "combobox", "notice", "textbox"] }
-winapi = { version = "0.3", features = ["winuser", "consoleapi", "wincon", "processenv", "commctrl", "shellapi", "fileapi", "winbase", "combaseapi", "objbase", "timezoneapi", "minwinbase", "libloaderapi", "uxtheme", "synchapi", "errhandlingapi", "sysinfoapi", "winerror", "handleapi", "processthreadsapi", "wingdi", "oleidl", "ole2", "objidl", "unknwnbase", "guiddef", "windef", "minwindef", "usp10", "winhttp", "winnt", "winreg"] }
+winapi = { version = "0.3", features = ["winuser", "consoleapi", "wincon", "processenv", "commctrl", "shellapi", "fileapi", "winbase", "combaseapi", "objbase", "timezoneapi", "minwinbase", "libloaderapi", "uxtheme", "synchapi", "errhandlingapi", "sysinfoapi", "winerror", "handleapi", "processthreadsapi", "wingdi", "oleidl", "ole2", "objidl", "unknwnbase", "guiddef", "windef", "minwindef", "usp10", "winhttp", "winnt", "winreg", "dbt", "ioapiset"] }
 
 # Windows.Media.Ocr for text in images and scanned PDFs (src/ocr.rs).
 windows = { version = "0.62", features = ["Foundation", "Foundation_Collections", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage", "Storage_Streams", "Win32_System_WinRT"] }

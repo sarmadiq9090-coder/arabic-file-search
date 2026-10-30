@@ -188,6 +188,7 @@ impl NativeUi<AppUi> for App {
             .build(&mut app.timer)?;
         nwg::Notice::builder().parent(w).build(&mut app.name_notice)?;
         nwg::Notice::builder().parent(w).build(&mut app.update_notice)?;
+        nwg::Notice::builder().parent(w).build(&mut app.watch_notice)?;
         phase("controls");
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.menu)?;
         nwg::MenuItem::builder().text(tr!("فتح الملف\tEnter", "Open file\tEnter")).parent(&app.menu).build(&mut app.menu_open)?;
@@ -225,6 +226,11 @@ impl NativeUi<AppUi> for App {
             .parent(&app.options_menu)
             .build(&mut app.menu_digits)?;
         nwg::MenuItem::builder()
+            .text(tr!("تحديث الفهرس تلقائياً عند تغيّر الملفات", "Update the index automatically when files change"))
+            .check(settings.auto_index)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_auto_index)?;
+                nwg::MenuItem::builder()
             .text(tr!("فهرسة محتوى المستندات في الخلفية (بحث أسرع داخل الملفات)", "Index document contents in the background (faster content search)"))
             .check(settings.content_index)
             .parent(&app.options_menu)
@@ -257,7 +263,7 @@ impl NativeUi<AppUi> for App {
             .tip(Some(&format!("{} ({HOTKEY_TEXT})", title())))
             .build(&mut app.tray)?;
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.tray_menu)?;
-        nwg::MenuItem::builder().text(tr!("إظهار بحث سريع", "Show Bahth Sari'")).parent(&app.tray_menu).build(&mut app.tray_show)?;
+        nwg::MenuItem::builder().text(tr!("إظهار بحث سريع", "Show InstaFind")).parent(&app.tray_menu).build(&mut app.tray_show)?;
         nwg::MenuItem::builder().text(tr!("خروج", "Exit")).parent(&app.tray_menu).build(&mut app.tray_exit)?;
 
         phase("tray");
@@ -286,6 +292,7 @@ impl NativeUi<AppUi> for App {
                 E::OnTimerTick if handle == app.timer => app.on_tick(),
                 E::OnNotice if handle == app.name_notice => app.on_names_found(),
                 E::OnNotice if handle == app.update_notice => app.on_update_event(),
+                E::OnNotice if handle == app.watch_notice => app.on_watch_notice(),
                 E::OnComboxBoxSelection if handle == app.kind_combo => app.on_kind_changed(),
                 E::OnButtonClick => {
                     if handle == app.search_btn {
@@ -339,7 +346,7 @@ impl NativeUi<AppUi> for App {
                     } else if handle == app.menu_delete {
                         app.delete_selected();
                     } else if handle == app.menu_hotkey {
-                        app.set_status(&trf!("اضغط {HOTKEY_TEXT} من أي برنامج لإظهار بحث سريع أو إخفائه.", "Press {HOTKEY_TEXT} in any program to show or hide Bahth Sari'."));
+                        app.set_status(&trf!("اضغط {HOTKEY_TEXT} من أي برنامج لإظهار بحث سريع أو إخفائه.", "Press {HOTKEY_TEXT} in any program to show or hide InstaFind."));
                     } else if handle == app.menu_autostart {
                         let on = !app.menu_autostart.checked();
                         if autostart::set_enabled(on) {
@@ -359,6 +366,8 @@ impl NativeUi<AppUi> for App {
                         app.toggle_digits();
                     } else if handle == app.menu_content_index {
                         app.toggle_content_index();
+                    } else if handle == app.menu_auto_index {
+                        app.toggle_auto_index();
                     } else if handle == app.menu_export {
                         app.export_csv();
                     } else if handle == app.menu_hide {

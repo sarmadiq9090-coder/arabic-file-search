@@ -2,6 +2,7 @@
 //! index in the background.
 
 use native_windows_gui as nwg;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use winapi::um::winuser::SendMessageW;
@@ -133,6 +134,20 @@ impl App {
     /// Applies a change to the index, saves it in the background and shows
     /// the results again.
     pub(super) fn update_index(&self, change: impl FnOnce(&mut Index)) {
+        self.edit_index(
+            |idx| {
+                change(idx);
+                true
+            },
+            false,
+        );
+    }
+
+    /// `update_index` for a change that returns whether it changed anything.
+    /// `live` marks a change found on disk by the watcher: it keeps the
+    /// selection, re-runs only a non-empty search, and saves less often.
+    pub(super) fn edit_index(&self, change: impl FnOnce(&mut Index) -> bool, live: bool) {
+        let selected = if live { self.selected_path() } else { None };
         let mut st = self.state.borrow_mut();
         // Paths of the current rows, to find them again after the change.
         let rows = std::mem::take(&mut st.rows);
@@ -142,14 +157,14 @@ impl App {
             .collect();
         st.rows_index = Arc::default();
         // A save still waiting holds the index too; it is about to be stale.
-        PENDING_SAVE.lock().map(|mut p| p.take()).ok();
+        let had_pending = PENDING_SAVE.lock().map(|mut p| p.take().is_some()).unwrap_or(false);
         let mut idx = std::mem::take(&mut st.index);
         let inner = Arc::get_mut(&mut idx);
         let mut owned = match inner {
             Some(i) => std::mem::take(i),
             None => Index { entries: idx.entries.clone(), roots: idx.roots.clone(), built_at: idx.built_at },
         };
-        change(&mut owned);
+        let changed = change(&mut owned);
         let idx = Arc::new(owned);
         st.index = idx.clone();
         st.rows_index = idx.clone();
@@ -160,14 +175,35 @@ impl App {
         drop(st);
         // Several quick edits only need the last state written; on_close
         // writes it at once if it is still waiting.
-        if let Ok(mut p) = PENDING_SAVE.lock() {
+        if (changed || had_pending)
+            && let Ok(mut p) = PENDING_SAVE.lock()
+        {
             *p = Some(idx);
         }
-        std::thread::spawn(|| {
-            background_priority();
-            std::thread::sleep(std::time::Duration::from_millis(500));
-            flush_index_save();
-        });
+        if !changed {
+            return;
+        }
+        // Files change all the time; writing a big index after each batch
+        // would cost more than it saves, so watcher edits wait half a minute.
+        if !live || !LIVE_SAVE_QUEUED.swap(true, Ordering::Relaxed) {
+            std::thread::spawn(move || {
+                background_priority();
+                std::thread::sleep(std::time::Duration::from_millis(if live { 30_000 } else { 500 }));
+                if live {
+                    LIVE_SAVE_QUEUED.store(false, Ordering::Relaxed);
+                }
+                flush_index_save();
+            });
+        }
+        if live {
+            self.refresh_list();
+            self.reselect(selected);
+            if !self.content_mode() && !self.query.text().trim().is_empty() {
+                self.state.borrow_mut().live_search = true;
+                self.search_names();
+            }
+            return;
+        }
         self.clear_selection();
         self.refresh_list();
         if !self.content_mode() {
@@ -175,6 +211,9 @@ impl App {
         }
     }
 }
+
+/// A save of watcher edits is already scheduled.
+static LIVE_SAVE_QUEUED: AtomicBool = AtomicBool::new(false);
 
 /// The edited index waiting to be written to disk (see `update_index`).
 pub(super) static PENDING_SAVE: Mutex<Option<Arc<Index>>> = Mutex::new(None);

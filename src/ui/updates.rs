@@ -117,7 +117,7 @@ impl App {
         let notes = if rel.notes.trim().is_empty() { String::new() } else { trf!("\n\nالجديد:\n{}", "\n\nWhat's new:\n{}", rel.notes.trim()) };
         let text = trf!(
             "يتوفر إصدار جديد من بحث سريع: {} (لديك {current}).{notes}\n\nهل تريد التحديث الآن؟ سيُعاد تشغيل البرنامج بعد التنزيل.",
-            "A new version of Bahth Sari' is available: {} (you have {current}).{notes}\n\nUpdate now? The program restarts after the download.",
+            "A new version of InstaFind is available: {} (you have {current}).{notes}\n\nUpdate now? The program restarts after the download.",
             rel.version
         );
         let params = nwg::MessageParams {
