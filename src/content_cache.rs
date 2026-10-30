@@ -249,7 +249,33 @@ pub fn text_of(cache: Option<&ContentCache>, path: &str) -> (Option<String>, boo
 /// A text or a document whose text is worth caching: supported and not
 /// beyond the extraction size limit.
 pub fn is_document(e: &Entry) -> bool {
-    !e.is_dir && e.size > 0 && e.size <= extract::MAX_FILE_SIZE && extract::is_supported(&e.ext())
+    !e.is_dir
+        && e.size > 0
+        && e.size <= extract::MAX_FILE_SIZE
+        && extract::is_supported(&e.ext())
+        && !in_folder(&e.path, own_data_dir())
+}
+
+/// The program's own data folder (`%LOCALAPPDATA%\BahthSari\`, with the
+/// trailing separator): its history and logs hold what was just searched for,
+/// so they would match every content search.
+fn own_data_dir() -> &'static str {
+    static DIR: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| {
+        #[cfg(windows)]
+        {
+            let dir = crate::index::cache_path().with_file_name("");
+            dir.to_string_lossy().into_owned()
+        }
+        #[cfg(not(windows))]
+        String::new()
+    })
+}
+
+/// True when `path` is inside `dir` (which ends with a separator), ignoring
+/// ASCII case like Windows does. An empty `dir` contains nothing.
+fn in_folder(path: &str, dir: &str) -> bool {
+    !dir.is_empty() && path.len() > dir.len() && path.as_bytes()[..dir.len()].eq_ignore_ascii_case(dir.as_bytes())
 }
 
 impl ContentCache {
@@ -545,6 +571,15 @@ mod tests {
     }
 
     const AR: &str = "تقرير المبيعات السنوي للعام ٢٠٢٤\nإجمالي الإيرادات: ١٢٣٤٥ ريال";
+
+    #[test]
+    fn own_data_folder_is_not_searched() {
+        let dir = "C:\\Users\\a\\AppData\\Local\\BahthSari\\";
+        assert!(in_folder("c:\\users\\a\\appdata\\local\\bahthsari\\history.json", dir));
+        assert!(!in_folder("C:\\Users\\a\\AppData\\Local\\BahthSariX\\x.txt", dir));
+        assert!(!in_folder("C:\\Users\\a\\Documents\\history.json", dir));
+        assert!(!in_folder("C:\\anything.txt", ""));
+    }
 
     #[test]
     fn roundtrip_stale_and_no_text() {
