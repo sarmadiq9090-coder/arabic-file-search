@@ -25,7 +25,7 @@ impl Term {
         self.alts.iter().filter_map(|a| hay.find(a.as_str())).min()
     }
 
-    fn matches(&self, hay: &str) -> bool {
+    pub(crate) fn matches(&self, hay: &str) -> bool {
         self.alts.iter().any(|a| hay.contains(a.as_str()))
     }
 
@@ -78,7 +78,7 @@ fn word_matches<'a>(hay: &'a str, w: &'a str) -> impl Iterator<Item = usize> + '
 }
 
 /// The words of `hay` as (byte offset, word), split on non-word characters.
-fn split_words(hay: &str) -> impl Iterator<Item = (usize, &str)> {
+pub(crate) fn split_words(hay: &str) -> impl Iterator<Item = (usize, &str)> {
     let mut rest = hay.char_indices().peekable();
     std::iter::from_fn(move || {
         while rest.next_if(|&(_, c)| !is_word_char(c)).is_some() {}
@@ -225,6 +225,13 @@ pub struct Query {
     pub words: Vec<Term>,
     /// `"a b"~N` proximity searches.
     pub near: Vec<Near>,
+    /// `franco:` / `فرانكو:`: Latin words also match their Arabic
+    /// transliterations (Arabizi, `3abd` → عبد).
+    pub franco: bool,
+    /// `fuzzy:` / `تقريب:`: words may match with small typos.
+    pub fuzzy: bool,
+    /// `root:` / `جذر:`: Arabic words match words with the same 3-letter root.
+    pub root: bool,
     /// Problems found while parsing (in Arabic), for the UI to show.
     pub warnings: Vec<String>,
 }
@@ -254,8 +261,14 @@ const NO_EXT: &str = "\0";
 /// Prefixes of a token that keeps only folders (ASCII case ignored).
 pub const FOLDER_PREFIXES: [&str; 2] = ["folder:", "مجلد:"];
 
+/// Prefixes of the tokens that switch on Arabizi, typo-tolerant and root
+/// matching for the whole query (ASCII case ignored).
+pub const FRANCO_PREFIXES: [&str; 2] = ["franco:", "فرانكو:"];
+pub const FUZZY_PREFIXES: [&str; 2] = ["fuzzy:", "تقريب:"];
+pub const ROOT_PREFIXES: [&str; 2] = ["root:", "جذر:"];
+
 /// Arabic prefixes stripped to also match the bare word, longest first.
-const ARTICLES: [&str; 6] = ["وال", "بال", "كال", "فال", "لل", "ال"];
+pub(crate) const ARTICLES: [&str; 6] = ["وال", "بال", "كال", "فال", "لل", "ال"];
 
 /// Prefixes of the filters that take a value (ASCII case ignored).
 const SIZE_PREFIXES: [&str; 2] = ["size:", "حجم:"];
@@ -715,7 +728,13 @@ impl Query {
                     join = false;
                     continue;
                 }
-                if let Some(len) = folder_prefix(&tok) {
+                if let Some(len) = q.mode_prefix(&tok) {
+                    if tok.len() == len {
+                        join = false;
+                        continue;
+                    }
+                    pieces = vec![&tok[len..]];
+                } else if let Some(len) = folder_prefix(&tok) {
                     q.dirs_only = true;
                     if tok.len() == len {
                         join = false;
@@ -751,7 +770,32 @@ impl Query {
                 _ => q.terms.push(Term { alts }),
             }
         }
+        if q.franco {
+            for t in &mut q.terms {
+                let latin: Vec<String> = t.alts.iter().filter(|a| crate::franco::is_arabizi(a)).cloned().collect();
+                for c in latin.iter().flat_map(|a| crate::franco::candidates(a)) {
+                    push_alt(&mut t.alts, c, false);
+                }
+            }
+        }
         q
+    }
+
+    /// Handles a `franco:`, `fuzzy:` or `root:` prefix (and their Arabic
+    /// forms) at the start of `tok`: sets the flag and returns its length.
+    fn mode_prefix(&mut self, tok: &str) -> Option<usize> {
+        if let Some(len) = prefix_len(tok, &FRANCO_PREFIXES) {
+            self.franco = true;
+            Some(len)
+        } else if let Some(len) = prefix_len(tok, &FUZZY_PREFIXES) {
+            self.fuzzy = true;
+            Some(len)
+        } else if let Some(len) = prefix_len(tok, &ROOT_PREFIXES) {
+            self.root = true;
+            Some(len)
+        } else {
+            None
+        }
     }
 
     /// Handles a `size:`, `dm:`, `regex:` or `ww:` token. Returns false when
@@ -879,7 +923,7 @@ impl Query {
 
     /// Every filter on an entry's name: type, folder, size, date, excluded
     /// words, regex, whole word and proximity.
-    fn entry_ok(&self, e: &Entry) -> bool {
+    pub(crate) fn entry_ok(&self, e: &Entry) -> bool {
         self.kind_ok(e) && !self.excludes.iter().any(|x| e.norm_name.contains(x.as_str())) && self.name_ok(e)
     }
 }
@@ -896,28 +940,45 @@ pub fn in_scope(path: &str, scope_lower: &str) -> bool {
 /// Returns indices into `entries` whose file name matches every term and
 /// passes the filters, best matches first (exact name, then names starting
 /// with the first term).
+///
+/// A `fuzzy:` or `root:` query goes to [`crate::fuzzy::fuzzy_search_names`].
+/// With `franco:`, names matching an earlier (more likely) transliteration
+/// of the first term come first among equally good matches.
 pub fn search_names(entries: &[Entry], q: &Query, scope: &str) -> Vec<u32> {
+    if q.fuzzy || q.root {
+        return crate::fuzzy::fuzzy_search_names(entries, q, scope);
+    }
     if q.is_empty() {
         return Vec::new();
     }
     let scope_lower = scope.to_lowercase();
-    let mut hits: Vec<(u8, u32, u32)> = entries
+    let mut hits: Vec<(u8, u8, u32, u32)> = entries
         .par_iter()
         .enumerate()
         .filter(|(_, e)| q.terms.iter().all(|t| t.matches(&e.norm_name)))
         .filter(|(_, e)| q.entry_ok(e) && in_scope(&e.path, &scope_lower))
         .map(|(i, e)| {
-            let name: &str = &e.norm_name;
-            let rank = match q.terms.first() {
-                Some(t) if t.alts.iter().any(|a| name == a) => 0,
-                Some(t) if t.alts.iter().any(|a| name.starts_with(a.as_str())) => 1,
-                _ => 2,
-            };
-            (rank, e.norm_name.chars().count() as u32, i as u32)
+            let alt = if q.franco { alt_rank(q, &e.norm_name) } else { 0 };
+            (name_rank(q, &e.norm_name), alt, e.norm_name.chars().count() as u32, i as u32)
         })
         .collect();
     hits.par_sort_unstable();
-    hits.into_iter().map(|(_, _, i)| i).collect()
+    hits.into_iter().map(|(_, _, _, i)| i).collect()
+}
+
+/// How `name` matches the first term: 0 is the whole name, 1 its start, 2 elsewhere.
+pub(crate) fn name_rank(q: &Query, name: &str) -> u8 {
+    match q.terms.first() {
+        Some(t) if t.alts.iter().any(|a| name == a) => 0,
+        Some(t) if t.alts.iter().any(|a| name.starts_with(a.as_str())) => 1,
+        _ => 2,
+    }
+}
+
+/// Position of the first alternative of the first term found in `name`.
+fn alt_rank(q: &Query, name: &str) -> u8 {
+    let alts = q.terms.first().map_or(&[][..], |t| &t.alts[..]);
+    alts.iter().position(|a| name.contains(a.as_str())).map_or(u8::MAX, |p| p.min(254) as u8)
 }
 
 /// One content-search result.
@@ -1257,6 +1318,10 @@ pub fn match_ranges(name: &str, q: &Query) -> Vec<(usize, usize)> {
     }
     for r in &q.regexes {
         ranges.extend(r.ranges(name));
+    }
+    if q.fuzzy || q.root {
+        // The word a typo-tolerant or root match found.
+        ranges.extend(crate::fuzzy::word_spans(&norm, q).into_iter().map(|(s, e)| (map[s] as usize, src_end(e - 1))));
     }
     merge_spans(ranges)
 }
