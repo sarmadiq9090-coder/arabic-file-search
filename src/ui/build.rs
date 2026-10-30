@@ -18,7 +18,7 @@ use winapi::um::winuser::{NMHDR, SendMessageW, WM_NOTIFY, WM_SETFONT};
 
 use super::format::{ARABIC_DIGITS, wide_to_string};
 use super::keys::{HOTKEY_ID, HOTKEY_TEXT};
-use super::shell;
+use super::{autostart, shell};
 use super::startup::{phase, ui_font_family, work_area};
 use super::{App, COLUMNS, TITLE, WS_EX_LAYOUTRTL};
 use crate::history::History;
@@ -73,10 +73,18 @@ impl NativeUi<AppUi> for App {
             .size((settings.width as i32, settings.height as i32))
             .center(true)
             .ex_flags(WS_EX_LAYOUTRTL)
-            .flags(if settings.maximized {
-                nwg::WindowFlags::MAIN_WINDOW | nwg::WindowFlags::VISIBLE | nwg::WindowFlags::MAXIMIZED
-            } else {
-                nwg::WindowFlags::MAIN_WINDOW | nwg::WindowFlags::VISIBLE
+            .flags({
+                // Started with Windows: wait in the tray until called.
+                let visible = if std::env::args().any(|a| a == autostart::STARTUP_ARG) {
+                    nwg::WindowFlags::empty()
+                } else {
+                    nwg::WindowFlags::VISIBLE
+                };
+                if settings.maximized {
+                    nwg::WindowFlags::MAIN_WINDOW | visible | nwg::WindowFlags::MAXIMIZED
+                } else {
+                    nwg::WindowFlags::MAIN_WINDOW | visible
+                }
             })
             .build(&mut app.window)?;
         let w = &app.window;
@@ -226,6 +234,11 @@ impl NativeUi<AppUi> for App {
             .text(&format!("التحقق من التحديثات (الإصدار {})", env!("CARGO_PKG_VERSION")))
             .parent(&app.options_menu)
             .build(&mut app.menu_update)?;
+        nwg::MenuItem::builder()
+            .text("التشغيل مع ويندوز (في الخلفية)")
+            .check(autostart::is_enabled())
+            .parent(&app.options_menu)
+            .build(&mut app.menu_autostart)?;
 
         // Tray icon, so a hidden window comes back instantly.
         app.tray_icon.handle = crate::icon::load_icon(true) as _;
@@ -320,6 +333,18 @@ impl NativeUi<AppUi> for App {
                         app.delete_selected();
                     } else if handle == app.menu_hotkey {
                         app.set_status(&format!("اضغط {HOTKEY_TEXT} من أي برنامج لإظهار بحث سريع أو إخفائه."));
+                    } else if handle == app.menu_autostart {
+                        let on = !app.menu_autostart.checked();
+                        if autostart::set_enabled(on) {
+                            app.menu_autostart.set_checked(on);
+                            app.set_status(if on {
+                                "سيعمل البرنامج في الخلفية عند تشغيل ويندوز، وتُظهره بـ Ctrl+Alt+F."
+                            } else {
+                                "لن يعمل البرنامج تلقائياً مع ويندوز."
+                            });
+                        } else {
+                            app.set_status("تعذر تغيير إعداد التشغيل مع ويندوز.");
+                        }
                     } else if handle == app.menu_update {
                         app.check_for_update(true);
                     } else if handle == app.menu_digits {

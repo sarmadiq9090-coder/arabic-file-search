@@ -13,6 +13,7 @@
 //! - `startup`: start-up timing, logging, single instance, fonts
 //! - `format`, `shell`: text formatting and Windows shell helpers
 
+mod autostart;
 mod build;
 mod files;
 mod format;
@@ -177,6 +178,7 @@ pub struct App {
     menu_hotkey: nwg::MenuItem,
     menu_digits: nwg::MenuItem,
     menu_update: nwg::MenuItem,
+    menu_autostart: nwg::MenuItem,
     menu_export: nwg::MenuItem,
     menu_hide: nwg::MenuItem,
     tray_icon: nwg::Icon,
@@ -374,6 +376,7 @@ pub fn run() {
     }
     // Only the copy that keeps running tidies up after an update.
     crate::update::cleanup_old();
+    autostart::apply_default();
     phase("single-instance");
     unsafe {
         winapi::um::objbase::CoInitialize(std::ptr::null_mut());
