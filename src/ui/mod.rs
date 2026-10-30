@@ -12,6 +12,7 @@
 //! - `content_index`: the stored document text and its background warm-up
 //! - `keys`: keyboard handling and the global hotkey
 //! - `quickswitch`: Ctrl+Alt+G moves an Open / Save As dialog to a result's folder
+//! - `thumbs`: the thumbnail view of the results (Ctrl+T)
 //! - `startup`: start-up timing, logging, single instance, fonts
 //! - `format`, `shell`: text formatting and Windows shell helpers
 
@@ -28,6 +29,7 @@ mod results;
 mod search_jobs;
 mod shell;
 mod startup;
+mod thumbs;
 mod updates;
 
 use native_windows_gui as nwg;
@@ -218,6 +220,8 @@ pub struct App {
     state: RefCell<State>,
     /// Moving another program's Open / Save As dialog to a result's folder.
     quick: quickswitch::QuickSwitch,
+    /// The thumbnail view of the results (Ctrl+T).
+    thumbs: thumbs::Thumbs,
 }
 
 impl App {
@@ -355,7 +359,8 @@ impl App {
                 (s.width, s.height) = self.window.size();
             }
         }
-        if let Some(h) = self.list.handle.hwnd() {
+        // The icon view has no columns to measure.
+        if let Some(h) = self.list.handle.hwnd().filter(|_| !self.thumbs_on()) {
             let scale = nwg::scale_factor();
             s.columns = (0..COLUMNS.len())
                 .map(|i| (unsafe { SendMessageW(h, LVM_GETCOLUMNWIDTH, i, 0) } as f64 / scale).round() as i32)
