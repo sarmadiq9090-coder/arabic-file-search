@@ -271,6 +271,7 @@ impl NativeUi<AppUi> for App {
         app.build_dupes()?;
         app.build_replace_window()?;
         app.build_disk_usage()?;
+        app.build_web_ui()?;
         app.state.get_mut().settings = settings.clone();
         app.state.get_mut().history = History::load();
         let ui = AppUi { inner: Rc::new(app), handlers: Default::default(), raw_handlers: Default::default() };
@@ -475,6 +476,7 @@ impl NativeUi<AppUi> for App {
         let (handlers, raw) = ui.inner.setup_disk_usage()?;
         ui.handlers.borrow_mut().extend(handlers);
         ui.raw_handlers.borrow_mut().push(raw);
+        ui.handlers.borrow_mut().extend(ui.inner.setup_web());
 
         ui.register_hotkey();
         ui.show_sort_arrow();

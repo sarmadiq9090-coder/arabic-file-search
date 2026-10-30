@@ -36,6 +36,7 @@ mod shell;
 mod startup;
 mod updates;
 mod watching;
+mod web_server;
 
 use native_windows_gui as nwg;
 use nwg::NativeUi;
@@ -245,6 +246,8 @@ pub struct App {
     replace: replace_window::ReplaceWindow,
     /// Folder sizes: the Size column of folders and the folder-sizes window.
     disk: disk_usage::DiskUsage,
+    /// Searching from a phone over the home network (off by default).
+    web: web_server::WebUi,
 }
 
 impl App {
