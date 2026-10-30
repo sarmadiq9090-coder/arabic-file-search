@@ -1,8 +1,8 @@
 {
   "ID": "E9FF45C66D16454991F0F2B66A8268DD",
   "ActionKeywords": ["ب", "bs"],
-  "Name": "بحث سريع (Bahth Sari')",
-  "Description": "بحث فوري في أسماء الملفات بفهرس «بحث سريع» مع دعم العربية / Instant Arabic-aware file search through Bahth Sari's index",
+  "Name": "InstaFind — بحث سريع",
+  "Description": "بحث فوري في أسماء الملفات بفهرس «بحث سريع» مع دعم العربية / Instant Arabic-aware file search through the InstaFind index",
   "Author": "Saif",
   "Version": "1.0.0",
   "Language": "python",

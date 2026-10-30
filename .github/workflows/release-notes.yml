@@ -1,0 +1,39 @@
+name: release-notes
+
+# Keeps the title and body of each published GitHub Release in sync with
+# releases/<tag>-notes.md (first line "# title", the rest is the body).
+# Only the text is edited: assets such as bahth.exe, which the in-app updater
+# downloads, and the "latest" release are left as they are. A notes file for
+# a tag that has no release yet is skipped; the `release` job in build.yml
+# publishes it.
+
+on:
+  push:
+    branches: [main]
+    paths: ["releases/*-notes.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for notes in releases/v*-notes.md; do
+            tag=$(basename "$notes" -notes.md)
+            if ! gh release view "$tag" >/dev/null 2>&1; then
+              echo "$tag: no release yet, skipped"
+              continue
+            fi
+            title=$(head -1 "$notes" | sed 's/^# *//')
+            [ -n "$title" ] || title="$tag"
+            tail -n +2 "$notes" | sed '/./,$!d' > body.md
+            gh release edit "$tag" --title "$title" --notes-file body.md
+            echo "$tag: updated"
+          done
