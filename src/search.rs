@@ -767,7 +767,7 @@ impl Query {
             match parse_size(v) {
                 Some(range) => self.size = intersect(self.size, range),
                 None => {
-                    self.warnings.push(format!("لم أفهم الحجم «{v}»، فبحثت عن «{tok}» كنص عادي."));
+                    self.warnings.push(trf!("لم أفهم الحجم «{v}»، فبحثت عن «{tok}» كنص عادي.", "Did not understand the size “{v}”, so searched for “{tok}” as plain text."));
                     return false;
                 }
             }
@@ -779,7 +779,7 @@ impl Query {
             match clock.parse(v) {
                 Some(range) => self.mtime = intersect(self.mtime, range),
                 None => {
-                    self.warnings.push(format!("لم أفهم التاريخ «{v}»، فبحثت عن «{tok}» كنص عادي."));
+                    self.warnings.push(trf!("لم أفهم التاريخ «{v}»، فبحثت عن «{tok}» كنص عادي.", "Did not understand the date “{v}”, so searched for “{tok}” as plain text."));
                     return false;
                 }
             }
@@ -788,7 +788,7 @@ impl Query {
             if !v.is_empty() {
                 let p = Pattern::new(v);
                 if !p.is_valid() {
-                    self.warnings.push(format!("التعبير النمطي «{v}» غير صحيح، فلن يطابق أي شيء."));
+                    self.warnings.push(trf!("التعبير النمطي «{v}» غير صحيح، فلن يطابق أي شيء.", "The regular expression “{v}” is not valid, so it matches nothing."));
                 }
                 self.regexes.push(p);
             }

@@ -47,17 +47,17 @@ pub(super) fn digits(s: String) -> String {
 
 pub(super) fn fmt_size(e: &Entry) -> String {
     if e.is_dir {
-        return "مجلد".into();
+        return tr!("مجلد", "Folder").into();
     }
     let b = e.size as f64;
     digits(if b < 1024.0 {
-        format!("{} بايت", e.size)
+        trf!("{} بايت", "{} bytes", e.size)
     } else if b < 1024.0 * 1024.0 {
-        format!("{:.1} ك.ب", b / 1024.0)
+        trf!("{:.1} ك.ب", "{:.1} KB", b / 1024.0)
     } else if b < 1024.0 * 1024.0 * 1024.0 {
-        format!("{:.1} م.ب", b / 1024.0 / 1024.0)
+        trf!("{:.1} م.ب", "{:.1} MB", b / 1024.0 / 1024.0)
     } else {
-        format!("{:.2} ج.ب", b / 1024.0 / 1024.0 / 1024.0)
+        trf!("{:.2} ج.ب", "{:.2} GB", b / 1024.0 / 1024.0 / 1024.0)
     })
 }
 
@@ -83,10 +83,10 @@ pub(super) fn csv_field(s: &str) -> String {
 /// "قبل 5 دقائق" with the right Arabic plural for the count.
 pub(super) fn minutes_ago(n: i64) -> String {
     match n {
-        0 => "الآن".into(),
-        1 => "قبل دقيقة".into(),
-        2 => "قبل دقيقتين".into(),
-        3..=10 => format!("قبل {n} دقائق"),
-        _ => format!("قبل {n} دقيقة"),
+        0 => tr!("الآن", "just now").into(),
+        1 => tr!("قبل دقيقة", "1 minute ago").into(),
+        2 => tr!("قبل دقيقتين", "2 minutes ago").into(),
+        3..=10 => trf!("قبل {n} دقائق", "{n} minutes ago"),
+        _ => trf!("قبل {n} دقيقة", "{n} minutes ago"),
     }
 }

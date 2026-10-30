@@ -20,7 +20,7 @@ use super::format::{ARABIC_DIGITS, wide_to_string};
 use super::keys::{HOTKEY_ID, HOTKEY_TEXT};
 use super::{autostart, shell};
 use super::startup::{phase, ui_font_family, work_area};
-use super::{App, COLUMNS, TITLE, WS_EX_LAYOUTRTL};
+use super::{App, COLUMNS, WS_EX_LAYOUTRTL, title};
 use crate::history::History;
 use crate::search;
 use crate::settings::Settings;
@@ -69,10 +69,10 @@ impl NativeUi<AppUi> for App {
         let f = Some(&app.font);
 
         nwg::Window::builder()
-            .title(TITLE)
+            .title(title())
             .size((settings.width as i32, settings.height as i32))
             .center(true)
-            .ex_flags(WS_EX_LAYOUTRTL)
+            .ex_flags(crate::i18n::rtl_only(WS_EX_LAYOUTRTL))
             .flags({
                 // Started with Windows: wait in the tray until called.
                 let visible = if std::env::args().any(|a| a == autostart::STARTUP_ARG) {
@@ -96,12 +96,12 @@ impl NativeUi<AppUi> for App {
         nwg::TextInput::builder()
             .parent(w)
             .font(Some(&app.query_font))
-            .placeholder_text(Some("اكتب اسم الملف أو كلمة للبحث…   أمثلة:  تقرير ‎.pdf   ·   عقد !قديم   ·   صورة|فيديو"))
+            .placeholder_text(Some(tr!("اكتب اسم الملف أو كلمة للبحث…   أمثلة:  تقرير ‎.pdf   ·   عقد !قديم   ·   صورة|فيديو", "Type a file name or a word…   e.g.  report .pdf   ·   contract !old   ·   photo|video")))
             .focus(true)
             .build(&mut app.query)?;
-        nwg::Button::builder().parent(w).font(f).text("بحث").build(&mut app.search_btn)?;
-        nwg::Button::builder().parent(w).font(f).text("السجل").build(&mut app.history_btn)?;
-        let kinds: Vec<&'static str> = search::KINDS.iter().map(|(label, _)| *label).collect();
+        nwg::Button::builder().parent(w).font(f).text(tr!("بحث", "Search")).build(&mut app.search_btn)?;
+        nwg::Button::builder().parent(w).font(f).text(tr!("السجل", "History")).build(&mut app.history_btn)?;
+        let kinds: Vec<&'static str> = search::KINDS.iter().zip(crate::i18n::KIND_LABELS_EN).map(|((label, _), en)| tr!(*label, en)).collect();
         let kind = settings.kind.min(kinds.len().saturating_sub(1));
         nwg::ComboBox::builder()
             .parent(w)
@@ -112,18 +112,18 @@ impl NativeUi<AppUi> for App {
         nwg::CheckBox::builder()
             .parent(w)
             .font(f)
-            .text("البحث داخل المستندات أيضاً")
+            .text(tr!("البحث داخل المستندات أيضاً", "Also search inside documents"))
             .build(&mut app.content_chk)?;
-        nwg::Label::builder().parent(w).font(f).text("النطاق:").build(&mut app.scope_label)?;
+        nwg::Label::builder().parent(w).font(f).text(tr!("النطاق:", "Scope:")).build(&mut app.scope_label)?;
         nwg::TextInput::builder()
             .parent(w)
             .font(f)
             .readonly(true)
-            .text("كل الأقراص")
+            .text(tr!("كل الأقراص", "All drives"))
             .build(&mut app.scope_input)?;
-        nwg::Button::builder().parent(w).font(f).text("اختيار مجلد…").build(&mut app.scope_btn)?;
-        nwg::Button::builder().parent(w).font(f).text("كل الأقراص").build(&mut app.all_btn)?;
-        nwg::Button::builder().parent(w).font(f).text("تحديث الفهرس").build(&mut app.reindex_btn)?;
+        nwg::Button::builder().parent(w).font(f).text(tr!("اختيار مجلد…", "Choose folder…")).build(&mut app.scope_btn)?;
+        nwg::Button::builder().parent(w).font(f).text(tr!("كل الأقراص", "All drives")).build(&mut app.all_btn)?;
+        nwg::Button::builder().parent(w).font(f).text(tr!("تحديث الفهرس", "Update index")).build(&mut app.reindex_btn)?;
 
         // Owner-data (virtual) list: rows are drawn on demand, so even a
         // million results display instantly.
@@ -168,17 +168,17 @@ impl NativeUi<AppUi> for App {
                 index: Some(i as i32),
                 fmt: None,
                 width: Some((width as f64 * scale).round() as i32),
-                text: Some(title.to_string()),
+                text: Some(tr!(*title, super::COLUMNS_EN[i]).to_string()),
             });
         }
         app.list.set_headers_enabled(true);
 
-        nwg::Button::builder().parent(w).font(f).text("فتح الملف").build(&mut app.open_btn)?;
-        nwg::Button::builder().parent(w).font(f).text("فتح المجلد").build(&mut app.folder_btn)?;
-        nwg::Button::builder().parent(w).font(f).text("نسخ المسار").build(&mut app.copy_btn)?;
-        nwg::Button::builder().parent(w).font(f).text("تصدير النتائج").build(&mut app.export_btn)?;
-        nwg::Button::builder().parent(w).font(f).text("إيقاف البحث").enabled(false).build(&mut app.stop_btn)?;
-        nwg::Button::builder().parent(w).font(f).text("خيارات…").build(&mut app.options_btn)?;
+        nwg::Button::builder().parent(w).font(f).text(tr!("فتح الملف", "Open file")).build(&mut app.open_btn)?;
+        nwg::Button::builder().parent(w).font(f).text(tr!("فتح المجلد", "Open folder")).build(&mut app.folder_btn)?;
+        nwg::Button::builder().parent(w).font(f).text(tr!("نسخ المسار", "Copy path")).build(&mut app.copy_btn)?;
+        nwg::Button::builder().parent(w).font(f).text(tr!("تصدير النتائج", "Export results")).build(&mut app.export_btn)?;
+        nwg::Button::builder().parent(w).font(f).text(tr!("إيقاف البحث", "Stop search")).enabled(false).build(&mut app.stop_btn)?;
+        nwg::Button::builder().parent(w).font(f).text(tr!("خيارات…", "Options…")).build(&mut app.options_btn)?;
         nwg::StatusBar::builder().parent(w).font(f).text("").build(&mut app.status)?;
 
         nwg::AnimationTimer::builder()
@@ -190,21 +190,21 @@ impl NativeUi<AppUi> for App {
         nwg::Notice::builder().parent(w).build(&mut app.update_notice)?;
         phase("controls");
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.menu)?;
-        nwg::MenuItem::builder().text("فتح الملف\tEnter").parent(&app.menu).build(&mut app.menu_open)?;
-        nwg::MenuItem::builder().text("فتح المجلد الذي يحتويه\tCtrl+Enter").parent(&app.menu).build(&mut app.menu_folder)?;
-        nwg::MenuItem::builder().text("نسخ الملف\tCtrl+C").parent(&app.menu).build(&mut app.menu_copy_file)?;
-        nwg::MenuItem::builder().text("نسخ المسار\tCtrl+Shift+C").parent(&app.menu).build(&mut app.menu_copy)?;
-        nwg::MenuItem::builder().text("نسخ مسارات كل النتائج").parent(&app.menu).build(&mut app.menu_copy_all)?;
-        nwg::MenuItem::builder().text("تغيير الاسم\tF2").parent(&app.menu).build(&mut app.menu_rename)?;
-        nwg::MenuItem::builder().text("نقل إلى سلة المحذوفات\tDelete").parent(&app.menu).build(&mut app.menu_delete)?;
-        nwg::MenuItem::builder().text("عرض كل التطابقات داخل الملف\tF4").parent(&app.menu).build(&mut app.menu_matches)?;
+        nwg::MenuItem::builder().text(tr!("فتح الملف\tEnter", "Open file\tEnter")).parent(&app.menu).build(&mut app.menu_open)?;
+        nwg::MenuItem::builder().text(tr!("فتح المجلد الذي يحتويه\tCtrl+Enter", "Open containing folder\tCtrl+Enter")).parent(&app.menu).build(&mut app.menu_folder)?;
+        nwg::MenuItem::builder().text(tr!("نسخ الملف\tCtrl+C", "Copy file\tCtrl+C")).parent(&app.menu).build(&mut app.menu_copy_file)?;
+        nwg::MenuItem::builder().text(tr!("نسخ المسار\tCtrl+Shift+C", "Copy path\tCtrl+Shift+C")).parent(&app.menu).build(&mut app.menu_copy)?;
+        nwg::MenuItem::builder().text(tr!("نسخ مسارات كل النتائج", "Copy paths of all results")).parent(&app.menu).build(&mut app.menu_copy_all)?;
+        nwg::MenuItem::builder().text(tr!("تغيير الاسم\tF2", "Rename\tF2")).parent(&app.menu).build(&mut app.menu_rename)?;
+        nwg::MenuItem::builder().text(tr!("نقل إلى سلة المحذوفات\tDelete", "Move to Recycle Bin\tDelete")).parent(&app.menu).build(&mut app.menu_delete)?;
+        nwg::MenuItem::builder().text(tr!("عرض كل التطابقات داخل الملف\tF4", "Show all matches in the file\tF4")).parent(&app.menu).build(&mut app.menu_matches)?;
 
         // Window with every matching line of one document (hidden until used).
         nwg::Window::builder()
-            .title("كل التطابقات")
+            .title(tr!("كل التطابقات", "All matches"))
             .size((720, 460))
             .center(true)
-            .ex_flags(WS_EX_LAYOUTRTL)
+            .ex_flags(crate::i18n::rtl_only(WS_EX_LAYOUTRTL))
             .flags(nwg::WindowFlags::WINDOW | nwg::WindowFlags::RESIZABLE)
             .icon(None)
             .parent(Some(&app.window))
@@ -220,30 +220,31 @@ impl NativeUi<AppUi> for App {
 
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.options_menu)?;
         nwg::MenuItem::builder()
-            .text("عرض الأرقام بالعربية (٠١٢٣)")
+            .text(tr!("عرض الأرقام بالعربية (٠١٢٣)", "Show Arabic-Indic digits (٠١٢٣)"))
             .check(settings.arabic_digits)
             .parent(&app.options_menu)
             .build(&mut app.menu_digits)?;
         nwg::MenuItem::builder()
-            .text("فهرسة محتوى المستندات في الخلفية (بحث أسرع داخل الملفات)")
+            .text(tr!("فهرسة محتوى المستندات في الخلفية (بحث أسرع داخل الملفات)", "Index document contents in the background (faster content search)"))
             .check(settings.content_index)
             .parent(&app.options_menu)
             .build(&mut app.menu_content_index)?;
-        nwg::MenuItem::builder().text("تصدير النتائج إلى Excel (CSV)").parent(&app.options_menu).build(&mut app.menu_export)?;
-        nwg::MenuItem::builder().text("إخفاء إلى شريط المهام\tEsc").parent(&app.options_menu).build(&mut app.menu_hide)?;
+        nwg::MenuItem::builder().text(tr!("تصدير النتائج إلى Excel (CSV)", "Export results to Excel (CSV)")).parent(&app.options_menu).build(&mut app.menu_export)?;
+        nwg::MenuItem::builder().text(tr!("إخفاء إلى شريط المهام\tEsc", "Hide to the taskbar tray\tEsc")).parent(&app.options_menu).build(&mut app.menu_hide)?;
         nwg::MenuItem::builder()
-            .text(&format!("إظهار البرنامج من أي مكان\t{HOTKEY_TEXT}"))
+            .text(&trf!("إظهار البرنامج من أي مكان\t{HOTKEY_TEXT}", "Show the program from anywhere\t{HOTKEY_TEXT}"))
             .parent(&app.options_menu)
             .build(&mut app.menu_hotkey)?;
         nwg::MenuItem::builder()
-            .text(&format!("التحقق من التحديثات (الإصدار {})", env!("CARGO_PKG_VERSION")))
+            .text(&trf!("التحقق من التحديثات (الإصدار {})", "Check for updates (version {})", env!("CARGO_PKG_VERSION")))
             .parent(&app.options_menu)
             .build(&mut app.menu_update)?;
         nwg::MenuItem::builder()
-            .text("التشغيل مع ويندوز (في الخلفية)")
+            .text(tr!("التشغيل مع ويندوز (في الخلفية)", "Start with Windows (in the background)"))
             .check(autostart::is_enabled())
             .parent(&app.options_menu)
             .build(&mut app.menu_autostart)?;
+        super::lang_menu::build(&app.options_menu, &mut app.lang_menu, &mut app.menu_lang_ar, &mut app.menu_lang_en)?;
 
         // Tray icon, so a hidden window comes back instantly.
         app.tray_icon.handle = crate::icon::load_icon(true) as _;
@@ -253,11 +254,11 @@ impl NativeUi<AppUi> for App {
         nwg::TrayNotification::builder()
             .parent(w)
             .icon(Some(&app.tray_icon))
-            .tip(Some(&format!("{TITLE} ({HOTKEY_TEXT})")))
+            .tip(Some(&format!("{} ({HOTKEY_TEXT})", title())))
             .build(&mut app.tray)?;
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.tray_menu)?;
-        nwg::MenuItem::builder().text("إظهار بحث سريع").parent(&app.tray_menu).build(&mut app.tray_show)?;
-        nwg::MenuItem::builder().text("خروج").parent(&app.tray_menu).build(&mut app.tray_exit)?;
+        nwg::MenuItem::builder().text(tr!("إظهار بحث سريع", "Show Bahth Sari'")).parent(&app.tray_menu).build(&mut app.tray_show)?;
+        nwg::MenuItem::builder().text(tr!("خروج", "Exit")).parent(&app.tray_menu).build(&mut app.tray_exit)?;
 
         phase("tray");
         app.build_quick_switch_menus()?;
@@ -338,19 +339,20 @@ impl NativeUi<AppUi> for App {
                     } else if handle == app.menu_delete {
                         app.delete_selected();
                     } else if handle == app.menu_hotkey {
-                        app.set_status(&format!("اضغط {HOTKEY_TEXT} من أي برنامج لإظهار بحث سريع أو إخفائه."));
+                        app.set_status(&trf!("اضغط {HOTKEY_TEXT} من أي برنامج لإظهار بحث سريع أو إخفائه.", "Press {HOTKEY_TEXT} in any program to show or hide Bahth Sari'."));
                     } else if handle == app.menu_autostart {
                         let on = !app.menu_autostart.checked();
                         if autostart::set_enabled(on) {
                             app.menu_autostart.set_checked(on);
                             app.set_status(if on {
-                                "سيعمل البرنامج في الخلفية عند تشغيل ويندوز، وتُظهره بـ Ctrl+Alt+F."
+                                tr!("سيعمل البرنامج في الخلفية عند تشغيل ويندوز، وتُظهره بـ Ctrl+Alt+F.", "The program will run in the background when Windows starts; show it with Ctrl+Alt+F.")
                             } else {
-                                "لن يعمل البرنامج تلقائياً مع ويندوز."
+                                tr!("لن يعمل البرنامج تلقائياً مع ويندوز.", "The program will not start with Windows.")
                             });
                         } else {
-                            app.set_status("تعذر تغيير إعداد التشغيل مع ويندوز.");
+                            app.set_status(tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting."));
                         }
+                    } else if app.on_lang_item(handle) {
                     } else if handle == app.menu_update {
                         app.check_for_update(true);
                     } else if handle == app.menu_digits {

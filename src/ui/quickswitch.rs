@@ -40,7 +40,12 @@ const REG_VALUE: &str = "QuickSwitch";
 const ID_FILENAME_COMBO: i32 = 0x47C;
 const ID_FILENAME_EDIT: i32 = 0x480;
 
-const HINT: &str = "اختر نتيجة واضغط Enter لنقل نافذة الحفظ إلى مجلدها (Esc للإلغاء)";
+fn hint() -> &'static str {
+    tr!(
+        "اختر نتيجة واضغط Enter لنقل نافذة الحفظ إلى مجلدها (Esc للإلغاء)",
+        "Pick a result and press Enter to move the Save dialog to its folder (Esc to cancel)"
+    )
+}
 
 /// Quick Switch state and controls, one field of `App`.
 #[derive(Default)]
@@ -236,12 +241,12 @@ impl App {
     pub(super) fn build_quick_switch_menus(&mut self) -> Result<(), nwg::NwgError> {
         let enabled = load_enabled();
         nwg::MenuItem::builder()
-            .text("فتح مجلدها في نافذة الحفظ/الفتح\tEnter")
+            .text(tr!("فتح مجلدها في نافذة الحفظ/الفتح\tEnter", "Open its folder in the Save/Open dialog\tEnter"))
             .disabled(true)
             .parent(&self.menu)
             .build(&mut self.quick.menu_switch)?;
         nwg::MenuItem::builder()
-            .text(&format!("القفز إلى مجلد النتيجة في نوافذ الحفظ والفتح ({HOTKEY_TEXT})"))
+            .text(&trf!("القفز إلى مجلد النتيجة في نوافذ الحفظ والفتح ({HOTKEY_TEXT})", "Jump to the result's folder in Save/Open dialogs ({HOTKEY_TEXT})"))
             .check(enabled)
             .parent(&self.options_menu)
             .build(&mut self.quick.menu_option)?;
@@ -270,7 +275,7 @@ impl App {
                 }
                 // Picking a result is when the reminder helps most.
                 nwg::Event::OnListViewItemChanged if handle == app.list && app.quick_target().is_some() => {
-                    app.set_status(HINT);
+                    app.set_status(hint());
                 }
                 _ => {}
             }
@@ -315,16 +320,17 @@ impl App {
         if on {
             self.register_quick_switch();
             if self.quick.registered.get() {
-                self.set_status(&format!(
-                    "في نافذة حفظ أو فتح بأي برنامج، اضغط {HOTKEY_TEXT} ثم اختر نتيجة لنقل النافذة إلى مجلدها."
+                self.set_status(&trf!(
+                    "في نافذة حفظ أو فتح بأي برنامج، اضغط {HOTKEY_TEXT} ثم اختر نتيجة لنقل النافذة إلى مجلدها.",
+                    "In any program's Save or Open dialog, press {HOTKEY_TEXT}, then pick a result to move the dialog to its folder."
                 ));
             } else {
-                self.set_status(&format!("الاختصار {HOTKEY_TEXT} مستخدم في برنامج آخر."));
+                self.set_status(&trf!("الاختصار {HOTKEY_TEXT} مستخدم في برنامج آخر.", "The shortcut {HOTKEY_TEXT} is used by another program."));
             }
         } else {
             self.unregister_quick_switch();
             self.set_quick_target(None);
-            self.set_status("أوقف القفز إلى مجلد النتيجة في نوافذ الحفظ والفتح.");
+            self.set_status(tr!("أوقف القفز إلى مجلد النتيجة في نوافذ الحفظ والفتح.", "Jumping to the result's folder in Save/Open dialogs is off."));
         }
     }
 
@@ -360,7 +366,7 @@ impl App {
         self.set_quick_target(dialog);
         self.show_window();
         if dialog.is_some() {
-            self.set_status(HINT);
+            self.set_status(hint());
         }
     }
 
@@ -388,18 +394,18 @@ impl App {
             return false;
         }
         self.set_quick_target(None);
-        self.set_status("أُلغي نقل نافذة الحفظ/الفتح.");
+        self.set_status(tr!("أُلغي نقل نافذة الحفظ/الفتح.", "Save/Open dialog switch cancelled."));
         true
     }
 
     fn quick_switch_selected(&self) {
         if self.quick_target().is_none() {
-            self.set_status(&format!("اضغط {HOTKEY_TEXT} في نافذة حفظ أو فتح أولاً."));
+            self.set_status(&trf!("اضغط {HOTKEY_TEXT} في نافذة حفظ أو فتح أولاً.", "Press {HOTKEY_TEXT} in a Save or Open dialog first."));
             return;
         }
         match self.list.selected_item() {
             Some(row) => self.switch_to_row(row),
-            None => self.set_status("اختر نتيجة من القائمة أولاً."),
+            None => self.set_status(tr!("اختر نتيجة من القائمة أولاً.", "Pick a result from the list first.")),
         }
     }
 
@@ -419,7 +425,7 @@ impl App {
         } else {
             self.show_window();
             self.set_quick_target(None);
-            self.set_status("تعذر نقل نافذة الحفظ/الفتح إلى هذا المجلد.");
+            self.set_status(tr!("تعذر نقل نافذة الحفظ/الفتح إلى هذا المجلد.", "Could not move the Save/Open dialog to this folder."));
         }
     }
 }

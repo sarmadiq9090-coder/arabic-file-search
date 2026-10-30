@@ -380,11 +380,11 @@ mod win {
         if !ok {
             let code = unsafe { GetLastError() };
             return Err(match code {
-                12002 => "انتهت مهلة الاتصال".into(),
-                12007 => "تعذر الوصول إلى الخادم (هل الإنترنت متصل؟)".into(),
-                12029 | 12030 => "فشل الاتصال بالخادم".into(),
-                12175 => "فشل الاتصال الآمن (TLS)".into(),
-                _ => format!("فشل الطلب (خطأ {code})"),
+                12002 => tr!("انتهت مهلة الاتصال", "the connection timed out").into(),
+                12007 => tr!("تعذر الوصول إلى الخادم (هل الإنترنت متصل؟)", "cannot reach the server (is the internet connected?)").into(),
+                12029 | 12030 => tr!("فشل الاتصال بالخادم", "the connection to the server failed").into(),
+                12175 => tr!("فشل الاتصال الآمن (TLS)", "the secure connection (TLS) failed").into(),
+                _ => trf!("فشل الطلب (خطأ {code})", "the request failed (error {code})"),
             });
         }
         if let Some(out) = final_url {
@@ -400,9 +400,9 @@ mod win {
         let status = query_number(&request, WINHTTP_QUERY_STATUS_CODE).unwrap_or(0);
         if status != 200 {
             return Err(match status {
-                403 | 429 => format!("GitHub حدّ مؤقتاً عدد الطلبات من جهازك (HTTP {status}). حاول بعد ساعة."),
-                404 => "لا يوجد إصدار منشور بعد (HTTP 404)".into(),
-                _ => format!("رد غير متوقع من الخادم (HTTP {status})"),
+                403 | 429 => trf!("GitHub حدّ مؤقتاً عدد الطلبات من جهازك (HTTP {status}). حاول بعد ساعة.", "GitHub is temporarily limiting requests from this computer (HTTP {status}). Try again in an hour."),
+                404 => tr!("لا يوجد إصدار منشور بعد (HTTP 404)", "no release has been published yet (HTTP 404)").into(),
+                _ => trf!("رد غير متوقع من الخادم (HTTP {status})", "unexpected answer from the server (HTTP {status})"),
             });
         }
         let length = query_number(&request, WINHTTP_QUERY_CONTENT_LENGTH).map(u64::from);
@@ -430,7 +430,7 @@ mod win {
             sink(&buf[..read as usize])?;
         }
         if length.is_some_and(|n| n != total) {
-            return Err("انقطع التنزيل قبل اكتماله".into());
+            return Err(tr!("انقطع التنزيل قبل اكتماله", "the download stopped before it was complete").into());
         }
         Ok(())
     }
@@ -543,7 +543,7 @@ mod win {
         if let Some(want) = &rel.sha256 {
             let got: String = sha2::Digest::finalize(hasher).iter().map(|b| format!("{b:02x}")).collect();
             if &got != want {
-                return Err("الملف الذي نُزّل لا يطابق بصمة الإصدار (SHA-256)".into());
+                return Err(tr!("الملف الذي نُزّل لا يطابق بصمة الإصدار (SHA-256)", "the downloaded file does not match the release checksum (SHA-256)").into());
             }
         }
         let size = fs::metadata(new).map_err(|e| e.to_string())?.len();

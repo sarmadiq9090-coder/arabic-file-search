@@ -21,6 +21,7 @@ mod content_index;
 mod files;
 mod format;
 mod history_menu;
+mod lang_menu;
 mod keys;
 mod quickswitch;
 mod results;
@@ -61,6 +62,12 @@ const WS_EX_LAYOUTRTL: u32 = 0x0040_0000;
 
 /// The window title; also how a second copy of the program finds the first.
 const TITLE: &str = "بحث سريع";
+const TITLE_EN: &str = "Bahth Sari'";
+
+/// The window title in the interface language.
+fn title() -> &'static str {
+    tr!(TITLE, TITLE_EN)
+}
 
 const COL_NAME: usize = 0;
 const COL_PATH: usize = 1;
@@ -69,6 +76,7 @@ const COL_DATE: usize = 3;
 const COL_SNIPPET: usize = 4;
 const COLUMNS: [(&str, i32); 5] =
     [("الاسم", 260), ("المسار الكامل", 460), ("الحجم", 90), ("تاريخ التعديل", 140), ("النص المطابق", 360)];
+const COLUMNS_EN: [&str; 5] = ["Name", "Full path", "Size", "Date modified", "Matching text"];
 
 /// A result row: an index into `State::rows_index` plus an optional snippet.
 struct Row {
@@ -186,6 +194,9 @@ pub struct App {
     menu_content_index: nwg::MenuItem,
     menu_update: nwg::MenuItem,
     menu_autostart: nwg::MenuItem,
+    lang_menu: nwg::Menu,
+    menu_lang_ar: nwg::MenuItem,
+    menu_lang_en: nwg::MenuItem,
     menu_export: nwg::MenuItem,
     menu_hide: nwg::MenuItem,
     tray_icon: nwg::Icon,
@@ -306,8 +317,8 @@ impl App {
         self.window.set_visible(false);
         if !self.tray_hint_shown.replace(true) {
             self.tray.show(
-                "البرنامج ما زال يعمل هنا. انقر الأيقونة أو شغّل البرنامج مرة أخرى لإظهاره فوراً.",
-                Some(TITLE),
+                tr!("البرنامج ما زال يعمل هنا. انقر الأيقونة أو شغّل البرنامج مرة أخرى لإظهاره فوراً.", "The program is still running here. Click the icon or start the program again to show it at once."),
+                Some(title()),
                 None,
                 None,
             );
@@ -404,7 +415,7 @@ pub fn run() {
             ui
         }
         Err(e) => {
-            nwg::fatal_message(TITLE, &format!("تعذر إنشاء الواجهة: {e}"));
+            nwg::fatal_message(title(), &trf!("تعذر إنشاء الواجهة: {e}", "Could not create the window: {e}"));
         }
     };
     phase("loop");

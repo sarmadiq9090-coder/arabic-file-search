@@ -11,7 +11,7 @@ use std::time::Duration;
 use winapi::shared::windef::RECT;
 use winapi::um::winuser::{IsIconic, SW_RESTORE, SetForegroundWindow, ShowWindow};
 
-use super::{TITLE, shell};
+use super::{shell, title};
 use crate::index;
 
 /// Set once the message loop runs, so start-up timing ends at a real tick.
@@ -139,7 +139,7 @@ pub(super) fn activate_running_copy(updated: bool) -> bool {
         return false;
     }
     // The first copy may still be creating its window; give it a few seconds.
-    let (class, title) = (shell::wide("NativeWindowsGuiWindow"), shell::wide(TITLE));
+    let (class, title) = (shell::wide("NativeWindowsGuiWindow"), shell::wide(title()));
     let mut hwnd = std::ptr::null_mut();
     for _ in 0..50 {
         hwnd = unsafe { FindWindowW(class.as_ptr(), title.as_ptr()) };

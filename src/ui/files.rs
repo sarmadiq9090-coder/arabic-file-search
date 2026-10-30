@@ -8,7 +8,7 @@ use winapi::um::winuser::SendMessageW;
 
 use super::shell;
 use super::startup::background_priority;
-use super::{App, Row, TITLE};
+use super::{App, Row, title};
 use crate::index::{self, Index};
 
 impl App {
@@ -19,9 +19,9 @@ impl App {
     pub(super) fn index_busy(&self) -> bool {
         let st = self.state.borrow();
         let msg = if st.content.is_some() {
-            "انتظر انتهاء البحث داخل المستندات أو أوقفه أولاً."
+            tr!("انتظر انتهاء البحث داخل المستندات أو أوقفه أولاً.", "Wait for the document search to finish, or stop it first.")
         } else if st.scan.is_some() || st.loading.is_some() {
-            "انتظر حتى تكتمل الفهرسة."
+            tr!("انتظر حتى تكتمل الفهرسة.", "Wait until indexing is complete.")
         } else {
             return false;
         };
@@ -32,7 +32,7 @@ impl App {
 
     pub(super) fn start_rename(&self) {
         let Some(row) = self.list.selected_item() else {
-            self.set_status("اختر ملفاً من القائمة أولاً.");
+            self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first."));
             return;
         };
         if self.index_busy() {
@@ -67,7 +67,7 @@ impl App {
             return false;
         }
         if new_name.contains(['\\', '/', ':', '*', '?', '"', '<', '>', '|']) {
-            self.set_status("لا يمكن أن يحتوي الاسم على أي من هذه الرموز: \\ / : * ? \" < > |");
+            self.set_status(tr!("لا يمكن أن يحتوي الاسم على أي من هذه الرموز: \\ / : * ? \" < > |", "A name cannot contain any of these characters: \\ / : * ? \" < > |"));
             return false;
         }
         // Windows drops a trailing dot or space and reserves device names.
@@ -77,7 +77,7 @@ impl App {
                 && (stem.starts_with("COM") || stem.starts_with("LPT"))
                 && stem.as_bytes()[3].is_ascii_digit());
         if new_name.ends_with(['.', ' ']) || reserved {
-            self.set_status("هذا الاسم غير مسموح في ويندوز.");
+            self.set_status(tr!("هذا الاسم غير مسموح في ويندوز.", "Windows does not allow this name."));
             return false;
         }
         let new = match old.rfind('\\') {
@@ -87,11 +87,11 @@ impl App {
         // fs::rename replaces an existing file, so check first. Changing only
         // the letter case of the same file is fine.
         if std::path::Path::new(&new).exists() && new.to_lowercase() != old.to_lowercase() {
-            nwg::modal_info_message(&self.window, TITLE, &format!("يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد."));
+            nwg::modal_info_message(&self.window, title(), &trf!("يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد.", "Another file named “{new_name}” already exists in this folder."));
             return false;
         }
         if let Err(e) = std::fs::rename(&old, &new) {
-            nwg::modal_error_message(&self.window, "خطأ", &format!("تعذر تغيير الاسم:\n{e}"));
+            nwg::modal_error_message(&self.window, tr!("خطأ", "Error"), &trf!("تعذر تغيير الاسم:\n{e}", "Could not rename:\n{e}"));
             return false;
         }
         self.update_index(|idx| {
@@ -102,21 +102,21 @@ impl App {
             st.history.rename_path(&old, &new);
             st.history.save();
         }
-        self.set_status(&format!("تم تغيير الاسم إلى «{new_name}»."));
+        self.set_status(&trf!("تم تغيير الاسم إلى «{new_name}».", "Renamed to “{new_name}”."));
         // The list is refreshed from the updated index; the edit box text is not needed.
         false
     }
 
     pub(super) fn delete_selected(&self) {
         let Some(p) = self.selected_path() else {
-            self.set_status("اختر ملفاً من القائمة أولاً.");
+            self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first."));
             return;
         };
         if self.index_busy() {
             return;
         }
         if !shell::recycle(&p) {
-            self.set_status("لم يُحذف الملف.");
+            self.set_status(tr!("لم يُحذف الملف.", "The file was not deleted."));
             return;
         }
         self.update_index(|idx| {
@@ -127,7 +127,7 @@ impl App {
             st.history.forget_path(&p);
             st.history.save();
         }
-        self.set_status("نُقل الملف إلى سلة المحذوفات.");
+        self.set_status(tr!("نُقل الملف إلى سلة المحذوفات.", "The file was moved to the Recycle Bin."));
     }
 
     /// Applies a change to the index, saves it in the background and shows

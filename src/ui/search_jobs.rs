@@ -46,7 +46,7 @@ impl App {
             }
         });
         self.state.borrow_mut().loading = Some(slot);
-        self.set_status("جاري تحميل الفهرس…");
+        self.set_status(tr!("جاري تحميل الفهرس…", "Loading the index…"));
         self.query.set_focus();
     }
 
@@ -62,7 +62,7 @@ impl App {
                 drop(st);
                 self.start_warm();
                 if self.query.text().trim().is_empty() || self.content_mode() {
-                    self.set_status(&format!("تم تحميل الفهرس ({} عنصر). اكتب للبحث.", fmt_num(n)));
+                    self.set_status(&trf!("تم تحميل الفهرس ({} عنصر). اكتب للبحث.", "Index loaded ({} items). Type to search.", fmt_num(n)));
                 } else {
                     self.search_names();
                 }
@@ -80,7 +80,7 @@ impl App {
         let mut st = self.state.borrow_mut();
         if st.loading.is_some() {
             drop(st);
-            self.set_status("انتظر حتى يكتمل تحميل الفهرس، ثم حدّثه.");
+            self.set_status(tr!("انتظر حتى يكتمل تحميل الفهرس، ثم حدّثه.", "Wait until the index has loaded, then update it."));
             return;
         }
         if st.scan.is_some() {
@@ -102,7 +102,7 @@ impl App {
         st.scan = Some(ScanJob { progress, result });
         drop(st);
         self.reindex_btn.set_enabled(false);
-        self.set_status("جاري فهرسة الملفات على كل الأقراص…");
+        self.set_status(tr!("جاري فهرسة الملفات على كل الأقراص…", "Indexing files on all drives…"));
     }
 
     // ---------------------------------------------------------------- search
@@ -227,25 +227,26 @@ impl App {
         self.refresh_list();
         if res.empty {
             if !busy {
-                self.set_status("اكتب اسم الملف أو جزءاً منه للبحث.");
+                self.set_status(tr!("اكتب اسم الملف أو جزءاً منه للبحث.", "Type a file name or part of one to search."));
             }
             return;
         }
         let tail = match (loading, busy) {
-            (true, _) => " (جاري تحميل الفهرس…)",
-            (false, true) => " (الفهرسة ما زالت جارية)",
+            (true, _) => tr!(" (جاري تحميل الفهرس…)", " (loading the index…)"),
+            (false, true) => tr!(" (الفهرسة ما زالت جارية)", " (indexing is still running)"),
             _ => "",
         };
         let tail = format!("{tail}{warn}");
         match res.converted {
-            Some(alt) => self.set_status(&format!(
+            Some(alt) => self.set_status(&trf!(
                 "لا نتائج لـ «{}»، عرض نتائج «{}»: {} نتيجة في {} ملي ثانية{tail}",
+                "No results for “{}”; showing results for “{}”: {} results in {} ms{tail}",
                 res.text.trim(),
                 alt,
                 fmt_num(n),
                 fmt_num(res.ms)
             )),
-            None => self.set_status(&format!("وجدت {} نتيجة في {} ملي ثانية{tail}", fmt_num(n), fmt_num(res.ms))),
+            None => self.set_status(&trf!("وجدت {} نتيجة في {} ملي ثانية{tail}", "Found {} results in {} ms{tail}", fmt_num(n), fmt_num(res.ms))),
         }
     }
 
@@ -253,7 +254,7 @@ impl App {
         self.cancel_content();
         let q = self.parse_query(&self.query.text());
         if !q.has_text_criteria() {
-            self.set_status("اكتب الكلمة أو العبارة التي تريد البحث عنها داخل المستندات.");
+            self.set_status(tr!("اكتب الكلمة أو العبارة التي تريد البحث عنها داخل المستندات.", "Type the word or phrase to search for inside documents."));
             return;
         }
         let mut st = self.state.borrow_mut();
@@ -284,7 +285,7 @@ impl App {
         self.refresh_list();
         self.stop_btn.set_enabled(true);
         let warn = warnings_text(self.state.borrow().shown_query.as_ref());
-        self.set_status(&format!("جاري البحث داخل المستندات…{warn}"));
+        self.set_status(&trf!("جاري البحث داخل المستندات…{warn}", "Searching inside documents…{warn}"));
     }
 
     pub(super) fn cancel_content(&self) {
@@ -297,7 +298,7 @@ impl App {
     pub(super) fn on_stop(&self) {
         let n = self.state.borrow().rows.len();
         self.cancel_content();
-        self.set_status(&format!("تم إيقاف البحث. وجدت {} ملف.", fmt_num(n)));
+        self.set_status(&trf!("تم إيقاف البحث. وجدت {} ملف.", "Search stopped. Found {} files.", fmt_num(n)));
     }
 
     /// Polls background jobs a few times per second.
@@ -328,7 +329,7 @@ impl App {
             None => {
                 let n = job.progress.files.load(Ordering::Relaxed);
                 drop(st);
-                self.set_status(&format!("جاري فهرسة الملفات… {} عنصر حتى الآن", fmt_num(n)));
+                self.set_status(&trf!("جاري فهرسة الملفات… {} عنصر حتى الآن", "Indexing files… {} items so far", fmt_num(n)));
             }
             Some(idx) => {
                 let n = idx.entries.len();
@@ -338,7 +339,7 @@ impl App {
                 self.start_warm();
                 self.reindex_btn.set_enabled(true);
                 if self.query.text().trim().is_empty() || self.content_mode() {
-                    self.set_status(&format!("اكتملت الفهرسة: {} عنصر.", fmt_num(n)));
+                    self.set_status(&trf!("اكتملت الفهرسة: {} عنصر.", "Indexing complete: {} items.", fmt_num(n)));
                 } else {
                     self.search_names();
                 }
@@ -373,11 +374,12 @@ impl App {
         }
         if done {
             self.stop_btn.set_enabled(false);
-            let cached = if cached > 0 { format!(" (من الفهرس: {})", fmt_num(cached)) } else { String::new() };
-            self.set_status(&format!("انتهى البحث داخل {} مستند: وجدت {} ملف.{cached}", fmt_num(total), fmt_num(n)));
+            let cached = if cached > 0 { trf!(" (من الفهرس: {})", " ({} from the index)", fmt_num(cached)) } else { String::new() };
+            self.set_status(&trf!("انتهى البحث داخل {} مستند: وجدت {} ملف.{}", "Searched {} documents: found {} files.{}", fmt_num(total), fmt_num(n), cached));
         } else {
-            self.set_status(&format!(
+            self.set_status(&trf!(
                 "جاري البحث داخل المستندات… تم فحص {} من {} — وجدت {}",
+                "Searching inside documents… checked {} of {} — found {}",
                 fmt_num(checked),
                 fmt_num(total),
                 fmt_num(n)
@@ -392,7 +394,7 @@ impl App {
         if slot.is_none() {
             let mut d = nwg::FileDialog::default();
             let built = nwg::FileDialog::builder()
-                .title("اختر المجلد الذي تريد البحث فيه")
+                .title(tr!("اختر المجلد الذي تريد البحث فيه", "Choose the folder to search in"))
                 .action(nwg::FileDialogAction::OpenDirectory)
                 .build(&mut d);
             if built.is_err() {
@@ -413,7 +415,7 @@ impl App {
     }
 
     pub(super) fn set_scope(&self, scope: String) {
-        self.scope_input.set_text(if scope.is_empty() { "كل الأقراص" } else { &scope });
+        self.scope_input.set_text(if scope.is_empty() { tr!("كل الأقراص", "All drives") } else { &scope });
         self.state.borrow_mut().scope = scope;
         if !self.query.text().trim().is_empty() && !self.content_mode() {
             self.search_names();
@@ -424,7 +426,7 @@ impl App {
 /// " — تنبيه: …" for parts of the query that could not be understood, or "".
 fn warnings_text(q: Option<&Query>) -> String {
     match q {
-        Some(q) if !q.warnings.is_empty() => format!(" — تنبيه: {}", q.warnings.join("، ")),
+        Some(q) if !q.warnings.is_empty() => trf!(" — تنبيه: {}", " — Note: {}", q.warnings.join(tr!("، ", "; "))),
         _ => String::new(),
     }
 }

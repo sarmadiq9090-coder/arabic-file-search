@@ -89,7 +89,7 @@ pub fn parse_args(args: &[String]) -> Result<Command, String> {
         let Some(&(name, takes_value)) = OPTIONS.iter().find(|&&(o, _)| o == name) else {
             // `-word` is an exclusion in the query; only `--name` must be an option.
             if arg.starts_with("--") {
-                return Err(format!("unknown option: {arg}"));
+                return Err(trf!("خيار غير معروف: {arg}", "unknown option: {arg}"));
             }
             words.push(arg);
             continue;
@@ -97,18 +97,18 @@ pub fn parse_args(args: &[String]) -> Result<Command, String> {
         let value = if takes_value {
             match inline.or_else(|| it.next().map(String::as_str)) {
                 Some(v) => v,
-                None => return Err(format!("{name} needs a value")),
+                None => return Err(trf!("{name} يحتاج إلى قيمة", "{name} needs a value")),
             }
         } else {
             if inline.is_some() {
-                return Err(format!("{name} takes no value"));
+                return Err(trf!("{name} لا يأخذ قيمة", "{name} takes no value"));
             }
             ""
         };
         match name {
             "-s" | "--search" => words.push(value),
             "-n" | "--max" => {
-                let n = value.trim().parse::<usize>().map_err(|_| format!("{name}: not a number: {value}"))?;
+                let n = value.trim().parse::<usize>().map_err(|_| trf!("{name}: ليس رقماً: {value}", "{name}: not a number: {value}"))?;
                 o.max = Some(n);
             }
             "--sort" => {
@@ -117,7 +117,7 @@ pub fn parse_args(args: &[String]) -> Result<Command, String> {
                     "path" => SortKey::Path,
                     "size" => SortKey::Size,
                     "date" => SortKey::Date,
-                    _ => return Err(format!("--sort: expected name, path, size or date, got {value}")),
+                    _ => return Err(trf!("--sort: المتوقع name أو path أو size أو date، وليس {value}", "--sort: expected name, path, size or date, got {value}")),
                 }
             }
             "--desc" => o.desc = true,
@@ -129,7 +129,7 @@ pub fn parse_args(args: &[String]) -> Result<Command, String> {
                     _ => Format::Json,
                 };
                 if o.format != Format::Paths && o.format != f {
-                    return Err("choose only one of --count, --csv and --json".into());
+                    return Err(tr!("اختر واحداً فقط من --count و--csv و--json", "choose only one of --count, --csv and --json").into());
                 }
                 o.format = f;
             }
@@ -140,7 +140,7 @@ pub fn parse_args(args: &[String]) -> Result<Command, String> {
     }
     o.query = words.join(" ");
     if Query::parse(&o.query).is_empty() {
-        return Err("no search text; use -s \"words\"".into());
+        return Err(tr!("لا يوجد نص للبحث؛ استخدم -s \"كلمات\"", "no search text; use -s \"words\"").into());
     }
     Ok(Command::Search(o))
 }
@@ -154,6 +154,9 @@ fn scope_prefix(folder: &str) -> String {
 }
 
 pub fn usage() -> String {
+    if crate::i18n::is_en() {
+        return usage_en();
+    }
     format!(
         "بحث سريع {v} — البحث من سطر الأوامر
 Bahth Sari' {v} — command-line search
@@ -180,6 +183,34 @@ Uses the saved index; open the program once to build or refresh it.
     )
 }
 
+fn usage_en() -> String {
+    format!(
+        "Bahth Sari' {v} — command-line search
+
+Usage:
+  bahth.exe -s \"invoice ext:pdf\" [options]
+
+  -s, --search <text>   search text, same syntax as the GUI
+  -n, --max <N>         at most N results
+  --sort <key>          sort order: name | path | size | date
+  --desc                descending order
+  --scope <folder>      only inside this folder
+  --count               print only the number of results
+  --csv                 path,size,modified (CSV)
+  --json                a JSON array
+  -h, --help            this help
+  --version             version
+
+Exit codes: 0 results, 1 none, 2 error
+Uses the saved index; open the program once to build or refresh it.
+",
+        v = env!("CARGO_PKG_VERSION")
+    )
+}
+
+pub const NO_INDEX_HINT_EN: &str = "No index yet: open Bahth Sari' once to build it, then try again.
+";
+
 pub const NO_INDEX_HINT: &str = "لا يوجد فهرس بعد: افتح برنامج «بحث سريع» مرة واحدة لبنائه، ثم أعد المحاولة.
 No index yet: open Bahth Sari' once to build it, then try again.
 ";
@@ -204,7 +235,7 @@ pub fn execute(cmd: &Command, load: impl FnOnce() -> Option<Index>, out: &mut dy
         Command::Search(o) => o,
     };
     let Some(index) = load() else {
-        err.write_all(crlf(NO_INDEX_HINT).as_bytes())?;
+        err.write_all(crlf(tr!(NO_INDEX_HINT, NO_INDEX_HINT_EN)).as_bytes())?;
         return Ok(EXIT_ERROR);
     };
     let hits = find(&index.entries, o);
@@ -315,7 +346,7 @@ pub fn run(args: &[String]) -> ! {
                 execute(&cmd, load, &mut out, &mut err).unwrap_or(EXIT_ERROR)
             }
             Err(msg) => {
-                let _ = write!(err, "خطأ / error: {msg}\r\nbahth.exe --help\r\n");
+                let _ = err.write_all(trf!("خطأ / error: {msg}\r\nbahth.exe --help\r\n", "error: {msg}\r\nbahth.exe --help\r\n").as_bytes());
                 EXIT_ERROR
             }
         },
