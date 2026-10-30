@@ -22,6 +22,7 @@ use quick_xml::events::Event;
 mod bidi_fix;
 mod epub;
 mod mail;
+mod pdf_images;
 
 /// Files larger than this are never opened.
 pub const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
@@ -43,9 +44,23 @@ const OTHER_EXTS: &[&str] = &[
     "doc", "eml", "msg", "epub",
 ];
 
+/// Images searched through Windows OCR (see `crate::ocr`), when it is available.
+#[cfg(windows)]
+const IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif"];
+
 /// Returns true if the extension (lowercase, no dot) is supported for content search.
 pub fn is_supported(ext: &str) -> bool {
-    TEXT_EXTS.contains(&ext) || OTHER_EXTS.contains(&ext)
+    TEXT_EXTS.contains(&ext) || OTHER_EXTS.contains(&ext) || is_ocr_image(ext)
+}
+
+#[cfg(windows)]
+fn is_ocr_image(ext: &str) -> bool {
+    IMAGE_EXTS.contains(&ext) && crate::ocr::available()
+}
+
+#[cfg(not(windows))]
+fn is_ocr_image(_ext: &str) -> bool {
+    false
 }
 
 /// Extract plain text from the file at `path`. Returns None on any failure/unsupported.
@@ -87,6 +102,8 @@ fn extract_by_ext(path: &Path, ext: &str) -> Option<String> {
         "eml" => mail::extract_eml(path),
         "msg" => mail::extract_msg(path),
         "epub" => epub::extract_epub(path),
+        #[cfg(windows)]
+        e if is_ocr_image(e) => crate::ocr::ocr_image_file(path),
         _ => None,
     }
 }
@@ -463,8 +480,12 @@ fn extract_pdf(path: &Path) -> Option<String> {
     let text = panic::catch_unwind(AssertUnwindSafe(|| {
         pdf_extract::extract_text_from_mem(&bytes)
     }))
-    .ok()?
     .ok()?;
+    // A scanned PDF may have no text layer at all: OCR its page images.
+    #[cfg(windows)]
+    let text = pdf_images::ocr_if_scanned(&bytes, text.unwrap_or_default());
+    #[cfg(not(windows))]
+    let text = text.ok()?;
     // Before `extract_text` folds presentation forms: their shapes are the
     // best evidence of visual (reversed) Arabic line order.
     Some(bidi_fix::fix_visual_order(text))
