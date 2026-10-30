@@ -264,7 +264,7 @@ impl App {
         }
 
         let weak = Rc::downgrade(self);
-        let handler = nwg::full_bind_event_handler(&self.window.handle, move |evt, _data, handle| {
+        let handler = nwg::full_bind_event_handler(&self.window.handle, crate::crash_log::guard_events(move |evt, _data, handle| {
             let Some(app) = weak.upgrade() else { return };
             match evt {
                 nwg::Event::OnMenuItemSelected if handle == app.quick.menu_switch => {
@@ -279,15 +279,15 @@ impl App {
                 }
                 _ => {}
             }
-        });
+        }));
         let weak = Rc::downgrade(self);
-        let raw = nwg::bind_raw_event_handler(&self.window.handle, 0x1_0002, move |_h, msg: UINT, w: WPARAM, _l| {
+        let raw = nwg::bind_raw_event_handler(&self.window.handle, 0x1_0002, crate::crash_log::guard_raw(move |_h, msg: UINT, w: WPARAM, _l| {
             if msg == WM_HOTKEY && w as i32 == HOTKEY_ID {
                 weak.upgrade()?.on_quick_switch_hotkey();
                 return Some(0);
             }
             None
-        })?;
+        }))?;
         Ok((handler, raw))
     }
 

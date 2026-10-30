@@ -303,7 +303,7 @@ impl App {
     /// Binds the window's events, when it is created.
     fn bind_replace_window(self: &Rc<Self>) -> nwg::EventHandler {
         let weak = Rc::downgrade(self);
-        nwg::full_bind_event_handler(&self.replace.window.handle, move |evt, data, handle| {
+        nwg::full_bind_event_handler(&self.replace.window.handle, crate::crash_log::guard_events(move |evt, data, handle| {
             let Some(app) = weak.upgrade() else { return };
             let r = &app.replace;
             match evt {
@@ -331,7 +331,7 @@ impl App {
                 }
                 _ => {}
             }
-        })
+        }))
     }
 
     /// Opens the window on the plain-text files of the current results.

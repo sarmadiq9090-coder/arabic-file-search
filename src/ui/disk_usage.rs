@@ -253,7 +253,7 @@ impl App {
     /// Binds the window's events, when it is created.
     fn bind_disk_window(self: &Rc<Self>) -> Result<Bound, nwg::NwgError> {
         let weak = Rc::downgrade(self);
-        let window = nwg::full_bind_event_handler(&self.disk.window.handle, move |evt, data, handle| {
+        let window = nwg::full_bind_event_handler(&self.disk.window.handle, crate::crash_log::guard_events(move |evt, data, handle| {
             let Some(app) = weak.upgrade() else { return };
             let d = &app.disk;
             match evt {
@@ -279,10 +279,10 @@ impl App {
                 }
                 _ => {}
             }
-        });
+        }));
         let weak = Rc::downgrade(self);
         let list_hwnd = self.disk.list.handle.hwnd().unwrap_or(std::ptr::null_mut());
-        let raw = nwg::bind_raw_event_handler(&self.disk.window.handle, RAW_ID, move |_h: HWND, msg: UINT, _w: WPARAM, l: LPARAM| {
+        let raw = nwg::bind_raw_event_handler(&self.disk.window.handle, RAW_ID, crate::crash_log::guard_raw(move |_h: HWND, msg: UINT, _w: WPARAM, l: LPARAM| {
             if msg != WM_NOTIFY {
                 return None;
             }
@@ -292,7 +292,7 @@ impl App {
             }
             let app = weak.upgrade()?;
             draw_bar(l, |row| app.disk.rows.try_borrow().ok()?.get(row).map(|r| r.share))
-        })?;
+        }))?;
         Ok((vec![window], vec![raw]))
     }
 

@@ -245,7 +245,7 @@ impl App {
     /// Binds the window's events, when it is created.
     fn bind_web_window(self: &Rc<Self>) -> nwg::EventHandler {
         let weak = Rc::downgrade(self);
-        nwg::full_bind_event_handler(&self.web.window.handle, move |evt, data, handle| {
+        nwg::full_bind_event_handler(&self.web.window.handle, crate::crash_log::guard_events(move |evt, data, handle| {
             let Some(app) = weak.upgrade() else { return };
             match evt {
                 nwg::Event::OnWindowClose if handle == app.web.window => {
@@ -260,7 +260,7 @@ impl App {
                 nwg::Event::OnButtonClick if handle == app.web.close_btn => app.web.window.set_visible(false),
                 _ => {}
             }
-        })
+        }))
     }
 
     fn show_web_window(&self) {

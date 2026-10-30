@@ -391,7 +391,7 @@ impl NativeUi<AppUi> for App {
 
         // The "all matches" window only hides when closed, and its text fills it.
         let weak = Rc::downgrade(&ui.inner);
-        let handler = nwg::full_bind_event_handler(&ui.matches_window.handle, move |evt, data, handle| {
+        let handler = nwg::full_bind_event_handler(&ui.matches_window.handle, crate::crash_log::guard_events(move |evt, data, handle| {
             let Some(app) = weak.upgrade() else { return };
             if handle != app.matches_window {
                 return;
@@ -409,7 +409,7 @@ impl NativeUi<AppUi> for App {
                 }
                 _ => {}
             }
-        });
+        }));
         ui.handlers.borrow_mut().push(handler);
 
         // Virtual list: answer LVN_GETDISPINFO with the text and icon of each cell.

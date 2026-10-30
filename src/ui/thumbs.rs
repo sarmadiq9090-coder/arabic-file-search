@@ -375,7 +375,7 @@ impl App {
     /// `build_ui`, after the other list handlers so this one runs first.
     pub(super) fn setup_thumbs(self: &Rc<Self>) -> Result<(nwg::EventHandler, nwg::RawEventHandler), nwg::NwgError> {
         let weak = Rc::downgrade(self);
-        let handler = nwg::full_bind_event_handler(&self.window.handle, move |evt, data, handle| {
+        let handler = nwg::full_bind_event_handler(&self.window.handle, crate::crash_log::guard_events(move |evt, data, handle| {
             let Some(app) = weak.upgrade() else { return };
             match evt {
                 nwg::Event::OnMenuItemSelected if handle == app.thumbs.menu_item => app.toggle_thumbs(),
@@ -389,10 +389,10 @@ impl App {
                 }
                 _ => {}
             }
-        });
+        }));
         let weak = Rc::downgrade(self);
         let list_hwnd = self.list.handle.hwnd().unwrap_or(std::ptr::null_mut()) as usize;
-        let raw = nwg::bind_raw_event_handler(&self.window.handle, 0x1_0029, move |_h: HWND, msg: UINT, _w: WPARAM, l: LPARAM| {
+        let raw = nwg::bind_raw_event_handler(&self.window.handle, 0x1_0029, crate::crash_log::guard_raw(move |_h: HWND, msg: UINT, _w: WPARAM, l: LPARAM| {
             if msg != WM_NOTIFY || l == 0 {
                 return None;
             }
@@ -421,7 +421,7 @@ impl App {
                 NM_CUSTOMDRAW => Some(winapi::um::commctrl::CDRF_DODEFAULT),
                 _ => None,
             }
-        })?;
+        }))?;
         if self.thumbs.menu_item.checked() {
             // Switched from the message loop (see `on_thumbs_ready`), once
             // the window is laid out.

@@ -267,7 +267,7 @@ impl App {
     /// Binds the finder window's events, when it is created.
     fn bind_dupes_window(self: &Rc<Self>) -> Result<Bound, nwg::NwgError> {
         let weak = Rc::downgrade(self);
-        let own = nwg::full_bind_event_handler(&self.dupes.window.handle, move |evt, data, handle| {
+        let own = nwg::full_bind_event_handler(&self.dupes.window.handle, crate::crash_log::guard_events(move |evt, data, handle| {
             use nwg::Event as E;
             let Some(app) = weak.upgrade() else { return };
             let d = &app.dupes;
@@ -326,12 +326,12 @@ impl App {
                 }
                 _ => {}
             }
-        });
+        }));
 
         // Virtual list: answer LVN_GETDISPINFO with each cell's text.
         let weak = Rc::downgrade(self);
         let list_hwnd = self.dupes.list.handle.hwnd().unwrap_or(std::ptr::null_mut());
-        let raw = nwg::bind_raw_event_handler(&self.dupes.window.handle, 0x1_0026, move |_h: HWND, msg: UINT, _w: WPARAM, l: LPARAM| {
+        let raw = nwg::bind_raw_event_handler(&self.dupes.window.handle, 0x1_0026, crate::crash_log::guard_raw(move |_h: HWND, msg: UINT, _w: WPARAM, l: LPARAM| {
             if msg != WM_NOTIFY {
                 return None;
             }
@@ -353,7 +353,7 @@ impl App {
                 buf[n] = 0;
             }
             Some(0)
-        })?;
+        }))?;
         Ok((vec![own], vec![raw]))
     }
 
