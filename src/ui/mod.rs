@@ -12,6 +12,7 @@
 //! - `content_index`: the stored document text and its background warm-up
 //! - `keys`: keyboard handling and the global hotkey
 //! - `quickswitch`: Ctrl+Alt+G moves an Open / Save As dialog to a result's folder
+//! - `replace_window`: find and replace in the plain text files of the results
 //! - `startup`: start-up timing, logging, single instance, fonts
 //! - `format`, `shell`: text formatting and Windows shell helpers
 
@@ -24,6 +25,7 @@ mod history_menu;
 mod lang_menu;
 mod keys;
 mod quickswitch;
+mod replace_window;
 mod results;
 mod search_jobs;
 mod shell;
@@ -218,6 +220,8 @@ pub struct App {
     state: RefCell<State>,
     /// Moving another program's Open / Save As dialog to a result's folder.
     quick: quickswitch::QuickSwitch,
+    /// Find and replace across the plain text files of the results.
+    replace: replace_window::ReplaceWindow,
 }
 
 impl App {

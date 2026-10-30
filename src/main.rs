@@ -41,6 +41,8 @@ mod layout;
 #[cfg(any(windows, test))]
 mod normalize;
 #[cfg(any(windows, test))]
+mod replace;
+#[cfg(any(windows, test))]
 mod search;
 #[cfg(any(windows, test))]
 mod settings;

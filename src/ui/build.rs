@@ -262,6 +262,7 @@ impl NativeUi<AppUi> for App {
 
         phase("tray");
         app.build_quick_switch_menus()?;
+        app.build_replace_window()?;
         app.state.get_mut().settings = settings.clone();
         app.state.get_mut().history = History::load();
         let ui = AppUi { inner: Rc::new(app), handlers: Default::default(), raw_handlers: Default::default() };
@@ -455,6 +456,8 @@ impl NativeUi<AppUi> for App {
         let (handler, raw) = ui.inner.setup_quick_switch()?;
         ui.handlers.borrow_mut().push(handler);
         ui.raw_handlers.borrow_mut().push(raw);
+        let (main, own) = ui.inner.setup_replace_window();
+        ui.handlers.borrow_mut().extend([main, own]);
 
         ui.register_hotkey();
         ui.show_sort_arrow();
