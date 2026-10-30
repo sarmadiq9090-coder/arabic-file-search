@@ -7,7 +7,7 @@ use std::io::Write;
 
 use winapi::shared::minwindef::LPARAM;
 
-use super::format::{csv_field, digits, fmt_num, fmt_size, ltr_path};
+use super::format::{csv_field, digits, fmt_num, ltr_path};
 use super::shell;
 use super::{App, COL_DATE, COL_NAME, COL_PATH, COL_SIZE, COL_SNIPPET, COLUMNS, Row};
 use crate::index;
@@ -290,7 +290,7 @@ impl App {
         match col {
             COL_NAME => e.name().to_string(),
             COL_PATH => ltr_path(&e.path),
-            COL_SIZE => fmt_size(e),
+            COL_SIZE => self.size_cell(&st.rows_index, r.entry, e),
             COL_DATE => shell::format_time(e.mtime, true),
             COL_SNIPPET => {
                 let snippet = r.snippet.as_deref().unwrap_or_default();

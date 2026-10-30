@@ -18,6 +18,7 @@
 mod autostart;
 mod build;
 mod content_index;
+mod disk_usage;
 mod files;
 mod format;
 mod history_menu;
@@ -218,6 +219,8 @@ pub struct App {
     state: RefCell<State>,
     /// Moving another program's Open / Save As dialog to a result's folder.
     quick: quickswitch::QuickSwitch,
+    /// Folder sizes: the Size column of folders and the folder-sizes window.
+    disk: disk_usage::DiskUsage,
 }
 
 impl App {

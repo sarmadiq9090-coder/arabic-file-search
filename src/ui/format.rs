@@ -49,9 +49,14 @@ pub(super) fn fmt_size(e: &Entry) -> String {
     if e.is_dir {
         return tr!("مجلد", "Folder").into();
     }
-    let b = e.size as f64;
+    fmt_bytes(e.size)
+}
+
+/// A byte count as "12.3 MB".
+pub(super) fn fmt_bytes(size: u64) -> String {
+    let b = size as f64;
     digits(if b < 1024.0 {
-        trf!("{} بايت", "{} bytes", e.size)
+        trf!("{} بايت", "{} bytes", size)
     } else if b < 1024.0 * 1024.0 {
         trf!("{:.1} ك.ب", "{:.1} KB", b / 1024.0)
     } else if b < 1024.0 * 1024.0 * 1024.0 {

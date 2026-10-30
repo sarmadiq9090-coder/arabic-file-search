@@ -33,6 +33,8 @@ mod content_cache;
 #[cfg(any(windows, test))]
 mod extract;
 #[cfg(any(windows, test))]
+mod folder_sizes;
+#[cfg(any(windows, test))]
 mod history;
 #[cfg(any(windows, test))]
 mod index;
