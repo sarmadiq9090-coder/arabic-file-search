@@ -260,6 +260,7 @@ impl NativeUi<AppUi> for App {
         nwg::MenuItem::builder().text("خروج").parent(&app.tray_menu).build(&mut app.tray_exit)?;
 
         phase("tray");
+        app.build_quick_switch_menus()?;
         app.state.get_mut().settings = settings.clone();
         app.state.get_mut().history = History::load();
         let ui = AppUi { inner: Rc::new(app), handlers: Default::default(), raw_handlers: Default::default() };
@@ -448,6 +449,9 @@ impl NativeUi<AppUi> for App {
             }
             Some(0)
         })?;
+        ui.raw_handlers.borrow_mut().push(raw);
+        let (handler, raw) = ui.inner.setup_quick_switch()?;
+        ui.handlers.borrow_mut().push(handler);
         ui.raw_handlers.borrow_mut().push(raw);
 
         ui.register_hotkey();
