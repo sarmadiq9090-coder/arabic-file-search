@@ -180,6 +180,7 @@ impl NativeUi<AppUi> for App {
             .build(&mut app.timer)?;
         nwg::Notice::builder().parent(w).build(&mut app.name_notice)?;
         nwg::Notice::builder().parent(w).build(&mut app.update_notice)?;
+        nwg::Notice::builder().parent(w).build(&mut app.watch_notice)?;
         phase("controls");
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.menu)?;
         nwg::MenuItem::builder().text("فتح الملف\tEnter").parent(&app.menu).build(&mut app.menu_open)?;
@@ -216,6 +217,11 @@ impl NativeUi<AppUi> for App {
             .check(settings.arabic_digits)
             .parent(&app.options_menu)
             .build(&mut app.menu_digits)?;
+        nwg::MenuItem::builder()
+            .text("تحديث الفهرس تلقائياً عند تغيّر الملفات")
+            .check(settings.auto_index)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_auto_index)?;
         nwg::MenuItem::builder().text("تصدير النتائج إلى Excel (CSV)").parent(&app.options_menu).build(&mut app.menu_export)?;
         nwg::MenuItem::builder().text("إخفاء إلى شريط المهام\tEsc").parent(&app.options_menu).build(&mut app.menu_hide)?;
         nwg::MenuItem::builder()
@@ -266,6 +272,7 @@ impl NativeUi<AppUi> for App {
                 E::OnTimerTick if handle == app.timer => app.on_tick(),
                 E::OnNotice if handle == app.name_notice => app.on_names_found(),
                 E::OnNotice if handle == app.update_notice => app.on_update_event(),
+                E::OnNotice if handle == app.watch_notice => app.on_watch_notice(),
                 E::OnComboxBoxSelection if handle == app.kind_combo => app.on_kind_changed(),
                 E::OnButtonClick => {
                     if handle == app.search_btn {
@@ -324,6 +331,8 @@ impl NativeUi<AppUi> for App {
                         app.check_for_update(true);
                     } else if handle == app.menu_digits {
                         app.toggle_digits();
+                    } else if handle == app.menu_auto_index {
+                        app.toggle_auto_index();
                     } else if handle == app.menu_export {
                         app.export_csv();
                     } else if handle == app.menu_hide {

@@ -9,6 +9,7 @@
 //! - `files`: renaming and deleting files, and saving the edited index
 //! - `history_menu`: the menu of recent and saved searches
 //! - `updates`: checking for, downloading and installing new versions
+//! - `watching`: applying changes from the drive watcher to the index
 //! - `keys`: keyboard handling and the global hotkey
 //! - `startup`: start-up timing, logging, single instance, fonts
 //! - `format`, `shell`: text formatting and Windows shell helpers
@@ -23,6 +24,7 @@ mod search_jobs;
 mod shell;
 mod startup;
 mod updates;
+mod watching;
 
 use native_windows_gui as nwg;
 use nwg::NativeUi;
@@ -39,7 +41,7 @@ use winapi::um::winuser::{
 };
 
 use crate::history::History;
-use crate::index::{Entry, Index, ScanProgress};
+use crate::index::{Change, Entry, Index, ScanProgress};
 use crate::search::{ContentHit, ContentProgress, Query};
 use crate::settings::Settings;
 
@@ -50,6 +52,7 @@ use keys::HOTKEY_ID;
 use search_jobs::NameResult;
 use startup::{LOOP_STARTED, activate_running_copy, phase, ui_font_family};
 use updates::UpdateEvent;
+use watching::SubtreeScan;
 
 /// Mirrors the whole window so it reads right-to-left.
 const WS_EX_LAYOUTRTL: u32 = 0x0040_0000;
@@ -111,6 +114,15 @@ struct State {
     name_pending: bool,
     /// The query behind the current rows, used to underline the matches.
     shown_query: Option<Query>,
+    /// Watches the drives so the index follows changes (see `watching`).
+    watcher: Option<crate::watch::Watcher>,
+    /// Watcher changes waiting until the index may change.
+    changes: Vec<Change>,
+    /// Folders being walked because their contents are unknown.
+    subtree_scans: Vec<SubtreeScan>,
+    /// The running filename search refreshes results after a change on
+    /// disk, rather than answering the user's typing.
+    live_search: bool,
     /// Recent and saved searches and how often files were opened.
     history: History,
     settings: Settings,
@@ -153,6 +165,9 @@ pub struct App {
     /// Wakes the UI thread when an update check or download finishes.
     update_notice: nwg::Notice,
     update_result: Arc<Mutex<Option<UpdateEvent>>>,
+    /// Wakes the UI thread when the drive watcher has a batch of changes.
+    watch_notice: nwg::Notice,
+    watch_inbox: Arc<Mutex<Vec<Change>>>,
     /// Bytes downloaded / total of a running update download.
     update_progress: Arc<(AtomicU64, AtomicU64)>,
     update_busy: Cell<bool>,
@@ -176,6 +191,7 @@ pub struct App {
     options_menu: nwg::Menu,
     menu_hotkey: nwg::MenuItem,
     menu_digits: nwg::MenuItem,
+    menu_auto_index: nwg::MenuItem,
     menu_update: nwg::MenuItem,
     menu_export: nwg::MenuItem,
     menu_hide: nwg::MenuItem,
@@ -343,6 +359,7 @@ impl App {
     }
 
     fn on_close(&self) {
+        self.stop_watching();
         flush_index_save();
         self.remember_query();
         self.save_settings();
