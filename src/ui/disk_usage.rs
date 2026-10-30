@@ -15,6 +15,7 @@ use winapi::shared::windef::{HWND, RECT};
 use winapi::um::winuser::{NMHDR, SendMessageW, VK_BACK, VK_F5, WM_NOTIFY, WM_SETFONT};
 
 use super::format::{digits, fmt_bytes, fmt_num, fmt_size, ltr_path};
+use super::lazy::{Bound, Lazy};
 use super::{App, WS_EX_LAYOUTRTL, shell};
 use crate::folder_sizes::{self, Node};
 use crate::index::{Entry, Index};
@@ -56,15 +57,29 @@ pub struct DiskUsage {
     pending: Cell<usize>,
     /// When the last computation was started.
     last_request: Cell<Option<Instant>>,
+    /// Created the first time the window opens.
+    ui: Lazy<DiskUsageUi>,
+    /// The folder shown; empty means all drives.
+    location: RefCell<String>,
+    rows: RefCell<Vec<UsageRow>>,
+}
+
+impl std::ops::Deref for DiskUsage {
+    type Target = DiskUsageUi;
+    fn deref(&self) -> &DiskUsageUi {
+        &self.ui
+    }
+}
+
+/// The folder-sizes window's controls.
+#[derive(Default)]
+pub struct DiskUsageUi {
     window: nwg::Window,
     up_btn: nwg::Button,
     explorer_btn: nwg::Button,
     path_box: nwg::TextInput,
     total_label: nwg::Label,
     list: nwg::ListView,
-    /// The folder shown; empty means all drives.
-    location: RefCell<String>,
-    rows: RefCell<Vec<UsageRow>>,
 }
 
 /// Width in pixels of the filled part of a bar `width` wide; any share
@@ -130,8 +145,8 @@ fn percent(share: f64) -> String {
 }
 
 impl App {
-    /// Adds the menu items and builds the (hidden) window. Called from
-    /// `build_ui` while the app is still being built.
+    /// Adds the menu items. Called from `build_ui` while the app is still
+    /// being built; the window is created when it first opens.
     pub(super) fn build_disk_usage(&mut self) -> Result<(), nwg::NwgError> {
         nwg::MenuItem::builder()
             .text(tr!("أحجام المجلدات…", "Folder sizes…"))
@@ -141,10 +156,21 @@ impl App {
             .text(tr!("أحجام المجلدات هنا…", "Folder sizes here…"))
             .parent(&self.menu)
             .build(&mut self.disk.menu_row)?;
-        nwg::Notice::builder().parent(&self.window).build(&mut self.disk.notice)?;
+        nwg::Notice::builder().parent(&self.window).build(&mut self.disk.notice)
+    }
 
+    /// Builds the (hidden) window and binds its events, once.
+    fn ensure_disk_usage(self: &Rc<Self>) -> bool {
+        self.disk.ui.is_built() || self.build_lazily("folder sizes", |app| {
+            app.build_disk_window()?;
+            app.bind_disk_window()
+        })
+    }
+
+    fn build_disk_window(&self) -> Result<(), nwg::NwgError> {
+        let mut ui = DiskUsageUi::default();
+        let d = &mut ui;
         let f = Some(&self.font);
-        let d = &mut self.disk;
         nwg::Window::builder()
             .title(tr!("أحجام المجلدات", "Folder sizes"))
             .size((800, 540))
@@ -187,14 +213,15 @@ impl App {
             });
         }
         d.list.set_headers_enabled(true);
+        self.disk.ui.set(ui);
         Ok(())
     }
 
-    /// Binds the window's and the menu items' events. Called once from
-    /// `build_ui`; the handlers are unbound with the others.
-    pub(super) fn setup_disk_usage(self: &Rc<Self>) -> Result<(Vec<nwg::EventHandler>, nwg::RawEventHandler), nwg::NwgError> {
+    /// Binds the menu items' events. Called once from `build_ui`; the
+    /// handler is unbound with the others.
+    pub(super) fn setup_disk_usage(self: &Rc<Self>) -> nwg::EventHandler {
         let weak = Rc::downgrade(self);
-        let main = nwg::full_bind_event_handler(&self.window.handle, move |evt, _data, handle| {
+        self.bind_main_events(move |evt, _data, handle| {
             let Some(app) = weak.upgrade() else { return };
             match evt {
                 nwg::Event::OnMenuItemSelected if handle == app.disk.menu_options => {
@@ -220,8 +247,11 @@ impl App {
                 nwg::Event::OnNotice if handle == app.disk.notice => app.on_sizes_ready(),
                 _ => {}
             }
-        });
+        })
+    }
 
+    /// Binds the window's events, when it is created.
+    fn bind_disk_window(self: &Rc<Self>) -> Result<Bound, nwg::NwgError> {
         let weak = Rc::downgrade(self);
         let window = nwg::full_bind_event_handler(&self.disk.window.handle, move |evt, data, handle| {
             let Some(app) = weak.upgrade() else { return };
@@ -263,7 +293,7 @@ impl App {
             let app = weak.upgrade()?;
             draw_bar(l, |row| app.disk.rows.try_borrow().ok()?.get(row).map(|r| r.share))
         })?;
-        Ok((vec![main, window], raw))
+        Ok((vec![window], vec![raw]))
     }
 
     /// Size-column text of a result row: a folder shows everything inside it
@@ -309,13 +339,16 @@ impl App {
     fn on_sizes_ready(&self) {
         self.disk.pending.set(0);
         self.list.invalidate();
-        if self.disk.window.visible() {
+        if self.disk.ui.is_built() && self.disk.window.visible() {
             self.render_disk_usage();
         }
     }
 
     /// Opens the window on `folder` (empty for all drives).
-    pub(super) fn show_disk_usage(&self, folder: String) {
+    pub(super) fn show_disk_usage(self: &Rc<Self>, folder: String) {
+        if !self.ensure_disk_usage() {
+            return;
+        }
         *self.disk.location.borrow_mut() = folder;
         self.disk.window.set_visible(true);
         self.layout_disk_usage();

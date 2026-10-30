@@ -46,6 +46,7 @@ impl Drop for AppUi {
         for h in self.raw_handlers.borrow().iter() {
             let _ = nwg::unbind_raw_event_handler(h);
         }
+        self.inner.lazy_handlers.unbind();
     }
 }
 
@@ -469,15 +470,10 @@ impl NativeUi<AppUi> for App {
         let (handler, raw) = ui.inner.setup_quick_switch()?;
         ui.handlers.borrow_mut().push(handler);
         ui.raw_handlers.borrow_mut().push(raw);
-        let (handlers, raw) = ui.inner.setup_dupes()?;
-        ui.handlers.borrow_mut().extend(handlers);
-        ui.raw_handlers.borrow_mut().push(raw);
-        let (main, own) = ui.inner.setup_replace_window();
-        ui.handlers.borrow_mut().extend([main, own]);
-        let (handlers, raw) = ui.inner.setup_disk_usage()?;
-        ui.handlers.borrow_mut().extend(handlers);
-        ui.raw_handlers.borrow_mut().push(raw);
-        ui.handlers.borrow_mut().extend(ui.inner.setup_web());
+        ui.handlers.borrow_mut().push(ui.inner.setup_dupes());
+        ui.handlers.borrow_mut().push(ui.inner.setup_replace_window());
+        ui.handlers.borrow_mut().push(ui.inner.setup_disk_usage());
+        ui.handlers.borrow_mut().push(ui.inner.setup_web());
         let (handler, raw) = ui.inner.setup_thumbs()?;
         ui.handlers.borrow_mut().push(handler);
         ui.raw_handlers.borrow_mut().push(raw);

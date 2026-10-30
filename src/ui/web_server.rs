@@ -15,6 +15,7 @@ use winapi::um::winnt::{REG_DWORD, REG_SZ};
 use winapi::um::winreg::{RegQueryValueExW, RegSetValueExW};
 use winapi::um::winuser::{GWL_EXSTYLE, GetWindowLongW, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongW, SetWindowPos, WS_EX_LAYOUTRTL as EX_LAYOUTRTL, WS_EX_LEFTSCROLLBAR, WS_EX_RIGHT, WS_EX_RTLREADING};
 
+use super::lazy::Lazy;
 use super::shell::wide;
 use super::startup::log;
 use super::{App, WS_EX_LAYOUTRTL, autostart};
@@ -30,6 +31,24 @@ const REG_PIN: &str = "WebPin";
 #[derive(Default)]
 pub struct WebUi {
     menu_item: nwg::MenuItem,
+    /// Created the first time the window opens.
+    ui: Lazy<WebWindow>,
+    shared: RefCell<Option<Arc<web::Shared>>>,
+    server: RefCell<Option<web::Server>>,
+    /// The last error, shown in the details until the next try.
+    error: RefCell<Option<String>>,
+}
+
+impl std::ops::Deref for WebUi {
+    type Target = WebWindow;
+    fn deref(&self) -> &WebWindow {
+        &self.ui
+    }
+}
+
+/// The window's controls.
+#[derive(Default)]
+pub struct WebWindow {
     window: nwg::Window,
     info: nwg::Label,
     on_chk: nwg::CheckBox,
@@ -39,10 +58,6 @@ pub struct WebUi {
     details: nwg::TextBox,
     new_btn: nwg::Button,
     close_btn: nwg::Button,
-    shared: RefCell<Option<Arc<web::Shared>>>,
-    server: RefCell<Option<web::Server>>,
-    /// The last error, shown in the details until the next try.
-    error: RefCell<Option<String>>,
 }
 
 // ---------------------------------------------------------------- registry
@@ -119,15 +134,27 @@ Windows Firewall may ask the first time: allow private networks only, not public
 }
 
 impl App {
-    /// Builds the Options menu item and the (hidden) window. Called once
-    /// from `build_ui`.
+    /// Builds the Options menu item. Called once from `build_ui`; the
+    /// window is created when it first opens.
     pub(super) fn build_web_ui(&mut self) -> Result<(), nwg::NwgError> {
         nwg::MenuItem::builder()
             .text(tr!("البحث من الهاتف (الشبكة المنزلية)…", "Search from phone (home network)…"))
             .parent(&self.options_menu)
-            .build(&mut self.web.menu_item)?;
+            .build(&mut self.web.menu_item)
+    }
+
+    /// Builds the (hidden) window and binds its events, once.
+    fn ensure_web_window(self: &Rc<Self>) -> bool {
+        self.web.ui.is_built() || self.build_lazily("web", |app| {
+            app.build_web_window()?;
+            Ok((vec![app.bind_web_window()], Vec::new()))
+        })
+    }
+
+    fn build_web_window(&self) -> Result<(), nwg::NwgError> {
+        let mut ui = WebWindow::default();
         let f = Some(&self.font);
-        let w = &mut self.web;
+        let w = &mut ui;
         nwg::Window::builder()
             .title(tr!("البحث من الهاتف", "Search from phone"))
             .size((560, 520))
@@ -192,24 +219,33 @@ impl App {
             .size((200, 34))
             .build(&mut w.new_btn)?;
         nwg::Button::builder().parent(p).font(f).text(tr!("إغلاق", "Close")).position((428, 422)).size((120, 34)).build(&mut w.close_btn)?;
+        self.web.ui.set(ui);
         Ok(())
     }
 
-    /// Binds the events and starts the server if it was left on. Called once
-    /// from `build_ui`; the handlers are unbound with the others.
-    pub(super) fn setup_web(self: &Rc<Self>) -> Vec<nwg::EventHandler> {
+    /// Binds the menu item's events and starts the server if it was left
+    /// on. Called once from `build_ui`; the handler is unbound with the others.
+    pub(super) fn setup_web(self: &Rc<Self>) -> nwg::EventHandler {
         let weak = Rc::downgrade(self);
-        let main = nwg::full_bind_event_handler(&self.window.handle, move |evt, _data, handle| {
+        let main = self.bind_main_events(move |evt, _data, handle| {
             let Some(app) = weak.upgrade() else { return };
             match evt {
-                nwg::Event::OnMenuItemSelected if handle == app.web.menu_item => app.show_web_window(),
+                nwg::Event::OnMenuItemSelected if handle == app.web.menu_item && app.ensure_web_window() => app.show_web_window(),
                 nwg::Event::OnTimerTick if handle == app.timer => app.sync_web_index(),
                 nwg::Event::OnWindowClose if handle == app.window => app.stop_web(),
                 _ => {}
             }
         });
+        if get_dword(REG_ON) == Some(1) {
+            self.start_web();
+        }
+        main
+    }
+
+    /// Binds the window's events, when it is created.
+    fn bind_web_window(self: &Rc<Self>) -> nwg::EventHandler {
         let weak = Rc::downgrade(self);
-        let own = nwg::full_bind_event_handler(&self.web.window.handle, move |evt, data, handle| {
+        nwg::full_bind_event_handler(&self.web.window.handle, move |evt, data, handle| {
             let Some(app) = weak.upgrade() else { return };
             match evt {
                 nwg::Event::OnWindowClose if handle == app.web.window => {
@@ -224,12 +260,7 @@ impl App {
                 nwg::Event::OnButtonClick if handle == app.web.close_btn => app.web.window.set_visible(false),
                 _ => {}
             }
-        });
-        if get_dword(REG_ON) == Some(1) {
-            self.start_web();
-        }
-        self.refresh_web_window();
-        vec![main, own]
+        })
     }
 
     fn show_web_window(&self) {
@@ -243,7 +274,12 @@ impl App {
             return Some(s.clone());
         }
         let (token, pin) = load_secrets()?;
-        let allow = self.web.download_chk.check_state() == nwg::CheckBoxState::Checked;
+        // Before the window exists, the switch is as saved.
+        let allow = if self.web.ui.is_built() {
+            self.web.download_chk.check_state() == nwg::CheckBoxState::Checked
+        } else {
+            get_dword(REG_DOWNLOAD) == Some(1)
+        };
         let s = Arc::new(web::Shared::new(token, pin, allow));
         *self.web.shared.borrow_mut() = Some(s.clone());
         Some(s)
@@ -251,7 +287,11 @@ impl App {
 
     fn start_web(&self) -> bool {
         self.stop_web();
-        let port = self.web.port_input.text().trim().parse::<u16>().ok().filter(|p| *p >= 1024);
+        let port = if self.web.ui.is_built() {
+            self.web.port_input.text().trim().parse::<u16>().ok().filter(|p| *p >= 1024)
+        } else {
+            Some(saved_port())
+        };
         let Some(port) = port else {
             *self.web.error.borrow_mut() =
                 Some(tr!("المنفذ يجب أن يكون رقماً بين 1024 و65535.", "The port must be a number from 1024 to 65535.").into());

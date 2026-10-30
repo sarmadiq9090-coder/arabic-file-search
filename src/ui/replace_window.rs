@@ -14,6 +14,7 @@ use winapi::um::commctrl::{LVIS_STATEIMAGEMASK, LVITEMW, LVM_GETITEMSTATE, LVM_S
 use winapi::um::winuser::SendMessageW;
 
 use super::format::{digits, fmt_num, ltr_path};
+use super::lazy::Lazy;
 use super::{App, WS_EX_LAYOUTRTL};
 use crate::replace::{self, ApplyReport, Matcher, Options, Outcome, Sample, UndoReport};
 
@@ -46,11 +47,28 @@ struct ReplaceState {
     busy: bool,
 }
 
-/// The window, its controls and its state: one field of `App`.
+/// The menu items, the window and its state: one field of `App`.
 #[derive(Default)]
 pub struct ReplaceWindow {
     menu_item: nwg::MenuItem,
     options_item: nwg::MenuItem,
+    /// Created the first time the window opens.
+    ui: Lazy<ReplaceUi>,
+    done: Arc<Mutex<Option<Done>>>,
+    progress: Arc<AtomicUsize>,
+    state: RefCell<ReplaceState>,
+}
+
+impl std::ops::Deref for ReplaceWindow {
+    type Target = ReplaceUi;
+    fn deref(&self) -> &ReplaceUi {
+        &self.ui
+    }
+}
+
+/// The window's controls.
+#[derive(Default)]
+pub struct ReplaceUi {
     window: nwg::Window,
     find_label: nwg::Label,
     find: nwg::TextInput,
@@ -65,9 +83,6 @@ pub struct ReplaceWindow {
     detail: nwg::TextBox,
     status: nwg::Label,
     notice: nwg::Notice,
-    done: Arc<Mutex<Option<Done>>>,
-    progress: Arc<AtomicUsize>,
-    state: RefCell<ReplaceState>,
 }
 
 /// `%LOCALAPPDATA%\BahthSari\backups`.
@@ -186,13 +201,26 @@ impl ReplaceWindow {
 }
 
 impl App {
-    /// Adds the menu items and the (hidden) window. Called from `build_ui`.
+    /// Adds the menu items. Called from `build_ui`; the window is created
+    /// when it first opens.
     pub(super) fn build_replace_window(&mut self) -> Result<(), nwg::NwgError> {
         let r = &mut self.replace;
         let label = tr!("استبدال نص في الملفات…", "Replace text in files…");
         nwg::MenuItem::builder().text(label).parent(&self.menu).build(&mut r.menu_item)?;
-        nwg::MenuItem::builder().text(label).parent(&self.options_menu).build(&mut r.options_item)?;
+        nwg::MenuItem::builder().text(label).parent(&self.options_menu).build(&mut r.options_item)
+    }
 
+    /// Builds the (hidden) window and binds its events, once.
+    fn ensure_replace(self: &Rc<Self>) -> bool {
+        self.replace.ui.is_built() || self.build_lazily("replace", |app| {
+            app.build_replace_controls()?;
+            Ok((vec![app.bind_replace_window()], Vec::new()))
+        })
+    }
+
+    fn build_replace_controls(&self) -> Result<(), nwg::NwgError> {
+        let mut ui = ReplaceUi::default();
+        let r = &mut ui;
         let f = Some(&self.font);
         nwg::Window::builder()
             .title(tr!("استبدال نص في الملفات", "Replace text in files"))
@@ -245,28 +273,37 @@ impl App {
             .build(&mut r.detail)?;
         nwg::Label::builder().parent(w).font(f).text("").build(&mut r.status)?;
         nwg::Notice::builder().parent(w).build(&mut r.notice)?;
-        r.layout();
+        self.replace.ui.set(ui);
+        self.replace.layout();
         Ok(())
     }
 
-    /// Binds the window's events, and the menu items on the main window.
-    /// Called once from `build_ui`; the handlers are unbound with the others.
-    pub(super) fn setup_replace_window(self: &Rc<Self>) -> (nwg::EventHandler, nwg::EventHandler) {
+    /// Binds the menu items on the main window. Called once from
+    /// `build_ui`; the handler is unbound with the others.
+    pub(super) fn setup_replace_window(self: &Rc<Self>) -> nwg::EventHandler {
         let weak = Rc::downgrade(self);
-        let main = nwg::full_bind_event_handler(&self.window.handle, move |evt, _data, handle| {
+        self.bind_main_events(move |evt, _data, handle| {
             let Some(app) = weak.upgrade() else { return };
             let r = &app.replace;
             match evt {
-                nwg::Event::OnMenuItemSelected if handle == r.menu_item || handle == r.options_item => app.open_replace(),
+                nwg::Event::OnMenuItemSelected if handle == r.menu_item || handle == r.options_item => {
+                    if app.ensure_replace() {
+                        app.open_replace();
+                    }
+                }
                 nwg::Event::OnTimerTick if handle == app.timer && r.state.borrow().busy => {
                     let n = r.progress.load(Ordering::Relaxed);
                     r.set_status(&trf!("جارٍ العمل… ({} ملف)", "Working… ({} files)", fmt_num(n)));
                 }
                 _ => {}
             }
-        });
+        })
+    }
+
+    /// Binds the window's events, when it is created.
+    fn bind_replace_window(self: &Rc<Self>) -> nwg::EventHandler {
         let weak = Rc::downgrade(self);
-        let own = nwg::full_bind_event_handler(&self.replace.window.handle, move |evt, data, handle| {
+        nwg::full_bind_event_handler(&self.replace.window.handle, move |evt, data, handle| {
             let Some(app) = weak.upgrade() else { return };
             let r = &app.replace;
             match evt {
@@ -294,8 +331,7 @@ impl App {
                 }
                 _ => {}
             }
-        });
-        (main, own)
+        })
     }
 
     /// Opens the window on the plain-text files of the current results.

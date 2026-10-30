@@ -22,6 +22,7 @@ use winapi::um::winuser::{NMHDR, SendMessageW, WM_NOTIFY, WM_SETFONT};
 
 use super::format::{digits, fmt_num, ltr_path};
 use super::shell::{self, wide};
+use super::lazy::{Bound, Lazy};
 use super::startup::background_priority;
 use super::{App, WS_EX_LAYOUTRTL, autostart, title};
 use crate::dupes::{self, Mode, Progress, Report, Scope};
@@ -62,10 +63,31 @@ struct Job {
     result: Arc<Mutex<Option<Option<Report>>>>,
 }
 
-/// The finder's controls and state, one field of `App`.
+/// The finder's menu item, window and state, one field of `App`.
 #[derive(Default)]
 pub struct Dupes {
     pub(super) menu_item: nwg::MenuItem,
+    /// Created the first time the finder opens.
+    ui: Lazy<DupesUi>,
+    folder_dialog: RefCell<Option<nwg::FileDialog>>,
+    /// What to search; looked up in the current index at each start, so
+    /// the finder never holds an old index alive.
+    scope: RefCell<Option<Scope>>,
+    job: RefCell<Option<Job>>,
+    report: RefCell<Report>,
+    rows: RefCell<Vec<Row>>,
+}
+
+impl std::ops::Deref for Dupes {
+    type Target = DupesUi;
+    fn deref(&self) -> &DupesUi {
+        &self.ui
+    }
+}
+
+/// The finder window's controls.
+#[derive(Default)]
+pub struct DupesUi {
     window: nwg::Window,
     scope_label: nwg::Label,
     folder_btn: nwg::Button,
@@ -84,13 +106,6 @@ pub struct Dupes {
     menu_reveal: nwg::MenuItem,
     menu_copy: nwg::MenuItem,
     menu_delete: nwg::MenuItem,
-    folder_dialog: RefCell<Option<nwg::FileDialog>>,
-    /// What to search; looked up in the current index at each start, so
-    /// the finder never holds an old index alive.
-    scope: RefCell<Option<Scope>>,
-    job: RefCell<Option<Job>>,
-    report: RefCell<Report>,
-    rows: RefCell<Vec<Row>>,
 }
 
 // ---------------------------------------------------------------- registry
@@ -140,13 +155,26 @@ fn button(parent: &nwg::Window, font: Option<&nwg::Font>, text: &str, out: &mut 
 }
 
 impl App {
-    /// Builds the menu item and the (hidden) window. Called from `build_ui`.
+    /// Builds the menu item. Called from `build_ui`; the window is created
+    /// when it first opens.
     pub(super) fn build_dupes(&mut self) -> Result<(), nwg::NwgError> {
         nwg::MenuItem::builder()
             .text(tr!("البحث عن الملفات المكررة…", "Find duplicate files…"))
             .parent(&self.options_menu)
-            .build(&mut self.dupes.menu_item)?;
-        let d = &mut self.dupes;
+            .build(&mut self.dupes.menu_item)
+    }
+
+    /// Builds the (hidden) window and binds its events, once.
+    fn ensure_dupes(self: &Rc<Self>) -> bool {
+        self.dupes.ui.is_built() || self.build_lazily("dupes", |app| {
+            app.build_dupes_window()?;
+            app.bind_dupes_window()
+        })
+    }
+
+    fn build_dupes_window(&self) -> Result<(), nwg::NwgError> {
+        let mut ui = DupesUi::default();
+        let d = &mut ui;
         let f = Some(&self.font);
         nwg::Window::builder()
             .title(tr!("الملفات المكررة", "Duplicate files"))
@@ -220,21 +248,24 @@ impl App {
             .text(tr!("نقل المحدد إلى سلة المحذوفات…\tDelete", "Move selected to Recycle Bin…\tDelete"))
             .parent(&d.menu)
             .build(&mut d.menu_delete)?;
+        self.dupes.ui.set(ui);
         Ok(())
     }
 
-    /// Binds the finder's events. Called once from `build_ui`; the handlers
-    /// are unbound with the others.
-    pub(super) fn setup_dupes(
-        self: &Rc<Self>,
-    ) -> Result<(Vec<nwg::EventHandler>, nwg::RawEventHandler), nwg::NwgError> {
+    /// Binds the menu item's event. Called once from `build_ui`; the
+    /// handler is unbound with the others.
+    pub(super) fn setup_dupes(self: &Rc<Self>) -> nwg::EventHandler {
         let weak = Rc::downgrade(self);
-        let main = nwg::full_bind_event_handler(&self.window.handle, move |evt, _data, handle| {
+        self.bind_main_events(move |evt, _data, handle| {
             let Some(app) = weak.upgrade() else { return };
-            if evt == nwg::Event::OnMenuItemSelected && handle == app.dupes.menu_item {
+            if evt == nwg::Event::OnMenuItemSelected && handle == app.dupes.menu_item && app.ensure_dupes() {
                 app.open_dupes();
             }
-        });
+        })
+    }
+
+    /// Binds the finder window's events, when it is created.
+    fn bind_dupes_window(self: &Rc<Self>) -> Result<Bound, nwg::NwgError> {
         let weak = Rc::downgrade(self);
         let own = nwg::full_bind_event_handler(&self.dupes.window.handle, move |evt, data, handle| {
             use nwg::Event as E;
@@ -323,7 +354,7 @@ impl App {
             }
             Some(0)
         })?;
-        Ok((vec![main, own], raw))
+        Ok((vec![own], vec![raw]))
     }
 
     fn dupes_layout(&self) {

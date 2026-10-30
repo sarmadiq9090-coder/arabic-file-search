@@ -17,6 +17,7 @@
 //! - `replace_window`: find and replace in the plain text files of the results
 //! - `thumbs`: the thumbnail view of the results (Ctrl+T)
 //! - `startup`: start-up timing, logging, single instance, fonts
+//! - `lazy`: secondary windows created when they first open, for a quick start
 //! - `format`, `shell`: text formatting and Windows shell helpers
 
 mod autostart;
@@ -29,6 +30,7 @@ mod format;
 mod history_menu;
 mod lang_menu;
 mod keys;
+mod lazy;
 mod quickswitch;
 mod replace_window;
 mod results;
@@ -254,6 +256,8 @@ pub struct App {
     web: web_server::WebUi,
     /// The thumbnail view of the results (Ctrl+T).
     thumbs: thumbs::Thumbs,
+    /// Event handlers of the windows created on first use.
+    lazy_handlers: lazy::LazyHandlers,
 }
 
 impl App {
