@@ -12,12 +12,14 @@
 //! - `content_index`: the stored document text and its background warm-up
 //! - `keys`: keyboard handling and the global hotkey
 //! - `quickswitch`: Ctrl+Alt+G moves an Open / Save As dialog to a result's folder
+//! - `dupes_window`: the duplicate-file finder window
 //! - `startup`: start-up timing, logging, single instance, fonts
 //! - `format`, `shell`: text formatting and Windows shell helpers
 
 mod autostart;
 mod build;
 mod content_index;
+mod dupes_window;
 mod files;
 mod format;
 mod history_menu;
@@ -218,6 +220,8 @@ pub struct App {
     state: RefCell<State>,
     /// Moving another program's Open / Save As dialog to a result's folder.
     quick: quickswitch::QuickSwitch,
+    /// The duplicate-file finder window.
+    dupes: dupes_window::Dupes,
 }
 
 impl App {
