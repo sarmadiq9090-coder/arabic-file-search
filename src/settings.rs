@@ -22,11 +22,13 @@ pub struct Settings {
     pub sort_desc: bool,
     /// When the program last looked for a new version (seconds since 1970).
     pub update_check: u64,
+    /// Keep a persistent index of document text, filled in the background.
+    pub content_index: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0 }
+        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true }
     }
 }
 
@@ -46,6 +48,7 @@ impl Settings {
                 "sort_col" => s.sort_col = value.parse().unwrap_or(-1).clamp(-1, 3),
                 "sort_desc" => s.sort_desc = value == "1",
                 "update_check" => s.update_check = value.parse().unwrap_or(0),
+                "content_index" => s.content_index = value != "0",
                 _ => {}
             }
         }
@@ -55,7 +58,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let cols: Vec<String> = self.columns.iter().map(i32::to_string).collect();
         format!(
-            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\n",
+            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\n",
             self.width,
             self.height,
             self.maximized as u8,
@@ -64,7 +67,8 @@ impl Settings {
             self.kind,
             self.sort_col,
             self.sort_desc as u8,
-            self.update_check
+            self.update_check,
+            self.content_index as u8
         )
     }
 
@@ -108,7 +112,7 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000 };
+        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false };
         assert_eq!(Settings::parse(&s.to_text()), s);
         assert_eq!(Settings::parse("garbage\nwidth=abc"), Settings::default());
     }
@@ -126,6 +130,8 @@ mod tests {
         // `=` inside a value makes it unparsable; the last duplicate key wins.
         assert_eq!(Settings::parse("width=900=1").width, d.width);
         assert_eq!(Settings::parse("width=900\nwidth=1000").width, 1000);
+        // The content index is on unless switched off.
+        assert!(Settings::parse("content_index=yes").content_index && !Settings::parse("content_index=0").content_index);
     }
 
     #[test]

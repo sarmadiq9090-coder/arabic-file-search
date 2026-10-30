@@ -9,11 +9,13 @@
 //! - `files`: renaming and deleting files, and saving the edited index
 //! - `history_menu`: the menu of recent and saved searches
 //! - `updates`: checking for, downloading and installing new versions
+//! - `content_index`: the stored document text and its background warm-up
 //! - `keys`: keyboard handling and the global hotkey
 //! - `startup`: start-up timing, logging, single instance, fonts
 //! - `format`, `shell`: text formatting and Windows shell helpers
 
 mod build;
+mod content_index;
 mod files;
 mod format;
 mod history_menu;
@@ -28,7 +30,7 @@ use native_windows_gui as nwg;
 use nwg::NativeUi;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use winapi::shared::minwindef::LPARAM;
@@ -105,6 +107,8 @@ struct State {
     loading: Option<LoadJob>,
     scan: Option<ScanJob>,
     content: Option<ContentJob>,
+    /// Cancels the background content-index warm-up.
+    warm: Option<Arc<AtomicBool>>,
     /// A filename search is running on a background thread.
     name_running: bool,
     /// The query changed while a search was running; search again when it ends.
@@ -176,6 +180,7 @@ pub struct App {
     options_menu: nwg::Menu,
     menu_hotkey: nwg::MenuItem,
     menu_digits: nwg::MenuItem,
+    menu_content_index: nwg::MenuItem,
     menu_update: nwg::MenuItem,
     menu_export: nwg::MenuItem,
     menu_hide: nwg::MenuItem,
@@ -347,6 +352,7 @@ impl App {
         self.remember_query();
         self.save_settings();
         self.cancel_content();
+        self.stop_warm();
         if let Some(job) = &self.state.borrow().scan {
             job.progress.cancel.store(true, Ordering::Relaxed);
         }

@@ -8,6 +8,7 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
 
+use crate::content_cache::{self, ContentCache};
 use crate::extract;
 use crate::index::Entry;
 use crate::normalize::{normalize, normalize_with_map};
@@ -941,23 +942,27 @@ pub struct ContentProgress {
     pub checked: AtomicUsize,
     pub cancel: AtomicBool,
     pub done: AtomicBool,
+    /// Documents whose text came from the content index instead of the file.
+    pub from_cache: AtomicUsize,
 }
 
 /// Searches inside every supported document in scope. Hits are pushed into
 /// `hits` as they are found so the UI can show them while the search runs.
+/// With a `cache`, stored texts are used instead of re-reading unchanged
+/// documents, and newly extracted ones are added to it.
 pub fn search_content(
     entries: &[Entry],
     q: &Query,
     scope: &str,
     progress: &ContentProgress,
     hits: &Mutex<Vec<ContentHit>>,
+    cache: Option<&ContentCache>,
 ) {
     let scope_lower = scope.to_lowercase();
     let candidates: Vec<u32> = entries
         .par_iter()
         .enumerate()
-        .filter(|(_, e)| !e.is_dir && e.size > 0 && e.size <= extract::MAX_FILE_SIZE)
-        .filter(|(_, e)| extract::is_supported(&e.ext()) && q.kind_ok(e))
+        .filter(|(_, e)| content_cache::is_document(e) && q.kind_ok(e))
         .filter(|(_, e)| in_scope(&e.path, &scope_lower))
         .map(|(i, _)| i as u32)
         .collect();
@@ -968,6 +973,8 @@ pub fn search_content(
         return;
     }
 
+    // The background warm-up pauses while this runs.
+    let _searching = cache.map(ContentCache::begin_search);
     // A dedicated pool keeps the global one free for instant filename search.
     let threads = std::thread::available_parallelism().map_or(2, |n| n.get().saturating_sub(1).max(1));
     let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build();
@@ -977,7 +984,20 @@ pub fn search_content(
                 return;
             }
             let entry = &entries[i as usize];
-            if let Some(text) = extract::extract_text(Path::new(&*entry.path))
+            let text = match cache.and_then(|c| c.get(&entry.path, entry.size, entry.mtime)) {
+                Some(text) => {
+                    progress.from_cache.fetch_add(1, Ordering::Relaxed);
+                    text
+                }
+                None => {
+                    let text = extract::extract_text(Path::new(&*entry.path));
+                    if let Some(c) = cache {
+                        c.put(&entry.path, entry.size, entry.mtime, text.as_deref());
+                    }
+                    text
+                }
+            };
+            if let Some(text) = text
                 && let Some(hit) = content_hit(i, &text, q)
                 && let Ok(mut h) = hits.lock()
             {
@@ -989,6 +1009,9 @@ pub fn search_content(
     match pool {
         Ok(pool) => pool.install(run),
         Err(_) => run(),
+    }
+    if let Some(c) = cache {
+        let _ = c.flush();
     }
     progress.done.store(true, Ordering::Relaxed);
 }
@@ -1641,7 +1664,7 @@ mod tests {
             let progress = ContentProgress::default();
             progress.cancel.store(cancel, Ordering::Relaxed);
             let hits = Mutex::new(Vec::new());
-            search_content(&entries, &Query::parse(q), "", &progress, &hits);
+            search_content(&entries, &Query::parse(q), "", &progress, &hits, None);
             assert!(progress.done.load(Ordering::Relaxed));
             let hits: Vec<(u32, String)> = hits.into_inner().unwrap().into_iter().map(|h| (h.index, h.snippet)).collect();
             (progress.total.load(Ordering::Relaxed), progress.checked.load(Ordering::Relaxed), hits)
@@ -1659,6 +1682,51 @@ mod tests {
         assert_eq!(run("تقرير size:>100b", false).0, 0);
         assert_eq!(run("تقرير حجم:<1ك", false).2.len(), 1);
         assert_eq!(run("regex:السنو.", false).2.len(), 1);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn content_search_uses_the_cache() {
+        let dir = std::env::temp_dir().join(format!("bahth_content_cache_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let files = [("تقرير.txt", "تقرير المبيعات السنوي\nالمبيعات ارتفعت"), ("اخر.txt", "لا شيء هنا"), ("فارغ.txt", "  ")];
+        let mut entries: Vec<Entry> = files
+            .iter()
+            .map(|(name, text)| {
+                let p = dir.join(name);
+                std::fs::write(&p, text).unwrap();
+                Entry { size: text.len() as u64, mtime: 1000, ..entry(p.to_str().unwrap(), false) }
+            })
+            .collect();
+        let cache = ContentCache::open(&dir.join("store")).unwrap();
+        let run = |entries: &[Entry], q: &str| {
+            let progress = ContentProgress::default();
+            let hits = Mutex::new(Vec::new());
+            search_content(entries, &Query::parse(q), "", &progress, &hits, Some(&cache));
+            assert!(!cache.searching());
+            let mut hits: Vec<(u32, u32, usize)> =
+                hits.into_inner().unwrap().into_iter().map(|h| (h.index, h.count, h.lines.len())).collect();
+            hits.sort_unstable();
+            (progress.from_cache.load(Ordering::Relaxed), progress.checked.load(Ordering::Relaxed), hits)
+        };
+        // First run extracts every document (the empty one is stored as "no text").
+        assert_eq!(run(&entries, "المبيعات"), (0, 3, vec![(0, 2, 2)]));
+        assert_eq!(cache.stats().documents, 3);
+        // The files change on disk but their index entries don't: the second
+        // run never opens them and still finds the stored text.
+        for (name, _) in &files {
+            std::fs::write(dir.join(name), "المبيعات في كل مكان").unwrap();
+        }
+        assert_eq!(run(&entries, "المبيعات"), (3, 3, vec![(0, 2, 2)]));
+        // The store was saved at the end of the search.
+        assert_eq!(ContentCache::open(&dir.join("store")).unwrap().stats().documents, 3);
+        // A newer mtime makes that one document be read again.
+        entries[1].mtime = 2000;
+        entries[1].size = std::fs::metadata(&*entries[1].path).unwrap().len();
+        assert_eq!(run(&entries, "المبيعات"), (2, 3, vec![(0, 2, 2), (1, 1, 1)]));
+        assert_eq!(run(&entries, "المبيعات").0, 3);
+        drop(cache);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

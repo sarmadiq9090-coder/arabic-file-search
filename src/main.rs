@@ -21,6 +21,8 @@ mod cli;
 // Platform-independent logic: used by the Windows UI and unit-tested on every
 // platform (the network/installer parts of `update` are Windows-only inside).
 #[cfg(any(windows, test))]
+mod content_cache;
+#[cfg(any(windows, test))]
 mod extract;
 #[cfg(any(windows, test))]
 mod history;

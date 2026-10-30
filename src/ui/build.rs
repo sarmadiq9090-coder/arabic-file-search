@@ -216,6 +216,11 @@ impl NativeUi<AppUi> for App {
             .check(settings.arabic_digits)
             .parent(&app.options_menu)
             .build(&mut app.menu_digits)?;
+        nwg::MenuItem::builder()
+            .text("فهرسة محتوى المستندات في الخلفية (بحث أسرع داخل الملفات)")
+            .check(settings.content_index)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_content_index)?;
         nwg::MenuItem::builder().text("تصدير النتائج إلى Excel (CSV)").parent(&app.options_menu).build(&mut app.menu_export)?;
         nwg::MenuItem::builder().text("إخفاء إلى شريط المهام\tEsc").parent(&app.options_menu).build(&mut app.menu_hide)?;
         nwg::MenuItem::builder()
@@ -324,6 +329,8 @@ impl NativeUi<AppUi> for App {
                         app.check_for_update(true);
                     } else if handle == app.menu_digits {
                         app.toggle_digits();
+                    } else if handle == app.menu_content_index {
+                        app.toggle_content_index();
                     } else if handle == app.menu_export {
                         app.export_csv();
                     } else if handle == app.menu_hide {

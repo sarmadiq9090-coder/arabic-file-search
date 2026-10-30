@@ -5,6 +5,7 @@ use native_windows_gui as nwg;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
+use super::content_index;
 use super::files::flush_index_save;
 use super::format::fmt_num;
 use super::startup::{LOOP_STARTED, background_priority, log, log_phases, phase};
@@ -59,6 +60,7 @@ impl App {
                 let n = idx.entries.len();
                 st.index = Arc::new(idx);
                 drop(st);
+                self.start_warm();
                 if self.query.text().trim().is_empty() || self.content_mode() {
                     self.set_status(&format!("تم تحميل الفهرس ({} عنصر). اكتب للبحث.", fmt_num(n)));
                 } else {
@@ -262,7 +264,18 @@ impl App {
         let progress = Arc::new(ContentProgress::default());
         let hits = Arc::new(Mutex::new(Vec::new()));
         let (p, h, idx) = (progress.clone(), hits.clone(), index.clone());
-        std::thread::spawn(move || search::search_content(&idx.entries, &q, &scope, &p, &h));
+        let use_index = st.settings.content_index;
+        std::thread::spawn(move || {
+            let cache = if use_index { content_index::shared() } else { None };
+            let started = std::time::Instant::now();
+            search::search_content(&idx.entries, &q, &scope, &p, &h, cache);
+            log(&format!(
+                "content search: {} documents ({} from the content index) in {} ms",
+                p.checked.load(Ordering::Relaxed),
+                p.from_cache.load(Ordering::Relaxed),
+                started.elapsed().as_millis()
+            ));
+        });
         st.content = Some(ContentJob { progress, hits });
         st.rows.clear();
         st.rows_index = index;
@@ -322,6 +335,7 @@ impl App {
                 st.index = Arc::new(idx);
                 st.scan = None;
                 drop(st);
+                self.start_warm();
                 self.reindex_btn.set_enabled(true);
                 if self.query.text().trim().is_empty() || self.content_mode() {
                     self.set_status(&format!("اكتملت الفهرسة: {} عنصر.", fmt_num(n)));
@@ -339,6 +353,7 @@ impl App {
         let total = job.progress.total.load(Ordering::Relaxed);
         let checked = job.progress.checked.load(Ordering::Relaxed);
         let done = job.progress.done.load(Ordering::Relaxed);
+        let cached = job.progress.from_cache.load(Ordering::Relaxed);
         let changed = !new_hits.is_empty();
         st.rows.extend(new_hits.into_iter().map(|h| Row {
             entry: h.index,
@@ -358,7 +373,8 @@ impl App {
         }
         if done {
             self.stop_btn.set_enabled(false);
-            self.set_status(&format!("انتهى البحث داخل {} مستند: وجدت {} ملف.", fmt_num(total), fmt_num(n)));
+            let cached = if cached > 0 { format!(" (من الفهرس: {})", fmt_num(cached)) } else { String::new() };
+            self.set_status(&format!("انتهى البحث داخل {} مستند: وجدت {} ملف.{cached}", fmt_num(total), fmt_num(n)));
         } else {
             self.set_status(&format!(
                 "جاري البحث داخل المستندات… تم فحص {} من {} — وجدت {}",
