@@ -1,6 +1,6 @@
 # التكامل مع برامج التشغيل السريع والأدوات الأخرى
 
-يمكن استعمال فهرس «بحث سريع» (بمطابقته العربية: الهمزات والتاء المربوطة والألف المقصورة والتشكيل) من خارج البرنامج، عبر وضع سطر الأوامر في `bahth.exe`:
+يمكن استعمال فهرس InstaFind — «بحث سريع» (بمطابقته العربية: الهمزات والتاء المربوطة والألف المقصورة والتشكيل) من خارج البرنامج، عبر وضع سطر الأوامر في `bahth.exe`:
 
 ```
 bahth.exe -s "فاتورة ext:pdf" --json -n 20
@@ -94,7 +94,7 @@ $bahth = "$env:LOCALAPPDATA\Programs\Bahth\bahth.exe"
 
 ## English
 
-Bahth Sari's Arabic-aware index (hamza forms, ta marbuta, alef maqsura, diacritics) can be used from launchers and scripts through the CLI: `bahth.exe -s "query" --json -n 20` prints a JSON array of `{path, name, size, modified, is_dir}`; exit code 0 = results, 1 = none, 2 = error (usually no index yet: open the app once). Default install path: `%LOCALAPPDATA%\Programs\Bahth\bahth.exe`.
+InstaFind's Arabic-aware index (hamza forms, ta marbuta, alef maqsura, diacritics) can be used from launchers and scripts through the CLI: `bahth.exe -s "query" --json -n 20` prints a JSON array of `{path, name, size, modified, is_dir}`; exit code 0 = results, 1 = none, 2 = error (usually no index yet: open the app once). Default install path: `%LOCALAPPDATA%\Programs\Bahth\bahth.exe`.
 
 - **Flow Launcher:** copy `flow-launcher/` into `%APPDATA%\FlowLauncher\Plugins\` and restart Flow. Keywords `ب` and `bs`. Enter opens the file; the context menu opens its folder. Set the exe path in the plugin settings or the `BAHTH_EXE` environment variable if it is not installed in the default place. Tests: `python3 -m unittest -v test_main`.
 - **PowerToys Run:** plugins are C# DLLs, so there is none yet. Use the built-in Shell plugin (`> bahth.exe -s ...`), Flow Launcher, or the AutoHotkey script above.
