@@ -11,7 +11,7 @@ use super::format::fmt_num;
 use super::startup::{LOOP_STARTED, background_priority, log, log_phases, phase};
 use super::{App, ContentJob, LoadJob, Matches, Row, ScanJob};
 use crate::index::{self, Index, ScanProgress};
-use crate::layout;
+use crate::fuzzy;
 use crate::search::{self, ContentHit, ContentProgress, Query, SortKey};
 
 /// The outcome of a background filename search.
@@ -19,8 +19,8 @@ pub(super) struct NameResult {
     index: Arc<Index>,
     hits: Vec<u32>,
     text: String,
-    /// The query re-typed in the other keyboard layout, when that found the hits.
-    converted: Option<String>,
+    /// How a fallback (keyboard layout, Arabizi, typos) found the hits, if one did.
+    converted: Option<fuzzy::Fallback>,
     empty: bool,
     ms: usize,
 }
@@ -178,16 +178,13 @@ impl App {
             let started = std::time::Instant::now();
             let q = parse(&text);
             let mut hits = search::search_names(&index.entries, &q, &scope);
-            // Typed with the wrong keyboard layout? ("hgjrvdv" → "التقرير")
+            // Wrong keyboard layout ("hgjrvdv" → "التقرير"), Arabizi ("3abd"), then typos.
             let mut converted = None;
-            if hits.is_empty() && !q.is_empty()
-                && let Some(alt) = layout::convert_layout(&text)
+            if hits.is_empty()
+                && let Some((alt_hits, fb)) = fuzzy::name_fallback(&index.entries, &text, &scope, &parse)
             {
-                let alt_hits = search::search_names(&index.entries, &parse(&alt), &scope);
-                if !alt_hits.is_empty() {
-                    hits = alt_hits;
-                    converted = Some(alt);
-                }
+                hits = alt_hits;
+                converted = Some(fb);
             }
             if sort == SortKey::Relevance {
                 // Files the user opens often come first.
@@ -223,7 +220,7 @@ impl App {
         let old_n = st.rows.len();
         st.rows = res.hits.into_iter().map(|entry| Row { entry, snippet: None, matches: None }).collect();
         st.rows_index = res.index;
-        st.shown_query = Some(self.parse_query(res.converted.as_deref().unwrap_or(&res.text)));
+        st.shown_query = Some(self.parse_query(res.converted.as_ref().map_or(&res.text, |f| &f.query)));
         let n = st.rows.len();
         let busy = st.scan.is_some() || st.loading.is_some();
         let loading = st.loading.is_some();
@@ -254,11 +251,10 @@ impl App {
         };
         let tail = format!("{tail}{warn}");
         match res.converted {
-            Some(alt) => self.set_status(&trf!(
-                "لا نتائج لـ «{}»، عرض نتائج «{}»: {} نتيجة في {} ملي ثانية{tail}",
-                "No results for “{}”; showing results for “{}”: {} results in {} ms{tail}",
-                res.text.trim(),
-                alt,
+            Some(fb) => self.set_status(&trf!(
+                "{}: {} نتيجة في {} ملي ثانية{tail}",
+                "{}: {} results in {} ms{tail}",
+                fb.status(&res.text),
                 fmt_num(n),
                 fmt_num(res.ms)
             )),

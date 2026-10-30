@@ -37,6 +37,10 @@ mod dupes;
 #[cfg(any(windows, test))]
 mod extract;
 #[cfg(any(windows, test))]
+mod franco;
+#[cfg(any(windows, test))]
+mod fuzzy;
+#[cfg(any(windows, test))]
 mod history;
 #[cfg(any(windows, test))]
 mod index;
@@ -46,6 +50,8 @@ mod layout;
 mod normalize;
 #[cfg(any(windows, test))]
 mod replace;
+#[cfg(any(windows, test))]
+mod root;
 #[cfg(any(windows, test))]
 mod search;
 #[cfg(any(windows, test))]
