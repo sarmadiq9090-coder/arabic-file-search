@@ -1,0 +1,12 @@
+{
+  "ID": "E9FF45C66D16454991F0F2B66A8268DD",
+  "ActionKeywords": ["ب", "bs"],
+  "Name": "بحث سريع (Bahth Sari')",
+  "Description": "بحث فوري في أسماء الملفات بفهرس «بحث سريع» مع دعم العربية / Instant Arabic-aware file search through Bahth Sari's index",
+  "Author": "Saif",
+  "Version": "1.0.0",
+  "Language": "python",
+  "Website": "https://github.com/sarmadiq9090-coder/arabic-file-search",
+  "IcoPath": "Images\\bahth.png",
+  "ExecuteFileName": "main.py"
+}

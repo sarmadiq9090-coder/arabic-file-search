@@ -81,6 +81,8 @@ bahth.exe -s عقد --csv > نتائج.csv
 
 الخيارات: `-n`/`--max` أقصى عدد، `--sort name|path|size|date` و`--desc` للترتيب، `--scope` مجلد البحث، `--count` العدد فقط، `--csv` (المسار والحجم والتاريخ بصيغة ISO)، `--json`، و`--help` للمساعدة. رمز الخروج 0 عند وجود نتائج، و1 عند عدمها، و2 عند الخطأ أو غياب الفهرس.
 
+للبحث من Flow Launcher (إضافة جاهزة بالكلمة `ب`) أو PowerShell أو AutoHotkey أو Windows Terminal، راجع مجلد [`integrations/`](integrations/).
+
 ## البناء من المصدر
 
 1. ثبّت Rust من <https://rustup.rs> (مع أدوات Visual Studio C++ Build Tools عند الطلب).

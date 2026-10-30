@@ -1,0 +1,7 @@
+body:
+  - type: input
+    attributes:
+      name: bahth_path
+      label: "مسار bahth.exe / bahth.exe path"
+      description: "اتركه فارغاً للمسار الافتراضي %LOCALAPPDATA%\\Programs\\Bahth\\bahth.exe أو متغير BAHTH_EXE / Leave empty for the default path or the BAHTH_EXE env var"
+      defaultValue: ""
