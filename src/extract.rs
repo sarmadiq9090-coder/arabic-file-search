@@ -228,7 +228,9 @@ fn decode_html_entities(s: &str, out: &mut String) {
     while let Some(amp) = rest.find('&') {
         out.push_str(&rest[..amp]);
         rest = &rest[amp..];
-        let semi = rest[..rest.len().min(12)].find(';');
+        // Entities are short; look for the ';' only in the next few bytes,
+        // cut at a character boundary (the text may continue in Arabic or ‘…’).
+        let semi = rest[..rest.floor_char_boundary(12)].find(';');
         let decoded = semi.and_then(|semi| {
             let name = &rest[1..semi];
             let ch = if let Some(num) = name.strip_prefix("#x").or_else(|| name.strip_prefix("#X"))
@@ -1078,6 +1080,18 @@ mod tests {
         }
         zw.finish().unwrap();
         p
+    }
+
+    #[test]
+    fn entities_next_to_multibyte_text() {
+        for text in ["&x‘‘‘‘‘‘", "&nbsp‘quote’", "a &─────── b", "&#1575;‘", "&amp;مرحبا&"] {
+            let mut out = String::new();
+            decode_html_entities(text, &mut out);
+            assert!(!out.is_empty());
+        }
+        let mut out = String::new();
+        decode_html_entities("&quot;‘─’&amp;", &mut out);
+        assert_eq!(out, "\"‘─’&");
     }
 
     #[test]
