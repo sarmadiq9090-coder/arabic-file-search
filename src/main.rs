@@ -3,6 +3,12 @@
 
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
+// The interface language and its `tr!` / `trf!` macros, shared by the UI and
+// the CLI; declared first so the macros are visible in every module.
+#[cfg(any(windows, test))]
+#[macro_use]
+mod i18n;
+
 // The UI and Win32 glue only exist on Windows.
 #[cfg(windows)]
 mod dragdrop;

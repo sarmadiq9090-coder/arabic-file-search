@@ -46,25 +46,25 @@ impl App {
             }
         };
         if !st.history.saved.is_empty() {
-            add(&mut hm, "البحوث المحفوظة", HistoryAction::Nothing, true);
+            add(&mut hm, tr!("البحوث المحفوظة", "Saved searches"), HistoryAction::Nothing, true);
             for s in &st.history.saved {
                 add(&mut hm, &format!("★  {}", s.name), HistoryAction::Saved(s.clone()), false);
             }
             sep(&mut hm);
         }
         if st.history.recent.is_empty() {
-            add(&mut hm, "لا توجد عمليات بحث سابقة بعد", HistoryAction::Nothing, true);
+            add(&mut hm, tr!("لا توجد عمليات بحث سابقة بعد", "No recent searches yet"), HistoryAction::Nothing, true);
         } else {
-            add(&mut hm, "عمليات البحث الأخيرة", HistoryAction::Nothing, true);
+            add(&mut hm, tr!("عمليات البحث الأخيرة", "Recent searches"), HistoryAction::Nothing, true);
             for q in st.history.recent.iter().take(15) {
                 add(&mut hm, q, HistoryAction::Recent(q.clone()), false);
             }
         }
         sep(&mut hm);
         let has_query = !self.query.text().trim().is_empty();
-        add(&mut hm, "حفظ البحث الحالي", HistoryAction::SaveCurrent, !has_query);
-        add(&mut hm, "مسح عمليات البحث الأخيرة", HistoryAction::ClearRecent, st.history.recent.is_empty());
-        add(&mut hm, "حذف كل البحوث المحفوظة", HistoryAction::ClearSaved, st.history.saved.is_empty());
+        add(&mut hm, tr!("حفظ البحث الحالي", "Save the current search"), HistoryAction::SaveCurrent, !has_query);
+        add(&mut hm, tr!("مسح عمليات البحث الأخيرة", "Clear recent searches"), HistoryAction::ClearRecent, st.history.recent.is_empty());
+        add(&mut hm, tr!("حذف كل البحوث المحفوظة", "Delete all saved searches"), HistoryAction::ClearSaved, st.history.saved.is_empty());
         drop(st);
         *self.history_menu.borrow_mut() = hm;
         self.show_menu(&self.history_menu.borrow().menu);
@@ -104,7 +104,7 @@ impl App {
                 st.history.add_saved(saved);
                 st.history.save();
                 drop(st);
-                self.set_status(&format!("حُفظ البحث «{text}». تجده في قائمة «السجل»."));
+                self.set_status(&trf!("حُفظ البحث «{text}». تجده في قائمة «السجل».", "Saved the search “{text}”. Find it in the “History” menu."));
             }
             HistoryAction::ClearRecent => {
                 let mut st = self.state.borrow_mut();
@@ -129,7 +129,7 @@ impl App {
         } else {
             nwg::CheckBoxState::Unchecked
         });
-        self.scope_input.set_text(if s.scope.is_empty() { "كل الأقراص" } else { &s.scope });
+        self.scope_input.set_text(if s.scope.is_empty() { tr!("كل الأقراص", "All drives") } else { &s.scope });
         self.state.borrow_mut().scope = s.scope.clone();
         self.query.set_text(&s.query);
         self.focus_query();

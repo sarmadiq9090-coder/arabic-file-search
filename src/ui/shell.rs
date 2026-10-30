@@ -110,10 +110,10 @@ pub fn format_time(secs: i64, relative: bool) -> String {
         }
         if let Some(today) = local_time(now) {
             if same_day(&t, &today) {
-                return super::format::digits(format!("اليوم {hm}"));
+                return super::format::digits(trf!("اليوم {hm}", "Today {hm}"));
             }
             if local_time(now - 86_400).is_some_and(|y| same_day(&t, &y)) {
-                return super::format::digits(format!("أمس {hm}"));
+                return super::format::digits(trf!("أمس {hm}", "Yesterday {hm}"));
             }
         }
     }

@@ -72,10 +72,10 @@ impl App {
             Some(p) => {
                 self.note_use(&p);
                 if !shell::open(&p) {
-                    nwg::modal_error_message(&self.window, "خطأ", &format!("تعذر فتح الملف:\n{p}"));
+                    nwg::modal_error_message(&self.window, tr!("خطأ", "Error"), &trf!("تعذر فتح الملف:\n{p}", "Could not open the file:\n{p}"));
                 }
             }
-            None => self.set_status("اختر ملفاً من القائمة أولاً."),
+            None => self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first.")),
         }
     }
 
@@ -85,7 +85,7 @@ impl App {
                 self.note_use(&p);
                 shell::reveal(&p);
             }
-            None => self.set_status("اختر ملفاً من القائمة أولاً."),
+            None => self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first.")),
         }
     }
 
@@ -93,9 +93,9 @@ impl App {
         match self.selected_path() {
             Some(p) => {
                 nwg::Clipboard::set_data_text(&self.window, &p);
-                self.set_status("تم نسخ المسار.");
+                self.set_status(tr!("تم نسخ المسار.", "Path copied."));
             }
-            None => self.set_status("اختر ملفاً من القائمة أولاً."),
+            None => self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first.")),
         }
     }
 
@@ -105,24 +105,24 @@ impl App {
             st.rows.iter().filter_map(|r| st.rows_index.entries.get(r.entry as usize)).map(|e| &*e.path).collect();
         if paths.is_empty() {
             drop(st);
-            self.set_status("لا توجد نتائج لنسخها.");
+            self.set_status(tr!("لا توجد نتائج لنسخها.", "There are no results to copy."));
             return;
         }
         let n = paths.len();
         nwg::Clipboard::set_data_text(&self.window, &paths.join("\r\n"));
         drop(st);
-        self.set_status(&format!("تم نسخ {} مسار.", fmt_num(n)));
+        self.set_status(&trf!("تم نسخ {} مسار.", "Copied {} paths.", fmt_num(n)));
     }
 
     /// Puts the selected file itself on the clipboard, ready to paste into
     /// Explorer, an e-mail or a chat.
     pub(super) fn copy_file(&self) {
         let Some(p) = self.selected_path() else {
-            self.set_status("اختر ملفاً من القائمة أولاً.");
+            self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first."));
             return;
         };
         let ok = self.window.handle.hwnd().is_some_and(|h| crate::dragdrop::copy_files(h, std::slice::from_ref(&p)));
-        self.set_status(if ok { "تم نسخ الملف. الصقه حيث تريد بـ Ctrl+V." } else { "تعذر نسخ الملف." });
+        self.set_status(if ok { tr!("تم نسخ الملف. الصقه حيث تريد بـ Ctrl+V.", "File copied. Paste it anywhere with Ctrl+V.") } else { tr!("تعذر نسخ الملف.", "Could not copy the file.") });
     }
 
     pub(super) fn drag_row(&self, row: usize) {
@@ -202,7 +202,7 @@ impl App {
     /// Opens a window listing every matching line of the selected document.
     pub(super) fn show_matches(&self) {
         let Some(row) = self.list.selected_item() else {
-            self.set_status("اختر ملفاً من القائمة أولاً.");
+            self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first."));
             return;
         };
         let text = {
@@ -210,17 +210,17 @@ impl App {
             let (Some(r), Some(e)) = (st.rows.get(row), st.row_entry(row)) else { return };
             let Some(m) = &r.matches else {
                 drop(st);
-                self.set_status("كل التطابقات متاحة لنتائج البحث داخل المستندات.");
+                self.set_status(tr!("كل التطابقات متاحة لنتائج البحث داخل المستندات.", "All matches are available for results of a document search."));
                 return;
             };
-            let mut t = format!("{}\r\nعدد التطابقات: {}\r\n", ltr_path(&e.path), digits(m.count.to_string()));
+            let mut t = trf!("{}\r\nعدد التطابقات: {}\r\n", "{}\r\nMatches: {}\r\n", ltr_path(&e.path), digits(m.count.to_string()));
             if m.lines.len() < m.count as usize {
-                t.push_str(&format!("(أول {} سطر)\r\n", digits(m.lines.len().to_string())));
+                t.push_str(&trf!("(أول {} سطر)\r\n", "(first {} lines)\r\n", digits(m.lines.len().to_string())));
             }
             for (line, s) in &m.lines {
-                t.push_str(&format!("\r\nسطر {}:  {}", digits(line.to_string()), s.replace(['\r', '\n'], " ")));
+                t.push_str(&trf!("\r\nسطر {}:  {}", "\r\nLine {}:  {}", digits(line.to_string()), s.replace(['\r', '\n'], " ")));
             }
-            self.matches_window.set_text(&format!("كل التطابقات — {}", e.name()));
+            self.matches_window.set_text(&trf!("كل التطابقات — {}", "All matches — {}", e.name()));
             t
         };
         self.matches_text.set_text(&text);
@@ -231,14 +231,14 @@ impl App {
     /// Saves the result list as a CSV file that Excel opens with Arabic intact.
     pub(super) fn export_csv(&self) {
         if self.state.borrow().rows.is_empty() {
-            self.set_status("لا توجد نتائج لتصديرها.");
+            self.set_status(tr!("لا توجد نتائج لتصديرها.", "There are no results to export."));
             return;
         }
         let mut slot = self.export_dialog.borrow_mut();
         if slot.is_none() {
             let mut d = nwg::FileDialog::default();
             let built = nwg::FileDialog::builder()
-                .title("حفظ النتائج")
+                .title(tr!("حفظ النتائج", "Save results"))
                 .action(nwg::FileDialogAction::Save)
                 .filters("CSV(*.csv)")
                 .build(&mut d);
@@ -258,7 +258,7 @@ impl App {
         let st = self.state.borrow();
         let write = || -> std::io::Result<usize> {
             let mut f = std::io::BufWriter::new(std::fs::File::create(&path)?);
-            f.write_all("\u{FEFF}الاسم,المسار,الحجم بالبايت,تاريخ التعديل,النص المطابق\r\n".as_bytes())?;
+            f.write_all(tr!("\u{FEFF}الاسم,المسار,الحجم بالبايت,تاريخ التعديل,النص المطابق\r\n", "\u{FEFF}Name,Path,Size in bytes,Date modified,Matching text\r\n").as_bytes())?;
             let mut n = 0;
             for r in &st.rows {
                 let Some(e) = st.rows_index.entries.get(r.entry as usize) else { continue };
@@ -275,9 +275,9 @@ impl App {
         let result = write();
         drop(st);
         match result {
-            Ok(n) => self.set_status(&format!("تم تصدير {} نتيجة.", fmt_num(n))),
+            Ok(n) => self.set_status(&trf!("تم تصدير {} نتيجة.", "Exported {} results.", fmt_num(n))),
             Err(e) => {
-                nwg::modal_error_message(&self.window, "خطأ", &format!("تعذر حفظ الملف:\n{e}"));
+                nwg::modal_error_message(&self.window, tr!("خطأ", "Error"), &trf!("تعذر حفظ الملف:\n{e}", "Could not save the file:\n{e}"));
             }
         }
     }

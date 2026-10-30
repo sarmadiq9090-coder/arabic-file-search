@@ -4,7 +4,7 @@ use native_windows_gui as nwg;
 use std::sync::atomic::Ordering;
 
 use super::startup::{background_priority, log};
-use super::{App, TITLE};
+use super::{App, title};
 use crate::index;
 
 /// What a background update thread reports back.
@@ -22,12 +22,12 @@ impl App {
     pub(super) fn check_for_update(&self, manual: bool) {
         if self.update_busy.replace(true) {
             if manual {
-                self.set_status("جاري التحقق من التحديثات…");
+                self.set_status(tr!("جاري التحقق من التحديثات…", "Checking for updates…"));
             }
             return;
         }
         if manual {
-            self.set_status("جاري التحقق من التحديثات…");
+            self.set_status(tr!("جاري التحقق من التحديثات…", "Checking for updates…"));
         }
         let slot = self.update_result.clone();
         let notice = self.update_notice.sender();
@@ -69,18 +69,18 @@ impl App {
                     Ok(Some(rel)) => self.offer_update(rel),
                     Ok(None) if manual => {
                         let v = env!("CARGO_PKG_VERSION");
-                        self.set_status(&format!("لديك أحدث إصدار ({v})."));
-                        nwg::modal_info_message(&self.window, TITLE, &format!("لديك أحدث إصدار من البرنامج ({v})."));
+                        self.set_status(&trf!("لديك أحدث إصدار ({v}).", "You have the latest version ({v})."));
+                        nwg::modal_info_message(&self.window, title(), &trf!("لديك أحدث إصدار من البرنامج ({v}).", "You have the latest version of the program ({v})."));
                     }
                     Err(e) if manual => {
-                        self.set_status("تعذر التحقق من التحديثات.");
-                        nwg::modal_error_message(&self.window, TITLE, &format!("تعذر التحقق من التحديثات:\n{e}"));
+                        self.set_status(tr!("تعذر التحقق من التحديثات.", "Could not check for updates."));
+                        nwg::modal_error_message(&self.window, title(), &trf!("تعذر التحقق من التحديثات:\n{e}", "Could not check for updates:\n{e}"));
                     }
                     _ => {}
                 }
             }
             UpdateEvent::Installed(Ok(())) => {
-                self.set_status("اكتمل التحديث. جاري إعادة التشغيل…");
+                self.set_status(tr!("اكتمل التحديث. جاري إعادة التشغيل…", "Update complete. Restarting…"));
                 match crate::update::restart_new_version() {
                     Ok(()) => {
                         // Save everything, then leave at once so the new copy
@@ -93,8 +93,8 @@ impl App {
                         self.update_busy.set(false);
                         nwg::modal_info_message(
                             &self.window,
-                            TITLE,
-                            &format!("تم تثبيت الإصدار الجديد، لكن تعذرت إعادة التشغيل تلقائياً ({e}).\nأغلق البرنامج وافتحه من جديد."),
+                            title(),
+                            &trf!("تم تثبيت الإصدار الجديد، لكن تعذرت إعادة التشغيل تلقائياً ({e}).\nأغلق البرنامج وافتحه من جديد.", "The new version is installed, but the program could not restart itself ({e}).\nClose the program and open it again."),
                         );
                     }
                 }
@@ -102,8 +102,8 @@ impl App {
             UpdateEvent::Installed(Err(e)) => {
                 log(&format!("update: install failed: {e}"));
                 self.update_busy.set(false);
-                self.set_status("تعذر التحديث.");
-                nwg::modal_error_message(&self.window, TITLE, &format!("تعذر تنزيل التحديث أو تثبيته:\n{e}\n\nالإصدار الحالي يعمل كما هو."));
+                self.set_status(tr!("تعذر التحديث.", "The update failed."));
+                nwg::modal_error_message(&self.window, title(), &trf!("تعذر تنزيل التحديث أو تثبيته:\n{e}\n\nالإصدار الحالي يعمل كما هو.", "Could not download or install the update:\n{e}\n\nThe current version keeps working as before."));
             }
         }
     }
@@ -114,19 +114,20 @@ impl App {
             self.show_window();
         }
         let current = env!("CARGO_PKG_VERSION");
-        let notes = if rel.notes.trim().is_empty() { String::new() } else { format!("\n\nالجديد:\n{}", rel.notes.trim()) };
-        let text = format!(
+        let notes = if rel.notes.trim().is_empty() { String::new() } else { trf!("\n\nالجديد:\n{}", "\n\nWhat's new:\n{}", rel.notes.trim()) };
+        let text = trf!(
             "يتوفر إصدار جديد من بحث سريع: {} (لديك {current}).{notes}\n\nهل تريد التحديث الآن؟ سيُعاد تشغيل البرنامج بعد التنزيل.",
+            "A new version of Bahth Sari' is available: {} (you have {current}).{notes}\n\nUpdate now? The program restarts after the download.",
             rel.version
         );
         let params = nwg::MessageParams {
-            title: TITLE,
+            title: title(),
             content: &text,
             buttons: nwg::MessageButtons::YesNo,
             icons: nwg::MessageIcons::Question,
         };
         if nwg::modal_message(&self.window, &params) != nwg::MessageChoice::Yes {
-            self.set_status(&format!("الإصدار {} متاح. يمكنك التحديث لاحقاً من «خيارات».", rel.version));
+            self.set_status(&trf!("الإصدار {} متاح. يمكنك التحديث لاحقاً من «خيارات».", "Version {} is available. You can update later from “Options”.", rel.version));
             return;
         }
         self.update_busy.set(true);
@@ -154,7 +155,7 @@ impl App {
         let total = self.update_progress.1.load(Ordering::Relaxed);
         if total > 0 && self.update_busy.get() {
             let done = self.update_progress.0.load(Ordering::Relaxed);
-            self.set_status(&format!("جاري تنزيل التحديث… {}٪", (done * 100 / total).min(100)));
+            self.set_status(&trf!("جاري تنزيل التحديث… {}٪", "Downloading the update… {}%", (done * 100 / total).min(100)));
         }
     }
 }
