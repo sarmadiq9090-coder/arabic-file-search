@@ -64,6 +64,12 @@ fn is_ocr_image(_ext: &str) -> bool {
     false
 }
 
+/// True for the plain-text extensions (lowercase, no dot), read as-is: the
+/// only files that find-and-replace (`crate::replace`) may edit.
+pub fn is_plain_text(ext: &str) -> bool {
+    TEXT_EXTS.contains(&ext)
+}
+
 pub use archive::split_members;
 
 /// Extract plain text from the file at `path`. Returns None on any failure/unsupported.
