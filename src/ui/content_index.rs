@@ -56,7 +56,7 @@ impl App {
         st.warm = Some(cancel.clone());
         let index = st.index.clone();
         drop(st);
-        std::thread::spawn(move || {
+        crate::crash_log::spawn_named("content-warm", move || {
             idle_priority();
             // Only the documents are needed. Letting go of the index at once
             // matters: while another holder shares it, every change found by

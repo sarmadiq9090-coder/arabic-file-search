@@ -83,6 +83,6 @@ impl App {
     /// which added up to a slower layout at startup. nwg wants a second
     /// handle: the status bar, whose own events these handlers don't use.
     pub(super) fn bind_main_events(&self, f: impl Fn(nwg::Event, nwg::EventData, nwg::ControlHandle) + 'static) -> nwg::EventHandler {
-        nwg::bind_event_handler(&self.status.handle, &self.window.handle, f)
+        nwg::bind_event_handler(&self.status.handle, &self.window.handle, crate::crash_log::guard_events(f))
     }
 }
