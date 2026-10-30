@@ -20,7 +20,13 @@ cfb = "0.15.0"
 regex = "1"
 lz4_flex = { version = "0.14.0", default-features = false, features = ["std", "safe-encode", "safe-decode", "checked-decode"] }
 lopdf = { version = "0.42", default-features = false }
-flate2 = "1"
+flate2 = "1.1.10"
+tar = { version = "0.4.46", default-features = false }
+sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["bzip2", "deflate", "ppmd"] }
+
+[dev-dependencies]
+# The encoder, only to build .7z archives in the tests.
+sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["compress"] }
 
 [target.'cfg(windows)'.dependencies]
 native-windows-gui = { version = "1.0.13", default-features = false, features = ["list-view", "animation-timer", "clipboard", "menu", "file-dialog", "status-bar", "high-dpi", "tray-notification", "combobox", "notice", "textbox"] }

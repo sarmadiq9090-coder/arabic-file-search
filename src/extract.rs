@@ -19,6 +19,7 @@ use calamine::{Data, Reader, Sheets};
 use encoding_rs::{Encoding, UTF_16BE, UTF_16LE, WINDOWS_1252, WINDOWS_1256};
 use quick_xml::events::Event;
 
+mod archive;
 mod bidi_fix;
 mod epub;
 mod mail;
@@ -50,7 +51,7 @@ const IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif"]
 
 /// Returns true if the extension (lowercase, no dot) is supported for content search.
 pub fn is_supported(ext: &str) -> bool {
-    TEXT_EXTS.contains(&ext) || OTHER_EXTS.contains(&ext) || is_ocr_image(ext)
+    TEXT_EXTS.contains(&ext) || OTHER_EXTS.contains(&ext) || archive::is_archive_ext(ext) || is_ocr_image(ext)
 }
 
 #[cfg(windows)]
@@ -62,6 +63,8 @@ fn is_ocr_image(ext: &str) -> bool {
 fn is_ocr_image(_ext: &str) -> bool {
     false
 }
+
+pub use archive::split_members;
 
 /// Extract plain text from the file at `path`. Returns None on any failure/unsupported.
 ///
@@ -102,6 +105,7 @@ fn extract_by_ext(path: &Path, ext: &str) -> Option<String> {
         "eml" => mail::extract_eml(path),
         "msg" => mail::extract_msg(path),
         "epub" => epub::extract_epub(path),
+        e if archive::is_archive_ext(e) => archive::extract_archive(path),
         #[cfg(windows)]
         e if is_ocr_image(e) => crate::ocr::ocr_image_file(path),
         _ => None,
@@ -368,7 +372,10 @@ fn xml_to_text(xml: &str, flavor: XmlFlavor, out: &mut String) {
 }
 
 fn extract_docx(path: &Path) -> Option<String> {
-    let mut zip = open_zip(path)?;
+    docx_text(open_zip(path)?)
+}
+
+fn docx_text<R: Read + Seek>(mut zip: zip::ZipArchive<R>) -> Option<String> {
     let main = read_zip_entry(&mut zip, "word/document.xml")?;
     let mut out = String::new();
     xml_to_text(&main, XmlFlavor::Ooxml, &mut out);
@@ -394,7 +401,10 @@ fn extract_docx(path: &Path) -> Option<String> {
 }
 
 fn extract_pptx(path: &Path) -> Option<String> {
-    let mut zip = open_zip(path)?;
+    pptx_text(open_zip(path)?)
+}
+
+fn pptx_text<R: Read + Seek>(mut zip: zip::ZipArchive<R>) -> Option<String> {
     let slides = numbered_entries(&zip, "ppt/slides/slide");
     if slides.is_empty() {
         return None;
@@ -411,7 +421,10 @@ fn extract_pptx(path: &Path) -> Option<String> {
 }
 
 fn extract_odf(path: &Path) -> Option<String> {
-    let mut zip = open_zip(path)?;
+    odf_text(open_zip(path)?)
+}
+
+fn odf_text<R: Read + Seek>(mut zip: zip::ZipArchive<R>) -> Option<String> {
     let xml = read_zip_entry(&mut zip, "content.xml")?;
     let mut out = String::new();
     xml_to_text(&xml, XmlFlavor::Odf, &mut out);
@@ -426,14 +439,17 @@ fn extract_spreadsheet(path: &Path, ext: &str) -> Option<String> {
     use calamine::{Ods, Xls, Xlsb, Xlsx, open_workbook};
     // Dispatch on our lowercase extension (calamine's auto-detection is
     // case-sensitive, so "REPORT.XLSX" would go through slow guessing).
-    let mut book: Sheets<_> = match ext {
+    let book: Sheets<_> = match ext {
         "xlsx" | "xlsm" => Sheets::Xlsx(open_workbook::<Xlsx<_>, _>(path).ok()?),
         "xlsb" => Sheets::Xlsb(open_workbook::<Xlsb<_>, _>(path).ok()?),
         "xls" => Sheets::Xls(open_workbook::<Xls<_>, _>(path).ok()?),
         "ods" => Sheets::Ods(open_workbook::<Ods<_>, _>(path).ok()?),
         _ => return None,
     };
+    sheets_text(book)
+}
 
+fn sheets_text<RS: Read + Seek>(mut book: Sheets<RS>) -> Option<String> {
     let mut out = String::new();
     let sheet_count = book.sheet_names().len();
     for i in 0..sheet_count {
