@@ -45,6 +45,26 @@ pub fn recycle(path: &str) -> bool {
     r == 0 && op.fAnyOperationsAborted == 0 && !std::path::Path::new(path).exists()
 }
 
+/// Moves several files to the Recycle Bin in one operation, without asking
+/// again (the caller has confirmed), but with Windows' warning when a file
+/// can't go to the Recycle Bin. Returns the paths that are gone.
+pub fn recycle_many(paths: &[String]) -> Vec<String> {
+    use winapi::um::shellapi::{FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_WANTNUKEWARNING, SHFILEOPSTRUCTW, SHFileOperationW};
+    // NUL-separated paths, ending with two NULs.
+    let mut from: Vec<u16> = Vec::new();
+    for p in paths {
+        from.extend(p.encode_utf16());
+        from.push(0);
+    }
+    from.push(0);
+    let mut op: SHFILEOPSTRUCTW = unsafe { std::mem::zeroed() };
+    op.wFunc = FO_DELETE as u32;
+    op.pFrom = from.as_ptr();
+    op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_WANTNUKEWARNING;
+    unsafe { SHFileOperationW(&mut op) };
+    paths.iter().filter(|p| !std::path::Path::new(p.as_str()).exists()).cloned().collect()
+}
+
 /// Opens Explorer with the file selected.
 pub fn reveal(path: &str) {
     let _ = std::process::Command::new("explorer.exe").raw_arg(format!("/select,\"{path}\"")).spawn();

@@ -33,6 +33,8 @@ mod cli;
 #[cfg(any(windows, test))]
 mod content_cache;
 #[cfg(any(windows, test))]
+mod dupes;
+#[cfg(any(windows, test))]
 mod extract;
 #[cfg(any(windows, test))]
 mod history;
