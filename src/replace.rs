@@ -13,7 +13,10 @@
 //! - Before a file is written its original bytes are copied into the
 //!   operation's backup folder, and the folder's `index.json` records it.
 //!   The new content goes to a temporary file in the same folder that then
-//!   replaces the original in one rename.
+//!   replaces the original in one step (`ReplaceFileW` on Windows, which
+//!   keeps the original's attributes, ACL and alternate streams; else a
+//!   rename). Hard links to the original are not kept: they go on pointing
+//!   at the old content.
 //! - Undo puts a file back only while it still holds exactly what the
 //!   replace wrote (checked by SHA-256), so later edits are never lost.
 
@@ -389,12 +392,59 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         if let Ok(meta) = fs::metadata(path) {
             let _ = fs::set_permissions(&tmp, meta.permissions());
         }
-        fs::rename(&tmp, path)
+        replace_with(&tmp, path)
     })();
     if result.is_err() {
         let _ = fs::remove_file(&tmp);
     }
     result
+}
+
+/// Puts `tmp` in the place of `path`. On Windows `ReplaceFileW` keeps what
+/// belongs to the file being replaced (Hidden/System and other attributes,
+/// its ACL, object id, alternate data streams), which a rename would swap
+/// for the temp file's. It falls back to a rename where that fails (no file
+/// there yet, file systems or shares without support): with no backup name
+/// given, every failure of `ReplaceFileW` leaves `tmp` in place. Hard links
+/// to the old file are lost either way.
+fn replace_with(tmp: &Path, path: &Path) -> std::io::Result<()> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        use winapi::um::winbase::REPLACEFILE_IGNORE_MERGE_ERRORS;
+        // Declared here: winapi 0.3's binding leaves out the BOOL result.
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn ReplaceFileW(
+                replaced: *const u16,
+                replacement: *const u16,
+                backup: *const u16,
+                flags: u32,
+                exclude: *mut std::ffi::c_void,
+                reserved: *mut std::ffi::c_void,
+            ) -> i32;
+        }
+        let wide = |p: &Path| p.as_os_str().encode_wide().chain([0]).collect::<Vec<u16>>();
+        let (to, from) = (wide(path), wide(tmp));
+        if path.exists() {
+            // SAFETY: both strings are NUL-terminated and outlive the call;
+            // the optional pointers are null.
+            let ok = unsafe {
+                ReplaceFileW(
+                    to.as_ptr(),
+                    from.as_ptr(),
+                    std::ptr::null(),
+                    REPLACEFILE_IGNORE_MERGE_ERRORS,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                )
+            };
+            if ok != 0 {
+                return Ok(());
+            }
+        }
+    }
+    fs::rename(tmp, path)
 }
 
 fn write_index(dir: &Path, index: &OpIndex) -> std::io::Result<()> {
@@ -423,13 +473,34 @@ fn now_secs() -> i64 {
     SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)
 }
 
-/// A new, empty backup folder under `root` named after the local time.
+/// A backup folder's name: `s<sequence>-<UTC time>Z`. The sequence, one
+/// more than the highest one already there, orders the operations, so a
+/// clock or daylight-saving change can't make an older one look newest.
+fn op_dir_name(seq: u64, secs: i64) -> String {
+    format!("s{seq:08}-{}Z", stamp(secs, 0))
+}
+
+/// Where a backup folder sorts: folders of the old `YYYYMMDD-HHMMSS[-NNN]`
+/// (local time) format, by name, come before every sequenced one. `None`
+/// for a folder that is not a backup.
+fn op_dir_key(name: &str) -> Option<(Option<u64>, String)> {
+    if let Some(rest) = name.strip_prefix('s') {
+        let (seq, time) = rest.split_once('-')?;
+        if !seq.bytes().all(|b| b.is_ascii_digit()) || !time.ends_with('Z') {
+            return None;
+        }
+        return Some((Some(seq.parse().ok()?), String::new()));
+    }
+    (name.len() >= 15 && name.chars().all(|c| c.is_ascii_digit() || c == '-')).then(|| (None, name.to_string()))
+}
+
+/// A new, empty backup folder under `root` (see [`op_dir_name`]).
 fn new_op_dir(root: &Path, secs: i64) -> std::io::Result<PathBuf> {
     fs::create_dir_all(root)?;
-    let base = stamp(secs, crate::search::utc_offset_secs());
-    for n in 1..1000 {
-        let name = if n == 1 { base.clone() } else { format!("{base}-{n:03}") };
-        let dir = root.join(name);
+    let mut seq = op_dir_keys(root).into_iter().filter_map(|(k, _)| k.0).max().unwrap_or(0);
+    for _ in 0..1000 {
+        seq += 1;
+        let dir = root.join(op_dir_name(seq, secs));
         match fs::create_dir(&dir) {
             Ok(()) => return Ok(dir),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
@@ -439,23 +510,22 @@ fn new_op_dir(root: &Path, secs: i64) -> std::io::Result<PathBuf> {
     Err(std::io::Error::other("no free backup folder name"))
 }
 
-/// Backup folders under `root`, newest first.
-fn op_dirs(root: &Path) -> Vec<PathBuf> {
-    let mut dirs: Vec<PathBuf> = fs::read_dir(root)
+/// Backup folders under `root` with their sort keys, unordered.
+fn op_dir_keys(root: &Path) -> Vec<((Option<u64>, String), PathBuf)> {
+    fs::read_dir(root)
         .into_iter()
         .flatten()
         .flatten()
         .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
-        .filter(|e| {
-            let name = e.file_name();
-            let name = name.to_string_lossy();
-            name.len() >= 15 && name.chars().all(|c| c.is_ascii_digit() || c == '-')
-        })
-        .map(|e| e.path())
-        .collect();
-    dirs.sort();
-    dirs.reverse();
-    dirs
+        .filter_map(|e| Some((op_dir_key(&e.file_name().to_string_lossy())?, e.path())))
+        .collect()
+}
+
+/// Backup folders under `root`, newest first.
+fn op_dirs(root: &Path) -> Vec<PathBuf> {
+    let mut dirs = op_dir_keys(root);
+    dirs.sort_by(|a, b| b.0.cmp(&a.0));
+    dirs.into_iter().map(|(_, p)| p).collect()
 }
 
 fn prune(root: &Path) {
@@ -785,6 +855,62 @@ mod tests {
     }
 
     #[test]
+    fn write_atomic_replaces_and_creates() {
+        let t = TempDir::new("atomic");
+        let p = t.0.join("ملف.txt");
+        write_atomic(&p, b"one").unwrap();
+        write_atomic(&p, b"two").unwrap();
+        assert_eq!(fs::read(&p).unwrap(), b"two");
+        assert_eq!(fs::read_dir(&t.0).unwrap().count(), 1);
+    }
+
+    /// The replaced file keeps its Hidden and System attributes.
+    #[cfg(windows)]
+    #[test]
+    fn write_atomic_keeps_attributes() {
+        use std::os::windows::ffi::OsStrExt;
+        use winapi::um::fileapi::{GetFileAttributesW, SetFileAttributesW};
+        use winapi::um::winnt::{FILE_ATTRIBUTE_HIDDEN, FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_SYSTEM};
+        let t = TempDir::new("attrs");
+        let p = t.0.join("مخفي.txt");
+        fs::write(&p, "old").unwrap();
+        let w: Vec<u16> = p.as_os_str().encode_wide().chain([0]).collect();
+        let flags = FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM;
+        // SAFETY: `w` is a NUL-terminated path.
+        assert_ne!(unsafe { SetFileAttributesW(w.as_ptr(), flags) }, 0);
+        write_atomic(&p, b"new").unwrap();
+        assert_eq!(fs::read(&p).unwrap(), b"new");
+        // SAFETY: as above.
+        let attrs = unsafe { GetFileAttributesW(w.as_ptr()) };
+        assert_eq!(attrs & flags, flags);
+        // SAFETY: as above.
+        unsafe { SetFileAttributesW(w.as_ptr(), FILE_ATTRIBUTE_NORMAL) };
+    }
+
+    #[test]
+    fn backups_are_ordered_by_sequence_not_clock() {
+        let t = TempDir::new("seq");
+        // Old-format folders are still listed, older than any new one.
+        fs::create_dir_all(t.0.join("20991231-235959")).unwrap();
+        fs::create_dir_all(t.0.join("20260101-000000-002")).unwrap();
+        let a = new_op_dir(&t.0, 1_793_364_896).unwrap();
+        assert!(a.ends_with("s00000001-20261030-125456Z"));
+        // The clock goes back an hour: the next one is still the newest.
+        let b = new_op_dir(&t.0, 1_793_364_896 - 3600).unwrap();
+        assert!(b.ends_with("s00000002-20261030-115456Z"));
+        let c = new_op_dir(&t.0, 0).unwrap();
+        assert_eq!(op_dirs(&t.0), [c.clone(), b, a, t.0.join("20991231-235959"), t.0.join("20260101-000000-002")]);
+        fs::write(c.join(INDEX_FILE), serde_json::to_vec(&OpIndex::default()).unwrap()).unwrap();
+        assert_eq!(last_operation(&t.0).unwrap().0, c);
+        // Sequences past 8 digits still sort by number, and gaps are fine.
+        fs::create_dir_all(t.0.join("s123456789-19700101-000000Z")).unwrap();
+        assert!(new_op_dir(&t.0, 0).unwrap().ends_with("s123456790-19700101-000000Z"));
+        for bad in ["s-1Z", "sx-20260101Z", "s1-2026", "seq", "s12"] {
+            assert_eq!(op_dir_key(bad), None, "{bad}");
+        }
+    }
+
+    #[test]
     fn keeps_only_recent_backups() {
         let t = TempDir::new("prune");
         for i in 0..KEEP_OPERATIONS + 3 {
@@ -796,5 +922,13 @@ mod tests {
         assert_eq!(dirs.len(), KEEP_OPERATIONS);
         assert!(dirs[0].ends_with(format!("20260101-0000{:02}", KEEP_OPERATIONS + 2)));
         assert!(t.0.join("other").exists());
+        // New folders, whatever their time, push out the old-format ones first.
+        let newest = new_op_dir(&t.0, 0).unwrap();
+        prune(&t.0);
+        let dirs = op_dirs(&t.0);
+        assert_eq!(dirs.len(), KEEP_OPERATIONS);
+        assert_eq!(dirs[0], newest);
+        assert!(dirs[1].ends_with(format!("20260101-0000{:02}", KEEP_OPERATIONS + 2)));
+        assert!(!t.0.join("20260101-000003").exists());
     }
 }

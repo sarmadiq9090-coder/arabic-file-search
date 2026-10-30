@@ -51,7 +51,8 @@ const COOKIE: &str = "bahth_t";
 const MAX_FAILURES: u32 = 5;
 const FIRST_LOCKOUT: Duration = Duration::from_secs(30);
 const MAX_LOCKOUT: Duration = Duration::from_secs(3600);
-/// Failures older than this are forgotten.
+/// Failures older than this are forgotten, counted from the end of the
+/// lock-out they caused, so lock-outs keep growing up to [`MAX_LOCKOUT`].
 const FAILURE_MEMORY: Duration = Duration::from_secs(600);
 
 // ---------------------------------------------------------------- secrets
@@ -715,6 +716,9 @@ impl Limiter {
             let lock = FIRST_LOCKOUT.saturating_mul(1u32 << self.strikes.min(16)).min(MAX_LOCKOUT);
             self.strikes += 1;
             self.locked_until = Some(now + lock);
+            // Remembered from the end of the lock-out: waiting it out must
+            // not also wipe the strikes.
+            self.last_failure = self.locked_until;
         }
     }
 
@@ -1271,6 +1275,36 @@ mod tests {
             assert_eq!(handle(&get("/?t=bad", None), LAN, &s, t).status, 401);
         }
         assert_eq!(login(&s, PIN, t).status, 429);
+    }
+
+    #[test]
+    fn lockouts_grow_to_the_cap() {
+        let mut l = Limiter::default();
+        let mut t = Instant::now();
+        let mut locks = Vec::new();
+        for _ in 0..10 {
+            for _ in 0..MAX_FAILURES {
+                assert!(l.check(t).is_ok());
+                l.fail(t);
+            }
+            let lock = l.check(t).unwrap_err();
+            locks.push(lock.as_secs());
+            // Retry right when the lock-out ends.
+            t += lock;
+        }
+        assert_eq!(locks, [30, 60, 120, 240, 480, 960, 1920, 3600, 3600, 3600]);
+        // Forgotten only after a quiet FAILURE_MEMORY past the last lock-out.
+        assert!(l.check(t + FAILURE_MEMORY).is_ok());
+        for _ in 0..MAX_FAILURES {
+            l.fail(t + FAILURE_MEMORY);
+        }
+        assert_eq!(l.check(t + FAILURE_MEMORY).unwrap_err(), MAX_LOCKOUT);
+        let t = t + FAILURE_MEMORY + MAX_LOCKOUT + FAILURE_MEMORY + Duration::from_secs(1);
+        assert!(l.check(t).is_ok());
+        for _ in 0..MAX_FAILURES {
+            l.fail(t);
+        }
+        assert_eq!(l.check(t).unwrap_err(), FIRST_LOCKOUT);
     }
 
     #[test]
