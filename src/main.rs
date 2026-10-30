@@ -11,6 +11,8 @@ mod draw;
 #[cfg(windows)]
 mod icon;
 #[cfg(windows)]
+mod ocr;
+#[cfg(windows)]
 mod ui;
 
 // Command-line interface: parsing and output are platform independent; the
