@@ -740,6 +740,67 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// Searches read while the warm-up rewrites texts, flushes and compacts
+    /// (the situation of a content search started while the warm-up runs):
+    /// a read gives the right text or nothing, never a panic or another
+    /// document's text.
+    #[test]
+    fn reads_during_compaction_and_flush() {
+        let dir = temp_dir("compact_race");
+        let c = Arc::new(ContentCache::open(&dir).unwrap());
+        let text = |i: u64, v: u64| format!("{AR} {i} نسخة {v} {}", "ا".repeat((i * 37 % 300) as usize));
+        for i in 0..40 {
+            c.put(&format!("f{i}"), i, 0, Some(&text(i, 0)));
+        }
+        let stop = Arc::new(AtomicBool::new(false));
+        let writer = {
+            let (c, stop) = (c.clone(), stop.clone());
+            std::thread::spawn(move || {
+                let mut v: u64 = 1;
+                while !stop.load(Ordering::Relaxed) {
+                    // Each new version leaves the old record as garbage.
+                    for i in 0..40 {
+                        c.put(&format!("f{i}"), i, v as i64, Some(&text(i, v)));
+                    }
+                    let _ = c.flush();
+                    let _ = c.compact();
+                    v += 1;
+                }
+                v
+            })
+        };
+        let readers: Vec<_> = (0..6u64)
+            .map(|t| {
+                let c = c.clone();
+                std::thread::spawn(move || {
+                    let _searching = c.begin_search();
+                    let mut seen = 0;
+                    for round in 0..3000u64 {
+                        let i = (round * 13 + t) % 40;
+                        for v in [round % 8, 0] {
+                            if let Some(got) = c.get(&format!("f{i}"), i, v as i64) {
+                                assert_eq!(got.as_deref(), Some(text(i, v).as_str()));
+                                seen += 1;
+                            }
+                        }
+                    }
+                    seen
+                })
+            })
+            .collect();
+        let seen: usize = readers.into_iter().map(|r| r.join().unwrap()).sum();
+        stop.store(true, Ordering::Relaxed);
+        let versions = writer.join().unwrap();
+        assert!(versions > 1 && seen > 0, "{versions} {seen}");
+        assert!(!c.searching());
+        // What is on disk opens again and agrees.
+        c.flush().unwrap();
+        let reopened = ContentCache::open(&dir).unwrap();
+        assert_eq!(reopened.stats().documents, 40);
+        drop(c);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
     /// The entry of `path`, whose mtime on disk is set to `mtime` first.
     fn file_entry(path: &Path, mtime: i64) -> Entry {
         let f = File::options().write(true).open(path).unwrap();

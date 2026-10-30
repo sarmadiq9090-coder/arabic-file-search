@@ -280,7 +280,7 @@ impl NativeUi<AppUi> for App {
 
         // Regular events.
         let weak = Rc::downgrade(&ui.inner);
-        let handler = nwg::full_bind_event_handler(&ui.window.handle, move |evt, data, handle| {
+        let handler = nwg::full_bind_event_handler(&ui.window.handle, crate::crash_log::guard_events(move |evt, data, handle| {
             use nwg::Event as E;
             let Some(app) = weak.upgrade() else { return };
             match evt {
@@ -386,7 +386,7 @@ impl NativeUi<AppUi> for App {
                 }
                 _ => {}
             }
-        });
+        }));
         ui.handlers.borrow_mut().push(handler);
 
         // The "all matches" window only hides when closed, and its text fills it.
@@ -415,7 +415,7 @@ impl NativeUi<AppUi> for App {
         // Virtual list: answer LVN_GETDISPINFO with the text and icon of each cell.
         let weak = Rc::downgrade(&ui.inner);
         let list_hwnd = ui.list.handle.hwnd().unwrap_or(std::ptr::null_mut());
-        let raw = nwg::bind_raw_event_handler(&ui.window.handle, 0x1_0001, move |_hwnd: HWND, msg: UINT, w: WPARAM, l: LPARAM| {
+        let raw = nwg::bind_raw_event_handler(&ui.window.handle, 0x1_0001, crate::crash_log::guard_raw(move |_hwnd: HWND, msg: UINT, w: WPARAM, l: LPARAM| {
             if msg == winapi::um::winuser::WM_HOTKEY && w as i32 == HOTKEY_ID {
                 weak.upgrade()?.on_hotkey();
                 return Some(0);
@@ -465,7 +465,7 @@ impl NativeUi<AppUi> for App {
                 item.iImage = app.row_icon(item.iItem as usize);
             }
             Some(0)
-        })?;
+        }))?;
         ui.raw_handlers.borrow_mut().push(raw);
         let (handler, raw) = ui.inner.setup_quick_switch()?;
         ui.handlers.borrow_mut().push(handler);

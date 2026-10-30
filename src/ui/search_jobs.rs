@@ -32,7 +32,7 @@ impl App {
     pub(super) fn start(&self) {
         let slot: LoadJob = Arc::new(Mutex::new(None));
         let s = slot.clone();
-        std::thread::spawn(move || {
+        crate::crash_log::spawn_named("index-load", move || {
             background_priority();
             let started = std::time::Instant::now();
             let idx = Index::load(&index::cache_path());
@@ -92,7 +92,7 @@ impl App {
         let progress = Arc::new(ScanProgress::default());
         let result = Arc::new(Mutex::new(None));
         let (p, r) = (progress.clone(), result.clone());
-        std::thread::spawn(move || {
+        crate::crash_log::spawn_named("index-build", move || {
             background_priority();
             let started = std::time::Instant::now();
             let idx = Index::build(&index::list_drives(), &p);
@@ -174,7 +174,7 @@ impl App {
         };
         let slot = self.name_result.clone();
         let notice = self.name_notice.sender();
-        std::thread::spawn(move || {
+        crate::crash_log::spawn_named("name-search", move || {
             let started = std::time::Instant::now();
             let q = parse(&text);
             let mut hits = search::search_names(&index.entries, &q, &scope);
@@ -281,10 +281,14 @@ impl App {
         let hits = Arc::new(Mutex::new(Vec::new()));
         let (p, h, idx) = (progress.clone(), hits.clone(), index.clone());
         let use_index = st.settings.content_index;
-        std::thread::spawn(move || {
+        crate::crash_log::spawn_named("content-search", move || {
             let cache = if use_index { content_index::shared() } else { None };
             let started = std::time::Instant::now();
-            search::search_content(&idx.entries, &q, &scope, &p, &h, cache);
+            // After a panic (logged by the hook) the search still ends, so
+            // the window doesn't wait for it forever.
+            if crate::crash_log::catch(|| search::search_content(&idx.entries, &q, &scope, &p, &h, cache)).is_none() {
+                p.done.store(true, Ordering::Relaxed);
+            }
             log(&format!(
                 "content search: {} documents ({} from the content index) in {} ms",
                 p.checked.load(Ordering::Relaxed),

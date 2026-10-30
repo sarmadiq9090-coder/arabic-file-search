@@ -17,7 +17,6 @@
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::{self, Cursor, Read};
-use std::panic::{self, AssertUnwindSafe};
 use std::path::Path;
 
 use calamine::{Ods, Reader, Sheets, Xls, Xlsb, Xlsx};
@@ -114,12 +113,12 @@ fn archive_texts_with(path: &Path, lim: &Limits) -> Vec<(String, String)> {
     let mut col = Collector::new(lim, len);
     // Third-party decoders on hostile input: contain any panic, keep what
     // was collected before it.
-    let _ = panic::catch_unwind(AssertUnwindSafe(|| match kind {
+    let _ = crate::crash_log::quietly(|| match kind {
         Kind::Zip => read_zip(file, &mut col),
         Kind::SevenZ => read_7z(file, &mut col),
         Kind::Tar => read_tar(Capped::new(file, col.stream_cap), &mut col),
         Kind::TarGz => read_tar(Capped::new(flate2::read::GzDecoder::new(file), col.stream_cap), &mut col),
-    }));
+    });
     col.out
 }
 
@@ -420,7 +419,7 @@ fn read_7z(file: File, col: &mut Collector) {
 /// The text of a member with extension `ext` (a supported document type),
 /// like `extract_by_ext` but from bytes. Never panics.
 fn member_text(ext: &str, data: Vec<u8>) -> Option<String> {
-    panic::catch_unwind(AssertUnwindSafe(|| member_text_inner(ext, data))).ok().flatten()
+    crate::crash_log::quietly(|| member_text_inner(ext, data)).ok().flatten()
 }
 
 fn member_text_inner(ext: &str, mut data: Vec<u8>) -> Option<String> {

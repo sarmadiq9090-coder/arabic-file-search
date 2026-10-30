@@ -199,7 +199,7 @@ impl App {
         let progress = Arc::new(ScanProgress::default());
         let result = Arc::new(Mutex::new(None));
         let (d, p, r) = (dir.clone(), progress.clone(), result.clone());
-        std::thread::spawn(move || {
+        crate::crash_log::spawn_named("subtree-scan", move || {
             background_priority();
             let started = std::time::Instant::now();
             let found = Index::scan_subtree(&d, &p);

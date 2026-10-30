@@ -13,6 +13,8 @@ use crate::index::Entry;
 use crate::normalize::{normalize, normalize_with_map};
 
 mod members;
+#[cfg(test)]
+mod robustness;
 
 /// One search term: it matches when any of its alternatives is contained.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -1039,7 +1041,7 @@ pub fn search_content(
     let _searching = cache.map(ContentCache::begin_search);
     // A dedicated pool keeps the global one free for instant filename search.
     let threads = std::thread::available_parallelism().map_or(2, |n| n.get().saturating_sub(1).max(1));
-    let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build();
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).thread_name(|i| format!("content-{i}")).build();
     let run = || {
         candidates.par_iter().for_each(|&i| {
             if progress.cancel.load(Ordering::Relaxed) {
@@ -1051,8 +1053,10 @@ pub fn search_content(
             if from_cache {
                 progress.from_cache.fetch_add(1, Ordering::Relaxed);
             }
+            // A bug matching one document (reported by the panic hook)
+            // skips that document instead of ending the whole search.
             if let Some(text) = text
-                && let Some(hit) = content_hit(i, &text, q)
+                && let Some(hit) = crate::crash_log::catch(|| content_hit(i, &text, q)).flatten()
                 && let Ok(mut h) = hits.lock()
             {
                 h.push(hit);

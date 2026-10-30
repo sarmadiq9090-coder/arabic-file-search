@@ -199,7 +199,7 @@ impl App {
         // Files change all the time; writing a big index after each batch
         // would cost more than it saves, so watcher edits wait half a minute.
         if !live || !LIVE_SAVE_QUEUED.swap(true, Ordering::Relaxed) {
-            std::thread::spawn(move || {
+            crate::crash_log::spawn_named("index-save", move || {
                 background_priority();
                 std::thread::sleep(std::time::Duration::from_millis(if live { 30_000 } else { 500 }));
                 if live {

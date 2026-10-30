@@ -33,6 +33,8 @@ mod cli;
 #[cfg(any(windows, test))]
 mod content_cache;
 #[cfg(any(windows, test))]
+mod crash_log;
+#[cfg(any(windows, test))]
 mod dupes;
 #[cfg(any(windows, test))]
 mod extract;
@@ -69,6 +71,9 @@ mod web;
 
 #[cfg(windows)]
 fn main() {
+    // First, so a panic anywhere (UI or command line) leaves a report.
+    crash_log::install(crash_log::default_log_path());
+    crash_log::name_global_pool();
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.first().is_some_and(|a| cli::is_cli_arg(a)) {
         cli::run(&args);

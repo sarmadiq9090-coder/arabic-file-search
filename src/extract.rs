@@ -12,7 +12,6 @@ use std::borrow::Cow;
 use std::fs::File;
 use std::io::{Read, Seek};
 use std::ops::Range;
-use std::panic::{self, AssertUnwindSafe};
 use std::path::Path;
 
 use calamine::{Data, Reader, Sheets};
@@ -87,7 +86,7 @@ pub fn extract_text(path: &Path) -> Option<String> {
         return None;
     }
 
-    let text = panic::catch_unwind(AssertUnwindSafe(|| extract_by_ext(path, &ext)))
+    let text = crate::crash_log::quietly(|| extract_by_ext(path, &ext))
         .ok()
         .flatten()?;
     let text = normalize_arabic_forms(&text).into_owned();
@@ -500,10 +499,7 @@ fn extract_pdf(path: &Path) -> Option<String> {
     // though `extract_text` has an outer guard as well. (It does not print to
     // stdout in normal operation; in a GUI-subsystem build there is no console
     // to print to anyway.)
-    let text = panic::catch_unwind(AssertUnwindSafe(|| {
-        pdf_extract::extract_text_from_mem(&bytes)
-    }))
-    .ok()?;
+    let text = crate::crash_log::quietly(|| pdf_extract::extract_text_from_mem(&bytes)).ok()?;
     // A scanned PDF may have no text layer at all: OCR its page images.
     #[cfg(windows)]
     let text = pdf_images::ocr_if_scanned(&bytes, text.unwrap_or_default());
