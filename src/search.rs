@@ -12,6 +12,8 @@ use crate::extract;
 use crate::index::Entry;
 use crate::normalize::{normalize, normalize_with_map};
 
+mod members;
+
 /// One search term: it matches when any of its alternatives is contained.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Term {
@@ -1075,6 +1077,9 @@ pub fn all_matches(text: &str, q: &Query, max: usize) -> (u32, Vec<(u32, String)
 /// A content hit for entry `index` if `text` matches, normalising the text
 /// only once. Documents that don't match stop at the cheap first-match check.
 fn content_hit(index: u32, text: &str, q: &Query) -> Option<ContentHit> {
+    if let Some(m) = extract::split_members(text) {
+        return members::archive_hit(index, &m, q); // an archive: per member
+    }
     let (norm, map) = normalize_with_map(text);
     let first = text_matches(text, &norm, &map, q, false)?[0];
     let at = text_matches(text, &norm, &map, q, true).unwrap_or_else(|| vec![first]);

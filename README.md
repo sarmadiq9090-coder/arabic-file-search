@@ -13,6 +13,7 @@
 - **بحث فوري بالاسم**: يفهرس كل الأقراص مرة واحدة ويحفظ الفهرس، ثم تظهر النتائج أثناء الكتابة (ملي ثوانٍ حتى مع ملايين الملفات).
 - **دعم كامل للعربية**: واجهة من اليمين لليسار بخط Segoe UI، والبحث يتجاهل الفروق بين (أ إ آ ا)، (ة ه)، (ى ي)، والتشكيل والتطويل، والأرقام العربية (٠١٢٣).
 - **البحث داخل المستندات**: txt و docx و pptx و xlsx و xls و pdf و odt و ods و rtf و doc، ورسائل البريد eml وmsg (Outlook)، وكتب epub، وملفات النصوص البرمجية وغيرها. يُظهر مقتطفاً من النص المطابق.
+- **البحث داخل الملفات المضغوطة**: zip و7z وtar وtar.gz: المستندات داخل الأرشيف (docx وpdf وtxt وغيرها) تُقرأ في الذاكرة دون فك ضغطها على القرص، ويظهر الأرشيف في النتائج مع اسم الملف المطابق داخله (`تقارير\تقرير.docx: …نص…`). محمي من «القنابل المضغوطة»: 2000 عنصر على الأكثر، و50 ميغابايت للعنصر، و300 ميغابايت للأرشيف، ويُتجاهل ما يتضخم أكثر من 200 ضعف، ولا يُفتح أرشيف داخل أرشيف.
 - **إصلاح العربية المعكوسة في PDF**: الأسطر المخزّنة بترتيب بصري معكوس («يف» بدل «في») تُكتشف وتُقلب فتصبح قابلة للبحث.
 - **اختصار عام Ctrl+Alt+F**: يُظهر البرنامج من أي مكان ومربع البحث جاهز، ويُخفيه إذا كان ظاهراً.
 - **تلوين الجزء المطابق**: خط تحت الحروف المطابقة في اسم كل نتيجة، حتى مع التوحيد العربي (أحمد تطابق احمد).
@@ -110,7 +111,8 @@ cargo build --release
 | `src/index.rs` | فهرسة الأقراص بالتوازي وحفظ الفهرس |
 | `src/cli.rs` | البحث من سطر الأوامر (`bahth.exe -s …`) |
 | `src/search.rs` | تحليل الاستعلام والبحث بالاسم وداخل المحتوى |
-| `src/extract.rs` و`src/extract/` | استخراج النص من المستندات، والبريد (eml وmsg)، وepub، وتصحيح ترتيب العربية في PDF |
+| `src/extract.rs` و`src/extract/` | استخراج النص من المستندات، والبريد (eml وmsg)، وepub، وتصحيح ترتيب العربية في PDF، و`archive.rs` المستندات داخل zip و7z وtar وtar.gz مع حدود الحماية |
+| `src/search/members.rs` | نتيجة واحدة لكل أرشيف مع اسم الملف المطابق داخله في المقتطف وفي كل التطابقات |
 | `src/history.rs` | سجل البحث والبحوث المحفوظة والملفات الأكثر فتحاً |
 | `src/draw.rs` | رسم خط تحت الجزء المطابق في القائمة |
 | `src/dragdrop.rs` | السحب والإفلات ونسخ الملفات إلى الحافظة |
@@ -130,7 +132,7 @@ MIT — انظر ملف [LICENSE](LICENSE).
 
 ## English
 
-**Bahth Sari'** is a fast, open-source Windows file search tool written in Rust with full Arabic support. It indexes all local drives into a cached in-memory index for instant filename search, and can search inside documents (txt, docx, pptx, xlsx/xls, pdf, odt/ods, rtf, doc, eml/msg, epub, source files). Version 0.3 adds a global hotkey (Ctrl+Alt+F), match highlighting, column sorting, search history and saved searches, frequently-opened files first, F2 rename / Delete to Recycle Bin, drag & drop, fixing of reversed Arabic text in PDFs, and automatic updates from GitHub Releases. Arabic matching ignores hamza forms, ta marbuta, alef maqsura, diacritics and tatweel. Double-click to open a file, open its folder, or copy its full path.
+**Bahth Sari'** is a fast, open-source Windows file search tool written in Rust with full Arabic support. It indexes all local drives into a cached in-memory index for instant filename search, and can search inside documents (txt, docx, pptx, xlsx/xls, pdf, odt/ods, rtf, doc, eml/msg, epub, source files), including documents inside zip, 7z, tar and tar.gz archives (read in memory, with zip-bomb limits). Version 0.3 adds a global hotkey (Ctrl+Alt+F), match highlighting, column sorting, search history and saved searches, frequently-opened files first, F2 rename / Delete to Recycle Bin, drag & drop, fixing of reversed Arabic text in PDFs, and automatic updates from GitHub Releases. Arabic matching ignores hamza forms, ta marbuta, alef maqsura, diacritics and tatweel. Double-click to open a file, open its folder, or copy its full path.
 
 Command line: `bahth.exe -s "invoice ext:pdf" [-n N] [--sort name|path|size|date] [--desc] [--scope folder] [--count|--csv|--json]` prints matching paths from the saved index (exit code 0 found, 1 none, 2 error); see `bahth.exe --help`.
 

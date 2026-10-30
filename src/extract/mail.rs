@@ -504,7 +504,7 @@ pub(super) fn extract_msg(path: &Path) -> Option<String> {
     msg_to_text(comp)
 }
 
-fn msg_to_text<F: Read + std::io::Seek>(mut comp: cfb::CompoundFile<F>) -> Option<String> {
+pub(super) fn msg_to_text<F: Read + std::io::Seek>(mut comp: cfb::CompoundFile<F>) -> Option<String> {
     // Top-level streams, keyed by uppercase name (CFB names are
     // case-insensitive and writers differ in hex digit case).
     let names: Vec<(String, std::path::PathBuf)> = comp

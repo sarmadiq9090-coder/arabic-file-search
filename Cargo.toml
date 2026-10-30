@@ -18,6 +18,13 @@ zip = "9.1.3"
 sha2 = "0.10"
 cfb = "0.15.0"
 regex = "1"
+tar = { version = "0.4.46", default-features = false }
+flate2 = "1.1.10"
+sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["bzip2", "deflate", "ppmd"] }
+
+[dev-dependencies]
+# The encoder, only to build .7z archives in the tests.
+sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["compress"] }
 
 [target.'cfg(windows)'.dependencies]
 native-windows-gui = { version = "1.0.13", default-features = false, features = ["list-view", "animation-timer", "clipboard", "menu", "file-dialog", "status-bar", "high-dpi", "tray-notification", "combobox", "notice", "textbox"] }
