@@ -11,6 +11,11 @@ pub(super) static ARABIC_DIGITS: AtomicBool = AtomicBool::new(false);
 /// putting left-to-right marks around every separator. Display only: never
 /// pass the result to the shell or the clipboard.
 pub(super) fn ltr_path(path: &str) -> String {
+    // In the left-to-right (English) window a path with no right-to-left
+    // letters already reads correctly.
+    if crate::i18n::is_en() && !path.chars().any(|c| matches!(c, '\u{0590}'..='\u{08FF}' | '\u{FB1D}'..='\u{FEFC}')) {
+        return path.to_owned();
+    }
     let mut s = String::with_capacity(path.len() + 16);
     s.push('\u{200E}');
     for c in path.chars() {
