@@ -59,6 +59,8 @@ mod search;
 #[cfg(any(windows, test))]
 mod settings;
 #[cfg(any(windows, test))]
+mod thumb_cache;
+#[cfg(any(windows, test))]
 mod update;
 #[cfg(any(windows, test))]
 mod web;
