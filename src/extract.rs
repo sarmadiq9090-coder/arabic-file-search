@@ -56,7 +56,8 @@ pub fn is_supported(ext: &str) -> bool {
 
 #[cfg(windows)]
 fn is_ocr_image(ext: &str) -> bool {
-    IMAGE_EXTS.contains(&ext) && crate::ocr::available()
+    // Tests expect the same results on every machine, with or without OCR.
+    !cfg!(test) && IMAGE_EXTS.contains(&ext) && crate::ocr::available()
 }
 
 #[cfg(not(windows))]
@@ -169,14 +170,14 @@ fn guess_utf16_without_bom(buf: &[u8]) -> Option<&'static Encoding> {
     }
     let pairs = sample.len() / 2;
     let (mut even0, mut odd0) = (0usize, 0usize);
-    for pair in sample.chunks_exact(2) {
+    for pair in sample.as_chunks::<2>().0 {
         even0 += (pair[0] == 0) as usize;
         odd0 += (pair[1] == 0) as usize;
     }
     // ASCII-heavy UTF-16 has ~100% zeros on one side; Arabic UTF-16 has the
     // high byte 0x06 instead, so also accept a dominant 0x06 high byte.
-    let odd06 = sample.chunks_exact(2).filter(|p| p[1] == 0x06).count();
-    let even06 = sample.chunks_exact(2).filter(|p| p[0] == 0x06).count();
+    let odd06 = sample.as_chunks::<2>().0.iter().filter(|p| p[1] == 0x06).count();
+    let even06 = sample.as_chunks::<2>().0.iter().filter(|p| p[0] == 0x06).count();
     if (odd0 + odd06) * 10 >= pairs * 7 && even0 * 10 < pairs {
         Some(UTF_16LE)
     } else if (even0 + even06) * 10 >= pairs * 7 && odd0 * 10 < pairs {
@@ -922,8 +923,10 @@ fn extract_doc_heuristic(data: &[u8]) -> String {
 
     // UTF-16LE runs (Word stores Unicode text pieces this way, word-aligned).
     let units: Vec<u16> = data
-        .chunks_exact(2)
-        .map(|p| u16::from_le_bytes([p[0], p[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|&p| u16::from_le_bytes(p))
         .collect();
     for Range { start, end } in runs_where(&units, is_doc_text_unit) {
         let run = &units[start..end];

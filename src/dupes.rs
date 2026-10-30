@@ -326,7 +326,8 @@ mod tests {
         let mut entries: Vec<Entry> = files
             .iter()
             .map(|(name, data)| {
-                let p = dir.join(name);
+                // Native separators, so paths match the folder scope on Windows too.
+                let p = name.split('/').fold(dir.to_path_buf(), |p, part| p.join(part));
                 std::fs::create_dir_all(p.parent().unwrap()).unwrap();
                 std::fs::write(&p, data).unwrap();
                 entry(&p.to_string_lossy(), data.len() as u64, false)

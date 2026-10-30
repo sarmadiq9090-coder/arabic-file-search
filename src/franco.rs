@@ -114,6 +114,23 @@ fn consonant(c: u8, start: bool, end: bool) -> Option<Options> {
     })
 }
 
+/// The optional second letter of a doubled consonant: none by default.
+fn doubled(c: u8) -> Option<Options> {
+    Some(match c {
+        b'l' => &[("", 0), ("ل", 1)],
+        b'm' => &[("", 0), ("م", 1)],
+        b'n' => &[("", 0), ("ن", 1)],
+        b'r' => &[("", 0), ("ر", 1)],
+        b's' => &[("", 0), ("س", 1)],
+        b'd' => &[("", 0), ("د", 1)],
+        b't' => &[("", 0), ("ت", 1)],
+        b'b' => &[("", 0), ("ب", 1)],
+        b'y' => &[("", 0), ("ي", 1)],
+        b'w' => &[("", 0), ("و", 1)],
+        _ => return None,
+    })
+}
+
 /// Splits `word` into pieces with their options. `None` when a character
 /// has no Arabic reading.
 fn pieces(word: &str) -> Option<Vec<Options>> {
@@ -122,6 +139,13 @@ fn pieces(word: &str) -> Option<Vec<Options>> {
     let mut i = 0;
     while i < b.len() {
         let start = i == 0;
+        // Allah, also inside names: abdallah, abdullah, 3abdellah.
+        if let Some(n) = ["allah", "ullah", "ellah", "illah", "olah", "alah"].iter().find(|w| b[i..].starts_with(w.as_bytes())) {
+            const ALLAH: Options = &[("الله", 0), ("اله", 1)];
+            out.push(ALLAH);
+            i += n.len();
+            continue;
+        }
         if let Some(opts) = digraph(&b[i..]) {
             out.push(opts);
             i += 2;
@@ -136,12 +160,19 @@ fn pieces(word: &str) -> Option<Vec<Options>> {
             i += len;
             continue;
         }
-        // A doubled consonant (shadda) is written once: mohammed.
+        // A doubled consonant (shadda) is usually written once (mohammed),
+        // but sometimes twice: the two lams of allah, abdallah.
         let mut run = 1;
         while b.get(i + run) == Some(&c) {
             run += 1;
         }
-        out.push(consonant(c, start, i + run == b.len())?);
+        let opts = consonant(c, start, i + run == b.len())?;
+        out.push(opts);
+        if run > 1
+            && let Some(second) = doubled(c)
+        {
+            out.push(second);
+        }
         i += run;
     }
     Some(out)
@@ -210,6 +241,11 @@ mod tests {
         assert!(has("ahmed", "أحمد"));
         assert!(has("taqrer", "تقرير"));
         assert!(has("ta2rer", "تقرير"));
+        assert!(has("3abdallah", "عبدالله"));
+        assert!(has("abdallah", "عبدالله"));
+        assert!(has("abdullah", "عبدالله"));
+        assert!(has("allah", "الله"));
+        assert!(has("mohammed", "محمد"));
         assert!(has("taqrir", "تقرير"));
         assert!(has("sha3er", "شاعر"));
         assert!(has("khaled", "خالد"));

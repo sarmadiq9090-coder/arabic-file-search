@@ -546,7 +546,7 @@ pub(super) fn msg_to_text<F: Read + std::io::Seek>(mut comp: cfb::CompoundFile<F
     // fixed-size property stream (32-byte header, 16-byte entries).
     let find_long = |id: u32| {
         let entries = read("__PROPERTIES_VERSION1.0")?.get(32..)?;
-        entries.chunks_exact(16).find_map(|e| {
+        entries.as_chunks::<16>().0.iter().find_map(|e| {
             let tag = u32::from_le_bytes(e[0..4].try_into().ok()?);
             (tag == (id << 16 | 0x0003)).then(|| u32::from_le_bytes(e[8..12].try_into().unwrap_or_default()))
         })

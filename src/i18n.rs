@@ -94,6 +94,11 @@ pub const KIND_LABELS_EN: [&str; 8] =
 /// installed before English existed keep Arabic instead of switching on an
 /// update. The first detection is saved so it stays the same later.
 fn detect() -> Lang {
+    // Tests check the Arabic texts whatever the machine's language, and
+    // must not write the choice to the registry.
+    if cfg!(test) {
+        return Lang::Ar;
+    }
     if let Some(lang) = saved() {
         return lang;
     }

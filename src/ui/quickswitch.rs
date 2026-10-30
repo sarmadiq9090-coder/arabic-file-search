@@ -42,8 +42,8 @@ const ID_FILENAME_EDIT: i32 = 0x480;
 
 fn hint() -> &'static str {
     tr!(
-        "اختر نتيجة واضغط Enter لنقل نافذة الحفظ إلى مجلدها (Esc للإلغاء)",
-        "Pick a result and press Enter to move the Save dialog to its folder (Esc to cancel)"
+        "Enter: نقل النافذة إلى مجلد النتيجة · Esc: إلغاء",
+        "Enter: move the dialog to the result's folder · Esc: cancel"
     )
 }
 
