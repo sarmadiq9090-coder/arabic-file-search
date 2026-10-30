@@ -22,6 +22,7 @@ mod autostart;
 mod build;
 mod content_index;
 mod dupes_window;
+mod disk_usage;
 mod files;
 mod format;
 mod history_menu;
@@ -242,6 +243,8 @@ pub struct App {
     dupes: dupes_window::Dupes,
     /// Find and replace across the plain text files of the results.
     replace: replace_window::ReplaceWindow,
+    /// Folder sizes: the Size column of folders and the folder-sizes window.
+    disk: disk_usage::DiskUsage,
 }
 
 impl App {

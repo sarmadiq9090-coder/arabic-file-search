@@ -189,6 +189,9 @@ impl App {
             if sort == SortKey::Relevance {
                 // Files the user opens often come first.
                 search::promote(&mut hits, &boosted);
+            } else if sort == SortKey::Size {
+                // Folders sort by everything inside them.
+                crate::folder_sizes::sort_hits_by_total(&mut hits, &crate::folder_sizes::for_index(&index), desc);
             } else {
                 search::sort_hits(&index.entries, &mut hits, sort, desc);
             }
