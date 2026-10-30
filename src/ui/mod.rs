@@ -29,6 +29,7 @@ mod search_jobs;
 mod shell;
 mod startup;
 mod updates;
+mod web_server;
 
 use native_windows_gui as nwg;
 use nwg::NativeUi;
@@ -218,6 +219,8 @@ pub struct App {
     state: RefCell<State>,
     /// Moving another program's Open / Save As dialog to a result's folder.
     quick: quickswitch::QuickSwitch,
+    /// Searching from a phone over the home network (off by default).
+    web: web_server::WebUi,
 }
 
 impl App {

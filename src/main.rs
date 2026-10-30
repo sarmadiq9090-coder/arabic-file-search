@@ -46,6 +46,8 @@ mod search;
 mod settings;
 #[cfg(any(windows, test))]
 mod update;
+#[cfg(any(windows, test))]
+mod web;
 
 #[cfg(windows)]
 fn main() {
