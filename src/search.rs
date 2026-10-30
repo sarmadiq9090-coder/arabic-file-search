@@ -4,7 +4,6 @@
 
 use rayon::prelude::*;
 use regex::{Regex, RegexBuilder};
-use std::path::Path;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
 
@@ -1047,19 +1046,11 @@ pub fn search_content(
                 return;
             }
             let entry = &entries[i as usize];
-            let text = match cache.and_then(|c| c.get(&entry.path, entry.size, entry.mtime)) {
-                Some(text) => {
-                    progress.from_cache.fetch_add(1, Ordering::Relaxed);
-                    text
-                }
-                None => {
-                    let text = extract::extract_text(Path::new(&*entry.path));
-                    if let Some(c) = cache {
-                        c.put(&entry.path, entry.size, entry.mtime, text.as_deref());
-                    }
-                    text
-                }
-            };
+            // Keyed by the file on disk, not the index entry, which may be stale.
+            let (text, from_cache) = content_cache::text_of(cache, &entry.path);
+            if from_cache {
+                progress.from_cache.fetch_add(1, Ordering::Relaxed);
+            }
             if let Some(text) = text
                 && let Some(hit) = content_hit(i, &text, q)
                 && let Ok(mut h) = hits.lock()
@@ -1761,7 +1752,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let files = [("تقرير.txt", "تقرير المبيعات السنوي\nالمبيعات ارتفعت"), ("اخر.txt", "لا شيء هنا"), ("فارغ.txt", "  ")];
-        let mut entries: Vec<Entry> = files
+        let entries: Vec<Entry> = files
             .iter()
             .map(|(name, text)| {
                 let p = dir.join(name);
@@ -1769,6 +1760,13 @@ mod tests {
                 Entry { size: text.len() as u64, mtime: 1000, ..entry(p.to_str().unwrap(), false) }
             })
             .collect();
+        let set_mtime = |name: &str, secs: u64| {
+            let f = std::fs::File::options().write(true).open(dir.join(name)).unwrap();
+            f.set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs)).unwrap();
+        };
+        for (name, _) in &files {
+            set_mtime(name, 1000);
+        }
         let cache = ContentCache::open(&dir.join("store")).unwrap();
         let run = |entries: &[Entry], q: &str| {
             let progress = ContentProgress::default();
@@ -1783,19 +1781,24 @@ mod tests {
         // First run extracts every document (the empty one is stored as "no text").
         assert_eq!(run(&entries, "المبيعات"), (0, 3, vec![(0, 2, 2)]));
         assert_eq!(cache.stats().documents, 3);
-        // The files change on disk but their index entries don't: the second
-        // run never opens them and still finds the stored text.
-        for (name, _) in &files {
-            std::fs::write(dir.join(name), "المبيعات في كل مكان").unwrap();
-        }
         assert_eq!(run(&entries, "المبيعات"), (3, 3, vec![(0, 2, 2)]));
         // The store was saved at the end of the search.
         assert_eq!(ContentCache::open(&dir.join("store")).unwrap().stats().documents, 3);
-        // A newer mtime makes that one document be read again.
-        entries[1].mtime = 2000;
-        entries[1].size = std::fs::metadata(&*entries[1].path).unwrap().len();
-        assert_eq!(run(&entries, "المبيعات"), (2, 3, vec![(0, 2, 2), (1, 1, 1)]));
+        // The files change on disk but their index entries don't (auto-index
+        // off, a missed event): the cache is keyed by the disk, so they are
+        // read again and the new text is found.
+        for (name, _) in &files {
+            std::fs::write(dir.join(name), "المبيعات في كل مكان").unwrap();
+            set_mtime(name, 2000);
+        }
+        assert_eq!(run(&entries, "المبيعات"), (0, 3, vec![(0, 1, 1), (1, 1, 1), (2, 1, 1)]));
         assert_eq!(run(&entries, "المبيعات").0, 3);
+        // A same-size edit just now: read again, and not stored while the
+        // whole-second mtime couldn't tell it from a further edit.
+        std::fs::write(dir.join(files[1].0), "الأرباح في كل مكان!!").unwrap();
+        assert_eq!(std::fs::metadata(dir.join(files[1].0)).unwrap().len(), "المبيعات في كل مكان".len() as u64);
+        assert_eq!(run(&entries, "الأرباح"), (2, 3, vec![(1, 1, 1)]));
+        assert_eq!(run(&entries, "الأرباح").0, 2);
         drop(cache);
         std::fs::remove_dir_all(&dir).unwrap();
     }

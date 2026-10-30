@@ -8,9 +8,10 @@
 //! - `content.idx`: a bincode map from path to [`Meta`] (size, mtime, where
 //!   the text sits in `content.dat`), followed by a checksum.
 //!
-//! An entry is used only while the file's size and modification time still
-//! match. Files with no text (or whose extraction failed) are remembered
-//! too, so they are not re-parsed on every search. A missing, corrupt or
+//! An entry is used only while the file's size and modification time on
+//! disk still match. Files with no text (or whose extraction failed) are
+//! remembered too, so they are not re-parsed on every search, but only when
+//! the failure doesn't look passing (see `worth_storing`). A missing, corrupt or
 //! mismatched store is thrown away and started afresh; nothing here panics.
 //!
 //! Reads take a shared lock only, so the parallel content search reads many
@@ -26,7 +27,7 @@ use std::io::{self, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, RwLock};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::extract;
 use crate::index::Entry;
@@ -180,6 +181,69 @@ fn decode_idx(bytes: &[u8]) -> Option<IdxFile> {
         return None;
     }
     bincode::deserialize(payload).ok()
+}
+
+/// A file's size and modification time as it is on disk now, in the units
+/// of [`Entry`] (bytes, whole seconds since 1970). `None` when it is gone or
+/// is not a file.
+pub fn stamp(path: &Path) -> Option<(u64, i64)> {
+    let m = fs::metadata(path).ok().filter(|m| m.is_file())?;
+    let mtime = m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs() as i64);
+    Some((m.len(), mtime))
+}
+
+fn now_secs() -> i64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)
+}
+
+/// A file modified this recently may still be written to: an extraction
+/// that found no text then is not remembered. (Seconds.)
+const RECENT_SECS: i64 = 120;
+/// Mtimes are whole seconds, so a text read within the second of the last
+/// change could be followed by a same-size edit with the same mtime: such a
+/// text is not stored. (Seconds.)
+const SETTLE_SECS: i64 = 2;
+
+/// Whether the result of extracting `path`, whose [`stamp`] was `before`
+/// just ahead of the extraction, can be stored and trusted until the file
+/// changes. Not when the file changed meanwhile or was changed too recently;
+/// and "no text" only when the file can be opened now, so a document that
+/// was locked, denied or being written is tried again next time.
+fn worth_storing(path: &Path, before: (u64, i64), has_text: bool, now: i64) -> bool {
+    if stamp(path) != Some(before) {
+        return false;
+    }
+    let age = now - before.1;
+    if age < SETTLE_SECS {
+        return false;
+    }
+    has_text || (age >= RECENT_SECS && File::open(path).is_ok())
+}
+
+/// Extracts the text of `path` and stores it in `cache` when it can be
+/// trusted (see `worth_storing`). True when it was stored.
+fn extract_and_store(cache: &ContentCache, path: &str, before: (u64, i64)) -> (Option<String>, bool) {
+    let p = Path::new(path);
+    let text = extract::extract_text(p);
+    let store = worth_storing(p, before, text.is_some(), now_secs());
+    if store {
+        cache.put(path, before.0, before.1, text.as_deref());
+    }
+    (text, store)
+}
+
+/// The text of `path` for a content search: from `cache` when it holds a
+/// result for the file as it is on disk now (whatever the index says),
+/// otherwise extracted, and stored when it can be trusted. The flag is true
+/// when the text came from the cache.
+pub fn text_of(cache: Option<&ContentCache>, path: &str) -> (Option<String>, bool) {
+    let (Some(cache), Some(st)) = (cache, stamp(Path::new(path))) else {
+        return (extract::extract_text(Path::new(path)), false);
+    };
+    if let Some(text) = cache.get(path, st.0, st.1) {
+        return (text, true);
+    }
+    (extract_and_store(cache, path, st).0, false)
 }
 
 /// A text or a document whose text is worth caching: supported and not
@@ -450,10 +514,12 @@ pub fn warm(entries: &[Entry], cache: &ContentCache, progress: &WarmProgress, ca
         if cancel.load(Ordering::Relaxed) || cache.is_full() {
             break;
         }
-        // A search may have stored it meanwhile.
-        if !cache.is_fresh(&e.path, e.size, e.mtime) {
-            let text = extract::extract_text(Path::new(&*e.path));
-            cache.put(&e.path, e.size, e.mtime, text.as_deref());
+        // The file as it is now (the index may lag behind); a search may
+        // also have stored it meanwhile.
+        if let Some(st) = stamp(Path::new(&*e.path))
+            && !cache.is_fresh(&e.path, st.0, st.1)
+            && extract_and_store(cache, &e.path, st).1
+        {
             progress.added.fetch_add(1, Ordering::Relaxed);
             unsaved += 1;
             if unsaved >= FLUSH_EVERY {
@@ -674,7 +740,11 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// The entry of `path`, whose mtime on disk is set to `mtime` first.
     fn file_entry(path: &Path, mtime: i64) -> Entry {
+        let f = File::options().write(true).open(path).unwrap();
+        f.set_modified(UNIX_EPOCH + Duration::from_secs(mtime as u64)).unwrap();
+        drop(f);
         let size = fs::metadata(path).unwrap().len();
         Entry { path: path.to_str().unwrap().into(), size, mtime, is_dir: false, norm_name: "".into() }
     }
@@ -718,7 +788,7 @@ mod tests {
         assert_eq!(p.total.load(Ordering::Relaxed), 0);
 
         // It waits while a search runs.
-        entries[0].mtime = 999;
+        entries[0] = file_entry(Path::new(&*entries[0].path), 999);
         let cache = Arc::new(cache);
         let guard_cache = cache.clone();
         let p = Arc::new(WarmProgress::default());
@@ -742,6 +812,50 @@ mod tests {
         searcher.join().unwrap();
         warmer.join().unwrap();
         assert_eq!(p.added.load(Ordering::Relaxed), 1);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn passing_failures_are_not_remembered() {
+        let dir = temp_dir("worth");
+        fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("مستند.txt");
+        fs::write(&p, "نص").unwrap();
+        let st = file_entry(&p, 10_000);
+        let st = (st.size, st.mtime);
+        // Settled and unchanged: text and "no text" both kept.
+        assert!(worth_storing(&p, st, true, 20_000));
+        assert!(worth_storing(&p, st, false, 20_000));
+        // Changed just now: a text only after the mtime second has passed,
+        // "no text" only once the file has been left alone a while.
+        assert!(!worth_storing(&p, st, true, 10_001));
+        assert!(worth_storing(&p, st, true, 10_002));
+        assert!(!worth_storing(&p, st, false, 10_002));
+        assert!(worth_storing(&p, st, false, 10_000 + RECENT_SECS));
+        // Changed while it was read, or gone (the read failed): not kept.
+        assert!(!worth_storing(&p, (st.0 + 1, st.1), true, 20_000));
+        assert!(!worth_storing(&p, (st.0, st.1 - 1), false, 20_000));
+        fs::remove_file(&p).unwrap();
+        assert!(!worth_storing(&p, st, false, 20_000));
+        assert_eq!(stamp(&p), None);
+        assert_eq!(stamp(&dir), None);
+
+        // Through text_of: a failure on a fresh file is tried again; text is
+        // served from the cache only while the disk still matches.
+        let cache = ContentCache::open(&dir.join("store")).unwrap();
+        let empty = dir.join("فارغ.txt");
+        fs::write(&empty, " ").unwrap();
+        let path = empty.to_str().unwrap();
+        assert_eq!(text_of(Some(&cache), path), (None, false));
+        assert_eq!(cache.stats().documents, 0);
+        file_entry(&empty, 10_000);
+        assert_eq!(text_of(Some(&cache), path), (None, false));
+        assert_eq!(text_of(Some(&cache), path), (None, true));
+        fs::write(&empty, "نص").unwrap();
+        file_entry(&empty, 10_000);
+        assert_eq!(text_of(Some(&cache), path), (Some("نص".into()), false));
+        assert_eq!(text_of(Some(&cache), path), (Some("نص".into()), true));
+        drop(cache);
         fs::remove_dir_all(&dir).unwrap();
     }
 }
