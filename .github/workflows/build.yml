@@ -1,8 +1,9 @@
 name: build
 
-# CI only checks and builds; it never touches GitHub Releases. Releases are
-# published by hand with the exe that passed QC, under the exact asset name
-# `bahth.exe` that the in-app updater downloads.
+# CI checks and builds every push. When main gets a version (Cargo.toml) that
+# has no tag yet, the `release` job tags it and publishes the GitHub Release
+# with the exe cross-built exactly as in local QC (x86_64-pc-windows-gnu),
+# under the asset name `bahth.exe` that the in-app updater downloads.
 
 on:
   push:
@@ -57,3 +58,43 @@ jobs:
         with:
           name: bahth-windows
           path: target/release/bahth.exe
+
+  release:
+    needs: [linux-test, windows]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        id: v
+        run: |
+          v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$v" >/dev/null; then
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.v.outputs.new == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+      - if: steps.v.outputs.new == 'true'
+        name: Build bahth.exe
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q mingw-w64
+          cargo build --release --target x86_64-pc-windows-gnu
+          cp target/x86_64-pc-windows-gnu/release/bahth.exe bahth.exe
+      - if: steps.v.outputs.new == 'true'
+        name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          notes="releases/$TAG-notes.md"
+          [ -f "$notes" ] || notes=/dev/null
+          title=$(head -1 "$notes" | sed 's/^# *//')
+          [ -n "$title" ] || title="$TAG"
+          gh release create "$TAG" bahth.exe --target "$GITHUB_SHA" --title "$title" --notes-file "$notes" --latest
