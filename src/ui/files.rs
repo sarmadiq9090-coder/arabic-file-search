@@ -9,7 +9,7 @@ use winapi::um::winuser::SendMessageW;
 
 use super::shell;
 use super::startup::background_priority;
-use super::{App, Row, title};
+use super::{App, Row, State, title};
 use crate::index::{self, Index};
 
 impl App {
@@ -143,6 +143,14 @@ impl App {
         );
     }
 
+    /// True when an edit would have to copy the whole index, because a
+    /// holder other than the window's own (rows, a waiting save) shares it.
+    pub(super) fn index_shared(&self, st: &State) -> bool {
+        let rows = usize::from(Arc::ptr_eq(&st.rows_index, &st.index));
+        let save = PENDING_SAVE.lock().map_or(0, |p| usize::from(p.as_ref().is_some_and(|p| Arc::ptr_eq(p, &st.index))));
+        Arc::strong_count(&st.index) > 1 + rows + save
+    }
+
     /// `update_index` for a change that returns whether it changed anything.
     /// `live` marks a change found on disk by the watcher: it keeps the
     /// selection, re-runs only a non-empty search, and saves less often.
@@ -162,7 +170,12 @@ impl App {
         let inner = Arc::get_mut(&mut idx);
         let mut owned = match inner {
             Some(i) => std::mem::take(i),
-            None => Index { entries: idx.entries.clone(), roots: idx.roots.clone(), built_at: idx.built_at },
+            None => {
+                // Something else (a search, the web server, a save) still
+                // reads this snapshot: copy it. `apply_watched` paces this.
+                st.live.last_copy = Some(std::time::Instant::now());
+                Index { entries: idx.entries.clone(), roots: idx.roots.clone(), built_at: idx.built_at }
+            }
         };
         let changed = change(&mut owned);
         let idx = Arc::new(owned);

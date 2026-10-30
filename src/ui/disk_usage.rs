@@ -8,6 +8,7 @@ use native_windows_gui as nwg;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use winapi::shared::minwindef::{LPARAM, UINT, WPARAM};
 use winapi::shared::windef::{HWND, RECT};
@@ -22,6 +23,9 @@ use crate::index::{Entry, Index};
 const MAX_ROWS: usize = 1000;
 /// The column with the drawn bar.
 const COL_BAR: i32 = 3;
+/// The Size column computes the sizes again at most this often while the
+/// index keeps changing; meanwhile it shows the last totals.
+const SIZES_GAP: Duration = Duration::from_secs(30);
 /// Id of the raw handler that draws the bars.
 const RAW_ID: usize = 0x1_0D15;
 
@@ -50,6 +54,8 @@ pub struct DiskUsage {
     notice: nwg::Notice,
     /// The index snapshot whose sizes are being computed (pointer, 0 = none).
     pending: Cell<usize>,
+    /// When the last computation was started.
+    last_request: Cell<Option<Instant>>,
     window: nwg::Window,
     up_btn: nwg::Button,
     explorer_btn: nwg::Button,
@@ -266,22 +272,32 @@ impl App {
         if !e.is_dir {
             return fmt_size(e);
         }
-        match folder_sizes::cached(index) {
-            Some(s) => fmt_bytes(s.total(i as usize)),
-            None => {
-                self.request_sizes(index.clone());
-                fmt_size(e)
-            }
+        if let Some(s) = folder_sizes::cached(index) {
+            return fmt_bytes(s.total(i as usize));
+        }
+        // The index changed since the last sizes: keep showing those (by
+        // path) and compute anew only now and then.
+        let recent = folder_sizes::recent();
+        self.request_sizes(index.clone(), recent.is_none());
+        match recent.and_then(|r| r.get(&e.path)) {
+            Some(total) => fmt_bytes(total),
+            None => fmt_size(e),
         }
     }
 
-    /// Computes the sizes for `index` on a background thread, once.
-    fn request_sizes(&self, index: Arc<Index>) {
+    /// Computes the sizes for `index` on a background thread, once. Unless
+    /// `now`, waits while another computation runs or one started recently.
+    fn request_sizes(&self, index: Arc<Index>, now: bool) {
         let key = Arc::as_ptr(&index) as usize;
-        if self.disk.pending.get() == key {
+        let pending = self.disk.pending.get();
+        if pending == key {
+            return;
+        }
+        if !now && (pending != 0 || self.disk.last_request.get().is_some_and(|t| t.elapsed() < SIZES_GAP)) {
             return;
         }
         self.disk.pending.set(key);
+        self.disk.last_request.set(Some(Instant::now()));
         let notice = self.disk.notice.sender();
         std::thread::spawn(move || {
             folder_sizes::for_index(&index);
@@ -334,7 +350,7 @@ impl App {
             d.list.clear();
             d.rows.borrow_mut().clear();
             d.total_label.set_text(tr!("جاري حساب أحجام المجلدات…", "Calculating folder sizes…"));
-            self.request_sizes(index);
+            self.request_sizes(index, true);
             return;
         };
         let entries = &index.entries;

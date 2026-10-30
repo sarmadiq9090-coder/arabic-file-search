@@ -12,16 +12,18 @@ use std::time::{Duration, Instant};
 
 use winapi::shared::minwindef::{BYTE, DWORD, FALSE, LPARAM, LRESULT, TRUE, UINT, WPARAM};
 use winapi::shared::windef::HWND;
-use winapi::shared::winerror::{ERROR_NOTIFY_ENUM_DIR, WAIT_TIMEOUT};
+use winapi::shared::winerror::{ERROR_INVALID_PARAMETER, ERROR_NOTIFY_ENUM_DIR, WAIT_TIMEOUT};
 use winapi::um::dbt::{DBT_DEVICEQUERYREMOVE, DBT_DEVICEREMOVECOMPLETE, DBT_DEVTYP_HANDLE, DEV_BROADCAST_HANDLE, DEV_BROADCAST_HDR};
 use winapi::um::errhandlingapi::GetLastError;
-use winapi::um::fileapi::{CreateFileW, FindClose, FindFirstFileW, OPEN_EXISTING};
+use winapi::um::fileapi::{CreateFileW, FindClose, FindFirstFileW, GetDriveTypeW, OPEN_EXISTING};
 use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
 use winapi::um::ioapiset::{CancelIoEx, GetOverlappedResult};
 use winapi::um::libloaderapi::GetModuleHandleW;
 use winapi::um::minwinbase::{OVERLAPPED, WIN32_FIND_DATAW};
 use winapi::um::synchapi::{CreateEventW, ResetEvent, SetEvent, WaitForSingleObject};
-use winapi::um::winbase::{FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OVERLAPPED, INFINITE, ReadDirectoryChangesW, WAIT_OBJECT_0};
+use winapi::um::winbase::{
+    DRIVE_REMOTE, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OVERLAPPED, INFINITE, ReadDirectoryChangesW, WAIT_OBJECT_0,
+};
 use winapi::um::winnt::{
     FILE_ACTION_ADDED, FILE_ACTION_MODIFIED, FILE_ACTION_REMOVED, FILE_ACTION_RENAMED_NEW_NAME,
     FILE_ACTION_RENAMED_OLD_NAME, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT, FILE_LIST_DIRECTORY,
@@ -36,7 +38,11 @@ use winapi::um::winuser::{
 
 use crate::index::{Change, skipped_path};
 
-const BUF_BYTES: usize = 64 * 1024;
+/// Room for events between two reads. A full buffer drops them all and
+/// costs a walk of the whole drive, so local drives get a large one; over
+/// the network Windows refuses more than 64 KB.
+const BUF_BYTES: usize = 1024 * 1024;
+const NET_BUF_BYTES: usize = 64 * 1024;
 /// How long changes are collected before they are handed over.
 const BATCH: Duration = Duration::from_secs(1);
 /// Pause before reopening a root that failed or disappeared.
@@ -149,6 +155,16 @@ pub fn stat(path: &str) -> Option<(u64, i64, bool)> {
     Some((size, mtime, is_dir))
 }
 
+/// A share (`\\server\share\…`) or a folder on a mapped network drive.
+fn is_network(root: &str) -> bool {
+    if root.starts_with(r"\\") {
+        return true;
+    }
+    let b = root.as_bytes();
+    let drive = if b.len() >= 2 && b[1] == b':' { format!("{}\\", &root[..2]) } else { root.to_string() };
+    unsafe { GetDriveTypeW(wide(&drive).as_ptr()) == DRIVE_REMOTE }
+}
+
 enum Outcome {
     Stop,
     /// The watch broke or the drive is going away: reopen later and rescan.
@@ -220,8 +236,9 @@ fn watch_dir(
     DEVICE.with(|d| d.set((dir, notify, false)));
 
     let event = unsafe { CreateEventW(null_mut(), TRUE, FALSE, null()) };
+    let mut buf_bytes = if is_network(root) { NET_BUF_BYTES } else { BUF_BYTES };
     // DWORD-aligned, as ReadDirectoryChangesW requires.
-    let mut buf = vec![0u64; BUF_BYTES / 8];
+    let mut buf = vec![0u64; buf_bytes / 8];
     let mut ov: OVERLAPPED;
     let mut pending: Vec<Change> = Vec::new();
     let mut old_name: Option<String> = None;
@@ -233,9 +250,14 @@ fn watch_dir(
         ov.hEvent = event;
         unsafe { ResetEvent(event) };
         let ok = unsafe {
-            ReadDirectoryChangesW(dir, buf.as_mut_ptr() as _, BUF_BYTES as DWORD, TRUE, FILTER, null_mut(), &mut ov, None)
+            ReadDirectoryChangesW(dir, buf.as_mut_ptr() as _, buf_bytes as DWORD, TRUE, FILTER, null_mut(), &mut ov, None)
         };
         if ok == 0 {
+            // A network drive that did not look like one: try the small size.
+            if buf_bytes > NET_BUF_BYTES && unsafe { GetLastError() } == ERROR_INVALID_PARAMETER {
+                buf_bytes = NET_BUF_BYTES;
+                continue;
+            }
             break Outcome::Lost;
         }
         io_pending = true;
@@ -276,8 +298,12 @@ fn watch_dir(
             bytes = 0;
         }
         if bytes == 0 {
-            // The buffer overflowed and events were dropped.
-            pending.clear();
+            // The buffer overflowed and events were dropped. What came before
+            // is still right and is kept: the walk may be postponed a while.
+            // A rename's old name waiting for its new one lost it.
+            if let Some(old) = old_name.take() {
+                push(&mut pending, own, Change::Removed(old));
+            }
             pending.push(Change::Rescan(root.to_string()));
         } else {
             let data = unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const BYTE, bytes as usize) };
