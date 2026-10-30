@@ -78,6 +78,9 @@ impl App {
             return;
         }
         let ctrl = unsafe { GetKeyState(VK_CONTROL) } < 0;
+        if !ctrl && self.quick_switch_enter() {
+            return;
+        }
         if ctrl {
             self.open_folder();
         } else if self.list.focus() {
@@ -90,7 +93,7 @@ impl App {
 
     /// Esc clears the search box; a second Esc hides the window to the tray.
     pub(super) fn on_escape(&self) {
-        if self.renaming.get() {
+        if self.renaming.get() || self.quick_switch_cancel() {
             return;
         }
         if self.state.borrow().content.is_some() {

@@ -10,6 +10,7 @@
 //! - `history_menu`: the menu of recent and saved searches
 //! - `updates`: checking for, downloading and installing new versions
 //! - `keys`: keyboard handling and the global hotkey
+//! - `quickswitch`: Ctrl+Alt+G moves an Open / Save As dialog to a result's folder
 //! - `startup`: start-up timing, logging, single instance, fonts
 //! - `format`, `shell`: text formatting and Windows shell helpers
 
@@ -19,6 +20,7 @@ mod files;
 mod format;
 mod history_menu;
 mod keys;
+mod quickswitch;
 mod results;
 mod search_jobs;
 mod shell;
@@ -198,6 +200,8 @@ pub struct App {
     tray_hint_shown: Cell<bool>,
     startup_logged: Cell<bool>,
     state: RefCell<State>,
+    /// Moving another program's Open / Save As dialog to a result's folder.
+    quick: quickswitch::QuickSwitch,
 }
 
 impl App {

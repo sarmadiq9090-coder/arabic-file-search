@@ -15,13 +15,13 @@ const RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const VALUE: &str = "BahthSari";
 /// Remembers that the user has been given the default once, so turning it
 /// off is respected.
-const OWN_KEY: &str = "Software\\BahthSari";
+pub(super) const OWN_KEY: &str = "Software\\BahthSari";
 const CHOSEN: &str = "AutostartChosen";
 
 /// Command-line flag of a launch at sign-in: start hidden in the tray.
 pub const STARTUP_ARG: &str = "--startup";
 
-struct Key(HKEY);
+pub(super) struct Key(pub(super) HKEY);
 
 impl Drop for Key {
     fn drop(&mut self) {
@@ -29,7 +29,7 @@ impl Drop for Key {
     }
 }
 
-fn open(path: &str, write: bool) -> Option<Key> {
+pub(super) fn open(path: &str, write: bool) -> Option<Key> {
     let mut key: HKEY = std::ptr::null_mut();
     let path = wide(path);
     let ok = unsafe {
