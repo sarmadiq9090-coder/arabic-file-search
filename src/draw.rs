@@ -8,12 +8,15 @@
 //!
 //! # Where the glyphs are
 //!
-//! Positions come from Uniscribe (`ScriptStringAnalyse` +
-//! `ScriptStringCPtoX`) run on the cell text with the list's own font, so
-//! ligatures, joining, font fallback and bidi reordering of mixed
-//! Arabic/Latin names are all accounted for. `ScriptStringCPtoX` reports a
-//! visual offset measured from the *visual left edge* of the string, the
-//! same whether the paragraph is RTL or LTR.
+//! The width of every character comes from Uniscribe (`ScriptStringAnalyse`
+//! and `ScriptStringCPtoX`) run on the cell text with the list's own font, so
+//! ligatures, joining and font fallback are accounted for. The *order* of
+//! the characters on the line is worked out by [`crate::bidi_layout`] with
+//! the Unicode bidi algorithm and the list's reading order: on real Windows
+//! Uniscribe places a trailing Latin run (".xlsx") at the other end of the
+//! line than the list draws it, which shifted the underline by the width of
+//! the extension in the Arabic interface. Positions are visual offsets
+//! measured from the *visual left edge* of the string.
 //!
 //! # Mirroring
 //!
@@ -24,7 +27,8 @@
 //! of the label. In a mirrored DC GDI also lays text out with a
 //! right-to-left reading order (the LPK turns on `ETO_RTLREADING` for
 //! mirrored DCs, as ReactOS's LPK and Wine's win32u both model), so we
-//! analyse with `SSA_RTL` in that case.
+//! analyse with `SSA_RTL` and order the line as a right-to-left
+//! paragraph in that case.
 //!
 //! On screen the string therefore occupies `[label.left + pad, label.left +
 //! pad + width]` logically, its *visual right* edge being at logical
@@ -189,28 +193,11 @@ unsafe fn paint_spans(hdc: HDC, label: &RECT, rtl_reading: bool, text: &str, ran
         return;
     }
 
-    let mode = draw_mode();
-    // Modes 2 and 3 measure on an unmirrored memory DC with the same font.
-    let mem = if mode >= 2 { unsafe { winapi::um::wingdi::CreateCompatibleDC(hdc) } } else { null_mut() };
-    let font = unsafe { winapi::um::wingdi::GetCurrentObject(hdc, winapi::um::wingdi::OBJ_FONT) };
-    let old_font = if !mem.is_null() { unsafe { SelectObject(mem, font) } } else { null_mut() };
-    struct MemGuard(HDC, HGDIOBJ);
-    impl Drop for MemGuard {
-        fn drop(&mut self) {
-            if !self.0.is_null() {
-                unsafe {
-                    SelectObject(self.0, self.1);
-                    winapi::um::wingdi::DeleteDC(self.0);
-                }
-            }
-        }
-    }
-    let _mem = MemGuard(mem, old_font);
-    let mdc = if mem.is_null() { hdc } else { mem };
-    let use_mirror = mirrored && (mode == 0 || mode == 2 || mode == 4);
-    let Some(mut ssa) = (unsafe { analyse(mdc, &buf[..n16], flags) }) else { return };
-    // Number of UTF-16 units of the name that are actually shown.
+    let Some(mut ssa) = (unsafe { analyse(hdc, &buf[..n16], flags) }) else { return };
+    // Number of UTF-16 units of the name that are actually shown, and of the
+    // laid-out string (the shown part plus "..." when cut).
     let mut shown = n16;
+    let mut laid_out = n16;
     if ssa.width() > avail {
         // Too long: like DrawText's DT_END_ELLIPSIS, the list keeps the
         // longest start of the name that fits with "..." after it. Laying
@@ -233,25 +220,15 @@ unsafe fn paint_spans(hdc: HDC, label: &RECT, rtl_reading: bool, text: &str, ran
             shown -= 1; // never split a surrogate pair
         }
         buf[shown..shown + 3].copy_from_slice(&dots);
+        laid_out = shown + 3;
         drop(ssa);
-        ssa = match unsafe { analyse(mdc, &buf[..shown + 3], flags) } {
+        ssa = match unsafe { analyse(hdc, &buf[..laid_out], flags) } {
             Some(s) => s,
             None => return,
         };
     }
     let width = ssa.width();
-    {
-        let mut xs = String::new();
-        for i in 0..shown {
-            let (mut a, mut b2) = (0i32, 0i32);
-            unsafe {
-                ScriptStringCPtoX(ssa.0, i as i32, 0, &mut a);
-                ScriptStringCPtoX(ssa.0, i as i32, 1, &mut b2);
-            }
-            xs.push_str(&format!("{}:{}-{} ", char::from_u32(buf[i] as u32).unwrap_or('?'), a, b2));
-        }
-        draw_log(&format!("ALL mode={mode} width={width} {xs}"));
-    }
+    let spans = unsafe { unit_spans(&ssa, &buf[..laid_out], rtl) };
 
     // The text is vertically centred (DT_VCENTER); the line sits at the
     // bottom of its cell, below the baseline and most descenders.
@@ -281,23 +258,12 @@ unsafe fn paint_spans(hdc: HDC, label: &RECT, rtl_reading: bool, text: &str, ran
             break;
         }
         if ranges.iter().any(|&(s, e)| b >= s && b < e) {
-            let (mut x0, mut x1) = (0i32, 0i32);
-            let ok = unsafe {
-                SUCCEEDED(ScriptStringCPtoX(ssa.0, u as i32, 0, &mut x0))
-                    && SUCCEEDED(ScriptStringCPtoX(ssa.0, (u + len16 - 1) as i32, 1, &mut x1))
-            };
-            if ok {
-                let (v0, v1) = (x0.min(x1), x0.max(x1));
-                let (l, r) = if use_mirror { (start + width - v1, start + width - v0) } else { (start + v0, start + v1) };
-                draw_log(&format!(
-                    "mode={mode} mirrored={mirrored} rtl={rtl} label=({},{},{},{}) start={start} avail={avail} width={width} shown={shown} u={u} ch={ch:?} x0={x0} x1={x1} l={l} r={r}",
-                    label.left, label.top, label.right, label.bottom
-                ));
-                let (l, r) = (l.max(start), r.min(start + avail));
-                if r > l {
-                    let rc = RECT { left: l, top, right: r, bottom };
-                    unsafe { FillRect(hdc, &rc, brush) };
-                }
+            let (v0, v1) = spans[u];
+            let (l, r) = if mirrored { (start + width - v1, start + width - v0) } else { (start + v0, start + v1) };
+            let (l, r) = (l.max(start), r.min(start + avail));
+            if r > l {
+                let rc = RECT { left: l, top, right: r, bottom };
+                unsafe { FillRect(hdc, &rc, brush) };
             }
         }
         b += ch.len_utf8();
@@ -306,26 +272,41 @@ unsafe fn paint_spans(hdc: HDC, label: &RECT, rtl_reading: bool, text: &str, ran
     unsafe { DeleteObject(brush as HGDIOBJ) };
 }
 
-/// TEMPORARY diagnostics: BAHTH_DRAW_MODE=0..3 picks the mapping, and
-/// BAHTH_DRAW_LOG=<file> appends the measured values.
-fn draw_mode() -> u32 {
-    std::env::var("BAHTH_DRAW_MODE").ok().and_then(|v| v.parse().ok()).unwrap_or(0)
-}
-fn draw_log(line: &str) {
-    if let Ok(p) = std::env::var("BAHTH_DRAW_LOG") {
-        use std::io::Write;
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(p) {
-            let _ = writeln!(f, "{line}");
-        }
+/// The extent `(left, right)` of each character of `units` from the visual
+/// left edge of the laid-out line, stored at the index of the character's
+/// first UTF-16 unit (other entries stay `(0, 0)`). Widths come from the
+/// Uniscribe analysis, the order from [`crate::bidi_layout`] with paragraph
+/// direction `rtl`; Uniscribe's own positions are kept if that fails.
+/// A character Uniscribe cannot locate gets no width, so it is not drawn.
+unsafe fn unit_spans(ssa: &SsaGuard, units: &[u16], rtl: bool) -> Vec<(i32, i32)> {
+    let mut text = String::with_capacity(units.len());
+    let mut firsts = Vec::with_capacity(units.len());
+    let mut own = Vec::with_capacity(units.len());
+    let mut u = 0usize;
+    for r in char::decode_utf16(units.iter().copied()) {
+        let len = r.as_ref().map_or(1, |c| c.len_utf16());
+        let (mut x0, mut x1) = (0i32, 0i32);
+        let ok = unsafe {
+            SUCCEEDED(ScriptStringCPtoX(ssa.0, u as i32, 0, &mut x0))
+                && SUCCEEDED(ScriptStringCPtoX(ssa.0, (u + len - 1) as i32, 1, &mut x1))
+        };
+        own.push(if ok { (x0.min(x1), x0.max(x1)) } else { (0, 0) });
+        text.push(r.unwrap_or(char::REPLACEMENT_CHARACTER));
+        firsts.push(u);
+        u += len;
     }
+    let widths: Vec<i32> = own.iter().map(|&(l, r)| r - l).collect();
+    let ordered = crate::bidi_layout::visual_spans(&text, &widths, rtl).unwrap_or(own);
+    let mut spans = vec![(0, 0); units.len()];
+    for (first, span) in firsts.into_iter().zip(ordered) {
+        spans[first] = span;
+    }
+    spans
 }
 
 /// Shapes and lays out `text` with the font selected into `hdc`.
 unsafe fn analyse(hdc: HDC, text: &[u16], flags: u32) -> Option<SsaGuard> {
     let mut ssa: SCRIPT_STRING_ANALYSIS = null_mut();
-    // A right-to-left paragraph: bidi level 1.
-    let mut state: winapi::um::usp10::SCRIPT_STATE = unsafe { zeroed() };
-    state.set_uBidiLevel(1);
     let hr = unsafe {
         ScriptStringAnalyse(
             hdc,
@@ -336,7 +317,7 @@ unsafe fn analyse(hdc: HDC, text: &[u16], flags: u32) -> Option<SsaGuard> {
             flags,
             0,
             null_mut(),
-            if draw_mode() >= 4 && flags & SSA_RTL != 0 { &mut state } else { null_mut() },
+            null_mut(),
             null(),
             null_mut(),
             null(),
