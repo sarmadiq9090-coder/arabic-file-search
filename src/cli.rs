@@ -27,6 +27,8 @@ const OPTIONS: &[(&str, bool)] = &[
     ("--count", false),
     ("--csv", false),
     ("--json", false),
+    ("--all", false),
+    ("--include-system", false),
     ("-h", false),
     ("--help", false),
     ("/?", false),
@@ -60,6 +62,8 @@ pub struct Options {
     pub desc: bool,
     pub scope: String,
     pub format: Format,
+    /// `--all`: keep Windows system files in the results.
+    pub include_system: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -121,6 +125,7 @@ pub fn parse_args(args: &[String]) -> Result<Command, String> {
                 }
             }
             "--desc" => o.desc = true,
+            "--all" | "--include-system" => o.include_system = true,
             "--scope" => o.scope = scope_prefix(value),
             "--count" | "--csv" | "--json" => {
                 let f = match name {
@@ -172,6 +177,7 @@ InstaFind {v} — command-line search
   --count               اطبع عدد النتائج فقط / print only the number of results
   --csv                 path,size,modified (CSV)
   --json                مصفوفة JSON / a JSON array
+  --all                 أظهر ملفات النظام أيضاً / include Windows system files
   -h, --help            هذه المساعدة / this help
   --version             رقم الإصدار / version
 
@@ -198,6 +204,7 @@ Usage:
   --count               print only the number of results
   --csv                 path,size,modified (CSV)
   --json                a JSON array
+  --all                 include Windows system files (hidden by default)
   -h, --help            this help
   --version             version
 
@@ -245,7 +252,9 @@ pub fn execute(cmd: &Command, load: impl FnOnce() -> Option<Index>, out: &mut dy
 
 /// Searches, sorts and limits as the options say.
 fn find(entries: &[Entry], o: &Options) -> Vec<u32> {
-    let mut hits = search_names(entries, &Query::parse(&o.query), &o.scope);
+    let mut q = Query::parse(&o.query);
+    q.show_system |= crate::system_files::show_system(!o.include_system, &o.scope);
+    let mut hits = search_names(entries, &q, &o.scope);
     if o.sort == SortKey::Relevance {
         if o.desc {
             hits.reverse();
@@ -583,7 +592,8 @@ mod tests {
                 sort: SortKey::Date,
                 desc: true,
                 scope: r"C:\docs\".into(),
-                format: Format::Csv
+                format: Format::Csv,
+                include_system: false
             }
         );
         let o = search(&["--max=2", "--search=a b", "c", "--", "-d", "--json"]);
@@ -592,6 +602,7 @@ mod tests {
         assert_eq!(search(&["-s", "x", "--scope", r"D:\a\b"]).scope, r"D:\a\b\");
         assert_eq!(parse_args(&args(&["-s", "x", "--help"])), Ok(Command::Help));
         assert_eq!(parse_args(&args(&["--version"])), Ok(Command::Version));
+        assert!(search(&["-s", "x", "--all"]).include_system && search(&["--include-system", "x"]).include_system);
     }
 
     #[test]
@@ -628,6 +639,22 @@ mod tests {
 
         let (code, out, _) = run_cli(&["-s", "nothing-like-this"], Some(sample()));
         assert_eq!((code, out.as_str()), (EXIT_NONE, ""));
+    }
+
+    #[test]
+    fn system_files_need_all() {
+        let index = || {
+            let mut index = sample();
+            index.entries.push(entry(r"C:\Windows\Logs\فاتورة.log", 1, 1, false));
+            index.entries.push(entry(r"C:\$Recycle.Bin\S-1\فاتورة قديمة.pdf", 1, 1, false));
+            index
+        };
+        let count = |a: &[&str]| run_cli(a, Some(index())).1;
+        assert_eq!(count(&["-s", "فاتورة", "--count"]), "3\r\n");
+        assert_eq!(count(&["-s", "فاتورة", "--count", "--all"]), "5\r\n");
+        assert_eq!(count(&["-s", "sys: فاتورة", "--count"]), "5\r\n");
+        // A system folder as the scope shows what is inside it.
+        assert_eq!(count(&["-s", "فاتورة", "--count", "--scope", r"C:\Windows"]), "1\r\n");
     }
 
     #[test]

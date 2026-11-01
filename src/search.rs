@@ -212,7 +212,8 @@ impl Near {
 ///
 /// Filters: `size:>10mb` / `حجم:` (size), `dm:today` / `تاريخ:` (modified
 /// date), `regex:` / `re:` (regular expression), `ww:` / `كلمة:` (whole word)
-/// and `"a b"~5` (words near each other).
+/// and `"a b"~5` (words near each other). Windows system files are left out
+/// unless `sys:` / `نظام:` is typed (or [`Query::show_system`] is set).
 #[derive(Debug, Default, PartialEq)]
 pub struct Query {
     pub terms: Vec<Term>,
@@ -236,6 +237,9 @@ pub struct Query {
     pub fuzzy: bool,
     /// `root:` / `جذر:`: Arabic words match words with the same 3-letter root.
     pub root: bool,
+    /// `sys:` / `نظام:`, or the "hide system files" option switched off:
+    /// keep Windows system files ([`crate::system_files`]) in the results.
+    pub show_system: bool,
     /// Problems found while parsing (in Arabic), for the UI to show.
     pub warnings: Vec<String>,
 }
@@ -270,6 +274,8 @@ pub const FOLDER_PREFIXES: [&str; 2] = ["folder:", "مجلد:"];
 pub const FRANCO_PREFIXES: [&str; 2] = ["franco:", "فرانكو:"];
 pub const FUZZY_PREFIXES: [&str; 2] = ["fuzzy:", "تقريب:"];
 pub const ROOT_PREFIXES: [&str; 2] = ["root:", "جذر:"];
+/// Prefixes of the token that shows system files for one search.
+pub const SYSTEM_PREFIXES: [&str; 3] = ["sys:", "system:", "نظام:"];
 
 /// Arabic prefixes stripped to also match the bare word, longest first.
 pub(crate) const ARTICLES: [&str; 6] = ["وال", "بال", "كال", "فال", "لل", "ال"];
@@ -785,7 +791,7 @@ impl Query {
         q
     }
 
-    /// Handles a `franco:`, `fuzzy:` or `root:` prefix (and their Arabic
+    /// Handles a `franco:`, `fuzzy:`, `root:` or `sys:` prefix (and their Arabic
     /// forms) at the start of `tok`: sets the flag and returns its length.
     fn mode_prefix(&mut self, tok: &str) -> Option<usize> {
         if let Some(len) = prefix_len(tok, &FRANCO_PREFIXES) {
@@ -796,6 +802,9 @@ impl Query {
             Some(len)
         } else if let Some(len) = prefix_len(tok, &ROOT_PREFIXES) {
             self.root = true;
+            Some(len)
+        } else if let Some(len) = prefix_len(tok, &SYSTEM_PREFIXES) {
+            self.show_system = true;
             Some(len)
         } else {
             None
@@ -913,9 +922,12 @@ impl Query {
             && self.mtime.is_none_or(|(from, to)| (from..to).contains(&e.mtime))
     }
 
-    /// Type, folder, size and date filters on an entry.
+    /// Type, folder, size, date and system-file filters on an entry.
     fn kind_ok(&self, e: &Entry) -> bool {
-        (!self.dirs_only || e.is_dir) && self.ext_ok(e) && self.meta_ok(e)
+        (!self.dirs_only || e.is_dir)
+            && self.ext_ok(e)
+            && self.meta_ok(e)
+            && (self.show_system || !crate::system_files::is_system_path(&e.path))
     }
 
     /// Regex, whole-word and proximity filters on an entry's name.
@@ -2145,5 +2157,41 @@ mod tests {
         assert_eq!(hit.lines, vec![(1, "عقد الإيجار".to_string()), (3, "نهاية العقد".to_string())]);
         assert!(content_hit(0, text, &at("مفقود")).is_none());
         assert!(content_hit(0, text, &at("ext:pdf")).is_none());
+    }
+
+    #[test]
+    fn system_files_hidden_unless_asked() {
+        let entries = [
+            entry(r"C:\Windows\System32\report.dll", false),
+            entry(r"C:\Users\a\AppData\Local\Temp\report.tmp", false),
+            entry(r"C:\Users\a\Documents\report.txt", false),
+            entry(r"C:\Program Files\Report\report.exe", false),
+            entry(r"C:\$Recycle.Bin\S-1\report.txt", false),
+        ];
+        let names = |q: &Query| search_names(&entries, q, "");
+        assert_eq!(names(&Query::parse("report")), vec![2, 3]);
+        for t in ["sys: report", "SYS:report", "نظام: report", "system:report", "report sys:"] {
+            let q = Query::parse(t);
+            assert!(q.show_system, "{t}");
+            assert_eq!(alts(&q), vec![vec!["report"]], "{t}");
+            assert_eq!(names(&q).len(), 5, "{t}");
+        }
+        let mut q = Query::parse("report");
+        q.show_system = true;
+        assert_eq!(names(&q).len(), 5);
+        // The prefix alone searches for nothing; inside quotes it is text.
+        assert!(Query::parse("sys:").is_empty());
+        assert!(!Query::parse(r#""sys:x""#).show_system);
+        // Fuzzy search goes through the same filter.
+        assert_eq!(names(&Query::parse("fuzzy: reprot")), vec![2, 3]);
+        // Content search leaves system documents out of the candidates.
+        let docs = [entry(r"C:\Windows\a.txt", false), entry(r"C:\Users\a\Desktop\b.txt", false)];
+        let total = |q: &Query| {
+            let progress = ContentProgress::default();
+            search_content(&docs, q, "", &progress, &Mutex::new(Vec::new()), None);
+            progress.total.load(Ordering::Relaxed)
+        };
+        assert_eq!(total(&Query::parse("x")), 1);
+        assert_eq!(total(&Query::parse("نظام: x")), 2);
     }
 }

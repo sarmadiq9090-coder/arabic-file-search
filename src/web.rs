@@ -624,7 +624,7 @@ fn folder_of(path: &str) -> &str {
     }
 }
 
-fn search_page(q: &str, index: &Index, downloads: bool) -> String {
+fn search_page(q: &str, index: &Index, downloads: bool, show_system: bool) -> String {
     let mut body = String::new();
     let _ = write!(
         body,
@@ -634,7 +634,8 @@ autocomplete=\"off\" autofocus><button type=\"submit\">{}</button></form>",
         esc(tr!("اسم الملف أو كلمة…", "File name or a word…")),
         esc(tr!("بحث", "Search")),
     );
-    let query = Query::parse(q);
+    let mut query = Query::parse(q);
+    query.show_system |= show_system;
     if q.trim().is_empty() || query.is_empty() {
         let _ = write!(
             body,
@@ -737,6 +738,8 @@ struct Secrets {
 pub struct Shared {
     secrets: RwLock<Secrets>,
     pub allow_download: AtomicBool,
+    /// The "hide system files" option is off: results include them.
+    pub show_system: AtomicBool,
     index: RwLock<Arc<Index>>,
     limiter: Mutex<Limiter>,
 }
@@ -746,6 +749,7 @@ impl Shared {
         Shared {
             secrets: RwLock::new(Secrets { token, pin }),
             allow_download: AtomicBool::new(allow_download),
+            show_system: AtomicBool::new(false),
             index: RwLock::new(Arc::default()),
             limiter: Mutex::new(Limiter::default()),
         }
@@ -860,7 +864,8 @@ pub fn handle(req: &Request, peer: IpAddr, shared: &Shared, now: Instant) -> Res
         "/" => {
             let q: String = req.param("q").unwrap_or("").chars().take(MAX_QUERY).collect();
             let downloads = shared.allow_download.load(Ordering::Relaxed);
-            Response::html(200, search_page(&q, &shared.index(), downloads))
+            let show_system = shared.show_system.load(Ordering::Relaxed);
+            Response::html(200, search_page(&q, &shared.index(), downloads, show_system))
         }
         "/f" => download(req.param("p").unwrap_or(""), shared),
         "/favicon.ico" => Response::text(404, "Not Found"),
@@ -1345,6 +1350,17 @@ mod tests {
         assert_eq!(folder_of(r"C:\d\a.txt"), r"C:\d");
         assert_eq!(folder_of("/tmp/a"), "/tmp");
         assert_eq!(folder_of("/a"), "/");
+    }
+
+    #[test]
+    fn system_files_follow_the_option() {
+        let s = shared_with(vec![entry(r"C:\docs\report.pdf", 1, false), entry(r"C:\Windows\Logs\report.log", 1, false)]);
+        let find = |q: &str| body(&handle(&get(&format!("/?q={q}"), Some(TOKEN)), LAN, &s, Instant::now()));
+        let b = find("report");
+        assert!(b.contains("report.pdf") && !b.contains("report.log"));
+        assert!(find("sys:report").contains("report.log"));
+        s.show_system.store(true, Ordering::Relaxed);
+        assert!(find("report").contains("report.log"));
     }
 
     #[test]

@@ -220,6 +220,7 @@ pub struct App {
     menu_digits: nwg::MenuItem,
     menu_content_index: nwg::MenuItem,
     menu_auto_index: nwg::MenuItem,
+    menu_hide_system: nwg::MenuItem,
     menu_update: nwg::MenuItem,
     menu_autostart: nwg::MenuItem,
     lang_menu: nwg::Menu,
