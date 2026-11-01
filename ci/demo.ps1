@@ -1,4 +1,4 @@
-# Records the README demos on a real Windows machine: creates a few sample
+﻿# Records the README demos on a real Windows machine: creates a few sample
 # files, starts the program in Arabic and then in English, types searches into
 # it and saves a frame of its window every 125 ms (8 frames per second), plus
 # a still screenshot of each scene. ci/make-media.sh turns the frames into GIFs.
@@ -13,7 +13,7 @@ $Out = (Resolve-Path $Out).Path
 $data = Join-Path $env:LOCALAPPDATA 'BahthSari'
 $index = Join-Path $data 'index.bin'
 
-Add-Type -AssemblyName System.Drawing, UIAutomationClient, UIAutomationTypes
+Add-Type -AssemblyName System.Drawing, System.Windows.Forms, UIAutomationClient, UIAutomationTypes
 Add-Type -ReferencedAssemblies System.Drawing @'
 using System;
 using System.Drawing;

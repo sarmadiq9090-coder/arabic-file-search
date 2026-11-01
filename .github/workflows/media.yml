@@ -48,10 +48,10 @@ jobs:
         with:
           name: bahth-exe
       - name: Demo recordings
-        shell: pwsh
+        shell: powershell
         run: ./ci/demo.ps1 -Exe ./bahth.exe -Out ./media-raw
       - name: Speed comparison
-        shell: pwsh
+        shell: powershell
         run: ./ci/bench.ps1 -Exe ./bahth.exe -Out ./media-raw
       - uses: actions/upload-artifact@v4
         if: always()

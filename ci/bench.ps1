@@ -1,4 +1,4 @@
-# Speed comparison on the runner's C: drive, after ci/demo.ps1 has built the
+﻿# Speed comparison on the runner's C: drive, after ci/demo.ps1 has built the
 # index: InstaFind's command line (which loads the saved index from disk on
 # every run) against the tools Windows itself offers for a whole-drive name
 # search: `dir /s` in cmd, PowerShell's Get-ChildItem, and the Windows Search
