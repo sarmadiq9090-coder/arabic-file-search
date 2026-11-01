@@ -53,12 +53,12 @@ scoop install instafind
 
 ## السرعة
 
-قِسناها على جهاز ويندوز حقيقي في GitHub Actions (Windows Server 2025، قرص C كامل، فهرس بحجم 150 ميغابايت)، بالبحث في اسم الملف على القرص كله:
+قِسناها على جهاز ويندوز حقيقي في GitHub Actions (Windows Server 2025، فهرس فيه 1.2 مليون ملف)، بالبحث في اسم الملف على القرص كله:
 
 | البحث عن | InstaFind | `dir /s` في cmd | `Get-ChildItem -Recurse` في PowerShell |
 |---|---:|---:|---:|
-| `report` | **1 ثانية** | 96 ثانية | 50 ثانية |
-| `احمد` (والملفات اسمها «أحمد») | **1 ثانية**، وجد الملفين | 33 ثانية، لم يجد شيئاً | 50 ثانية، لم يجد شيئاً |
+| `report` | **1 ثانية** | 107 ثوانٍ | 49 ثانية |
+| `احمد` (والملفات اسمها «أحمد») | **1 ثانية**، وجد الملفين | 33 ثانية، لم يجد شيئاً | 49 ثانية، لم يجد شيئاً |
 
 الثانية في عمود InstaFind تشمل تشغيل البرنامج من سطر الأوامر وقراءة الفهرس من القرص. داخل نافذة البرنامج المفتوحة يظهر الجواب أثناء الكتابة في أجزاء من الثانية (شريط الحالة في العرض أعلاه يقول 15 إلى 34 ملي ثانية). خدمة فهرسة ويندوز غير موجودة على ذلك الجهاز، وهي أصلاً لا تفهرس إلا مجلدات المستخدم ولا تساوي بين «احمد» و«أحمد». يعيد [`ci/bench.ps1`](ci/bench.ps1) القياس، والنتائج الخام في [`docs/media/bench.md`](docs/media/bench.md).
 
@@ -196,12 +196,12 @@ The first run indexes your drives in the background (a minute or more, depending
 
 ### Speed
 
-Measured on a real Windows machine on GitHub Actions (Windows Server 2025, the whole C: drive, a 150 MB index), searching file names across the drive:
+Measured on a real Windows machine on GitHub Actions (Windows Server 2025, an index of 1.2 million files), searching file names across the drive:
 
 | Search | InstaFind | cmd `dir /s` | PowerShell `Get-ChildItem -Recurse` |
 |---|---:|---:|---:|
-| `report` | **1 s** | 96 s | 50 s |
-| `احمد` (the files are named `أحمد`) | **1 s**, finds both | 33 s, finds none | 50 s, finds none |
+| `report` | **1 s** | 107 s | 49 s |
+| `احمد` (the files are named `أحمد`) | **1 s**, finds both | 33 s, finds none | 49 s, finds none |
 
 InstaFind's second includes starting the command-line tool and loading the index from disk. In the open window results appear as you type, in milliseconds (the status bar in the demo above shows 15 to 34 ms). The Windows Search indexer is not installed on that machine; by default it covers only user folders and does not treat `احمد` and `أحمد` as the same. [`ci/bench.ps1`](ci/bench.ps1) reproduces the run; raw results are in [`docs/media/bench.md`](docs/media/bench.md).
 
