@@ -1,4 +1,4 @@
-# TEMPORARY: screenshots the Arabic match underline on real Windows under each
+﻿# TEMPORARY: screenshots the Arabic match underline on real Windows under each
 # BAHTH_DRAW_MODE, with the measured values logged, to pick the right mapping.
 param(
     [Parameter(Mandatory)][string]$Exe,
