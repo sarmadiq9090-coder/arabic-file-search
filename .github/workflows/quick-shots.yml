@@ -1,0 +1,98 @@
+name: quick-shots
+
+# Screenshots and checks of the quick search (Ctrl+Alt+F popup, floating box,
+# tray) on a real Windows machine, in Arabic and English and with the light
+# theme, plus a speed comparison with 0.6.1 (ci/quick-shots.ps1). Run it by
+# hand (Actions → quick-shots → Run workflow), or it runs when its own files
+# change on a claude/* branch. The screenshots, logs and speed.md are
+# committed to docs/quick-shots/ on the branch that ran it.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/**"]
+    paths: ["ci/quick-shots.ps1", ".github/workflows/quick-shots.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quick-shots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+      - uses: Swatinem/rust-cache@v2
+      - name: Build bahth.exe
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q mingw-w64
+          cargo build --release --target x86_64-pc-windows-gnu
+          cp target/x86_64-pc-windows-gnu/release/bahth.exe bahth.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bahth-exe
+          path: bahth.exe
+
+  shots:
+    needs: exe
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bahth-exe
+      - name: Download 0.6.1
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force old | Out-Null
+          Invoke-WebRequest -UseBasicParsing -Uri https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.6.1/bahth.exe -OutFile old/bahth.exe
+      - name: Screenshots, checks and speed
+        shell: powershell
+        run: ./ci/quick-shots.ps1 -Exe ./bahth.exe -OldExe ./old/bahth.exe -Out ./quick-raw
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quick-raw
+          path: quick-raw
+
+  commit:
+    needs: shots
+    if: always() && needs.exe.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: quick-raw
+          path: quick-raw
+      - name: Compress the screenshots
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q pngquant
+          rm -rf docs/quick-shots
+          mkdir -p docs/quick-shots
+          for f in quick-raw/*.png; do
+            pngquant --quality 80-98 --speed 1 --strip --output "docs/quick-shots/$(basename "$f")" -- "$f" || cp "$f" docs/quick-shots/
+          done
+          cp quick-raw/*.md quick-raw/*.txt docs/quick-shots/ 2>/dev/null || true
+          ls -la docs/quick-shots
+      - name: Commit to this branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A docs/quick-shots
+          if git diff --cached --quiet; then echo "nothing changed"; exit 0; fi
+          git commit -m "Update quick search screenshots, checks and speed comparison (run ${GITHUB_RUN_ID})"
+          for i in 1 2 3; do
+            git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+          done
+          exit 1
