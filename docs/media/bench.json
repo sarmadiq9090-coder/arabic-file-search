@@ -1,0 +1,60 @@
+﻿[
+    {
+        "Query":  "report",
+        "Note":  "English word",
+        "Tool":  "InstaFind (command line, loads the index each run)",
+        "Seconds":  1.01,
+        "Found":  0
+    },
+    {
+        "Query":  "report",
+        "Note":  "English word",
+        "Tool":  "cmd: dir /s",
+        "Seconds":  108.3,
+        "Found":  3066
+    },
+    {
+        "Query":  "report",
+        "Note":  "English word",
+        "Tool":  "PowerShell: Get-ChildItem -Recurse",
+        "Seconds":  0,
+        "Found":  0
+    },
+    {
+        "Query":  "report",
+        "Note":  "English word",
+        "Tool":  "Windows Search index",
+        "Seconds":  null,
+        "Found":  null,
+        "Error":  "Exception from HRESULT: 0x80041820"
+    },
+    {
+        "Query":  "احمد",
+        "Note":  "Arabic, typed without hamza (the file is named أحمد)",
+        "Tool":  "InstaFind (command line, loads the index each run)",
+        "Seconds":  1.01,
+        "Found":  0
+    },
+    {
+        "Query":  "احمد",
+        "Note":  "Arabic, typed without hamza (the file is named أحمد)",
+        "Tool":  "cmd: dir /s",
+        "Seconds":  35.42,
+        "Found":  0
+    },
+    {
+        "Query":  "احمد",
+        "Note":  "Arabic, typed without hamza (the file is named أحمد)",
+        "Tool":  "PowerShell: Get-ChildItem -Recurse",
+        "Seconds":  0,
+        "Found":  0
+    },
+    {
+        "Query":  "احمد",
+        "Note":  "Arabic, typed without hamza (the file is named أحمد)",
+        "Tool":  "Windows Search index",
+        "Seconds":  null,
+        "Found":  null,
+        "Error":  "Exception from HRESULT: 0x80041820"
+    }
+]
