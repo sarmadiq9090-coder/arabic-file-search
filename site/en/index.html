@@ -204,8 +204,8 @@
       <caption>File-name search across the whole C: drive of a real Windows machine on GitHub Actions (Windows Server 2025, an index of 1.2 million files)</caption>
       <thead><tr><th scope="col">Search</th><th scope="col">InstaFind</th><th scope="col"><code>dir /s</code></th><th scope="col"><code>Get-ChildItem</code></th></tr></thead>
       <tbody>
-        <tr><th scope="row"><code>report</code></th><td><strong>1 s</strong></td><td>107 s</td><td>49 s</td></tr>
-        <tr><th scope="row"><code>احمد</code> (files named <span lang="ar">أحمد</span>)</th><td><strong>1 s</strong>, finds both</td><td>33 s, finds none</td><td>49 s, finds none</td></tr>
+        <tr><th scope="row"><code>report</code></th><td><strong>1 s</strong></td><td>73–108 s</td><td>29–51 s</td></tr>
+        <tr><th scope="row"><code>احمد</code> (files named <span lang="ar">أحمد</span>)</th><td><strong>1 s</strong>, finds both</td><td>19–33 s, finds none</td><td>29–50 s, finds none</td></tr>
       </tbody>
     </table></div>
     <p class="bench-note">The second includes starting the command-line tool and loading the index from disk. In the open window, results appear as you type, in milliseconds. <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/blob/main/docs/media/bench.md">Raw results</a></p>
