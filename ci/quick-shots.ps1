@@ -43,6 +43,7 @@ public static class Q {
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
     [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr p, EnumProc f, IntPtr l);
@@ -114,6 +115,21 @@ public static class Q {
     public static void VKey(ushort vk) {
         SendInput(2, new[] { Key(vk, 0, 0), Key(vk, 0, 2) }, Marshal.SizeOf(typeof(INPUT)));
     }
+    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(POINT p);
+    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr h, uint flags);
+    // The class of the top-level window that a click at (x, y) would reach.
+    public static string ClassAt(int x, int y) {
+        var p = new POINT(); p.X = x; p.Y = y;
+        return Class(GetAncestor(WindowFromPoint(p), 2));
+    }
+    public static void Combo(ushort[] mods, ushort vk) {
+        var list = new List<INPUT>();
+        foreach (var m in mods) list.Add(Key(m, 0, 0));
+        list.Add(Key(vk, 0, 0)); list.Add(Key(vk, 0, 2));
+        for (int i = mods.Length - 1; i >= 0; i--) list.Add(Key(mods[i], 0, 2));
+        SendInput((uint)list.Count, list.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+    }
     public static void CtrlAltF() {
         SendInput(6, new[] { Key(0x11, 0, 0), Key(0x12, 0, 0), Key(0x46, 0, 0), Key(0x46, 0, 2), Key(0x12, 0, 2), Key(0x11, 0, 2) }, Marshal.SizeOf(typeof(INPUT)));
     }
@@ -180,10 +196,12 @@ foreach ($f in @('مشكلة الطابعة.txt', 'حل مشكلة الشبكة.
     Set-Content -LiteralPath (Join-Path $docs $f) -Value 'x' -Encoding utf8
 }
 
+$script:mode = 'fade'
+$script:altSpace = 0
 function Seed-Settings {
     New-Item -ItemType Directory -Force $data | Out-Null
     $now = [int][double]::Parse((Get-Date -UFormat %s))
-    $text = "floating_asked=1`nfloating_mode=fade`nhotkey_opens=quick`ntray_icon=1`nupdate_check=$now`n"
+    $text = "floating_asked=1`nfloating_mode=$($script:mode)`nhotkey_opens=quick`ntray_icon=1`nalt_space=$($script:altSpace)`nupdate_check=$now`n"
     [IO.File]::WriteAllText((Join-Path $data 'settings.txt'), $text, (New-Object Text.UTF8Encoding $false))
 }
 function Set-Lang([string]$lang) {
@@ -249,6 +267,15 @@ Write-Host ("index saved after {0:N0} s" -f ((Get-Date) - $started).TotalSeconds
 Start-Sleep -Seconds 20
 Check-Alive 'indexing' | Out-Null
 
+# Windows 11 puts a new program's tray icon in the overflow; show it on the
+# taskbar like a user who dragged it there.
+$promoted = 0
+Get-ChildItem 'HKCU:\Control Panel\NotifyIconSettings' -ErrorAction SilentlyContinue | ForEach-Object {
+    $path = (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).ExecutablePath
+    if ($path -and $path -like '*bahth.exe') { Set-ItemProperty $_.PSPath -Name IsPromoted -Value 1 -Type DWord; $promoted++ }
+}
+Write-Host "tray icon promoted: $promoted entries"
+
 # ---------------------------------------------------------------- the quick search
 function Popup { return [Q]::Find($script:proc.Id, 'InstaFindQuickSearch') }
 function Popup-Height { $h = Popup; if ($h -eq [IntPtr]::Zero) { return 0 }; $r = [Q]::Rect($h); return $r.B - $r.T }
@@ -297,7 +324,7 @@ function Session([string]$lang, [bool]$light, [string]$tag, [object[]]$queries, 
         $r = [Q]::Rect($box)
         Note ("[$tag] floating box at {0},{1} size {2}x{3} on a {4}x{5} screen" -f $r.L, $r.T, ($r.R - $r.L), ($r.B - $r.T), $sw, $sh)
         if ($r.R -gt $sw -or $r.B -gt $sh -or $r.L -lt 0 -or $r.T -lt 0) { Fail "floating box off screen ($tag)" }
-        $cx = 560; $cy = 150
+        $cx = 760; $cy = 140
         $idle = [Q]::Grab($sw - $cx, $sh - $cy, $cx, $cy)
         [Q]::Save($idle, (Join-Path $Out "floating-idle-$tag.png"))
         [Q]::SetCursorPos([int](($r.L + $r.R) / 2), [int](($r.T + $r.B) / 2)) | Out-Null
@@ -317,7 +344,7 @@ function Session([string]$lang, [bool]$light, [string]$tag, [object[]]$queries, 
                 $pr = [Q]::Rect((Popup))
                 Note ("[$tag] popup from the box at {0},{1} size {2}x{3}" -f $pr.L, $pr.T, ($pr.R - $pr.L), ($pr.B - $pr.T))
                 $top = [Math]::Min($pr.T, $r.T) - 20
-                Shot "box-click-$tag" ($sw - 640) $top 640 ($sh - $top) | Out-Null
+                Shot "box-click-$tag" ($sw - 760) $top 760 ($sh - $top) | Out-Null
                 Close-Popup "box click $tag"
             } else { Fail "a click on the floating box did not open the popup ($tag)" }
         }
@@ -394,6 +421,83 @@ if ($script:means['ar-light'] -and $script:means['ar'] -and $script:means['ar-li
 }
 Set-Theme $false
 
+# ---------------------------------------------------------------- extras
+function Log-Has([string]$pattern) { return (Test-Path $logFile) -and ([IO.File]::ReadAllText($logFile) -match $pattern) }
+try {
+    Write-Host '== extras'
+    Set-Lang 'en'
+    $script:altSpace = 1
+    $p = Start-App $Exe
+    Start-Sleep -Seconds 4
+    [Q]::ShowWindow($script:main, 6) | Out-Null
+    Far-Cursor
+    Start-Sleep -Seconds 1
+    # Alt+Space opens the quick search when it is turned on.
+    [Q]::Combo(@(0x12), 0x20)
+    for ($t = 0; $t -lt 20 -and -not (Popup-Visible); $t++) { Start-Sleep -Milliseconds 100 }
+    if (Popup-Visible) { Note '[extras] Alt+Space opened the quick search'; Close-Popup 'alt space' } else { Fail 'Alt+Space did not open the quick search (alt_space=1)' }
+    if (Log-Has 'hotkey Alt\+Space is taken') { Fail 'Alt+Space could not be registered' }
+
+    # Ctrl+Alt+G with an Open dialog of Notepad in front.
+    $np = Start-Process notepad -PassThru
+    Start-Sleep -Seconds 3
+    $npw = [Q]::MainWindow($np.Id)
+    if ($npw -ne [IntPtr]::Zero) { [Q]::SetForegroundWindow($npw) | Out-Null }
+    Start-Sleep -Milliseconds 500
+    [Q]::Combo(@(0x11), 0x4F)   # Ctrl+O
+    $dlg = [IntPtr]::Zero
+    for ($t = 0; $t -lt 30 -and $dlg -eq [IntPtr]::Zero; $t++) { Start-Sleep -Milliseconds 200; $dlg = [Q]::FindVisible('#32770') }
+    if ($dlg -eq [IntPtr]::Zero) { Write-Host '::warning::no Open dialog in Notepad; Ctrl+Alt+G tested without one' } else { [Q]::SetForegroundWindow($dlg) | Out-Null; Start-Sleep -Milliseconds 500 }
+    [Q]::Combo(@(0x11, 0x12), 0x47)   # Ctrl+Alt+G
+    Start-Sleep -Seconds 2
+    if (-not (Log-Has 'quick switch: hotkey')) { Fail 'Ctrl+Alt+G did nothing (no "quick switch: hotkey" in log.txt)' }
+    elseif ($dlg -ne [IntPtr]::Zero -and -not (Log-Has 'quick switch: hotkey, file dialog found')) { Fail 'Ctrl+Alt+G did not see the Open dialog in front' }
+    else { Note "[extras] Ctrl+Alt+G: $(([regex]::Matches([IO.File]::ReadAllText($logFile), 'quick switch: hotkey[^\r\n]*') | Select-Object -Last 1).Value)" }
+    Get-Process notepad -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Sleep -Seconds 1
+    [Q]::ShowWindow($script:main, 6) | Out-Null
+
+    # Classic tools from the settings results open (Enter; these are not system commands).
+    foreach ($tool in @(@{ Q = 'device manager'; Proc = 'mmc'; Name = 'devmgmt' }, @{ Q = 'devices and printers'; Proc = $null; Name = 'printers' })) {
+        if (-not (Open-Popup "tool $($tool.Name)")) { continue }
+        Type-Query $tool.Q
+        Shot-Window "tool-$($tool.Name)" (Popup) | Out-Null
+        $before = @(Get-Process | ForEach-Object Id)
+        [Q]::VKey(0x0D)
+        Start-Sleep -Seconds 5
+        $new = Get-Process | Where-Object { $before -notcontains $_.Id }
+        Note ("[extras] Enter on '{0}' started: {1}" -f $tool.Q, (($new | ForEach-Object { $_.ProcessName } | Sort-Object -Unique) -join ', '))
+        if ($tool.Proc -and -not ($new | Where-Object ProcessName -eq $tool.Proc)) { Fail "Enter on '$($tool.Q)' did not start $($tool.Proc).exe" }
+        if (Log-Has 'Could not open|system command .* failed') { Fail "opening '$($tool.Q)' failed (log)" }
+        Shot "tool-$($tool.Name)-opened" 0 0 ([Q]::ScreenW) ([Q]::ScreenH) | Out-Null
+        if (Popup-Visible) { Close-Popup "tool $($tool.Name)" }
+        $new | Where-Object { $_.ProcessName -in @('mmc', 'control', 'SystemSettings') } | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    }
+    Check-Alive 'extras' | Out-Null
+
+    # floating_mode=hidden: the invisible box lets clicks through.
+    $script:altSpace = 0
+    $script:mode = 'hidden'
+    $p = Start-App $Exe
+    Start-Sleep -Seconds 3
+    [Q]::ShowWindow($script:main, 6) | Out-Null
+    Far-Cursor
+    Start-Sleep -Seconds 4
+    $box = [Q]::Find($p.Id, 'InstaFindFloatingBox')
+    if ($box -eq [IntPtr]::Zero) { Fail 'no floating box in hidden mode' } else {
+        $r = [Q]::Rect($box)
+        $cls = [Q]::ClassAt([int](($r.L + $r.R) / 2), [int](($r.T + $r.B) / 2))
+        Note "[extras] hidden mode, cursor away: a click on the box's place reaches '$cls'"
+        if ($cls -eq 'InstaFindFloatingBox') { Fail 'in hidden mode the invisible box catches clicks' }
+        Shot 'floating-hidden-en' ([Q]::ScreenW - 760) ([Q]::ScreenH - 140) 760 140 | Out-Null
+    }
+    $script:mode = 'fade'
+    Check-Alive 'hidden mode' | Out-Null
+} catch {
+    Fail "extras failed: $($_.Exception.Message) at $($_.InvocationInfo.PositionMessage)"
+}
+
 # The catalog line in the log.
 $logText = if (Test-Path $logFile) { [IO.File]::ReadAllText($logFile) } else { '' }
 $m = [regex]::Matches($logText, 'launcher catalog: (\d+) apps, (\d+) settings pages in (\d+) ms')
@@ -409,13 +513,22 @@ Stop-All
 
 # ---------------------------------------------------------------- speed against 0.6.1
 function Median([double[]]$v) { $s = $v | Sort-Object; return $s[[int][Math]::Floor($s.Count / 2)] }
+# Start-Process -Wait polls about once a second, so the process is run
+# and waited for directly.
 function Cli-Time([string]$exePath, [string]$q) {
-    $o = Join-Path $env:RUNNER_TEMP 'qs-out.txt'
-    $line = "-s `"$q`" --all --scope C: --count"
+    $si = New-Object Diagnostics.ProcessStartInfo
+    $si.FileName = $exePath
+    $si.Arguments = "-s `"$q`" --all --scope C: --count"
+    $si.UseShellExecute = $false
+    $si.RedirectStandardOutput = $true
+    $si.StandardOutputEncoding = [Text.Encoding]::UTF8
+    $si.CreateNoWindow = $true
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    Start-Process -FilePath $exePath -ArgumentList $line -NoNewWindow -Wait -RedirectStandardOutput $o | Out-Null
+    $pr = [Diagnostics.Process]::Start($si)
+    $t = $pr.StandardOutput.ReadToEnd()
+    $pr.WaitForExit()
     $sw.Stop()
-    $t = [IO.File]::ReadAllText($o).Trim()
+    $t = $t.Trim()
     $n = if ($t -match '(\d+)') { [int]$Matches[1] } else { -1 }
     return @($sw.Elapsed.TotalMilliseconds, $n)
 }
