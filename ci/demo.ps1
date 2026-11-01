@@ -204,8 +204,8 @@ function Set-Scope([string[]]$names) {
     if (-not $b) { throw 'folder button not found' }
     [Win]::SetForegroundWindow($script:hwnd) | Out-Null
     [Win]::Click($b.H)
-    $dlg = [IntPtr]::Zero
-    for ($i = 0; $i -lt 20 -and $dlg -eq [IntPtr]::Zero; $i++) {
+    $dlg = $null
+    for ($i = 0; $i -lt 20 -and -not $dlg; $i++) {
         Start-Sleep -Milliseconds 500
         $dlg = [Win]::TopWindows($script:appPid) | Where-Object { [Win]::Class($_) -eq '#32770' } | Select-Object -First 1
     }
