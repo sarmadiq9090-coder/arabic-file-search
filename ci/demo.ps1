@@ -64,6 +64,18 @@ public static class Win {
         }, IntPtr.Zero);
         return best;
     }
+    [DllImport("user32.dll")] static extern IntPtr GetParent(IntPtr h);
+    public static string ParentClass(IntPtr h) { return Class(GetParent(h)); }
+    public static List<IntPtr> TopWindows(int pid) {
+        var list = new List<IntPtr>();
+        EnumWindows((h, l) => {
+            uint p; GetWindowThreadProcessId(h, out p);
+            if (p == pid && IsWindowVisible(h)) list.Add(h);
+            return true;
+        }, IntPtr.Zero);
+        return list;
+    }
+    public static void Press(IntPtr h) { SendMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero); }
     public static List<IntPtr> Children(IntPtr parent) {
         var list = new List<IntPtr>();
         EnumChildWindows(parent, (h, l) => { list.Add(h); return true; }, IntPtr.Zero);
@@ -130,14 +142,22 @@ $script:dir = $null
 function Start-App([string]$lang) {
     New-Item -Force 'HKCU:\Software\BahthSari' | Out-Null
     Set-ItemProperty 'HKCU:\Software\BahthSari' -Name Language -Value $lang
+    Get-Process bahth -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Sleep -Seconds 1
     $p = Start-Process -FilePath $Exe -PassThru
+    $script:appPid = $p.Id
     $deadline = (Get-Date).AddMinutes(2)
     $h = [IntPtr]::Zero
     while ((Get-Date) -lt $deadline -and $h -eq [IntPtr]::Zero) {
         Start-Sleep -Milliseconds 500
         $h = [Win]::MainWindow($p.Id)
     }
-    if ($h -eq [IntPtr]::Zero) { throw "no window for $lang" }
+    if ($h -eq [IntPtr]::Zero) {
+        Get-Process bahth -ErrorAction SilentlyContinue | Format-Table Id, MainWindowTitle, HasExited | Out-String | Write-Host
+        $log = Join-Path $data 'log.txt'
+        if (Test-Path $log) { Get-Content $log -Tail 20 | Write-Host }
+        throw "no window for $lang"
+    }
     $script:hwnd = $h
     [Win]::ShowWindow($script:hwnd, 9) | Out-Null   # SW_RESTORE
     [Win]::SetWindowPos($script:hwnd, [IntPtr]::Zero, 8, 8, 960, 600, 0x0040) | Out-Null
@@ -184,10 +204,18 @@ function Set-Scope([string[]]$names) {
     if (-not $b) { Write-Host "::warning::folder button not found"; return }
     [Win]::SetForegroundWindow($script:hwnd) | Out-Null
     [Win]::Click($b.H)
-    Start-Sleep -Seconds 3
-    foreach ($c in $docs.ToCharArray()) { [Win]::Char($c); Start-Sleep -Milliseconds 20 }
+    $dlg = [IntPtr]::Zero
+    for ($i = 0; $i -lt 20 -and $dlg -eq [IntPtr]::Zero; $i++) {
+        Start-Sleep -Milliseconds 500
+        $dlg = [Win]::TopWindows($script:appPid) | Where-Object { [Win]::Class($_) -eq '#32770' } | Select-Object -First 1
+    }
+    if (-not $dlg) { Write-Host '::warning::folder dialog did not open'; return }
+    $kids = [Win]::Children($dlg)
+    $edit = $kids | Where-Object { [Win]::Class($_) -eq 'Edit' -and [Win]::ParentClass($_) -eq 'ComboBox' } | Select-Object -First 1
+    if ($edit) { [Win]::SetText($edit, $docs) }
     Start-Sleep -Milliseconds 500
-    [Win]::VKey(0x0D)
+    $ok = $kids | Where-Object { [Win]::Class($_) -eq 'Button' -and [Win]::Text($_) -eq 'Select Folder' } | Select-Object -First 1
+    if ($ok) { [Win]::Press($ok) } else { Write-Host '::warning::Select Folder button not found'; $kids | ForEach-Object { Write-Host "  $([Win]::Class($_)) | $([Win]::Text($_))" } }
     Start-Sleep -Seconds 2
     [Win]::SetForegroundWindow($script:hwnd) | Out-Null
 }
