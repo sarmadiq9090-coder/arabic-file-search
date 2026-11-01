@@ -4,21 +4,21 @@
         "Note":  "English word",
         "Tool":  "InstaFind (command line, loads the index each run)",
         "Seconds":  1.01,
-        "Found":  0
+        "Found":  2093
     },
     {
         "Query":  "report",
         "Note":  "English word",
         "Tool":  "cmd: dir /s",
-        "Seconds":  108.3,
+        "Seconds":  96.1,
         "Found":  3066
     },
     {
         "Query":  "report",
         "Note":  "English word",
         "Tool":  "PowerShell: Get-ChildItem -Recurse",
-        "Seconds":  0,
-        "Found":  0
+        "Seconds":  49.63,
+        "Found":  2369
     },
     {
         "Query":  "report",
@@ -33,20 +33,20 @@
         "Note":  "Arabic, typed without hamza (the file is named أحمد)",
         "Tool":  "InstaFind (command line, loads the index each run)",
         "Seconds":  1.01,
-        "Found":  0
+        "Found":  2
     },
     {
         "Query":  "احمد",
         "Note":  "Arabic, typed without hamza (the file is named أحمد)",
         "Tool":  "cmd: dir /s",
-        "Seconds":  35.42,
+        "Seconds":  32.54,
         "Found":  0
     },
     {
         "Query":  "احمد",
         "Note":  "Arabic, typed without hamza (the file is named أحمد)",
         "Tool":  "PowerShell: Get-ChildItem -Recurse",
-        "Seconds":  0,
+        "Seconds":  49.64,
         "Found":  0
     },
     {
