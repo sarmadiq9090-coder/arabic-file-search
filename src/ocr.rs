@@ -74,7 +74,11 @@ pub fn ocr_image_file(path: &Path) -> Option<String> {
     if !meta.is_file() || meta.len() > MAX_IMAGE_FILE || !available() {
         return None;
     }
-    ocr_image_bytes(&std::fs::read(path).ok()?)
+    // Capped again: the file may have grown since the size was checked.
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    std::fs::File::open(path).ok()?.take(MAX_IMAGE_FILE).read_to_end(&mut bytes).ok()?;
+    ocr_image_bytes(&bytes)
 }
 
 // ---------------------------------------------------------------------------

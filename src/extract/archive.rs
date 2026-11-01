@@ -19,13 +19,12 @@ use std::fs::File;
 use std::io::{self, Cursor, Read};
 use std::path::Path;
 
-use calamine::{Ods, Reader, Sheets, Xls, Xlsb, Xlsx};
 use encoding_rs::WINDOWS_1256;
 
 use super::{
     MAX_OUTPUT, MAX_TEXT_READ, OTHER_EXTS, TEXT_EXTS, bidi_fix, decode_bytes, docx_text, epub,
     extract_doc_heuristic, mail, normalize_arabic_forms, odf_text, pptx_text, rtf_to_text,
-    sheets_text, strip_html,
+    spreadsheet_text, strip_html,
 };
 
 /// At most this many entries of an archive are looked at.
@@ -40,7 +39,10 @@ pub const MAX_ARCHIVE_TOTAL: u64 = 300 * 1024 * 1024;
 pub const MAX_RATIO: u64 = 200;
 /// Data below this size is too small to hurt, whatever its ratio (a short
 /// run of repeated characters easily compresses 200 times).
-const RATIO_FLOOR: u64 = 1024 * 1024;
+pub(super) const RATIO_FLOOR: u64 = 1024 * 1024;
+/// 7z archives whose decoders would allocate more than this (dictionary,
+/// model) are skipped. 7-Zip's strongest preset uses a 64 MB dictionary.
+const MAX_DECODER_MEMORY: u64 = 256 * 1024 * 1024;
 
 /// Extensions that make a file an archive. `gz` counts only as `.tar.gz`.
 const ARCHIVE_EXTS: &[&str] = &["zip", "7z", "tar", "tgz", "gz"];
@@ -380,9 +382,36 @@ fn read_tar(stream: impl Read, col: &mut Collector) {
     }
 }
 
+/// Memory the decoder for a 7z coder (method id, properties) allocates up
+/// front: the LZMA / LZMA2 dictionary or the PPMd model, as the header
+/// declares it (up to 4 GB; sevenz-rust2 sets no limit). 0 for the others.
+fn decoder_memory(method: &[u8], props: &[u8]) -> u64 {
+    let le32 = |i: usize| props.get(i..i + 4).map_or(0, |b| u64::from(u32::from_le_bytes([b[0], b[1], b[2], b[3]])));
+    match method {
+        // LZMA2: one byte, 40 meaning 4 GB.
+        [0x21] => match props.first().map(|&b| u64::from(b)) {
+            Some(bits @ 0..40) => (2 | (bits & 1)) << (bits / 2 + 11),
+            Some(_) => u64::from(u32::MAX),
+            None => 0,
+        },
+        // LZMA (dictionary) and PPMd (model size): bytes 1..5.
+        [0x03, 0x01, 0x01] | [0x03, 0x04, 0x01] => le32(1),
+        _ => 0,
+    }
+}
+
 fn read_7z(file: File, col: &mut Collector) {
     use sevenz_rust2::{ArchiveReader, Password};
     let Ok(mut zr) = ArchiveReader::new(file, Password::empty()) else { return };
+    // A failed allocation aborts the program, whatever catches panics.
+    let coders = zr.archive().blocks.iter().flat_map(|b| &b.coders);
+    if coders.map(|c| decoder_memory(c.encoder_method_id(), c.properties())).any(|m| m > MAX_DECODER_MEMORY) {
+        return;
+    }
+    // Decode on this thread: the multi-threaded LZMA2 decoder gives each of
+    // its threads (one per core) its own dictionary, and runs them outside
+    // the `catch_unwind` around this extraction.
+    zr.set_thread_count(1);
     // In a solid archive members share one stream: a skipped member must
     // still be decoded to reach the next, so all of it counts against the cap.
     let solid = zr.archive().is_solid;
@@ -422,7 +451,7 @@ fn member_text(ext: &str, data: Vec<u8>) -> Option<String> {
     crate::crash_log::quietly(|| member_text_inner(ext, data)).ok().flatten()
 }
 
-fn member_text_inner(ext: &str, mut data: Vec<u8>) -> Option<String> {
+pub(super) fn member_text_inner(ext: &str, mut data: Vec<u8>) -> Option<String> {
     let zip = |data: Vec<u8>| zip::ZipArchive::new(Cursor::new(data)).ok();
     match ext {
         "html" | "htm" => Some(strip_html(&decode_bytes(&data))),
@@ -433,10 +462,7 @@ fn member_text_inner(ext: &str, mut data: Vec<u8>) -> Option<String> {
         "docx" | "docm" => docx_text(zip(data)?),
         "pptx" => pptx_text(zip(data)?),
         "odt" | "odp" => odf_text(zip(data)?),
-        "xlsx" | "xlsm" => sheets_text(Sheets::Xlsx(Xlsx::new(Cursor::new(data)).ok()?)),
-        "xlsb" => sheets_text(Sheets::Xlsb(Xlsb::new(Cursor::new(data)).ok()?)),
-        "xls" => sheets_text(Sheets::Xls(Xls::new(Cursor::new(data)).ok()?)),
-        "ods" => sheets_text(Sheets::Ods(Ods::new(Cursor::new(data)).ok()?)),
+        "xlsx" | "xlsm" | "xlsb" | "xls" | "ods" => spreadsheet_text(Cursor::new(data), ext),
         "pdf" => {
             let text = pdf_extract::extract_text_from_mem(&data).ok()?;
             Some(bidi_fix::fix_visual_order(text))
@@ -747,6 +773,46 @@ mod tests {
             let lim = Limits { member_size: 2000, ..LIMITS };
             assert_eq!(names(&archive_texts_with(&p, &lim)), ["تقارير\\ميزانية.docx", "ملاحظة.txt"], "solid {solid}");
         }
+    }
+
+    #[test]
+    fn random_member_names_never_panic() {
+        const PIECES: &[&str] = &[
+            "/", "\\", "..", ".", "C:", "ب", "\u{202E}", "\u{FDD0}", "\u{1F}", "\0", "😀", "\u{0651}", " ", ".txt", "__MACOSX", "a",
+        ];
+        let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
+        let mut next = |n: usize| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            (x % n as u64) as usize
+        };
+        for _ in 0..5000 {
+            let name: String = (0..next(80)).map(|_| PIECES[next(PIECES.len())]).collect();
+            let shown = display_name(&name);
+            assert!(shown.chars().count() <= 201 && !shown.contains('/'), "{name:?} -> {shown:?}");
+            let _ = document_ext(&shown);
+            let raw: Vec<u8> = (0..next(40)).map(|_| next(256) as u8).collect();
+            let _ = decode_name(&raw, String::from_utf8_lossy(&raw));
+            let packed = format!("{MEMBER_MARK}{name}\n{shown}");
+            assert!(split_members(&packed).is_some());
+        }
+    }
+
+    #[test]
+    fn seven_zip_decoder_memory_is_bounded() {
+        // sevenz-rust2 allocates the dictionary / model the header declares,
+        // up to 4 GB; a failed allocation aborts the program.
+        assert_eq!(decoder_memory(&[0x21], &[16]), 1 << 20); // LZMA2, 1 MB
+        assert_eq!(decoder_memory(&[0x21], &[39]), 3 << 30);
+        assert_eq!(decoder_memory(&[0x21], &[40]), u64::from(u32::MAX));
+        assert_eq!(decoder_memory(&[0x21], &[]), 0);
+        assert_eq!(decoder_memory(&[0x03, 0x01, 0x01], &[0x5D, 0, 0, 0, 0x40]), 1 << 30); // LZMA, 1 GB
+        assert_eq!(decoder_memory(&[0x03, 0x04, 0x01], &[6, 0, 0, 0, 0x10]), 256 << 20); // PPMd
+        assert_eq!(decoder_memory(&[0x03, 0x01, 0x01], &[0x5D]), 0);
+        assert_eq!(decoder_memory(&[0x00], &[]), 0);
+        assert!(decoder_memory(&[0x21], &[27]) <= MAX_DECODER_MEMORY); // 7-Zip's 64 MB preset
+        assert!(decoder_memory(&[0x21], &[34]) > MAX_DECODER_MEMORY);
     }
 
     #[test]
