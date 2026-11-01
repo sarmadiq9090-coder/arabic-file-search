@@ -33,6 +33,8 @@ use crate::quick::{self, Anchor, FeedbackKind, Group, Icon, ListMetrics, Palette
 const WIDTH: i32 = 480;
 /// The search strip at the bottom.
 const STRIP_H: i32 = 52;
+/// Opacity (of 255) of the list's tint over the acrylic backdrop.
+const LIST_TINT: u8 = 0xA8;
 /// At most this many file rows (the full window has the rest).
 const FILE_ROWS: usize = 6;
 /// Id of the search box among the popup's children.
@@ -426,12 +428,30 @@ impl App {
     fn popup_text_changed(&self) {
         self.popup.enter_pending.set(false);
         let q = self.popup_query();
+        self.popup_edit_direction(&q);
         if q.trim().is_empty() {
             *self.popup.files.borrow_mut() = Files::default();
         } else {
             self.popup_search_files(q);
         }
         self.popup_refresh();
+    }
+
+    /// Gives the search box the reading order of what is typed ("250*12"
+    /// or "5 kg to lb" left to right in the Arabic interface, Arabic right
+    /// to left in the English one); the interface's own when it is empty.
+    fn popup_edit_direction(&self, text: &str) {
+        let edit = self.popup_edit();
+        let want = if text.trim().is_empty() { rtl() } else { quick::first_strong_rtl(text).unwrap_or(false) };
+        let ex = unsafe { GetWindowLongW(edit, GWL_EXSTYLE) } as u32;
+        let has = ex & WS_EX_RTLREADING != 0;
+        if has != want {
+            let ex = if want { ex | WS_EX_RTLREADING } else { ex & !WS_EX_RTLREADING };
+            unsafe {
+                SetWindowLongW(edit, GWL_EXSTYLE, ex as i32);
+                InvalidateRect(edit, std::ptr::null(), 1);
+            }
+        }
     }
 
     /// Starts the name search for `text` on a background thread; while one
@@ -755,7 +775,10 @@ impl App {
 
         // Backgrounds: the list (solid, or clear for the backdrop), the
         // search strip, the line between them and the selection.
-        let list_bg = if opaque { quick::premul(p.background, 255) } else { 0 };
+        // Over the backdrop the list keeps a tint: where Windows draws it
+        // without its blur (a virtual machine, a remote session) what is
+        // behind would show through crisp and fight with the rows.
+        let list_bg = quick::premul(p.background, if opaque { 255 } else { LIST_TINT });
         let mut base = vec![list_bg; (w * h) as usize];
         let strip = quick::premul(p.background, 255);
         base[(list_h * w) as usize..].fill(strip);
@@ -814,13 +837,14 @@ impl App {
                             }
                         }
                         let font = if row.group == Group::More { &look.small } else { &look.title };
+                        let title = quick::embed_quoted(&row.title);
                         if row.subtitle.is_empty() || row.group == Group::More {
-                            surface::draw_text(dc, font, p.text, &row.title, &Rect::at(tx, slot.y, text_w, slot.h), rtl, false);
+                            surface::draw_text(dc, font, p.text, &title, &Rect::at(tx, slot.y, text_w, slot.h), rtl, false);
                         } else {
                             let half = slot.h / 2;
                             let top = Rect::at(tx, slot.y + px(3, s), text_w, half - px(2, s));
                             let bottom = Rect::at(tx, slot.y + half, text_w, half - px(3, s));
-                            surface::draw_text(dc, font, p.text, &row.title, &top, rtl, false);
+                            surface::draw_text(dc, font, p.text, &title, &top, rtl, false);
                             // A folder reads left to right; other second lines as written.
                             let sub = if matches!(row.target, Target::File { .. }) { super::format::ltr_path(&row.subtitle) } else { row.subtitle.clone() };
                             surface::draw_text(dc, &look.small, p.muted, &sub, &bottom, rtl, false);
