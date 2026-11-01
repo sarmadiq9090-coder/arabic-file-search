@@ -1410,6 +1410,14 @@ pub fn promote(hits: &mut Vec<u32>, boosted: &[(u32, f64)]) {
 #[cfg(test)]
 mod tests {
 
+    /// A query that also finds files in the temp folder, which on Windows is
+    /// a hidden system folder (AppData\\Local\\Temp).
+    fn temp_query(q: &str) -> Query {
+        let mut q = Query::parse(q);
+        q.show_system = true;
+        q
+    }
+
     #[test]
     fn scope_matches_whole_folders_only() {
         assert!(in_scope(r"C:\Docs\a.txt", r"c:\docs"));
@@ -1779,7 +1787,7 @@ mod tests {
             let progress = ContentProgress::default();
             progress.cancel.store(cancel, Ordering::Relaxed);
             let hits = Mutex::new(Vec::new());
-            search_content(&entries, &Query::parse(q), "", &progress, &hits, None);
+            search_content(&entries, &temp_query(q), "", &progress, &hits, None);
             assert!(progress.done.load(Ordering::Relaxed));
             let hits: Vec<(u32, String)> = hits.into_inner().unwrap().into_iter().map(|h| (h.index, h.snippet)).collect();
             (progress.total.load(Ordering::Relaxed), progress.checked.load(Ordering::Relaxed), hits)
@@ -1825,7 +1833,7 @@ mod tests {
         let run = |entries: &[Entry], q: &str| {
             let progress = ContentProgress::default();
             let hits = Mutex::new(Vec::new());
-            search_content(entries, &Query::parse(q), "", &progress, &hits, Some(&cache));
+            search_content(entries, &temp_query(q), "", &progress, &hits, Some(&cache));
             assert!(!cache.searching());
             let mut hits: Vec<(u32, u32, usize)> =
                 hits.into_inner().unwrap().into_iter().map(|h| (h.index, h.count, h.lines.len())).collect();

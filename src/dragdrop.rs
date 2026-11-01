@@ -525,7 +525,7 @@ mod tests {
 
     fn list(bytes: &[u8]) -> Vec<String> {
         let header = std::mem::size_of::<DropFiles>();
-        let units: Vec<u16> = bytes[header..].chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+        let units: Vec<u16> = bytes[header..].as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect();
         assert_eq!(&units[units.len() - 2..], &[0, 0], "double-NUL terminated");
         String::from_utf16(&units[..units.len() - 2]).unwrap().split('\0').map(str::to_string).collect()
     }

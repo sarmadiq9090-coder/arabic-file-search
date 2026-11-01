@@ -1435,6 +1435,8 @@ mod tests {
         std::fs::write(&secret, b"secret").unwrap();
         let path = file.to_string_lossy().into_owned();
         let s = shared_with(vec![entry(&path, 5, false), entry(&dir.to_string_lossy(), 0, true)]);
+        // The temp folder is a hidden system folder on Windows.
+        s.show_system.store(true, Ordering::Relaxed);
         let url = format!("/f?p={}", percent_encode(&path));
 
         // Off by default.
