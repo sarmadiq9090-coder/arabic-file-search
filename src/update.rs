@@ -17,8 +17,22 @@ pub const LATEST_URL: &str =
 /// Named mutex that keeps a single copy of the program running (ui/startup.rs).
 #[cfg(windows)]
 pub const SINGLE_INSTANCE_MUTEX: &str = "Local\\BahthSari.SingleInstance";
-/// Name of the release asset that holds the program.
-pub const ASSET_NAME: &str = "bahth.exe";
+/// Name of the release asset that holds the program for this CPU. The x64
+/// name must never change: every copy installed since 0.3.0 looks for it.
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86")))]
+pub const ASSET_NAME: &str = ASSET_X64;
+#[cfg(target_arch = "aarch64")]
+pub const ASSET_NAME: &str = ASSET_ARM64;
+#[cfg(target_arch = "x86")]
+pub const ASSET_NAME: &str = ASSET_X86;
+/// The release assets for each CPU (build.yml publishes all three). Each
+/// build uses only its own; the others are named for the tests.
+#[allow(dead_code)]
+pub const ASSET_X64: &str = "bahth.exe";
+#[allow(dead_code)]
+pub const ASSET_ARM64: &str = "bahth-arm64.exe";
+#[allow(dead_code)]
+pub const ASSET_X86: &str = "bahth-x86.exe";
 /// Upper bound for the JSON answer.
 #[cfg(windows)]
 pub const MAX_JSON: usize = 1 << 20;
@@ -134,6 +148,11 @@ pub fn trim_notes(body: &str, max: usize) -> String {
 /// Turns the GitHub "release" JSON into a `Release`, if it is a usable
 /// release that is newer than `current`. Errors only for malformed input.
 pub fn parse_release(json: &str, current: &str) -> Result<Option<Release>, String> {
+    parse_release_for(json, current, ASSET_NAME)
+}
+
+/// `parse_release` for the program asset named `asset_name` (another CPU's).
+pub fn parse_release_for(json: &str, current: &str, asset_name: &str) -> Result<Option<Release>, String> {
     let v: serde_json::Value =
         serde_json::from_str(json).map_err(|e| format!("bad JSON from GitHub: {e}"))?;
     if !v.is_object() {
@@ -153,7 +172,7 @@ pub fn parse_release(json: &str, current: &str) -> Result<Option<Release>, Strin
     let version = tag.strip_prefix(['v', 'V']).unwrap_or(&tag).to_string();
     let asset = v["assets"]
         .as_array()
-        .and_then(|a| a.iter().find(|x| x["name"].as_str() == Some(ASSET_NAME)));
+        .and_then(|a| a.iter().find(|x| x["name"].as_str() == Some(asset_name)));
     let Some(asset) = asset else {
         // A newer tag without the program attached is not installable.
         return Ok(None);
@@ -682,7 +701,9 @@ mod tests {
       "body": "## الجديد\r\n- تحديث تلقائي\r\n- إصلاحات",
       "assets": [
         {"name": "bahth-setup.zip", "size": 5, "browser_download_url": "https://github.com/x/y/releases/download/v0.3.1/bahth-setup.zip"},
-        {"name": "bahth.exe", "size": 4321000, "browser_download_url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.3.1/bahth.exe"}
+        {"name": "bahth-arm64.exe", "size": 4321000, "browser_download_url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.3.1/bahth-arm64.exe"},
+        {"name": "bahth.exe", "size": 4321000, "browser_download_url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.3.1/bahth.exe"},
+        {"name": "bahth-x86.exe", "size": 4321000, "browser_download_url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.3.1/bahth-x86.exe"}
       ]
     }"###;
 
@@ -695,7 +716,7 @@ mod tests {
         let r = release_from_tag("v0.4.1", "0.4.0").unwrap();
         assert_eq!(r.version, "0.4.1");
         assert_eq!(r.exe_size, 0);
-        assert!(r.exe_url.ends_with("/releases/download/v0.4.1/bahth.exe"));
+        assert!(r.exe_url.ends_with(&format!("/releases/download/v0.4.1/{ASSET_NAME}")));
         assert!(release_from_tag("v0.4.0", "0.4.0").is_none());
         assert!(release_from_tag("v0.5.0-beta", "0.4.0").is_none());
     }
@@ -723,7 +744,7 @@ mod tests {
         assert_eq!(r.version, "0.3.1");
         assert_eq!(r.tag, "v0.3.1");
         assert_eq!(r.exe_size, 4_321_000);
-        assert!(r.exe_url.ends_with("/v0.3.1/bahth.exe"));
+        assert!(r.exe_url.ends_with(&format!("/v0.3.1/{ASSET_NAME}")));
         assert_eq!(r.notes, "## الجديد\n- تحديث تلقائي\n- إصلاحات");        assert_eq!(r.sha256, None);
         let h = "AB".repeat(32);
         let with = SAMPLE.replace("\"size\": 4321000,", &format!("\"size\": 4321000, \"digest\": \"sha256:{h}\","));
@@ -741,7 +762,7 @@ mod tests {
         assert_eq!(parse_release(&pre, "0.2.2").unwrap(), None);
         let tagged_pre = SAMPLE.replace("\"v0.3.1\"", "\"v0.3.1-beta\"");
         assert_eq!(parse_release(&tagged_pre, "0.2.2").unwrap(), None);
-        let no_exe = SAMPLE.replace("\"bahth.exe\"", "\"other.exe\"");
+        let no_exe = SAMPLE.replace(&format!("\"{ASSET_NAME}\""), "\"other.exe\"");
         assert_eq!(parse_release(&no_exe, "0.2.2").unwrap(), None);
     }
 
@@ -754,6 +775,30 @@ mod tests {
         assert!(parse_release(&http, "0.2.2").is_err());
         let huge = SAMPLE.replace("4321000", "999999999999");
         assert!(parse_release(&huge, "0.2.2").is_err());
+    }
+
+    #[test]
+    fn each_cpu_gets_its_own_asset() {
+        // The x64 name is what every installed copy since 0.3.0 looks for.
+        assert_eq!(ASSET_X64, "bahth.exe");
+        let expected = match std::env::consts::ARCH {
+            "aarch64" => ASSET_ARM64,
+            "x86" => ASSET_X86,
+            _ => ASSET_X64,
+        };
+        assert_eq!(ASSET_NAME, expected);
+        for name in [ASSET_X64, ASSET_ARM64, ASSET_X86] {
+            let r = parse_release_for(SAMPLE, "0.2.2", name).unwrap().unwrap();
+            assert!(r.exe_url.ends_with(&format!("/v0.3.1/{name}")), "{name}: {}", r.exe_url);
+        }
+        // A release without this CPU's program is not offered (no fallback
+        // to another CPU's exe, which validate_pe would refuse anyway).
+        let x64_only = SAMPLE
+            .replace(&format!("\"{ASSET_ARM64}\""), "\"a.zip\"")
+            .replace(&format!("\"{ASSET_X86}\""), "\"b.zip\"");
+        assert!(parse_release_for(&x64_only, "0.2.2", ASSET_X64).unwrap().is_some());
+        assert_eq!(parse_release_for(&x64_only, "0.2.2", ASSET_ARM64).unwrap(), None);
+        assert_eq!(parse_release_for(&x64_only, "0.2.2", ASSET_X86).unwrap(), None);
     }
 
     #[test]

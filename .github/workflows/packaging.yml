@@ -54,10 +54,14 @@ jobs:
             echo "$TAG is a draft or pre-release; nothing to do."; exit 0
           fi
           dl=$(mktemp -d)
-          gh release download "$TAG" --pattern bahth.exe --dir "$dl"
+          # bahth.exe (x64) always; the x86 and ARM64 exes exist since v0.7.0.
+          gh release download "$TAG" --pattern 'bahth*.exe' --dir "$dl"
           sha=$(sha256sum "$dl/bahth.exe" | cut -d' ' -f1)
+          extra=()
+          [ -f "$dl/bahth-x86.exe" ] && extra+=(--sha-x86 "$(sha256sum "$dl/bahth-x86.exe" | cut -d' ' -f1)")
+          [ -f "$dl/bahth-arm64.exe" ] && extra+=(--sha-arm64 "$(sha256sum "$dl/bahth-arm64.exe" | cut -d' ' -f1)")
           date=$(gh release view "$TAG" --json publishedAt --jq '.publishedAt[0:10]')
-          python3 packaging/update-manifests.py "$TAG" "$sha" "$date"
+          python3 packaging/update-manifests.py "$TAG" "$sha" "$date" "${extra[@]}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A bucket packaging

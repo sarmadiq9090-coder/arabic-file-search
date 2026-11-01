@@ -1,2 +1,10 @@
 [target.x86_64-pc-windows-gnu]
 linker = "x86_64-w64-mingw32-gcc"
+
+[target.i686-pc-windows-gnu]
+linker = "i686-w64-mingw32-gcc"
+
+# The ARM64 exe is built with MSVC (build.yml); link the C runtime statically
+# so the single exe runs without the Visual C++ redistributable.
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

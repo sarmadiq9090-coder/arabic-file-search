@@ -10,8 +10,11 @@ to main (`Packaging: update manifests for vX.Y.Z`):
 | `packaging/winget/manifests/s/Sarmad/InstaFind/<version>/` | winget, copy into `microsoft/winget-pkgs` |
 | `packaging/chocolatey/` | Chocolatey community repository |
 
-The exe asset must stay named `bahth.exe`: the in-app updater and all three
-manifests download `releases/download/vX.Y.Z/bahth.exe`.
+The x64 exe asset must stay named `bahth.exe`: the in-app updater of every
+installed copy and all three manifests download `releases/download/vX.Y.Z/bahth.exe`.
+Since v0.7.0 each release also has `bahth-x86.exe` (32-bit) and
+`bahth-arm64.exe`. Scoop and winget list all three CPUs; Chocolatey lists x64
+and x86 (it has no ARM64 URL, and Windows on ARM runs the x64 exe).
 
 Points that apply to every package manager:
 

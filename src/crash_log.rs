@@ -286,6 +286,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_pointer_width = "64")] // 64-bit addresses
     fn frames_get_offsets_into_the_program() {
         let bt = "   0:     0x140489519 - <unknown>\n   1:     0x7ffa00001000 - <unknown>\n  at src/x.rs:1\n";
         let out = annotate_frames(bt, Some(0x1_4000_0000), "bahth.exe");
@@ -334,7 +335,7 @@ mod tests {
         for _ in 0..3000 {
             let s: String = (0..below(12)).map(|_| PIECES[below(PIECES.len())]).collect();
             let _ = frame_address(&s);
-            let base = [None, Some(0), Some(usize::MAX), Some(0x1_4000_0000)][below(4)];
+            let base = [None, Some(0), Some(usize::MAX), Some(0x4000_0000)][below(4)];
             let _ = annotate_frames(&s, base, "bahth.exe");
             let r = report(&s, Some((&s, u32::MAX, 0)), &s, &s);
             assert!(r.ends_with("END PANIC"));

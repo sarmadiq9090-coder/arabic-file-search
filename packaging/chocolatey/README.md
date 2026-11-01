@@ -6,7 +6,8 @@
 - `tools/chocolateyuninstall.ps1` and `tools/chocolateybeforemodify.ps1` are
   hand-written and do not change between releases.
 
-At install time the package downloads `bahth.exe` from the GitHub release,
+At install time the package downloads `bahth.exe` (or `bahth-x86.exe` on
+32-bit Windows, saved as `bahth.exe`) from the GitHub release,
 checks its SHA-256, shims it as `bahth` (automatic), and adds a
 Start menu shortcut. `beforemodify` closes a running copy before upgrade and
 uninstall. Uninstall also removes the "Start with Windows" entry when it
