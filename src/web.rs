@@ -1665,6 +1665,8 @@ mod tests {
         let path = file.to_string_lossy().into_owned();
         let s = shared_with(vec![entry(&path, 1, false)]);
         s.allow_download.store(true, Ordering::Relaxed);
+        // The temp folder is a hidden system folder on Windows.
+        s.show_system.store(true, Ordering::Relaxed);
         let r = handle(&get(&format!("/f?p={}", percent_encode(&path)), Some(TOKEN)), LAN, &s, Instant::now());
         assert_eq!(r.status, 200);
         let cd = r.header("Content-Disposition").unwrap();
