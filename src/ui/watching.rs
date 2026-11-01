@@ -37,7 +37,9 @@ pub(super) struct Live {
 pub(super) struct SubtreeScan {
     dir: String,
     progress: Arc<ScanProgress>,
-    result: Arc<Mutex<Option<Vec<Entry>>>>,
+    /// `Some(None)` when the walk failed (a panic, logged): the job is
+    /// dropped and the index left as it was.
+    result: Arc<Mutex<Option<Option<Vec<Entry>>>>>,
     /// Changes under `dir` applied while the walk ran; the walk may have
     /// missed them, so they are applied again on top of its result.
     replay: Vec<Change>,
@@ -199,25 +201,32 @@ impl App {
         let progress = Arc::new(ScanProgress::default());
         let result = Arc::new(Mutex::new(None));
         let (d, p, r) = (dir.clone(), progress.clone(), result.clone());
-        crate::crash_log::spawn_named("subtree-scan", move || {
+        let started_thread = crate::crash_log::spawn_named("subtree-scan", move || {
             background_priority();
             let started = std::time::Instant::now();
-            let found = Index::scan_subtree(&d, &p);
+            let found = crate::crash_log::catch(|| Index::scan_subtree(&d, &p));
             // Only a whole-drive walk is worth a line in the log.
-            if d.ends_with('\\') {
+            if let Some(found) = &found
+                && d.ends_with('\\')
+            {
                 log(&format!("rescan {d}: {} entries in {} ms", found.len(), started.elapsed().as_millis()));
             }
             if let Ok(mut slot) = r.lock() {
                 *slot = Some(found);
             }
         });
+        if started_thread.is_none() {
+            return;
+        }
         st.subtree_scans.push(SubtreeScan { dir, progress, result, replay: Vec::new(), replay_stats: Stats::new() });
     }
 
     fn finish_subtree_scans(&self) {
         let mut done = Vec::new();
         self.state.borrow_mut().subtree_scans.retain_mut(|j| match j.result.lock().ok().and_then(|mut r| r.take()) {
-            Some(found) => {
+            // The walk failed: forget it; a later change can ask again.
+            Some(None) => false,
+            Some(Some(found)) => {
                 done.push((
                     std::mem::take(&mut j.dir),
                     found,

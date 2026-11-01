@@ -32,10 +32,12 @@ impl App {
     pub(super) fn start(&self) {
         let slot: LoadJob = Arc::new(Mutex::new(None));
         let s = slot.clone();
-        crate::crash_log::spawn_named("index-load", move || {
+        let started_thread = crate::crash_log::spawn_named("index-load", move || {
             background_priority();
             let started = std::time::Instant::now();
-            let idx = Index::load(&index::cache_path());
+            // A panic while reading a damaged cache counts as no cache, so
+            // the window builds a new index instead of loading forever.
+            let idx = crate::crash_log::catch(|| Index::load(&index::cache_path())).flatten();
             log(&format!(
                 "index load: {} entries in {} ms",
                 idx.as_ref().map_or(0, |i| i.entries.len()),
@@ -45,6 +47,12 @@ impl App {
                 *slot = Some(idx);
             }
         });
+        if started_thread.is_none() {
+            // No thread to read the cache: go straight to a fresh scan.
+            if let Ok(mut s) = slot.lock() {
+                *s = Some(None);
+            }
+        }
         self.state.borrow_mut().loading = Some(slot);
         self.set_status(tr!("جاري تحميل الفهرس…", "Loading the index…"));
         self.query.set_focus();
@@ -92,16 +100,26 @@ impl App {
         let progress = Arc::new(ScanProgress::default());
         let result = Arc::new(Mutex::new(None));
         let (p, r) = (progress.clone(), result.clone());
-        crate::crash_log::spawn_named("index-build", move || {
+        let started_thread = crate::crash_log::spawn_named("index-build", move || {
             background_priority();
             let started = std::time::Instant::now();
-            let idx = Index::build(&index::list_drives(), &p);
-            log(&format!("index build: {} entries in {} ms", idx.entries.len(), started.elapsed().as_millis()));
-            let _ = idx.save(&index::cache_path());
+            // `None` after a panic (logged by the hook): the scan still ends,
+            // keeping the index there was, instead of indexing forever.
+            let idx = crate::crash_log::catch(|| Index::build(&index::list_drives(), &p));
+            if let Some(idx) = &idx {
+                log(&format!("index build: {} entries in {} ms", idx.entries.len(), started.elapsed().as_millis()));
+                let _ = idx.save(&index::cache_path());
+            }
             if let Ok(mut slot) = r.lock() {
                 *slot = Some(idx);
             }
         });
+        if started_thread.is_none() {
+            drop(st);
+            self.start_watching();
+            self.set_status(tr!("تعذرت فهرسة الملفات.", "Could not index the files."));
+            return;
+        }
         st.scan = Some(ScanJob { progress, result });
         drop(st);
         self.reindex_btn.set_enabled(false);
@@ -174,33 +192,45 @@ impl App {
         };
         let slot = self.name_result.clone();
         let notice = self.name_notice.sender();
-        crate::crash_log::spawn_named("name-search", move || {
+        let started_thread = crate::crash_log::spawn_named("name-search", move || {
             let started = std::time::Instant::now();
-            let q = parse(&text);
-            let mut hits = search::search_names(&index.entries, &q, &scope);
-            // Wrong keyboard layout ("hgjrvdv" → "التقرير"), Arabizi ("3abd"), then typos.
-            let mut converted = None;
-            if hits.is_empty()
-                && let Some((alt_hits, fb)) = fuzzy::name_fallback(&index.entries, &text, &scope, &parse)
-            {
-                hits = alt_hits;
-                converted = Some(fb);
-            }
-            if sort == SortKey::Relevance {
-                // Files the user opens often come first.
-                search::promote(&mut hits, &boosted);
-            } else if sort == SortKey::Size {
-                // Folders sort by everything inside them.
-                crate::folder_sizes::sort_hits_by_total(&mut hits, &crate::folder_sizes::for_index(&index), desc);
-            } else {
-                search::sort_hits(&index.entries, &mut hits, sort, desc);
-            }
+            let run = || {
+                let q = parse(&text);
+                let mut hits = search::search_names(&index.entries, &q, &scope);
+                // Wrong keyboard layout ("hgjrvdv" → "التقرير"), Arabizi ("3abd"), then typos.
+                let mut converted = None;
+                if hits.is_empty()
+                    && let Some((alt_hits, fb)) = fuzzy::name_fallback(&index.entries, &text, &scope, &parse)
+                {
+                    hits = alt_hits;
+                    converted = Some(fb);
+                }
+                if sort == SortKey::Relevance {
+                    // Files the user opens often come first.
+                    search::promote(&mut hits, &boosted);
+                } else if sort == SortKey::Size {
+                    // Folders sort by everything inside them.
+                    crate::folder_sizes::sort_hits_by_total(&mut hits, &crate::folder_sizes::for_index(&index), desc);
+                } else {
+                    search::sort_hits(&index.entries, &mut hits, sort, desc);
+                }
+                (hits, converted, q.is_empty())
+            };
+            // After a panic (logged by the hook) the search still answers,
+            // with no results: otherwise `name_running` would stay set and
+            // no search would run again, nor any change from the watcher.
+            let (hits, converted, empty) = crate::crash_log::catch(run).unwrap_or_default();
             let ms = started.elapsed().as_millis() as usize;
             if let Ok(mut r) = slot.lock() {
-                *r = Some(NameResult { index, hits, text, converted, empty: q.is_empty(), ms });
+                *r = Some(NameResult { index, hits, text, converted, empty, ms });
             }
             notice.notice();
         });
+        if started_thread.is_none() {
+            let mut st = self.state.borrow_mut();
+            st.name_running = false;
+            st.name_pending = false;
+        }
     }
 
     pub(super) fn on_names_found(&self) {
@@ -351,7 +381,14 @@ impl App {
                 drop(st);
                 self.set_status(&trf!("جاري فهرسة الملفات… {} عنصر حتى الآن", "Indexing files… {} items so far", fmt_num(n)));
             }
-            Some(idx) => {
+            Some(None) => {
+                st.scan = None;
+                drop(st);
+                self.reindex_btn.set_enabled(true);
+                self.start_watching();
+                self.set_status(tr!("تعذرت فهرسة الملفات.", "Could not index the files."));
+            }
+            Some(Some(idx)) => {
                 let n = idx.entries.len();
                 st.index = Arc::new(idx);
                 st.scan = None;
@@ -411,7 +448,9 @@ impl App {
     // ---------------------------------------------------------------- scope
 
     pub(super) fn choose_folder(&self) {
-        let mut slot = self.folder_dialog.borrow_mut();
+        // Taken out while it runs: the dialog pumps messages, and a handler
+        // that runs meanwhile must not find the cell borrowed.
+        let mut slot = self.folder_dialog.take();
         if slot.is_none() {
             let mut d = nwg::FileDialog::default();
             let built = nwg::FileDialog::builder()
@@ -421,11 +460,11 @@ impl App {
             if built.is_err() {
                 return;
             }
-            *slot = Some(d);
+            slot = Some(d);
         }
         let Some(dialog) = slot.as_ref() else { return };
         let chosen = if dialog.run(Some(&self.window)) { dialog.get_selected_item().ok() } else { None };
-        drop(slot);
+        *self.folder_dialog.borrow_mut() = slot;
         if let Some(dir) = chosen {
             let mut dir = dir.to_string_lossy().into_owned();
             if !dir.ends_with('\\') {

@@ -106,12 +106,24 @@ fn descendants(parent: HWND) -> Vec<HWND> {
     out
 }
 
+/// Longest window text read from another program, in UTF-16 units: a
+/// long path (`\\?\` prefix) is at most 32,767 units.
+const MAX_TEXT: usize = 32_768;
+
+/// The buffer length for a text of the length another program reported.
+/// Its answer is untrusted: a negative or huge LRESULT must not overflow
+/// `len + 1` nor make us allocate gigabytes.
+fn text_len(reported: usize) -> usize {
+    reported.min(MAX_TEXT)
+}
+
 /// Text of another program's window. A hung program can't stall us.
 fn window_text(h: HWND) -> String {
     let mut len: usize = 0;
     unsafe {
         SendMessageTimeoutW(h, WM_GETTEXTLENGTH, 0, 0, SMTO_ABORTIFHUNG, 500, &mut len);
     }
+    let len = text_len(len);
     let mut buf = vec![0u16; len + 1];
     let mut got: usize = 0;
     unsafe {
@@ -217,7 +229,8 @@ pub(super) fn switch_dialog_folder(dialog: HWND, folder: &str) -> bool {
     // The newer dialogs navigate asynchronously and may rewrite the box
     // meanwhile, so give the name back once the click has been handled.
     let edit_addr = edit as usize;
-    std::thread::spawn(move || {
+    // `std::thread::spawn` would panic if no thread can be made.
+    crate::crash_log::spawn_named("quick-switch", move || {
         let edit = edit_addr as HWND;
         for _ in 0..2 {
             std::thread::sleep(std::time::Duration::from_millis(250));
@@ -432,7 +445,44 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use super::result_folder;
+    use super::{MAX_TEXT, result_folder, text_len};
+
+    #[test]
+    fn untrusted_text_lengths_are_capped() {
+        assert_eq!(text_len(0), 0);
+        assert_eq!(text_len(260), 260);
+        assert_eq!(text_len(32_767), 32_767);
+        assert_eq!(text_len(usize::MAX), MAX_TEXT);
+        // A negative LRESULT read as usize.
+        assert_eq!(text_len(-1isize as usize), MAX_TEXT);
+        assert!(text_len(usize::MAX).checked_add(1).is_some());
+    }
+
+    #[test]
+    fn result_folder_never_panics() {
+        assert_eq!(result_folder("", false), "\\");
+        assert_eq!(result_folder("", true), "\\");
+        assert_eq!(result_folder("\\\\", false), "\\");
+        assert_eq!(result_folder("ملف", false), "ملف\\");
+        let long = format!(r"\\?\C:\{}\f.txt", "مجلد\\".repeat(300));
+        assert!(result_folder(&long, false).starts_with(r"\\?\C:\"));
+        // Random names made of awkward pieces: always one folder, ending in a slash.
+        const PIECES: &[&str] = &["\\", "/", "a", "ب", "\u{0651}", "\u{0640}", "\u{200F}", "👨‍👩‍👧", ".", " ", "C:", "\u{FFFD}"];
+        let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
+        let mut next = |n: usize| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            (x % n as u64) as usize
+        };
+        for _ in 0..2000 {
+            let path: String = (0..next(12)).map(|_| PIECES[next(PIECES.len())]).collect();
+            let is_dir = next(2) == 0;
+            let f = result_folder(&path, is_dir);
+            assert!(f.ends_with('\\'), "{path:?} -> {f:?}");
+            assert!(f.len() <= path.len() + 1, "{path:?} -> {f:?}");
+        }
+    }
 
     #[test]
     fn folder_of_a_result() {
