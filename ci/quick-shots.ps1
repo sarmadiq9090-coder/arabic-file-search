@@ -469,9 +469,21 @@ try {
     [Q]::Combo(@(0x11), 0x4F)   # Ctrl+O
     $dlg = [IntPtr]::Zero
     for ($t = 0; $t -lt 30 -and $dlg -eq [IntPtr]::Zero; $t++) { Start-Sleep -Milliseconds 200; $dlg = [Q]::FindVisible('#32770') }
-    if ($dlg -eq [IntPtr]::Zero) { Write-Host '::warning::no Open dialog in Notepad; Ctrl+Alt+G tested without one' } else { [Q]::SetForegroundWindow($dlg) | Out-Null; Start-Sleep -Milliseconds 500 }
-    [Q]::Combo(@(0x11, 0x12), 0x47)   # Ctrl+Alt+G
-    Start-Sleep -Seconds 2
+    if ($dlg -eq [IntPtr]::Zero) { Write-Host '::warning::no Open dialog in Notepad; Ctrl+Alt+G tested without one' }
+    for ($try = 0; $try -lt 3; $try++) {
+        if ($dlg -ne [IntPtr]::Zero) {
+            # A click on its title bar puts the dialog in front (SetForegroundWindow
+            # from this script is not always allowed to).
+            $dr = [Q]::Rect($dlg)
+            [Q]::Click([int](($dr.L + $dr.R) / 2), $dr.T + 12)
+            Start-Sleep -Milliseconds 600
+            Write-Host "  in front before Ctrl+Alt+G: '$([Q]::Class([Q]::GetForegroundWindow()))'"
+        }
+        [Q]::Combo(@(0x11, 0x12), 0x47)   # Ctrl+Alt+G
+        Start-Sleep -Seconds 2
+        if ($dlg -eq [IntPtr]::Zero -or (Log-Has 'quick switch: hotkey, file dialog found')) { break }
+        [Q]::ShowWindow($script:main, 6) | Out-Null
+    }
     if (-not (Log-Has 'quick switch: hotkey')) { Fail 'Ctrl+Alt+G did nothing (no "quick switch: hotkey" in log.txt)' }
     elseif ($dlg -ne [IntPtr]::Zero -and -not (Log-Has 'quick switch: hotkey, file dialog found')) { Fail 'Ctrl+Alt+G did not see the Open dialog in front' }
     else { Note "[extras] Ctrl+Alt+G: $(([regex]::Matches([IO.File]::ReadAllText($logFile), 'quick switch: hotkey[^\r\n]*') | Select-Object -Last 1).Value)" }
