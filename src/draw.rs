@@ -207,7 +207,7 @@ unsafe fn paint_spans(hdc: HDC, label: &RECT, rtl_reading: bool, text: &str, ran
     }
     let _mem = MemGuard(mem, old_font);
     let mdc = if mem.is_null() { hdc } else { mem };
-    let use_mirror = mirrored && (mode == 0 || mode == 2);
+    let use_mirror = mirrored && (mode == 0 || mode == 2 || mode == 4);
     let Some(mut ssa) = (unsafe { analyse(mdc, &buf[..n16], flags) }) else { return };
     // Number of UTF-16 units of the name that are actually shown.
     let mut shown = n16;
@@ -240,6 +240,18 @@ unsafe fn paint_spans(hdc: HDC, label: &RECT, rtl_reading: bool, text: &str, ran
         };
     }
     let width = ssa.width();
+    {
+        let mut xs = String::new();
+        for i in 0..shown {
+            let (mut a, mut b2) = (0i32, 0i32);
+            unsafe {
+                ScriptStringCPtoX(ssa.0, i as i32, 0, &mut a);
+                ScriptStringCPtoX(ssa.0, i as i32, 1, &mut b2);
+            }
+            xs.push_str(&format!("{}:{}-{} ", char::from_u32(buf[i] as u32).unwrap_or('?'), a, b2));
+        }
+        draw_log(&format!("ALL mode={mode} width={width} {xs}"));
+    }
 
     // The text is vertically centred (DT_VCENTER); the line sits at the
     // bottom of its cell, below the baseline and most descenders.
@@ -311,6 +323,9 @@ fn draw_log(line: &str) {
 /// Shapes and lays out `text` with the font selected into `hdc`.
 unsafe fn analyse(hdc: HDC, text: &[u16], flags: u32) -> Option<SsaGuard> {
     let mut ssa: SCRIPT_STRING_ANALYSIS = null_mut();
+    // A right-to-left paragraph: bidi level 1.
+    let mut state: winapi::um::usp10::SCRIPT_STATE = unsafe { zeroed() };
+    state.set_uBidiLevel(1);
     let hr = unsafe {
         ScriptStringAnalyse(
             hdc,
@@ -321,7 +336,7 @@ unsafe fn analyse(hdc: HDC, text: &[u16], flags: u32) -> Option<SsaGuard> {
             flags,
             0,
             null_mut(),
-            null_mut(),
+            if draw_mode() >= 4 && flags & SSA_RTL != 0 { &mut state } else { null_mut() },
             null(),
             null_mut(),
             null(),

@@ -124,7 +124,7 @@ Stop-Process -Id $p.Id -Force
 Start-Sleep -Seconds 2
 
 $env:BAHTH_DRAW_LOG = Join-Path $Out 'draw.log'
-foreach ($run in @(@('ar', 0), @('ar', 1), @('ar', 2), @('ar', 3), @('en', 0))) {
+foreach ($run in @(@('ar', 0), @('ar', 4), @('ar', 5), @('en', 4))) {
     $lang, $mode = $run
     $env:BAHTH_DRAW_MODE = "$mode"
     Add-Content -LiteralPath $env:BAHTH_DRAW_LOG -Value "=== $lang mode $mode"
