@@ -6,9 +6,12 @@ $exe = Join-Path $toolsDir 'bahth.exe'
 $packageArgs = @{
   packageName    = $env:ChocolateyPackageName
   fileFullPath   = $exe
-  url64bit       = 'https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.6.1/bahth.exe'
-  checksum64     = 'd991ebda7c08fe732d7727b4b6efeae279565a83d60bffb1cb9ea684e5bcba29'
+  url64bit       = 'https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.7.0/bahth.exe'
+  checksum64     = '893b4dc1de54c34b48017271be814c47f4b51fb595af5e47b61157352353558e'
   checksumType64 = 'sha256'
+  url            = 'https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.7.0/bahth-x86.exe'
+  checksum       = 'e9005c059df372dda142d8a0e278a07e8a43c904e7e12c292e42e4776c541502'
+  checksumType   = 'sha256'
 }
 Get-ChocolateyWebFile @packageArgs
 
