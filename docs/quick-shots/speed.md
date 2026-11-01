@@ -6,14 +6,14 @@ Measured by `ci/quick-shots.ps1` on a GitHub Actions runner: Microsoft Windows S
 
 | Query | 0.6.1 (ms) | this build (ms) | change | found (0.6.1 / this) |
 |---|---:|---:|---:|---:|
-| `report` | 631 | 636 | +1% | 2089 / 2089 |
-| `notepad` | 635 | 634 | +0% | 48 / 48 |
-| `احمد` | 635 | 631 | -1% | 0 / 0 |
-| `تقرير مالي` | 629 | 627 | +0% | 1 / 1 |
-| `مشكلة` | 628 | 623 | -1% | 2 / 2 |
-| `ext:dll` | 696 | 685 | -2% | 111794 / 111794 |
-| `system32 config` | 627 | 631 | +1% | 0 / 0 |
-| **all** | **4,481** | **4,467** | **+0%** | |
+| `report` | 626 | 624 | +0% | 2089 / 2089 |
+| `notepad` | 634 | 626 | -1% | 48 / 48 |
+| `احمد` | 626 | 623 | -1% | 0 / 0 |
+| `تقرير مالي` | 636 | 632 | -1% | 1 / 1 |
+| `مشكلة` | 629 | 625 | -1% | 2 / 2 |
+| `ext:dll` | 679 | 674 | -1% | 111790 / 111790 |
+| `system32 config` | 630 | 622 | -1% | 0 / 0 |
+| **all** | **4,460** | **4,426** | **-1%** | |
 
 ## Start-up of the main window (index already saved)
 
@@ -21,17 +21,17 @@ Shown = from `Start-Process` until the window is visible (measured outside). The
 
 | Phase (median ms) | 0.6.1 | this build | change |
 |---|---:|---:|---:|
-| Shown | 31 | 31 | +0% |
-| Built | 156 | 161 | +3% |
-| Layout | 156 | 161 | +3% |
-| FirstTick | 316 | 316 | +0% |
+| Shown | 31 | 33 | +5% |
+| Built | 147 | 155 | +5% |
+| Layout | 147 | 155 | +5% |
+| FirstTick | 312 | 312 | +0% |
 
 Raw phases (last run of each):
 
-- 0.6.1: `single-instance=10 init=12 font=12 settings=12 window=48 list=88 controls=111 tray=118 events=120 layout=150 built=151 loop=151 first-tick=312`
-- this build: `single-instance=10 init=12 font=12 settings=12 window=50 list=92 controls=114 tray=122 events=123 layout=160 built=160 loop=160 first-tick=316`
+- 0.6.1: `single-instance=11 init=13 font=13 settings=13 window=46 list=84 controls=107 tray=114 events=115 layout=146 built=146 loop=146 first-tick=308`
+- this build: `single-instance=10 init=12 font=12 settings=12 window=48 list=86 controls=112 tray=118 events=119 layout=157 built=158 loop=158 first-tick=312`
 
-Quick search popup (this build only): opened in a median of 13 ms over 8 openings (`quick search shown in` in log.txt).
+Quick search popup (this build only): opened in a median of 13 ms over 6 openings (`quick search shown in` in log.txt).
 
 ## Checks
 
@@ -44,25 +44,13 @@ Quick search popup (this build only): opened in a median of 13 ms over 8 opening
 - [ar] 'واي فاي': height 239 (empty 96), sd 33.0
 - [ar] '250*12': height 173 (empty 96), sd 34.4
 - [ar] '5 kg to lb': height 173 (empty 96), sd 35.6
-- [ar] 'هجري': height 239 (empty 96), sd 33.4
+- [ar] 'هجري': height 239 (empty 96), sd 33.3
 - [ar] 'يوتيوب قرآن': height 207 (empty 96), sd 34.3
 - [ar] 'اطفاء': height 239 (empty 96), sd 32.8
 - [ar] 'مشكلة': height 339 (empty 96), sd 34.1
 - [ar] 'qzxwvkjh': height 207 (empty 96), sd 35.0
 - [en] floating box at 392,676 size 236x36 on a 1024x768 screen
-- [en] floating box idle vs hovered: mean difference 2.58
-- [en] popup from the box at 392,572 size 480x96
-- [en] popup empty: height 96, mean 41
-- [en] 'notepad': height 319 (empty 96), sd 35.5
-- [en] 'paint': height 439 (empty 96), sd 35.6
-- [en] 'واي فاي': height 239 (empty 96), sd 35.7
-- [en] '250*12': height 173 (empty 96), sd 35.2
-- [en] '5 kg to lb': height 173 (empty 96), sd 36.5
-- [en] 'هجري': height 239 (empty 96), sd 36.1
-- [en] 'يوتيوب قرآن': height 207 (empty 96), sd 36.6
-- [en] 'اطفاء': height 239 (empty 96), sd 34.9
-- [en] 'مشكلة': height 339 (empty 96), sd 35.5
-- [en] 'qzxwvkjh': height 207 (empty 96), sd 37.2
+- [en] floating box idle vs hovered: mean difference 0.00
 - [ar-light] floating box at 392,676 size 236x36 on a 1024x768 screen
 - [ar-light] floating box idle vs hovered: mean difference 8.33
 - [ar-light] popup empty: height 96, mean 181
@@ -74,6 +62,10 @@ Quick search popup (this build only): opened in a median of 13 ms over 8 opening
 - [extras] Enter on 'device manager' started: mmc
 - [extras] Enter on 'devices and printers' started: ApplicationFrameHost, dllhost, svchost, SystemSettings
 - [extras] hidden mode, cursor away: a click on the box's place reaches 'Progman'
-- catalog: launcher catalog: 144 apps, 188 settings pages in 111 ms
+- catalog: launcher catalog: 144 apps, 188 settings pages in 115 ms
 
-All checks passed.
+**Failed:**
+
+- the floating box does not fade in on hover (en)
+- a click on the floating box did not open the popup (en)
+- the popup did not open with Ctrl+Alt+F (en)

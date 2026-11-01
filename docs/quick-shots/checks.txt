@@ -7,25 +7,13 @@
 [ar] 'واي فاي': height 239 (empty 96), sd 33.0
 [ar] '250*12': height 173 (empty 96), sd 34.4
 [ar] '5 kg to lb': height 173 (empty 96), sd 35.6
-[ar] 'هجري': height 239 (empty 96), sd 33.4
+[ar] 'هجري': height 239 (empty 96), sd 33.3
 [ar] 'يوتيوب قرآن': height 207 (empty 96), sd 34.3
 [ar] 'اطفاء': height 239 (empty 96), sd 32.8
 [ar] 'مشكلة': height 339 (empty 96), sd 34.1
 [ar] 'qzxwvkjh': height 207 (empty 96), sd 35.0
 [en] floating box at 392,676 size 236x36 on a 1024x768 screen
-[en] floating box idle vs hovered: mean difference 2.58
-[en] popup from the box at 392,572 size 480x96
-[en] popup empty: height 96, mean 41
-[en] 'notepad': height 319 (empty 96), sd 35.5
-[en] 'paint': height 439 (empty 96), sd 35.6
-[en] 'واي فاي': height 239 (empty 96), sd 35.7
-[en] '250*12': height 173 (empty 96), sd 35.2
-[en] '5 kg to lb': height 173 (empty 96), sd 36.5
-[en] 'هجري': height 239 (empty 96), sd 36.1
-[en] 'يوتيوب قرآن': height 207 (empty 96), sd 36.6
-[en] 'اطفاء': height 239 (empty 96), sd 34.9
-[en] 'مشكلة': height 339 (empty 96), sd 35.5
-[en] 'qzxwvkjh': height 207 (empty 96), sd 37.2
+[en] floating box idle vs hovered: mean difference 0.00
 [ar-light] floating box at 392,676 size 236x36 on a 1024x768 screen
 [ar-light] floating box idle vs hovered: mean difference 8.33
 [ar-light] popup empty: height 96, mean 181
@@ -37,4 +25,4 @@
 [extras] Enter on 'device manager' started: mmc
 [extras] Enter on 'devices and printers' started: ApplicationFrameHost, dllhost, svchost, SystemSettings
 [extras] hidden mode, cursor away: a click on the box's place reaches 'Progman'
-catalog: launcher catalog: 144 apps, 188 settings pages in 111 ms
+catalog: launcher catalog: 144 apps, 188 settings pages in 115 ms

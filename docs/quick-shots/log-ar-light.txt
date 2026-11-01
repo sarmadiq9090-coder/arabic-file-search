@@ -1,33 +1,30 @@
-1793565292 index load: 0 entries in 0 ms
-1793565292 startup ms (v0.7.0): single-instance=18 init=20 font=20 settings=20 window=58 list=112 controls=142 tray=149 events=150 layout=194 built=195 loop=195 first-tick=344
-1793565292 floating box built in 9 ms
-1793565298 launcher catalog: 144 apps, 188 settings pages in 527 ms
-1793565747 index build: 1216511 entries in 454294 ms
-1793565748 watch: C:\ D:\
-1793565754 content index open: 0 documents, 0 KB in 16 ms
-1793565778 startup ms (v0.7.0): single-instance=12 init=16 font=16 settings=16 window=55 list=113 controls=145 tray=154 events=155 layout=201 built=203 loop=203 first-tick=346
-1793565779 floating box built in 7 ms
-1793565779 index load: 1216511 entries in 625 ms
-1793565779 watch: C:\ D:\
-1793565783 launcher catalog: 144 apps, 188 settings pages in 120 ms
-1793565784 content index open: 1800 documents, 12985 KB in 1 ms
-1793565788 quick search window built in 4 ms
-1793565788 quick search shown in 14 ms
-1793565788 quick search shown in 13 ms
-1793565818 startup ms (v0.7.0): single-instance=10 init=14 font=14 settings=14 window=48 list=85 controls=109 tray=117 events=118 layout=156 built=156 loop=156 first-tick=312
-1793565818 floating box built in 4 ms
-1793565819 index load: 1216655 entries in 453 ms
-1793565819 watch: C:\ D:\
-1793565823 launcher catalog: 144 apps, 188 settings pages in 109 ms
-1793565824 content index open: 6398 documents, 15847 KB in 2 ms
-1793565827 quick search window built in 3 ms
-1793565827 quick search shown in 7 ms
-1793565828 quick search shown in 13 ms
-1793565858 startup ms (v0.7.0): single-instance=11 init=13 font=13 settings=13 window=48 list=90 controls=114 tray=120 events=122 layout=160 built=161 loop=161 first-tick=315
-1793565858 floating box built in 4 ms
-1793565858 index load: 1216655 entries in 456 ms
-1793565858 watch: C:\ D:\
-1793565863 launcher catalog: 144 apps, 188 settings pages in 110 ms
-1793565863 content index open: 11595 documents, 32227 KB in 5 ms
-1793565866 quick search window built in 4 ms
-1793565866 quick search shown in 9 ms
+1793566241 index load: 0 entries in 0 ms
+1793566241 startup ms (v0.7.0): single-instance=15 init=17 font=17 settings=17 window=57 list=109 controls=139 tray=147 events=149 layout=190 built=190 loop=190 first-tick=340
+1793566242 floating box built in 8 ms
+1793566247 launcher catalog: 144 apps, 188 settings pages in 551 ms
+1793566598 index build: 1216527 entries in 356149 ms
+1793566599 watch: C:\ D:\
+1793566604 content index open: 0 documents, 0 KB in 1 ms
+1793566625 startup ms (v0.7.0): single-instance=11 init=13 font=13 settings=13 window=46 list=99 controls=124 tray=132 events=132 layout=168 built=168 loop=168 first-tick=325
+1793566625 floating box built in 6 ms
+1793566625 index load: 1216527 entries in 457 ms
+1793566625 watch: C:\ D:\
+1793566630 launcher catalog: 144 apps, 188 settings pages in 108 ms
+1793566631 content index open: 6600 documents, 15888 KB in 2 ms
+1793566634 quick search window built in 3 ms
+1793566634 quick search shown in 13 ms
+1793566635 quick search shown in 13 ms
+1793566664 startup ms (v0.7.0): single-instance=10 init=12 font=12 settings=12 window=48 list=87 controls=109 tray=117 events=119 layout=156 built=157 loop=157 first-tick=312
+1793566664 floating box built in 4 ms
+1793566664 index load: 1216543 entries in 459 ms
+1793566665 watch: C:\ D:\
+1793566669 launcher catalog: 144 apps, 188 settings pages in 120 ms
+1793566670 content index open: 13397 documents, 41437 KB in 6 ms
+1793566685 startup ms (v0.7.0): single-instance=12 init=15 font=15 settings=15 window=52 list=95 controls=121 tray=129 events=131 layout=173 built=173 loop=173 first-tick=322
+1793566685 floating box built in 4 ms
+1793566685 index load: 1216543 entries in 525 ms
+1793566685 watch: C:\ D:\
+1793566690 launcher catalog: 144 apps, 188 settings pages in 110 ms
+1793566691 content index open: 15993 documents, 48942 KB in 9 ms
+1793566694 quick search window built in 4 ms
+1793566694 quick search shown in 9 ms
