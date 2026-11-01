@@ -1654,7 +1654,9 @@ mod tests {
     fn download_headers_stay_on_one_line() {
         let dir = std::env::temp_dir().join(format!("bahth-web-hdr-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let file = dir.join("a\"b;c=d ف.txt");
+        // `"` cannot be in a Windows file name; `;`, `=` and Arabic can.
+        let (name, want) = if cfg!(windows) { ("a'b;c=d ف.txt", "a'b;c=d _.txt") } else { ("a\"b;c=d ف.txt", "a_b;c=d _.txt") };
+        let file = dir.join(name);
         std::fs::write(&file, b"x").unwrap();
         let path = file.to_string_lossy().into_owned();
         let s = shared_with(vec![entry(&path, 1, false)]);
@@ -1663,7 +1665,7 @@ mod tests {
         assert_eq!(r.status, 200);
         let cd = r.header("Content-Disposition").unwrap();
         assert!(!cd.contains(['\r', '\n']));
-        assert!(cd.starts_with("attachment; filename=\"a_b;c=d _.txt\";"), "{cd}");
+        assert!(cd.starts_with(&format!("attachment; filename=\"{want}\";")), "{cd}");
         let mut out = Vec::new();
         write_response(&mut out, r, true, &AtomicBool::new(false)).unwrap();
         let head = String::from_utf8(out).unwrap();
