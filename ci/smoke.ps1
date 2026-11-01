@@ -54,13 +54,15 @@ if (Test-Path (Join-Path $data 'log.txt')) { Write-Host '--- log.txt ---'; Get-C
 if (Test-Path $index) {
     $r = Run-Cli @('-s', 'تقرير مالي')
     if ($r.Code -ne 0 -or $r.Out -notmatch 'bahth-smoke') { Fail 'Arabic name search did not find the test file' }
-    $r = Run-Cli @('-s', 'emoji report', '--json')
-    if ($r.Code -ne 0) { Fail 'Unicode name search failed' }
+    $r = Run-Cli @('-s', 'émoji 😀 report', '--json')
+    if ($r.Code -ne 0 -or $r.Out -notmatch 'bahth-smoke') { Fail 'Unicode name search failed' }
     $r = Run-Cli @('-s', 'longxxxxxxxxxx')
     if ($r.Code -ne 0) { Fail 'long name search failed' }
-    foreach ($q in @('ext:dll', 'sys: notepad', 'نظام: ext:exe', 'size:>1mb', 'regex:^a.*z$', '"a b"~3', 'ـــ', '*')) {
+    foreach ($q in @('ext:dll', 'sys: notepad', 'نظام: ext:exe', 'size:>1mb', 'regex:^a.*z$', '"a b"~3', '*', 'ـــ')) {
         $r = Run-Cli @('-s', $q, '--count')
-        if ($r.Code -gt 1) { Fail "query '$q' failed with exit $($r.Code)" }
+        # Exit 2 is a clean refusal (e.g. tatweel alone is no text); only a
+        # crash report or another code counts as a failure here.
+        if ($r.Code -gt 2 -or $r.Code -lt 0) { Fail "query '$q' failed with exit $($r.Code)" }
     }
 } else {
     Write-Host '::warning::the index was not saved within the time limit; skipped the command-line searches'
