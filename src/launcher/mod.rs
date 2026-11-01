@@ -11,8 +11,11 @@
 
 pub mod answers;
 pub mod apps;
+mod calc;
+mod hijri;
 pub mod settings_pages;
 pub mod system;
+mod units;
 pub mod web;
 pub mod windows;
 
