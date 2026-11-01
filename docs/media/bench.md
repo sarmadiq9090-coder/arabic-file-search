@@ -3,11 +3,11 @@ Index file: 150 MB.
 
 | Search | Tool | Time (s) | Found |
 |---|---|---:|---:|
-| `report` | InstaFind (command line, loads the index each run) | 1.01 | 2093 |
-| `report` | cmd: dir /s | 96.1 | 3066 |
-| `report` | PowerShell: Get-ChildItem -Recurse | 49.63 | 2369 |
+| `report` | InstaFind (command line, loads the index each run) | 1.01 | 2091 |
+| `report` | cmd: dir /s | 108.79 | 3068 |
+| `report` | PowerShell: Get-ChildItem -Recurse | 51.19 | 2370 |
 | `report` | Windows Search index | not available | — |
 | `احمد` | InstaFind (command line, loads the index each run) | 1.01 | 2 |
-| `احمد` | cmd: dir /s | 32.54 | 0 |
-| `احمد` | PowerShell: Get-ChildItem -Recurse | 49.64 | 0 |
+| `احمد` | cmd: dir /s | 32.73 | 0 |
+| `احمد` | PowerShell: Get-ChildItem -Recurse | 50.48 | 0 |
 | `احمد` | Windows Search index | not available | — |
