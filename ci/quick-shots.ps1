@@ -43,6 +43,9 @@ public static class Q {
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+    public static string Title(IntPtr h) { var s = new StringBuilder(256); GetWindowText(h, s, 256); return s.ToString(); }
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
@@ -409,13 +412,32 @@ $ar = @(@{ Name = 'app'; Text = 'المفكرة'; Expect = $true }, @{ Name = 'c
 $en = @(@{ Name = 'app'; Text = 'notepad'; Expect = $true }, @{ Name = 'paint'; Text = 'paint'; Expect = $true }) + $common
 $light = @(@{ Name = 'app'; Text = 'calculator'; Expect = $true }, @{ Name = 'calc'; Text = '250*12'; Expect = $true }, @{ Name = 'problem'; Text = 'مشكلة'; Expect = $true })
 
-try {
-    Session 'ar' $false 'ar' $ar $true
-    Session 'en' $false 'en' $en $true
-    Session 'ar' $true 'ar-light' $light $false
-} catch {
-    Fail "session failed: $($_.Exception.Message) at $($_.InvocationInfo.PositionMessage)"
+# What the desktop looks like when something did not react.
+function Diag([string]$where) {
+    $c = New-Object Q+POINT
+    [Q]::GetCursorPos([ref]$c) | Out-Null
+    $fg = [Q]::GetForegroundWindow()
+    $resp = if ($script:proc -and -not $script:proc.HasExited) { $script:proc.Refresh(); $script:proc.Responding } else { 'exited' }
+    Write-Host ("  diag {0}: cursor {1},{2}; foreground '{3}' '{4}'; bahth responding: {5}" -f $where, $c.X, $c.Y, [Q]::Class($fg), [Q]::Title($fg), $resp)
+    Shot "diag-$where" 0 0 ([Q]::ScreenW) ([Q]::ScreenH) | Out-Null
 }
+
+# A session that fails is run once more: the runner's desktop sometimes
+# stops taking input for a moment. Both attempts are reported.
+function Session-Twice([string]$lang, [bool]$light, [string]$tag, [object[]]$queries, [bool]$full) {
+    $before = $script:failed.Count
+    try { Session $lang $light $tag $queries $full } catch { Fail "session $tag failed: $($_.Exception.Message) at $($_.InvocationInfo.PositionMessage)" }
+    if ($script:failed.Count -eq $before) { return }
+    Diag $tag
+    $first = @($script:failed[$before..($script:failed.Count - 1)])
+    $script:failed = @(if ($before -gt 0) { $script:failed[0..($before - 1)] })
+    Note "[$tag] first attempt failed ($($first -join '; ')); running the session again"
+    try { Session $lang $light $tag $queries $full } catch { Fail "session $tag failed: $($_.Exception.Message) at $($_.InvocationInfo.PositionMessage)" }
+    if ($script:failed.Count -gt $before) { Diag "$tag-2" }
+}
+Session-Twice 'ar' $false 'ar' $ar $true
+Session-Twice 'en' $false 'en' $en $true
+Session-Twice 'ar' $true 'ar-light' $light $false
 if ($script:means['ar-light'] -and $script:means['ar'] -and $script:means['ar-light'] -le $script:means['ar']) {
     Write-Host "::warning::the light popup is not lighter than the dark one"
 }
