@@ -18,7 +18,7 @@ use winapi::um::winuser::{NMHDR, SendMessageW, WM_NOTIFY, WM_SETFONT};
 
 use super::format::{ARABIC_DIGITS, wide_to_string};
 use super::keys::{HOTKEY_ID, HOTKEY_TEXT};
-use super::{autostart, shell};
+use super::{autostart, shell, style};
 use super::startup::{phase, ui_font_family, work_area};
 use super::{App, COLUMNS, WS_EX_LAYOUTRTL, title};
 use crate::history::History;
@@ -61,12 +61,10 @@ impl NativeUi<AppUi> for App {
 
         let family = ui_font_family();
         phase("settings");
-        let scale = nwg::scale_factor();
-        nwg::Font::builder().family(family).size_absolute((15.0 * scale).round() as u32).build(&mut app.font)?;
-        nwg::Font::builder()
-            .family(family)
-            .size_absolute((19.0 * scale).round() as u32)
-            .build(&mut app.query_font)?;
+        // Sizes in logical pixels: nwg scales fonts for the DPI itself
+        // (scaling here too made the text 2.25× too big at 150 %).
+        nwg::Font::builder().family(family).size_absolute(15).build(&mut app.font)?;
+        nwg::Font::builder().family(family).size_absolute(19).build(&mut app.query_font)?;
         let f = Some(&app.font);
 
         nwg::Window::builder()
@@ -115,16 +113,15 @@ impl NativeUi<AppUi> for App {
             .font(f)
             .text(tr!("البحث داخل المستندات أيضاً", "Also search inside documents"))
             .build(&mut app.content_chk)?;
-        nwg::Label::builder().parent(w).font(f).text(tr!("النطاق:", "Scope:")).build(&mut app.scope_label)?;
-        nwg::TextInput::builder()
-            .parent(w)
-            .font(f)
-            .readonly(true)
-            .text(tr!("كل الأقراص", "All drives"))
-            .build(&mut app.scope_input)?;
+        nwg::Label::builder().parent(w).font(f).text(tr!("البحث في", "Look in")).build(&mut app.scope_label)?;
+        nwg::Label::builder().parent(w).font(f).text(tr!("كل الأقراص", "All drives")).build(&mut app.scope_text)?;
+        style::set_path_ellipsis(&app.scope_text);
         nwg::Button::builder().parent(w).font(f).text(tr!("اختيار مجلد…", "Choose folder…")).build(&mut app.scope_btn)?;
         nwg::Button::builder().parent(w).font(f).text(tr!("كل الأقراص", "All drives")).build(&mut app.all_btn)?;
         nwg::Button::builder().parent(w).font(f).text(tr!("تحديث الفهرس", "Update index")).build(&mut app.reindex_btn)?;
+        // Only shown while a folder is chosen (see `show_scope`).
+        app.all_btn.set_visible(false);
+        style::set_default_button(&app.search_btn);
 
         // Owner-data (virtual) list: rows are drawn on demand, so even a
         // million results display instantly.
@@ -168,7 +165,7 @@ impl NativeUi<AppUi> for App {
             app.list.insert_column(nwg::InsertListViewColumn {
                 index: Some(i as i32),
                 fmt: None,
-                width: Some((width as f64 * scale).round() as i32),
+                width: Some(width), // nwg scales it for the DPI
                 text: Some(tr!(*title, super::COLUMNS_EN[i]).to_string()),
             });
         }
@@ -181,6 +178,24 @@ impl NativeUi<AppUi> for App {
         nwg::Button::builder().parent(w).font(f).text(tr!("إيقاف البحث", "Stop search")).enabled(false).build(&mut app.stop_btn)?;
         nwg::Button::builder().parent(w).font(f).text(tr!("خيارات…", "Options…")).build(&mut app.options_btn)?;
         nwg::StatusBar::builder().parent(w).font(f).text("").build(&mut app.status)?;
+        {
+            use style::glyph as g;
+            for (b, glyph) in [
+                (&app.search_btn, g::SEARCH),
+                (&app.history_btn, g::HISTORY),
+                (&app.scope_btn, g::FOLDER),
+                (&app.all_btn, g::DRIVE),
+                (&app.reindex_btn, g::REFRESH),
+                (&app.open_btn, g::OPEN_FILE),
+                (&app.folder_btn, g::OPEN_FOLDER),
+                (&app.copy_btn, g::COPY),
+                (&app.export_btn, g::EXPORT),
+                (&app.stop_btn, g::STOP),
+                (&app.options_btn, g::SETTINGS),
+            ] {
+                style::set_button_icon(b, glyph);
+            }
+        }
 
         nwg::AnimationTimer::builder()
             .parent(w)
@@ -474,6 +489,8 @@ impl NativeUi<AppUi> for App {
             Some(0)
         }))?;
         ui.raw_handlers.borrow_mut().push(raw);
+        let muted = ui.scope_label.handle.hwnd().into_iter().collect();
+        ui.raw_handlers.borrow_mut().push(style::bind_window_style(&ui.window, muted)?);
         let (handler, raw) = ui.inner.setup_quick_switch()?;
         ui.handlers.borrow_mut().push(handler);
         ui.raw_handlers.borrow_mut().push(raw);
@@ -489,6 +506,12 @@ impl NativeUi<AppUi> for App {
         ui.show_sort_arrow();
         phase("events");
         ui.layout();
+        // Repaint once in full: controls created at (0, 0) before the first
+        // layout can leave traces in the margin above the search box.
+        if let Some(h) = ui.window.handle.hwnd() {
+            use winapi::um::winuser::{RDW_ALLCHILDREN, RDW_ERASE, RDW_INVALIDATE, RedrawWindow};
+            unsafe { RedrawWindow(h, std::ptr::null(), std::ptr::null_mut(), RDW_ERASE | RDW_INVALIDATE | RDW_ALLCHILDREN) };
+        }
         phase("layout");
         ui.start();
         Ok(ui)

@@ -37,6 +37,7 @@ mod results;
 mod search_jobs;
 mod shell;
 mod startup;
+mod style;
 mod thumbs;
 mod updates;
 mod watching;
@@ -174,7 +175,8 @@ pub struct App {
     kind_combo: nwg::ComboBox<&'static str>,
     content_chk: nwg::CheckBox,
     scope_label: nwg::Label,
-    scope_input: nwg::TextInput,
+    /// The folder searched, or "All drives"; long paths are shortened in the middle.
+    scope_text: nwg::Label,
     scope_btn: nwg::Button,
     all_btn: nwg::Button,
     reindex_btn: nwg::Button,
@@ -186,6 +188,8 @@ pub struct App {
     stop_btn: nwg::Button,
     options_btn: nwg::Button,
     status: nwg::StatusBar,
+    /// Button and check box widths fitted to their text, measured once.
+    widths: Cell<Option<style::Widths>>,
     timer: nwg::AnimationTimer,
     /// Wakes the UI thread when a background filename search finishes.
     name_notice: nwg::Notice,
@@ -277,67 +281,128 @@ impl App {
 
     // ---------------------------------------------------------------- layout
 
+    /// The widths of the buttons and the check box, measured on first use.
+    fn widths(&self) -> style::Widths {
+        if let Some(w) = self.widths.get() {
+            return w;
+        }
+        let f = &self.font;
+        let b = |btn: &nwg::Button| style::button_width(f, btn);
+        let w = style::Widths {
+            search: b(&self.search_btn),
+            history: b(&self.history_btn),
+            check: style::check_width(f, &self.content_chk),
+            scope_label: style::text_width(f, &self.scope_label.text()) + 6,
+            scope_btn: b(&self.scope_btn),
+            all_btn: b(&self.all_btn),
+            reindex: b(&self.reindex_btn),
+            bottom: [b(&self.open_btn), b(&self.folder_btn), b(&self.copy_btn), b(&self.export_btn), b(&self.stop_btn)],
+            options: b(&self.options_btn),
+        };
+        // The narrowest window in which nothing overlaps: the bottom button
+        // row, or the scope row when it has a row of its own.
+        use style::{GAP, MARGIN};
+        // (Export, also in the Options menu, steps aside when there is no room.)
+        let bottom = w.bottom.iter().sum::<i32>() - w.bottom[3] + w.options + 5 * GAP + 2 * MARGIN;
+        let scope_row =
+            w.scope_label + style::MIN_SCOPE_W + w.scope_btn + w.all_btn + w.reindex + 4 * GAP + 2 * MARGIN;
+        let filter_row = style::KIND_W + w.check + 3 * GAP + 2 * MARGIN;
+        style::set_min_width(bottom.max(scope_row).max(filter_row));
+        self.widths.set(Some(w));
+        w
+    }
+
+    /// Shows the folder searched (or "All drives"); the "All drives" button
+    /// only appears while a folder is chosen.
+    fn show_scope(&self, scope: &str) {
+        if scope.is_empty() {
+            self.scope_text.set_text(tr!("كل الأقراص", "All drives"));
+        } else {
+            self.scope_text.set_text(&format::ltr_path(scope));
+        }
+        self.all_btn.set_visible(!scope.is_empty());
+        self.layout();
+    }
+
     fn layout(&self) {
+        use style::{CTRL_H, GAP, KIND_W, MARGIN as M, MIN_SCOPE_W, QUERY_H};
         let (w, h) = self.window.size();
         let (w, h) = (w as i32, h as i32);
-        let m = 12;
-        let row_h = 32;
-        let query_h = 38;
-        let btn_w = 120;
+        let wd = self.widths();
 
-        // Row 1: a large query box, the search button and the history menu.
-        let hist_w = 90;
-        self.query.set_position(m, m);
-        self.query.set_size((w - 4 * m - btn_w - hist_w).max(100) as u32, query_h as u32);
-        self.history_btn.set_position(w - 2 * m - btn_w - hist_w, m);
-        self.history_btn.set_size(hist_w as u32, query_h as u32);
-        self.search_btn.set_position(w - m - btn_w, m);
-        self.search_btn.set_size(btn_w as u32, query_h as u32);
+        // Row 1: a large search box, then History and Search, all one height.
+        let right = w - M;
+        style::place(&self.search_btn.handle, right - wd.search, M, wd.search, QUERY_H);
+        let hist_x = right - wd.search - GAP - wd.history;
+        style::place(&self.history_btn.handle, hist_x, M, wd.history, QUERY_H);
+        style::place(&self.query.handle, M, M, (hist_x - GAP - M).max(100), QUERY_H);
+        // The box centres its text with a frame area; repaint that too.
+        style::repaint_frame(&self.query.handle);
 
-        // Row 2: file-type filter, content checkbox, scope and index buttons.
-        let y2 = m * 2 + query_h;
-        let mut x = m;
-        self.kind_combo.set_position(x, y2 + 1);
-        self.kind_combo.set_size(150, 300);
-        x += 150 + m;
-        self.content_chk.set_position(x, y2);
-        self.content_chk.set_size(230, row_h as u32);
-        x += 230 + m;
-        self.scope_label.set_position(x, y2 + 6);
-        self.scope_label.set_size(55, row_h as u32);
-        x += 55;
-        let right_buttons = 3 * (btn_w + m);
-        let scope_w = (w - x - right_buttons - m).max(80);
-        self.scope_input.set_position(x, y2);
-        self.scope_input.set_size(scope_w as u32, row_h as u32);
-        x += scope_w + m;
-        for b in [&self.scope_btn, &self.all_btn, &self.reindex_btn] {
-            b.set_position(x, y2);
-            b.set_size(btn_w as u32, row_h as u32);
-            x += btn_w + m;
+        // Row 2: file type and the content check box, then where to search
+        // and the index button. When the window is narrow the scope gets a
+        // row of its own.
+        let y2 = M + QUERY_H + GAP + 2;
+        // A drop-down's height is that of its open list; the closed box
+        // keeps the height Windows gives it for its font, centred in the row.
+        let combo_h = style::height_of(&self.kind_combo.handle).unwrap_or(CTRL_H).min(CTRL_H);
+        style::place(&self.kind_combo.handle, M, y2 + (CTRL_H - combo_h) / 2, KIND_W, 320);
+        let chk_x = M + KIND_W + GAP + 4;
+        style::place(&self.content_chk.handle, chk_x, y2, wd.check, CTRL_H);
+
+        let all_visible = self.all_btn.visible();
+        let buttons_w = wd.scope_btn + wd.reindex + GAP + if all_visible { wd.all_btn + GAP } else { 0 };
+        let scope_start = chk_x + wd.check + 2 * GAP;
+        let (y_scope, scope_x) = if right - buttons_w - GAP - wd.scope_label - MIN_SCOPE_W >= scope_start {
+            (y2, scope_start)
+        } else {
+            (y2 + CTRL_H + GAP, M)
+        };
+        // The labels are exactly one line tall and centred in the row, so
+        // they have no frame area left to paint.
+        let line_h = style::line_height(&self.font).min(CTRL_H);
+        let y_text = y_scope + (CTRL_H - line_h) / 2;
+        style::place(&self.scope_label.handle, scope_x, y_text, wd.scope_label, line_h);
+        let text_x = scope_x + wd.scope_label;
+        let mut x = right - buttons_w;
+        style::place(&self.scope_text.handle, text_x, y_text, (x - GAP - text_x).max(40), line_h);
+        for (b, bw, shown) in [
+            (&self.scope_btn, wd.scope_btn, true),
+            (&self.all_btn, wd.all_btn, all_visible),
+            (&self.reindex_btn, wd.reindex, true),
+        ] {
+            if shown {
+                style::place(&b.handle, x, y_scope, bw, CTRL_H);
+                x += bw + GAP;
+            }
         }
 
         // Bottom: action buttons above the status bar, options at the far end.
         let status_h = self.status_height();
-        let y_btn = h - status_h - m - row_h;
-        let mut x = m;
-        for b in [&self.open_btn, &self.folder_btn, &self.copy_btn, &self.export_btn, &self.stop_btn] {
-            b.set_position(x, y_btn);
-            b.set_size(btn_w as u32, row_h as u32);
-            x += btn_w + m;
+        let y_btn = h - status_h - GAP - CTRL_H;
+        let mut x = M;
+        // Export results is also in the Options menu, so in a narrow window
+        // it gives up its place rather than overlap Options.
+        let export_fits = wd.bottom.iter().sum::<i32>() + wd.options + 6 * GAP + 2 * M <= w;
+        self.export_btn.set_visible(export_fits);
+        let bottom = [&self.open_btn, &self.folder_btn, &self.copy_btn, &self.export_btn, &self.stop_btn];
+        for (i, (b, bw)) in bottom.into_iter().zip(wd.bottom).enumerate() {
+            if i == 3 && !export_fits {
+                continue;
+            }
+            style::place(&b.handle, x, y_btn, bw, CTRL_H);
+            x += bw + GAP;
         }
-        self.options_btn.set_position(w - m - btn_w, y_btn);
-        self.options_btn.set_size(btn_w as u32, row_h as u32);
+        style::place(&self.options_btn.handle, right - wd.options, y_btn, wd.options, CTRL_H);
 
         // The result list fills the rest.
-        let y3 = y2 + row_h + m;
-        self.list.set_position(m, y3);
-        self.list.set_size((w - 2 * m).max(100) as u32, (y_btn - m - y3).max(50) as u32);
+        let y3 = y_scope + CTRL_H + GAP + 2;
+        style::place(&self.list.handle, M, y3, (w - 2 * M).max(100), (y_btn - GAP - y3).max(50));
 
         // Status bar: messages on one side, the selected file's path on the other.
         if let Some(sb) = self.status.handle.hwnd() {
             let px = (w as f64 * nwg::scale_factor()) as i32;
-            let parts: [i32; 2] = [px * 45 / 100, -1];
+            let parts: [i32; 2] = [px / 2, -1];
             unsafe { SendMessageW(sb, SB_SETPARTS, 2, parts.as_ptr() as LPARAM) };
         }
     }

@@ -492,7 +492,7 @@ impl App {
     }
 
     pub(super) fn set_scope(&self, scope: String) {
-        self.scope_input.set_text(if scope.is_empty() { tr!("كل الأقراص", "All drives") } else { &scope });
+        self.show_scope(&scope);
         self.state.borrow_mut().scope = scope;
         if !self.query.text().trim().is_empty() && !self.content_mode() {
             self.search_names();
