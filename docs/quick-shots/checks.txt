@@ -1,28 +1,39 @@
 ﻿[ar] floating box at 392,676 size 236x36 on a 1024x768 screen
-[ar] floating box idle vs hovered: mean difference 2.51
+[ar] floating box idle vs hovered: mean difference 2.48
 [ar] popup from the box at 392,572 size 480x96
-[ar] popup empty: height 96, mean 41
-[ar] 'المفكرة': height 207 (empty 96), sd 33.3
+[ar] popup empty: height 96, mean 44
+[ar] 'المفكرة': height 207 (empty 96), sd 33.4
 [ar] 'كروم': height 173 (empty 96), sd 34.3
-[ar] 'واي فاي': height 239 (empty 96), sd 33.0
-[ar] '250*12': height 173 (empty 96), sd 34.4
-[ar] '5 kg to lb': height 173 (empty 96), sd 35.6
-[ar] 'هجري': height 239 (empty 96), sd 33.3
+[ar] 'واي فاي': height 239 (empty 96), sd 32.0
+[ar] '250*12': height 173 (empty 96), sd 34.3
+[ar] '5 kg to lb': height 173 (empty 96), sd 35.5
+[ar] 'هجري': height 239 (empty 96), sd 32.3
 [ar] 'يوتيوب قرآن': height 207 (empty 96), sd 34.3
-[ar] 'اطفاء': height 239 (empty 96), sd 32.8
-[ar] 'مشكلة': height 339 (empty 96), sd 34.1
-[ar] 'qzxwvkjh': height 207 (empty 96), sd 35.0
+[ar] 'اطفاء': height 239 (empty 96), sd 31.8
+[ar] 'مشكلة': height 339 (empty 96), sd 33.7
+[ar] 'qzxwvkjh': height 207 (empty 96), sd 35.1
 [en] floating box at 392,676 size 236x36 on a 1024x768 screen
-[en] floating box idle vs hovered: mean difference 0.00
+[en] floating box idle vs hovered: mean difference 2.55
+[en] popup from the box at 392,572 size 480x96
+[en] popup empty: height 96, mean 44
+[en] 'notepad': height 319 (empty 96), sd 35.6
+[en] 'paint': height 439 (empty 96), sd 35.8
+[en] 'واي فاي': height 239 (empty 96), sd 34.5
+[en] '250*12': height 173 (empty 96), sd 35.8
+[en] '5 kg to lb': height 173 (empty 96), sd 37.0
+[en] 'هجري': height 239 (empty 96), sd 34.9
+[en] 'يوتيوب قرآن': height 207 (empty 96), sd 37.2
+[en] 'اطفاء': height 239 (empty 96), sd 33.7
+[en] 'مشكلة': height 339 (empty 96), sd 35.5
+[en] 'qzxwvkjh': height 207 (empty 96), sd 37.8
 [ar-light] floating box at 392,676 size 236x36 on a 1024x768 screen
-[ar-light] floating box idle vs hovered: mean difference 8.33
-[ar-light] popup empty: height 96, mean 181
-[ar-light] 'calculator': height 439 (empty 96), sd 64.6
-[ar-light] '250*12': height 173 (empty 96), sd 74.0
-[ar-light] 'مشكلة': height 339 (empty 96), sd 66.4
+[ar-light] floating box idle vs hovered: mean difference 8.44
+[ar-light] popup empty: height 96, mean 184
+[ar-light] 'calculator': height 439 (empty 96), sd 65.0
+[ar-light] '250*12': height 173 (empty 96), sd 74.3
+[ar-light] 'مشكلة': height 339 (empty 96), sd 67.0
 [extras] Alt+Space opened the quick search
-[extras] Ctrl+Alt+G: quick switch: hotkey, file dialog found (box found)
 [extras] Enter on 'device manager' started: mmc
 [extras] Enter on 'devices and printers' started: ApplicationFrameHost, dllhost, svchost, SystemSettings
 [extras] hidden mode, cursor away: a click on the box's place reaches 'Progman'
-catalog: launcher catalog: 144 apps, 188 settings pages in 115 ms
+catalog: launcher catalog: 144 apps, 188 settings pages in 82 ms
