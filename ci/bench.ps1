@@ -72,7 +72,7 @@ foreach ($case in @(
 }
 
 $os = (Get-CimInstance Win32_OperatingSystem).Caption
-$cpu = (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
+$cpu = (Get-CimInstance Win32_Processor | Select-Object -First 1).Name.Trim()
 $md = @("Measured on a GitHub Actions runner: $os, $cpu, $(Get-Date -Format 'yyyy-MM-dd').", "Index file: $([Math]::Round($entries / 1MB)) MB.", '',
         '| Search | Tool | Time (s) | Found |', '|---|---|---:|---:|')
 foreach ($r in $rows) {
@@ -80,8 +80,8 @@ foreach ($r in $rows) {
     $f = if ($null -ne $r.Found) { $r.Found } else { '—' }
     $md += "| ``$($r.Query)`` | $($r.Tool) | $t | $f |"
 }
-$md -join "`n" | Set-Content -LiteralPath (Join-Path $Out 'bench.md') -Encoding utf8
-$rows | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Out 'bench.json') -Encoding utf8
+[IO.File]::WriteAllText((Join-Path $Out 'bench.md'), ($md -join "`n") + "`n", (New-Object Text.UTF8Encoding $false))
+[IO.File]::WriteAllText((Join-Path $Out 'bench.json'), ($rows | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))
 Get-Content (Join-Path $Out 'bench.md') | Write-Host
 if ($env:GITHUB_STEP_SUMMARY) { Get-Content (Join-Path $Out 'bench.md') | Add-Content $env:GITHUB_STEP_SUMMARY }
 exit 0

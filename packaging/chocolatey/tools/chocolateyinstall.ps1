@@ -12,9 +12,7 @@ $packageArgs = @{
 }
 Get-ChocolateyWebFile @packageArgs
 
-# Chocolatey shims bahth.exe as `bahth` automatically; add `instafind` too.
-# -UseStart: it is a GUI app, the shim must not wait for it to exit.
-Install-BinFile -Name 'instafind' -Path $exe -UseStart
+# Chocolatey shims bahth.exe as `bahth` automatically.
 
 $programs = [Environment]::GetFolderPath('CommonPrograms')
 Install-ChocolateyShortcut -ShortcutFilePath (Join-Path $programs 'InstaFind.lnk') `

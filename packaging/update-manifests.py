@@ -131,7 +131,7 @@ def winget(version, sha, date):
         + common
         + "InstallerType: portable\n"
         + "Commands:\n- bahth\n"
-        + "MinimumOSVersion: 6.2.9200.0\n"
+        + "MinimumOSVersion: 10.0.0.0\n"
         + f"ReleaseDate: {date}\n"
         + "Installers:\n"
         + "- Architecture: x64\n"
@@ -210,8 +210,8 @@ def nuspec(version):
     <description><![CDATA[{DESC_EN}
 
 ## Notes
-- The package downloads the single portable `bahth.exe` from the GitHub release and adds the `bahth` and `instafind` commands and a Start menu shortcut.
-- The app can update itself in place; `choco upgrade instafind` still works and keeps Chocolatey's records current.
+- The package downloads the single portable `bahth.exe` from the GitHub release and adds the `bahth` command and a Start menu shortcut.
+- Use `choco upgrade instafind` to update. The app's own update prompt cannot replace the exe in the Chocolatey folder without administrator rights.
 - Uninstalling leaves the user data in `%LOCALAPPDATA%\\BahthSari` and `HKCU\\Software\\BahthSari`.
 ]]></description>
     <releaseNotes>{REPO}/releases/tag/v{version}</releaseNotes>
@@ -239,9 +239,7 @@ $packageArgs = @{{
 }}
 Get-ChocolateyWebFile @packageArgs
 
-# Chocolatey shims bahth.exe as `bahth` automatically; add `instafind` too.
-# -UseStart: it is a GUI app, the shim must not wait for it to exit.
-Install-BinFile -Name 'instafind' -Path $exe -UseStart
+# Chocolatey shims bahth.exe as `bahth` automatically.
 
 $programs = [Environment]::GetFolderPath('CommonPrograms')
 Install-ChocolateyShortcut -ShortcutFilePath (Join-Path $programs 'InstaFind.lnk') `
@@ -256,6 +254,8 @@ def main():
     ap.add_argument("date", help="release date, YYYY-MM-DD")
     ap.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent,
                     help="repository root to write into (default: this script's repo)")
+    ap.add_argument("--allow-older", action="store_true",
+                    help="write even if the bucket already holds a newer version")
     a = ap.parse_args()
 
     version = a.version.lstrip("vV")
@@ -268,6 +268,13 @@ def main():
         sys.exit(f"bad date: {a.date!r} (expected YYYY-MM-DD)")
 
     root = a.root.resolve()
+    current = root / "bucket/instafind.json"
+    if current.is_file() and not a.allow_older:
+        m = re.search(r'"version":\s*"(\d+)\.(\d+)\.(\d+)"', current.read_text(encoding="utf-8"))
+        new = tuple(int(x) for x in version.split("."))
+        if m and tuple(int(x) for x in m.groups()) > new:
+            sys.exit(f"the manifests already hold {'.'.join(m.groups())}, newer than {version}; "
+                     "pass --allow-older to roll them back")
     written = []
 
     def write(rel, text):

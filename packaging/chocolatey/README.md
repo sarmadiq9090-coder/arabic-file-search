@@ -7,7 +7,7 @@
   hand-written and do not change between releases.
 
 At install time the package downloads `bahth.exe` from the GitHub release,
-checks its SHA-256, shims it as `bahth` (automatic) and `instafind`, and adds a
+checks its SHA-256, shims it as `bahth` (automatic), and adds a
 Start menu shortcut. `beforemodify` closes a running copy before upgrade and
 uninstall. Uninstall also removes the "Start with Windows" entry when it
 points at the package. User data in `%LOCALAPPDATA%\BahthSari` stays.
@@ -26,7 +26,8 @@ choco push out\instafind.<version>.nupkg --source https://push.chocolatey.org/
 ```
 
 Or let CI do it: add the key as the repository secret `CHOCOLATEY_API_KEY`
-and `.github/workflows/packaging.yml` packs and pushes each release.
+and `.github/workflows/packaging.yml` packs and pushes each release (build.yml
+starts that workflow after publishing a release).
 
 Every pushed version goes through Chocolatey's automatic validator and
 verifier (a test install). The first versions also wait for a human moderator,

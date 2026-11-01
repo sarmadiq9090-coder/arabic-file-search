@@ -3,7 +3,6 @@ $toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
 # Chocolatey removes the package folder (bahth.exe) and the automatic `bahth`
 # shim itself; this removes what chocolateyinstall.ps1 added on top.
-Uninstall-BinFile -Name 'instafind'
 
 $lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'InstaFind.lnk'
 if (Test-Path $lnk) { Remove-Item $lnk -Force }

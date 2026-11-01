@@ -13,7 +13,9 @@ for dir in "$raw"/frames-*; do
     -loop 0 "$out/demo-$lang.gif"
   echo "demo-$lang.gif: $(du -h "$out/demo-$lang.gif" | cut -f1)"
 done
-for f in "$raw"/*.png "$raw"/bench.md "$raw"/bench.json; do
+for f in "$raw"/search-*.png "$raw"/inside-*.png "$raw"/bench.md "$raw"/bench.json; do
   [ -f "$f" ] && cp "$f" "$out/"
 done
+# The website shows the same demo and stills.
+[ -d site/img ] && cp "$out"/demo-*.gif "$out"/inside-*.png site/img/ 2>/dev/null || true
 ls -la "$out"

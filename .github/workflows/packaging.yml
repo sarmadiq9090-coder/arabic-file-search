@@ -5,9 +5,10 @@ name: packaging
 #
 # Note: the release that build.yml creates with GITHUB_TOKEN does NOT fire the
 # `release` event below (GitHub never starts workflows from GITHUB_TOKEN
-# events, except workflow_dispatch). build.yml's `release` job therefore runs
-# the same script itself; this workflow covers releases published by hand and
-# lets you redo any tag from the Actions tab (Run workflow -> tag).
+# events, except workflow_dispatch). build.yml's `release` job therefore
+# starts this workflow with `gh workflow run`. You can also redo any tag from
+# the Actions tab (Run workflow -> tag); an older tag than the one on main is
+# refused by update-manifests.py.
 #
 # Optional, off until the secrets exist:
 #   CHOCOLATEY_API_KEY  -> packs and pushes the Chocolatey package

@@ -61,7 +61,6 @@ jobs:
 
   assemble:
     needs: record
-    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -79,7 +78,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/media
+          git add docs/media site/img
           if git diff --cached --quiet; then echo "nothing changed"; exit 0; fi
           git commit -m "Update demo GIFs, screenshots and speed comparison"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          for i in 1 2 3; do
+            git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+          done
+          exit 1

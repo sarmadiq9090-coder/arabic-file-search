@@ -25,8 +25,8 @@ Extras: duplicate finder, folder sizes, thumbnails, find & replace in text files
 Single portable exe, no installer. Data lives in %LOCALAPPDATA%\BahthSari. The interface is Arabic or English and follows Windows.
 
 ## Notes
-- The package downloads the single portable `bahth.exe` from the GitHub release and adds the `bahth` and `instafind` commands and a Start menu shortcut.
-- The app can update itself in place; `choco upgrade instafind` still works and keeps Chocolatey's records current.
+- The package downloads the single portable `bahth.exe` from the GitHub release and adds the `bahth` command and a Start menu shortcut.
+- Use `choco upgrade instafind` to update. The app's own update prompt cannot replace the exe in the Chocolatey folder without administrator rights.
 - Uninstalling leaves the user data in `%LOCALAPPDATA%\BahthSari` and `HKCU\Software\BahthSari`.
 ]]></description>
     <releaseNotes>https://github.com/sarmadiq9090-coder/arabic-file-search/releases/tag/v0.6.0</releaseNotes>

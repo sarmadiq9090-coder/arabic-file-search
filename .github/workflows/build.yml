@@ -98,6 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v4
       - name: Version
@@ -127,25 +128,13 @@ jobs:
           title=$(head -1 "$notes" | sed 's/^# *//')
           [ -n "$title" ] || title="$TAG"
           gh release create "$TAG" bahth.exe --target "$GITHUB_SHA" --title "$title" --notes-file "$notes" --latest
-      # Package managers: rewrite the Scoop, winget and Chocolatey manifests
-      # for this release and commit them to main (see packaging/SUBMITTING.md).
+      # Package managers: packaging.yml rewrites the Scoop, winget and
+      # Chocolatey manifests and commits them to main (and pushes to
+      # Chocolatey/winget when their secrets exist). A release made with
+      # GITHUB_TOKEN does not fire its `release` event, so start it here.
       - if: steps.v.outputs.new == 'true'
         name: Update package manifests
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.v.outputs.tag }}
-        run: |
-          set -euo pipefail
-          sha=$(sha256sum bahth.exe | cut -d' ' -f1)
-          git fetch -q origin main
-          git checkout -q -B packaging origin/main
-          python3 packaging/update-manifests.py "$TAG" "$sha" "$(date -u +%F)"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A bucket packaging
-          git diff --cached --quiet && exit 0
-          git commit -q -m "Packaging: update manifests for $TAG"
-          for i in 1 2 3; do
-            git push -q origin HEAD:main && exit 0
-            git pull -q --rebase origin main
-          done
-          exit 1
+        run: gh workflow run packaging.yml --ref main -f tag="$TAG"

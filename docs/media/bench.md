@@ -1,4 +1,4 @@
-﻿Measured on a GitHub Actions runner: Microsoft Windows Server 2025 Datacenter, AMD EPYC 7763 64-Core Processor                , 2026-11-01.
+Measured on a GitHub Actions runner: Microsoft Windows Server 2025 Datacenter, AMD EPYC 7763 64-Core Processor, 2026-11-01.
 Index file: 150 MB.
 
 | Search | Tool | Time (s) | Found |

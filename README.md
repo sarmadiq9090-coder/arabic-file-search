@@ -47,7 +47,7 @@ scoop install instafind
 أول تشغيل يفهرس الأقراص في الخلفية (دقيقة أو أكثر حسب عدد الملفات)، وبعدها يفتح البرنامج فوراً ويبقى الفهرس محدَّثاً وحده عند إضافة الملفات أو حذفها أو إعادة تسميتها.
 
 - **التحديث تلقائي**: يتحقق البرنامج مرة يومياً من GitHub ويعرض تثبيت الإصدار الجديد بنقرة ثم يعيد التشغيل، ويمكن التحقق يدوياً من «خيارات…». من لديه 0.3.1 أو أحدث يصله كل تحديث وحده.
-- **المتطلبات**: ويندوز 8 أو أحدث، 64 بت. البحث داخل الصور يحتاج ويندوز 10 أو 11 (وحزمة اللغة العربية في ويندوز لقراءة النص العربي).
+- **المتطلبات**: ويندوز 10 أو 11، 64 بت (Rust لم تعد تدعم الأقدم). البحث داخل الصور يحتاج حزمة اللغة العربية في ويندوز لقراءة النص العربي.
 - **الخصوصية**: كل شيء يبقى على جهازك. الاتصال الوحيد بالإنترنت هو التحقق من التحديثات على GitHub، والبحث من الهاتف مطفأ ما لم تشغّله.
 - **بيانات البرنامج** في `%LOCALAPPDATA%\BahthSari\` (الفهرس والسجل والإعدادات)، وتفضيلاته في `HKCU\Software\BahthSari`. لإزالته: أطفئ «التشغيل مع ويندوز» من «خيارات…»، ثم احذف `bahth.exe` وذلك المجلد.
 
@@ -190,7 +190,7 @@ scoop install instafind
 The first run indexes your drives in the background (a minute or more, depending on the number of files). After that the app opens instantly and keeps the index current by itself as files are added, deleted or renamed.
 
 - **Automatic updates**: once a day the app checks GitHub, offers the new version with one click and restarts. You can also check from **Options…**. Version 0.3.1 and later update themselves.
-- **Requirements**: Windows 8 or later, 64-bit. Text recognition in images needs Windows 10 or 11 (plus the Windows language pack for each OCR language).
+- **Requirements**: Windows 10 or 11, 64-bit (Rust no longer supports older versions). Text recognition in images needs the Windows language pack for each OCR language.
 - **Privacy**: everything stays on your PC. The only internet connection is the update check against GitHub; phone search is off unless you turn it on.
 - **Data** lives in `%LOCALAPPDATA%\BahthSari\` (index, log, settings) and `HKCU\Software\BahthSari`. To remove the app, turn off *Start with Windows* in **Options…**, then delete `bahth.exe` and that folder.
 
