@@ -65,6 +65,17 @@ scoop install instafind
 
 ## المميزات
 
+### البحث من أي مكان (جديد في 0.8)
+- **خانة بحث صغيرة فوق الساعة**: شفافة وتكاد لا تُرى حتى تقرّب المؤشر، فتظهر بنعومة. تختفي وحدها مع الألعاب والفيديو بملء الشاشة، وتُسحب لأي مكان. تُطفأ أو تُخفى من «خيارات ← البحث من أي مكان».
+- **نافذة بحث صغيرة بـ Ctrl+Alt+F** أو من أيقونة الساعة، تفتح النتائج للأعلى: الملفات، و**البرامج المثبتة** (`كروم` تفتح Google Chrome، `وورد`، `الحاسبة`)، و**صفحات إعدادات ويندوز** (`واي فاي`، `بلوتوث`، `الشاشة`)، و**التبديل إلى نافذة مفتوحة**.
+- **إجابات فورية**: حاسبة (`250*12`)، تحويل وحدات (`5 كيلو بالباوند`، `30 مئوي`)، و**التاريخ الهجري** (`هجري`، وتحويل التواريخ بتقويم أم القرى).
+- **اختصارات المواقع**: `يوتيوب قرآن` يبحث في يوتيوب مباشرة، ومثلها جوجل وويكيبيديا والخرائط والترجمة.
+- **أوامر النظام** (إيقاف التشغيل، إعادة التشغيل، السكون، القفل، إفراغ السلة، إنهاء برنامج معلّق) وكلها **تطلب تأكيداً قبل التنفيذ**.
+- **Tab** يفتح إجراءات النتيجة: تشغيل كمسؤول، نسخ المسار، فتح المجلد، التثبيت في المفضلة. والبرنامج يتعلم ما تفتحه كثيراً فيقدّمه.
+- أيقونة بلون واحد بجانب الساعة تتبع الوضع الداكن والفاتح. وكل الجديد يُطفأ، فيرجع البرنامج كما كان تماماً.
+
+<p align="center"><img src="docs/quick-shots/q-chrome-ar.png" width="420" alt="نافذة البحث الصغيرة: «كروم» تجد Google Chrome"></p>
+
 ### البحث
 - **نتائج فورية بالاسم** أثناء الكتابة في كل الأقراص أو في مجلد تختاره، مع فلاتر جاهزة: مستندات، صور، صوت، فيديو، مضغوطات، برامج، مجلدات.
 - **عربية حقيقية**: لا فرق بين أ إ آ ا، ولا ة ه، ولا ى ي، ويتجاهل التشكيل والتطويل و«ال»، ويقبل الأرقام العربية (٠١٢٣) والحروف الفارسية.
@@ -82,7 +93,7 @@ scoop install instafind
 - **كل التطابقات** داخل الملف مع أرقام الأسطر (F4)، وتصحيح العربية المعكوسة في ملفات PDF.
 
 ### أدوات
-- **Ctrl+Alt+F** يُظهر البرنامج من أي مكان، و**Ctrl+Alt+G** في نافذة «حفظ» أو «فتح» بأي برنامج ينقلها إلى مجلد النتيجة التي تختارها.
+- **Ctrl+Alt+F** يفتح نافذة البحث الصغيرة من أي مكان (أو النافذة الكاملة إن اخترت ذلك في الخيارات)، و**Ctrl+Alt+G** في نافذة «حفظ» أو «فتح» بأي برنامج ينقلها إلى مجلد النتيجة التي تختارها.
 - **الملفات المكررة**: يجدها بالحجم ثم بصمة المحتوى، ويعرض المساحة المهدرة، وينقل ما تختاره إلى سلة المحذوفات.
 - **أحجام المجلدات**: عمود الحجم يشمل المجلدات، ونافذة تبيّن ما يملأ القرص.
 - **عرض المصغرات** للصور والمستندات (Ctrl+T).
@@ -126,7 +137,7 @@ scoop install instafind
 
 | المفتاح | العمل |
 |---|---|
-| Ctrl+Alt+F | إظهار البرنامج أو إخفاؤه من أي مكان |
+| Ctrl+Alt+F | نافذة البحث الصغيرة من أي مكان (Tab للإجراءات، Esc للإغلاق) |
 | Ctrl+Alt+G | في نافذة حفظ أو فتح: الانتقال إلى مجلد نتيجة |
 | Enter / Ctrl+Enter | فتح الملف / فتح مجلده مع تحديده |
 | السهم للأسفل | من مربع البحث إلى النتائج (وفي مربع فارغ: السجل) |
@@ -216,6 +227,17 @@ InstaFind's second includes starting the command-line tool and loading the index
 
 ### Features
 
+#### Search from anywhere (new in 0.8)
+- **A small search box above the clock**: nearly invisible until the pointer comes close, then it fades in. It hides during full-screen games and video and can be dragged anywhere. Turn it off or hide it in **Options → Search from anywhere**.
+- **A quick-search popup on Ctrl+Alt+F** or from the tray icon, opening upward: files, **installed apps** (`chrome`, or `كروم` in Arabic), **Windows settings pages** (`wifi`, `bluetooth`, `display`) and **switching to an open window**.
+- **Instant answers**: calculator (`250*12`), unit conversion (`5 kg to lb`, `100 F to C`) and the **Hijri date** (`hijri`, plus Umm al-Qura date conversion).
+- **Web shortcuts**: `youtube quran` searches YouTube directly; also Google, Wikipedia, Maps and Translate.
+- **System commands** (shut down, restart, sleep, lock, empty the Recycle Bin, end a frozen program), each **confirmed before it runs**.
+- **Tab** opens a row's actions: run as administrator, copy path, open folder, pin to favourites. Often-opened items rise to the top.
+- A monochrome tray icon that follows the dark or light taskbar. Everything new can be turned off, which brings back the old behaviour exactly.
+
+<p align="center"><img src="docs/quick-shots/q-app-en.png" width="420" alt="The quick-search popup finding Notepad"></p>
+
 #### Search
 - **Instant filename search** across all drives or one folder, with ready-made filters: documents, pictures, audio, video, archives, programs, folders.
 - **Real Arabic matching**: hamza forms, ta marbuta, alef maqsura, diacritics, tatweel and the `ال` prefix are ignored; Arabic-Indic digits and Persian letters are accepted.
@@ -232,7 +254,7 @@ InstaFind's second includes starting the command-line tool and loading the index
 - **All matches** in a file with line numbers (F4), and reversed Arabic text in PDFs is repaired.
 
 #### Tools
-- **Ctrl+Alt+F** shows the app from anywhere; **Ctrl+Alt+G** in any program's Save or Open dialog jumps the dialog to the folder of a result.
+- **Ctrl+Alt+F** opens the quick-search popup from anywhere (or the full window, if you choose so in Options); **Ctrl+Alt+G** in any program's Save or Open dialog jumps the dialog to the folder of a result.
 - **Duplicate finder** (size, then content hash), sorted by wasted space, moves your picks to the Recycle Bin.
 - **Folder sizes** in the Size column and a disk-usage window.
 - **Thumbnail view** (Ctrl+T).
@@ -276,7 +298,7 @@ Every filter also has an Arabic spelling (`حجم:`, `تاريخ:`, `كلمة:`,
 
 | Key | Action |
 |---|---|
-| Ctrl+Alt+F | show or hide the app from anywhere |
+| Ctrl+Alt+F | quick-search popup from anywhere (Tab for actions, Esc to close) |
 | Ctrl+Alt+G | in a Save/Open dialog: jump to a result's folder |
 | Enter / Ctrl+Enter | open the file / open its folder with the file selected |
 | Down arrow | from the search box to the results (in an empty box: history) |
