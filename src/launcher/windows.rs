@@ -107,7 +107,6 @@ fn title_match(q: &str, title: &str) -> u32 {
 }
 
 /// "Switch to" results for open windows whose title or program matches `query`.
-#[allow(dead_code)] // Called by the quick-search UI.
 pub fn matches(query: &str, ctx: &Context) -> Vec<Item> {
     let q = norm(query);
     if q.chars().count() < 2 || q.len() > 300 {
@@ -310,7 +309,6 @@ mod win {
 
 /// The visible top-level windows of other programs, front to back.
 #[cfg(windows)]
-#[allow(dead_code)] // Called by the quick-search UI.
 pub fn list() -> Vec<OpenWindow> {
     win::list()
 }
@@ -318,7 +316,6 @@ pub fn list() -> Vec<OpenWindow> {
 /// Brings a window to the front (restoring it if minimised). False if it is gone
 /// or Windows refused.
 #[cfg(windows)]
-#[allow(dead_code)] // Called by the quick-search UI.
 pub fn focus(hwnd: isize) -> bool {
     win::focus(hwnd)
 }

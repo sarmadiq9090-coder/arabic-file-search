@@ -145,7 +145,6 @@ fn web_item(title: String, url: String, score: u32) -> Item {
 }
 
 /// Web-search results for `query` (a site shortcut, or the generic fallback when `fallback`).
-#[allow(dead_code)] // Called by the quick-search UI.
 pub fn shortcuts(query: &str, ctx: &Context, fallback: bool) -> Vec<Item> {
     let q = clean(query);
     if q.is_empty() || q.len() > 2000 {

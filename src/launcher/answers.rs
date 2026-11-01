@@ -14,7 +14,6 @@ fn item(title: String, subtitle: String, copy: String) -> Item {
 }
 
 /// An instant answer for `query`, if it is a calculation, a conversion or a date question.
-#[allow(dead_code)] // Called by the quick-search UI.
 pub fn answer(query: &str, ctx: &Context) -> Option<Item> {
     let q = query.trim();
     if q.is_empty() || q.len() > 512 {

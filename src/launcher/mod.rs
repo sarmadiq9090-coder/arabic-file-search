@@ -9,11 +9,6 @@
 //! The UI calls [`Catalog::query`] on every keystroke, so it must stay well
 //! under a millisecond for a few hundred entries.
 
-// The quick-search window that calls into this module, and parts of the
-// other launcher modules, are built separately; until they are wired in,
-// several shared types and functions are only used by the tests.
-#![allow(dead_code)]
-
 pub mod aliases;
 pub mod answers;
 pub mod apps;

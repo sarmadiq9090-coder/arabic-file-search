@@ -117,7 +117,6 @@ fn title(cmd: &SystemCommand, english: bool) -> String {
 }
 
 /// The question the UI shows before running `cmd`.
-#[allow(dead_code)] // Called by the quick-search UI.
 pub fn confirm_text(cmd: &SystemCommand, english: bool) -> String {
     match (cmd, english) {
         (SystemCommand::Shutdown, false) => "هل تريد إيقاف تشغيل الجهاز الآن؟".into(),
@@ -166,7 +165,6 @@ fn end_target(q: &str) -> Option<&str> {
 }
 
 /// Commands whose words match `query`, including "end <program>" for open windows.
-#[allow(dead_code)] // Called by the quick-search UI.
 pub fn commands(query: &str, ctx: &Context) -> Vec<Item> {
     let q = norm(query);
     if q.is_empty() || q.chars().count() > 60 {
@@ -356,7 +354,6 @@ mod win {
 
 /// Runs a system command. The UI must have asked [`confirm_text`] first.
 #[cfg(windows)]
-#[allow(dead_code)] // Called by the quick-search UI.
 pub fn run(cmd: &SystemCommand) -> Result<(), String> {
     win::run(cmd)
 }

@@ -41,6 +41,8 @@ mod dupes;
 #[cfg(any(windows, test))]
 mod extract;
 #[cfg(any(windows, test))]
+mod feedback;
+#[cfg(any(windows, test))]
 mod folder_sizes;
 #[cfg(any(windows, test))]
 mod franco;
@@ -56,6 +58,8 @@ mod launcher;
 mod layout;
 #[cfg(any(windows, test))]
 mod normalize;
+#[cfg(any(windows, test))]
+mod quick;
 #[cfg(any(windows, test))]
 mod replace;
 #[cfg(any(windows, test))]

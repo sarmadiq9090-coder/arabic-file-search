@@ -9,6 +9,7 @@
 //! - `files`: renaming and deleting files, and saving the edited index
 //! - `history_menu`: the menu of recent and saved searches
 //! - `updates`: checking for, downloading and installing new versions
+//! - `feedback`: the "Send feedback" menu and the offer to report a crash
 //! - `content_index`: the stored document text and its background warm-up
 //! - `watching`: applying changes from the drive watcher to the index
 //! - `keys`: keyboard handling and the global hotkey
@@ -18,6 +19,10 @@
 //! - `thumbs`: the thumbnail view of the results (Ctrl+T)
 //! - `startup`: start-up timing, logging, single instance, fonts
 //! - `lazy`: secondary windows created when they first open, for a quick start
+//! - `quick`: the quick search popup (Ctrl+Alt+F, the floating box, the tray icon)
+//! - `floating`: the small search box above the taskbar clock
+//! - `tray`: the monochrome tray icon and menu, the new options, first-run question
+//! - `surface`: drawing, theme and DWM helpers of those custom-drawn windows
 //! - `format`, `shell`: text formatting and Windows shell helpers
 
 mod autostart;
@@ -25,12 +30,16 @@ mod build;
 mod content_index;
 mod dupes_window;
 mod disk_usage;
+mod feedback;
 mod files;
+mod floating;
 mod format;
 mod history_menu;
 mod lang_menu;
 mod keys;
+mod launcher_shim; // TEMPORARY, see the file
 mod lazy;
+mod quick;
 mod quickswitch;
 mod replace_window;
 mod results;
@@ -38,7 +47,9 @@ mod search_jobs;
 mod shell;
 mod startup;
 mod style;
+mod surface;
 mod thumbs;
+mod tray;
 mod updates;
 mod watching;
 mod web_server;
@@ -231,13 +242,32 @@ pub struct App {
     lang_menu: nwg::Menu,
     menu_lang_ar: nwg::MenuItem,
     menu_lang_en: nwg::MenuItem,
+    /// Options ▸ "Send feedback": report a problem, suggest an idea, discuss.
+    feedback_menu: nwg::Menu,
+    menu_feedback_bug: nwg::MenuItem,
+    menu_feedback_idea: nwg::MenuItem,
+    menu_feedback_talk: nwg::MenuItem,
+    /// The crash reports of the last run were already offered (or none).
+    crash_checked: Cell<bool>,
     menu_export: nwg::MenuItem,
     menu_hide: nwg::MenuItem,
     tray_icon: nwg::Icon,
     tray: nwg::TrayNotification,
     tray_menu: nwg::Menu,
+    tray_quick: nwg::MenuItem,
+    tray_floating: nwg::MenuItem,
     tray_show: nwg::MenuItem,
+    tray_settings: nwg::MenuItem,
+    tray_about: nwg::MenuItem,
     tray_exit: nwg::MenuItem,
+    /// The tray icon in white and in black, for dark and light taskbars.
+    mono_icons: tray::MonoIcons,
+    /// Options ▸ "Search from anywhere".
+    quick_menu: tray::QuickMenu,
+    /// The quick search popup (built when it first opens).
+    popup: quick::Popup,
+    /// The search box above the clock.
+    floating: floating::Floating,
     /// The recent/saved searches menu, rebuilt each time it opens.
     history_menu: RefCell<HistoryMenu>,
     /// True while the user edits a file name in the list (F2).
@@ -422,7 +452,7 @@ impl App {
     fn hide_to_tray(&self) {
         self.remember_query();
         self.window.set_visible(false);
-        if !self.tray_hint_shown.replace(true) {
+        if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
             self.tray.show(
                 tr!("البرنامج ما زال يعمل هنا. انقر الأيقونة أو شغّل البرنامج مرة أخرى لإظهاره فوراً.", "The program is still running here. Click the icon or start the program again to show it at once."),
                 Some(title()),
@@ -486,6 +516,8 @@ impl App {
         if let Some(h) = self.window.handle.hwnd() {
             unsafe { winapi::um::winuser::UnregisterHotKey(h, HOTKEY_ID) };
         }
+        self.unregister_alt_space();
+        self.hide_quick();
         nwg::stop_thread_dispatch();
     }
 }
