@@ -15,22 +15,23 @@ cargo test                 # the search, index and extraction tests also run on 
 Cross-building from Linux, exactly as the release job does:
 
 ```
-rustup target add x86_64-pc-windows-gnu
+rustup target add x86_64-pc-windows-gnu i686-pc-windows-gnu
 sudo apt-get install mingw-w64
-cargo build --release --target x86_64-pc-windows-gnu
+cargo build --release --target x86_64-pc-windows-gnu   # bahth.exe (x64)
+cargo build --release --target i686-pc-windows-gnu     # bahth-x86.exe (32-bit)
 ```
 
 ## Checks
 
-Every push and pull request runs [`.github/workflows/build.yml`](../.github/workflows/build.yml): `cargo clippy --all-targets -D warnings` on Linux and Windows, `cargo test` (debug and release) on Linux and `cargo test --release` on Windows, then the gnu cross-build of `bahth.exe` (artifact `bahth-exe`) and a smoke test of that exact exe on real Windows ([`ci/smoke.ps1`](../ci/smoke.ps1)): the GUI indexes the runner's drives, the command line searches the index (Arabic, emoji, long names, filters), and any `crash.txt` or early exit fails the job.
+Every push and pull request runs [`.github/workflows/build.yml`](../.github/workflows/build.yml): `cargo clippy --all-targets -D warnings` on Linux and Windows, `cargo test` (debug and release) on Linux and `cargo test --release` on Windows, then the gnu cross-builds of `bahth.exe` (x64) and `bahth-x86.exe` (32-bit), a native build and `cargo test --release` of `bahth-arm64.exe` on a `windows-11-arm` runner (MSVC, static CRT), and a smoke test of each exact exe on real Windows of its CPU (x86 under WOW64) ([`ci/smoke.ps1`](../ci/smoke.ps1)): the GUI indexes the runner's drives, the command line searches the index (Arabic, emoji, long names, filters), and any `crash.txt` or early exit fails the job.
 
 ## Releases
 
 1. Bump `version` in `Cargo.toml` and add the entry to [CHANGELOG.md](../CHANGELOG.md).
 2. Write `releases/vX.Y.Z-notes.md`. The first line, `# title`, becomes the release title; the rest is the release body (Arabic first, then a short **English:** line).
-3. Push to `main`. When the version has no tag yet and the smoke test passed, the `release` job publishes the very `bahth.exe` the smoke test ran, creates the tag and marks the GitHub Release as *latest*.
+3. Push to `main`. When the version has no tag yet and the smoke test passed, the `release` job publishes the very `bahth.exe`, `bahth-x86.exe` and `bahth-arm64.exe` the smoke tests ran, creates the tag and marks the GitHub Release as *latest*.
 
-The in-app updater (`src/update.rs`) reads the latest release and downloads the asset named exactly **`bahth.exe`**, so keep that name, keep releases out of draft/prerelease, and keep the repository URL. Editing a `releases/*-notes.md` file later re-syncs that release's title and body ([`release-notes.yml`](../.github/workflows/release-notes.yml)); assets are never touched.
+The in-app updater (`src/update.rs`) reads the latest release and downloads the asset for its own CPU: exactly **`bahth.exe`** on x64 (every installed copy since 0.3.0 looks for that name, so never rename it), `bahth-x86.exe` on 32-bit and `bahth-arm64.exe` on ARM64 (`ASSET_NAME`). Keep those names, keep releases out of draft/prerelease, and keep the repository URL. Editing a `releases/*-notes.md` file later re-syncs that release's title and body ([`release-notes.yml`](../.github/workflows/release-notes.yml)); assets are never touched.
 
 ## Code map
 
