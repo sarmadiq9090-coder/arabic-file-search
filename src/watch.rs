@@ -118,13 +118,24 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-/// `C:\…` as `\\?\C:\…`, so paths longer than 260 characters work too.
+/// `C:\…` as `\\?\C:\…` and `\\server\share\…` as `\\?\UNC\server\share\…`,
+/// so paths longer than 260 characters work too. (A long path on a watched
+/// share used to look gone, and its entry was dropped.)
 fn long_path(path: &str) -> Vec<u16> {
+    wide(&long_path_str(path))
+}
+
+fn long_path_str(path: &str) -> String {
     let b = path.as_bytes();
-    if b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && b[2] == b'\\' {
-        wide(&format!("\\\\?\\{path}"))
+    if path.starts_with(r"\\?\") || path.starts_with(r"\\.\") {
+        path.to_string()
+    } else if b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == b'\\' || b[2] == b'/') {
+        // The prefix turns off the conversion of `/` to `\`.
+        format!("\\\\?\\{}", path.replace('/', "\\"))
+    } else if let Some(unc) = path.strip_prefix(r"\\").filter(|u| !u.is_empty() && !u.starts_with('\\')) {
+        format!("\\\\?\\UNC\\{}", unc.replace('/', "\\"))
     } else {
-        wide(path)
+        path.to_string()
     }
 }
 
@@ -151,7 +162,8 @@ pub fn stat(path: &str) -> Option<(u64, i64, bool)> {
     let size = if is_dir { 0 } else { (fd.nFileSizeHigh as u64) << 32 | fd.nFileSizeLow as u64 };
     // FILETIME counts 100 ns steps since 1601; the index stores Unix seconds.
     let ft = ((fd.ftLastWriteTime.dwHighDateTime as u64) << 32 | fd.ftLastWriteTime.dwLowDateTime as u64) as i64;
-    let mtime = ((ft - 116_444_736_000_000_000) / 10_000_000).max(0);
+    // Saturating: a damaged or odd time stamp (top bit set) must not overflow.
+    let mtime = (ft.saturating_sub(116_444_736_000_000_000) / 10_000_000).max(0);
     Some((size, mtime, is_dir))
 }
 
@@ -355,38 +367,56 @@ fn watch_dir(
 /// paths. A rename's old name waits in `old_name` for its new name, which
 /// may come in the next buffer.
 fn parse(data: &[u8], root: &str, own: &str, old_name: &mut Option<String>, out: &mut Vec<Change>) {
-    // Where the name starts (the struct's size includes padding after it).
-    let header = std::mem::offset_of!(FILE_NOTIFY_INFORMATION, FileName);
-    let mut off = 0;
-    while off + header <= data.len() {
-        let info = unsafe { &*(data.as_ptr().add(off) as *const FILE_NOTIFY_INFORMATION) };
-        let n = (info.FileNameLength as usize / 2).min((data.len() - off - header) / 2);
-        let name = unsafe { std::slice::from_raw_parts(info.FileName.as_ptr(), n) };
-        // Names that are not valid UTF-16 are not in the index either.
-        if let Ok(rel) = String::from_utf16(name) {
+    // FILE_NOTIFY_INFORMATION: three DWORDs (next entry offset, action, name
+    // length in bytes), then the UTF-16 name. Read field by field with bounds
+    // checks, never through a struct reference: an offset that is out of
+    // range or not DWORD-aligned is then just the end of the list.
+    const HEADER: usize = 12;
+    const _: () = assert!(std::mem::offset_of!(FILE_NOTIFY_INFORMATION, FileName) == HEADER);
+    let dword = |at: usize| {
+        let b = data.get(at..at.checked_add(4)?)?;
+        Some(u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+    };
+    let mut off = 0usize;
+    while let (Some(next), Some(action), Some(name_bytes)) = (dword(off), dword(off.saturating_add(4)), dword(off.saturating_add(8))) {
+        // In bounds: the third DWORD ended there.
+        let start = off + HEADER;
+        let end = start.saturating_add(name_bytes as usize).min(data.len());
+        let name: Vec<u16> = data[start..end].as_chunks::<2>().0.iter().map(|&c| u16::from_le_bytes(c)).collect();
+        // Names that are not valid UTF-16 are not in the index either; an
+        // empty one would stand for the root itself.
+        let path = String::from_utf16(&name).ok().filter(|rel| !rel.is_empty()).map(|rel| {
             let sep = if root.ends_with('\\') { "" } else { "\\" };
-            let path = format!("{root}{sep}{rel}");
-            if info.Action != FILE_ACTION_RENAMED_NEW_NAME
-                && let Some(old) = old_name.take()
-            {
-                push(out, own, Change::Removed(old));
-            }
-            match info.Action {
-                FILE_ACTION_ADDED => push(out, own, Change::Added(path)),
-                FILE_ACTION_REMOVED => push(out, own, Change::Removed(path)),
-                FILE_ACTION_MODIFIED => push(out, own, Change::Modified(path)),
-                FILE_ACTION_RENAMED_OLD_NAME => *old_name = Some(path),
-                FILE_ACTION_RENAMED_NEW_NAME => match old_name.take() {
-                    Some(old) => push(out, own, Change::Renamed(old, path)),
-                    None => push(out, own, Change::Added(path)),
-                },
-                _ => {}
-            }
+            format!("{root}{sep}{rel}")
+        });
+        if action != FILE_ACTION_RENAMED_NEW_NAME
+            && let Some(old) = old_name.take()
+        {
+            push(out, own, Change::Removed(old));
         }
-        if info.NextEntryOffset == 0 {
+        match (action, path) {
+            (FILE_ACTION_ADDED, Some(p)) => push(out, own, Change::Added(p)),
+            (FILE_ACTION_REMOVED, Some(p)) => push(out, own, Change::Removed(p)),
+            (FILE_ACTION_MODIFIED, Some(p)) => push(out, own, Change::Modified(p)),
+            // An old name the index can't hold: the new one is an addition.
+            (FILE_ACTION_RENAMED_OLD_NAME, p) => *old_name = p,
+            (FILE_ACTION_RENAMED_NEW_NAME, Some(p)) => match old_name.take() {
+                Some(old) => push(out, own, Change::Renamed(old, p)),
+                None => push(out, own, Change::Added(p)),
+            },
+            // Renamed to a name the index can't hold: the old one is gone.
+            (FILE_ACTION_RENAMED_NEW_NAME, None) => {
+                if let Some(old) = old_name.take() {
+                    push(out, own, Change::Removed(old));
+                }
+            }
+            _ => {}
+        }
+        if next == 0 || next % 4 != 0 {
             break;
         }
-        off += info.NextEntryOffset as usize;
+        let Some(o) = off.checked_add(next as usize) else { break };
+        off = o;
     }
 }
 
@@ -455,4 +485,115 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, w: WPARAM, l: LPARA
         }
     }
     unsafe { DefWindowProcW(hwnd, msg, w, l) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// One FILE_NOTIFY_INFORMATION record, padded to a DWORD boundary.
+    fn record(action: DWORD, name: &[u16], last: bool) -> Vec<u8> {
+        let len = (12 + name.len() * 2).div_ceil(4) * 4;
+        let mut r = Vec::new();
+        r.extend_from_slice(&(if last { 0 } else { len as u32 }).to_le_bytes());
+        r.extend_from_slice(&action.to_le_bytes());
+        r.extend_from_slice(&((name.len() * 2) as u32).to_le_bytes());
+        for c in name {
+            r.extend_from_slice(&c.to_le_bytes());
+        }
+        r.resize(len, 0);
+        r
+    }
+
+    fn utf16(s: &str) -> Vec<u16> {
+        s.encode_utf16().collect()
+    }
+
+    fn run(data: &[u8], old: &mut Option<String>) -> Vec<Change> {
+        let mut out = Vec::new();
+        parse(data, r"C:\", r"c:\own\", old, &mut out);
+        out
+    }
+
+    #[test]
+    fn records_become_changes() {
+        let mut d = record(FILE_ACTION_ADDED, &utf16(r"مجلد\ملف.txt"), false);
+        d.extend(record(FILE_ACTION_RENAMED_OLD_NAME, &utf16("a.txt"), false));
+        d.extend(record(FILE_ACTION_RENAMED_NEW_NAME, &utf16("A.TXT"), false));
+        d.extend(record(FILE_ACTION_MODIFIED, &utf16(r"OWN\log.txt"), false));
+        d.extend(record(FILE_ACTION_REMOVED, &utf16("😀"), true));
+        let mut old = None;
+        assert_eq!(
+            run(&d, &mut old),
+            vec![
+                Change::Added(r"C:\مجلد\ملف.txt".into()),
+                Change::Renamed(r"C:\a.txt".into(), r"C:\A.TXT".into()),
+                Change::Removed(r"C:\😀".into()),
+            ]
+        );
+        assert_eq!(old, None);
+        // A rename split over two buffers.
+        assert!(run(&record(FILE_ACTION_RENAMED_OLD_NAME, &utf16("x"), true), &mut old).is_empty());
+        assert_eq!(old.as_deref(), Some(r"C:\x"));
+        let got = run(&record(FILE_ACTION_RENAMED_NEW_NAME, &utf16("y"), true), &mut old);
+        assert_eq!(got, vec![Change::Renamed(r"C:\x".into(), r"C:\y".into())]);
+    }
+
+    #[test]
+    fn odd_names_and_damaged_buffers() {
+        let mut old = None;
+        // Renamed to a name that is not valid UTF-16 (a lone surrogate): gone.
+        let mut d = record(FILE_ACTION_RENAMED_OLD_NAME, &utf16("a"), false);
+        d.extend(record(FILE_ACTION_RENAMED_NEW_NAME, &[0xD800, 0x61], true));
+        assert_eq!(run(&d, &mut old), vec![Change::Removed(r"C:\a".into())]);
+        // An empty name is not the root.
+        assert!(run(&record(FILE_ACTION_REMOVED, &[], true), &mut old).is_empty());
+        // A name length past the end is cut at the end.
+        let mut d = record(FILE_ACTION_ADDED, &utf16("abcd"), true);
+        d[8..12].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert_eq!(run(&d, &mut old), vec![Change::Added(r"C:\abcd".into())]);
+        // An offset that is not DWORD-aligned, or points past the end, ends the list.
+        let mut d = record(FILE_ACTION_ADDED, &utf16("a"), false);
+        d[..4].copy_from_slice(&13u32.to_le_bytes());
+        d.extend(record(FILE_ACTION_ADDED, &utf16("b"), true));
+        assert_eq!(run(&d, &mut old), vec![Change::Added(r"C:\a".into())]);
+        let mut d = record(FILE_ACTION_ADDED, &utf16("a"), false);
+        d[..4].copy_from_slice(&0xFFFF_FFFCu32.to_le_bytes());
+        assert_eq!(run(&d, &mut old), vec![Change::Added(r"C:\a".into())]);
+        // Every cut of a good buffer, and random bytes: never a panic, and
+        // every path lies under the root.
+        let mut good = record(FILE_ACTION_ADDED, &utf16("تقرير.docx"), false);
+        good.extend(record(FILE_ACTION_RENAMED_OLD_NAME, &utf16("b"), false));
+        good.extend(record(FILE_ACTION_RENAMED_NEW_NAME, &utf16("c"), true));
+        for n in 0..=good.len() {
+            for c in run(&good[..n], &mut None) {
+                assert!(c.touches(r"C:\"), "{c:?}");
+            }
+        }
+        let mut seed = 0x5151_7777_u64;
+        for _ in 0..2000 {
+            let mut b = Vec::new();
+            for _ in 0..(seed % 120) {
+                seed ^= seed << 13;
+                seed ^= seed >> 7;
+                seed ^= seed << 17;
+                b.push(seed as u8);
+            }
+            for c in run(&b, &mut None) {
+                assert!(c.touches(r"C:\"), "{c:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn long_paths_get_the_right_prefix() {
+        assert_eq!(long_path_str(r"C:\a\b"), r"\\?\C:\a\b");
+        assert_eq!(long_path_str("C:/a/b"), r"\\?\C:\a\b");
+        assert_eq!(long_path_str(r"\\srv\share\مجلد"), r"\\?\UNC\srv\share\مجلد");
+        assert_eq!(long_path_str(r"\\?\C:\x"), r"\\?\C:\x");
+        assert_eq!(long_path_str(r"\\.\pipe\x"), r"\\.\pipe\x");
+        for odd in ["", r"\\", r"\\\x", "C:", "relative"] {
+            assert_eq!(long_path_str(odd), odd);
+        }
+    }
 }

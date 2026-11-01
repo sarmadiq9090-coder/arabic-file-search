@@ -148,6 +148,46 @@ mod tests {
         assert_eq!(Settings::parse(""), Settings::default());
     }
 
+    /// Random text: never a panic, every value stays in its range, and what
+    /// is parsed survives a save and a reload unchanged.
+    #[test]
+    fn random_text_parses_into_valid_settings() {
+        const PIECES: &[&str] = &[
+            "width", "height", "maximized", "columns", "kind", "sort_col", "update_check", "content_index", "=", "\n",
+            "\r\n", ",", " ", "-", "1", "0", "99999999999999999999", "٣", "\u{FEFF}", "\u{0}", "ب", "😀", "\u{200F}",
+        ];
+        let mut seed = 0xABCD_EF01_u64;
+        let mut below = |n: usize| {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed % n as u64) as usize
+        };
+        for _ in 0..5000 {
+            let text: String = (0..below(30)).map(|_| PIECES[below(PIECES.len())]).collect();
+            let s = Settings::parse(&text);
+            assert!((400..=10_000).contains(&s.width) && (300..=10_000).contains(&s.height), "{text:?}");
+            assert!((-1..=3).contains(&s.sort_col), "{text:?}");
+            assert_eq!(Settings::parse(&s.to_text()), s, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn unreadable_file_gives_defaults() {
+        let dir = std::env::temp_dir().join(format!("bahth_settings_bad_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("folder.txt")).unwrap();
+        let file = dir.join("settings.txt");
+        // Not UTF-8, a folder, nothing there.
+        std::fs::write(&file, [0xFF, 0xFE, b'w', 0x80]).unwrap();
+        assert_eq!(Settings::load_from(&file), Settings::default());
+        assert_eq!(Settings::load_from(&dir.join("folder.txt")), Settings::default());
+        // Saving where a folder sits fails without touching it.
+        assert!(Settings::default().save_to(&dir.join("folder.txt")).is_err());
+        assert!(dir.join("folder.txt").is_dir());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     #[test]
     fn save_and_load_file() {
         let dir = std::env::temp_dir().join(format!("bahth_settings_{}", std::process::id()));

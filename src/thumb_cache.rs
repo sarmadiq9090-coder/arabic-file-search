@@ -178,6 +178,51 @@ mod tests {
         assert_eq!(c.insert_image("b".into()), a);
     }
 
+    /// Random lookups and inserts: never a panic, the bounds hold, and no
+    /// two cached thumbnails share a slot (one would show the other's
+    /// picture), nor a pinned slot.
+    #[test]
+    fn random_use_keeps_slots_unique_and_bounded() {
+        let mut seed = 0x00DD_BA11_u64;
+        let mut below = |n: usize| {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed % n as u64) as usize
+        };
+        for (max_images, max_entries) in [(1, 1), (2, 3), (5, 2), (8, 40), (0, 0)] {
+            let mut c = ThumbCache::new(max_images, max_entries);
+            let pinned: Vec<i32> = (0..3).map(|_| c.pin_slot()).collect();
+            let mut handed_out = 0;
+            for _ in 0..3000 {
+                let key = ThumbCache::key(&format!("C:\\صور\\{}", below(30)), below(3) as u64, -(below(2) as i64));
+                match below(3) {
+                    0 => {
+                        let s = c.insert_image(key.clone());
+                        assert!(!pinned.contains(&s));
+                        // A new slot is exactly the next one in the image list.
+                        assert!(s as usize <= pinned.len() + handed_out);
+                        handed_out = handed_out.max(s as usize + 1 - pinned.len());
+                        assert_eq!(c.get(&key), Some(Cached::Image(s)));
+                    }
+                    1 => c.insert_none(key),
+                    _ => {
+                        let _ = c.get(&key);
+                    }
+                }
+                let slots: Vec<i32> =
+                    c.map.values().filter_map(|(v, _)| if let Cached::Image(s) = v { Some(*s) } else { None }).collect();
+                let mut unique = slots.clone();
+                unique.sort_unstable();
+                unique.dedup();
+                assert_eq!(unique.len(), slots.len(), "a slot is shared");
+                assert_eq!(slots.len(), c.images);
+                assert!(c.images <= c.max_images && c.len() <= c.max_entries);
+                assert!(c.free.iter().all(|s| !slots.contains(s) && !pinned.contains(s)));
+            }
+        }
+    }
+
     #[test]
     fn a_changed_file_has_another_key() {
         assert_ne!(ThumbCache::key("C:\\a.jpg", 10, 1), ThumbCache::key("C:\\a.jpg", 10, 2));

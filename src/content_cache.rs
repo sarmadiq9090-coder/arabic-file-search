@@ -322,10 +322,11 @@ impl ContentCache {
         }
         let mut live = 0u64;
         for m in idx.entries.values().filter(|m| m.kind == Kind::Text) {
-            if m.offset < HEADER_LEN || m.offset + u64::from(m.len) > idx.dat_len {
+            // Checked: a damaged offset near u64::MAX must not overflow.
+            if m.offset < HEADER_LEN || m.offset.checked_add(u64::from(m.len))? > idx.dat_len {
                 return None;
             }
-            live += u64::from(m.len);
+            live = live.checked_add(u64::from(m.len))?;
         }
         let garbage = (idx.dat_len - HEADER_LEN).checked_sub(live)?;
         let reader = File::open(dir.join(DAT)).ok()?;
@@ -361,6 +362,10 @@ impl ContentCache {
         }
         if m.kind == Kind::NoText {
             return Some(None);
+        }
+        // `put` never stores more; a damaged length must not allocate gigabytes.
+        if m.raw_len as usize > MAX_TEXT {
+            return None;
         }
         let mut buf = vec![0u8; m.len as usize];
         read_at(reader.as_ref()?, &mut buf, m.offset).ok()?;
@@ -952,6 +957,155 @@ mod tests {
         assert_eq!(text_of(Some(&cache), path), (Some("نص".into()), false));
         assert_eq!(text_of(Some(&cache), path), (Some("نص".into()), true));
         drop(cache);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A small xorshift generator: the same cases on every run.
+    struct Rng(u64);
+
+    impl Rng {
+        fn below(&mut self, n: usize) -> usize {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            (self.0 % n.max(1) as u64) as usize
+        }
+
+        fn bytes(&mut self, max: usize) -> Vec<u8> {
+            (0..self.below(max)).map(|_| self.below(256) as u8).collect()
+        }
+    }
+
+    /// An idx with a valid checksum around `payload`, as `write_idx` makes.
+    fn sealed(mut payload: Vec<u8>) -> Vec<u8> {
+        let sum = fnv(&payload);
+        payload.extend_from_slice(&sum.to_le_bytes());
+        payload
+    }
+
+    fn idx_bytes(id: u64, dat_len: u64, entries: &[(&str, Meta)]) -> Vec<u8> {
+        let map: Map = entries.iter().map(|(p, m)| (Box::from(*p), *m)).collect();
+        sealed(bincode::serialize(&IdxRef { version: VERSION, id, dat_len, entries: &map }).unwrap())
+    }
+
+    #[test]
+    fn random_idx_bytes_never_panic() {
+        let mut rng = Rng(0xC0FF_EE11);
+        for i in 0..3000 {
+            let b = rng.bytes(300);
+            assert!(decode_idx(&b).is_none() || b.len() >= 8);
+            // Random payloads that pass the checksum, some behind a good
+            // version: lengths and counts are whatever the bytes say.
+            let mut p = rng.bytes(200);
+            if i % 2 == 0 && p.len() >= 4 {
+                p[..4].copy_from_slice(&VERSION.to_le_bytes());
+            }
+            let _ = decode_idx(&sealed(p));
+        }
+        // A map claiming billions of entries, a path claiming exabytes.
+        let mut p = Vec::new();
+        for v in [u64::from(VERSION), 7, 100, u64::MAX / 3, u64::MAX / 5] {
+            p.extend_from_slice(&v.to_le_bytes());
+        }
+        assert!(decode_idx(&sealed(p.clone())).is_none());
+        p[4..8].copy_from_slice(&[0; 4]);
+        assert!(decode_idx(&sealed(p)).is_none());
+    }
+
+    #[test]
+    fn damaged_idx_files_open_as_an_empty_store() {
+        let dir = temp_dir("fuzzopen");
+        let c = ContentCache::open(&dir).unwrap();
+        c.put("a", 1, 2, Some(AR));
+        c.flush().unwrap();
+        drop(c);
+        let good_idx = fs::read(dir.join(IDX)).unwrap();
+        let good_dat = fs::read(dir.join(DAT)).unwrap();
+        let mut rng = Rng(0x5EED_0001);
+        for i in 0..200 {
+            let mut b = good_idx.clone();
+            match i % 3 {
+                0 => b.truncate(rng.below(b.len())),
+                1 => {
+                    let at = rng.below(b.len());
+                    b[at] ^= 1 + rng.below(255) as u8;
+                }
+                _ => b = rng.bytes(100),
+            }
+            fs::write(dir.join(IDX), &b).unwrap();
+            fs::write(dir.join(DAT), &good_dat).unwrap();
+            let c = ContentCache::open(&dir).unwrap();
+            assert_ne!(c.get("a", 1, 2), Some(Some("wrong".into())));
+            c.put("b", 1, 1, Some("ب"));
+            assert_eq!(c.get("b", 1, 1), Some(Some("ب".into())));
+        }
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn idx_with_impossible_records_is_thrown_away() {
+        let dir = temp_dir("impossible");
+        drop(ContentCache::open(&dir).unwrap());
+        let id = decode_idx(&fs::read(dir.join(IDX)).unwrap()).unwrap().id;
+        let text = Meta { size: 1, mtime: 1, offset: HEADER_LEN, len: 4, raw_len: 4, hash: 0, kind: Kind::Text };
+        // Offset + length past u64::MAX: an overflow panic in debug builds,
+        // a wrapped (accepted) range in release ones.
+        let wraps = Meta { offset: u64::MAX - 1, ..text };
+        fs::write(dir.join(IDX), idx_bytes(id, HEADER_LEN, &[("x", wraps)])).unwrap();
+        assert_eq!(ContentCache::open(&dir).unwrap().stats().documents, 0);
+        // Records past the end of the dat, or before its start.
+        drop(ContentCache::open(&dir).unwrap());
+        let id = decode_idx(&fs::read(dir.join(IDX)).unwrap()).unwrap().id;
+        for bad in [Meta { offset: HEADER_LEN + 1, ..text }, Meta { offset: 3, ..text }] {
+            fs::write(dir.join(IDX), idx_bytes(id, HEADER_LEN, &[("x", bad)])).unwrap();
+            assert_eq!(ContentCache::open(&dir).unwrap().stats().documents, 0);
+            drop(ContentCache::open(&dir).unwrap());
+        }
+        // A record claiming a gigantic text is not decompressed into one.
+        let c = ContentCache::open(&dir).unwrap();
+        c.put("y", 1, 1, Some("abcd"));
+        c.flush().unwrap();
+        drop(c);
+        let idx = decode_idx(&fs::read(dir.join(IDX)).unwrap()).unwrap();
+        let mut m = idx.entries["y"];
+        m.raw_len = u32::MAX;
+        fs::write(dir.join(IDX), idx_bytes(idx.id, idx.dat_len, &[("y", m)])).unwrap();
+        let c = ContentCache::open(&dir).unwrap();
+        assert_eq!(c.stats().documents, 1);
+        assert_eq!(c.get("y", 1, 1), None);
+        drop(c);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_crash_between_writes_keeps_a_usable_store() {
+        // The idx is replaced by a rename: a leftover temp file from a crash
+        // mid-write changes nothing, and the old idx still opens.
+        let dir = temp_dir("crash");
+        let c = ContentCache::open(&dir).unwrap();
+        c.put("a", 1, 2, Some(AR));
+        c.flush().unwrap();
+        drop(c);
+        fs::write(dir.join("content.idx.tmp"), b"half an id").unwrap();
+        fs::write(dir.join("content.dat.tmp"), b"half a dat").unwrap();
+        let c = ContentCache::open(&dir).unwrap();
+        assert_eq!(c.get("a", 1, 2), Some(Some(AR.to_string())));
+        // Records appended after the last flush, cut off mid-write.
+        c.put("b", 1, 1, Some(&AR.repeat(50)));
+        drop(c);
+        let dat = dir.join(DAT);
+        let len = fs::metadata(&dat).unwrap().len();
+        OpenOptions::new().write(true).open(&dat).unwrap().set_len(len - 7).unwrap();
+        let c = ContentCache::open(&dir).unwrap();
+        assert_eq!(c.get("a", 1, 2), Some(Some(AR.to_string())));
+        assert_eq!(c.get("b", 1, 1), None);
+        c.flush().unwrap();
+        c.put("c", 1, 1, Some("ج"));
+        c.flush().unwrap();
+        drop(c);
+        let c = ContentCache::open(&dir).unwrap();
+        assert_eq!(c.get("c", 1, 1), Some(Some("ج".into())));
+        drop(c);
         fs::remove_dir_all(&dir).unwrap();
     }
 }

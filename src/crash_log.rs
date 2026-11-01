@@ -252,7 +252,7 @@ fn append_log(path: &Path, text: &str) {
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    if std::fs::metadata(path).is_ok_and(|m| m.len() + text.len() as u64 > LOG_MAX) {
+    if std::fs::metadata(path).is_ok_and(|m| m.len().saturating_add(text.len() as u64) > LOG_MAX) {
         let _ = std::fs::rename(path, path.with_file_name("log.old.txt"));
     }
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
@@ -316,6 +316,70 @@ mod tests {
         assert!(quietly(|| panic!("damaged file")).is_err());
         assert_eq!(quietly(|| 1).ok(), Some(1));
         // The flag is restored after the panic.
+        assert!(!QUIET.with(Cell::get));
+    }
+
+    /// The hook's helpers run while a panic is being handled, where a
+    /// second panic aborts the program: odd input must not make them panic.
+    #[test]
+    fn report_helpers_take_any_input() {
+        const PIECES: &[&str] = &["0", "9", ":", " ", "0x", "ff", "FFFFFFFFFFFFFFFFFFFF", "-", "\n", "\r", "ب", "😀", "\u{0}", "\u{200F}", "x"];
+        let mut seed = 0xFACE_B00C_u64;
+        let mut below = |n: usize| {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed % n as u64) as usize
+        };
+        for _ in 0..3000 {
+            let s: String = (0..below(12)).map(|_| PIECES[below(PIECES.len())]).collect();
+            let _ = frame_address(&s);
+            let base = [None, Some(0), Some(usize::MAX), Some(0x1_4000_0000)][below(4)];
+            let _ = annotate_frames(&s, base, "bahth.exe");
+            let r = report(&s, Some((&s, u32::MAX, 0)), &s, &s);
+            assert!(r.ends_with("END PANIC"));
+            let _ = quiet_line(&s, Some((&s, 0, 0)), below(2) == 0);
+            assert!(!quiet_line(&s, None, false).contains(['\n', '\r']));
+        }
+        assert_eq!(frame_address("1: 0xFFFFFFFFFFFFFFFFFFFFFFFF - f"), None);
+        assert_eq!(frame_address(":"), None);
+        assert_eq!(frame_address(""), None);
+    }
+
+    #[test]
+    fn writing_a_report_where_it_cannot_go_is_harmless() {
+        let dir = std::env::temp_dir().join(format!("bahth_crash_nowhere_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("log.txt")).unwrap();
+        std::fs::write(dir.join("file"), "x").unwrap();
+        // The log path is a folder; its parent is a file; a name that isn't one.
+        append_log(&dir.join("log.txt"), "a");
+        append_crash(&dir.join("log.txt"), "a");
+        append_log(&dir.join("file").join("log.txt"), "b");
+        append_crash(&dir.join("file").join("crash.txt"), "b");
+        append_log(Path::new(""), "c");
+        append_crash(Path::new(""), "c");
+        // A report bigger than the cap is still written whole.
+        let log = dir.join("big").join("log.txt");
+        let big = "ب".repeat(LOG_MAX as usize);
+        append_log(&log, &big);
+        append_log(&log, "after");
+        assert!(std::fs::read_to_string(dir.join("big").join("log.old.txt")).unwrap().contains(&big));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn panics_with_odd_payloads_are_contained() {
+        assert!(quietly(|| std::panic::panic_any(42u8)).is_err());
+        assert!(catch(|| std::panic::panic_any(vec![1, 2, 3])).is_none());
+        assert!(quietly(|| panic!("{}", "ب\u{0}\n".repeat(10_000))).is_err());
+        // Nested: a contained panic inside a contained panic's handler.
+        assert!(catch(|| {
+            let inner = quietly(|| panic!("inner"));
+            assert!(inner.is_err());
+            panic!("outer")
+        })
+        .is_none());
         assert!(!QUIET.with(Cell::get));
     }
 

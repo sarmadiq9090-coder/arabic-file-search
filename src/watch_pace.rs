@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use crate::index::{Change, skipped_path};
+use crate::index::{Change, change_path, skipped_path};
 
 /// Size, mtime and folder flag of a path, or `None` when it is gone (see
 /// `watch::stat`).
@@ -27,6 +27,8 @@ pub fn stat_paths(changes: &[Change]) -> impl Iterator<Item = &str> {
             Change::Rescan(_) => [None, None],
         })
         .flatten()
+        // Spelled as `apply_changes` will ask for them.
+        .filter_map(change_path)
         .filter(|p| !skipped_path(p))
 }
 
@@ -114,6 +116,58 @@ mod tests {
         ];
         let got: Vec<&str> = stat_paths(&changes).collect();
         assert_eq!(got, [r"C:\a.txt", r"C:\b", r"C:\c", r"C:\d", r"C:\e"]);
+        // Trailing separators are dropped and roots are never looked up,
+        // matching what `apply_changes` asks for.
+        let odd = vec![
+            Change::Modified(r"C:\a\".into()),
+            Change::Removed(r"C:\".into()),
+            Change::Renamed("/".into(), "/home/u//".into()),
+            Change::Added(String::new()),
+        ];
+        assert_eq!(stat_paths(&odd).collect::<Vec<_>>(), [r"C:\a", "/home/u"]);
+    }
+
+    /// Random requests at random times: never panics, a deferred root is
+    /// listed once, and a root is never walked twice within the gap.
+    #[test]
+    fn random_pacing_keeps_the_gap() {
+        let mut seed = 0x9E37_79B9_7F4A_7C15u64;
+        let mut next = move |n: u64| {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed % n
+        };
+        let gap = Duration::from_secs(60);
+        let mut pace = RescanPace::new(gap);
+        let t0 = Instant::now();
+        let roots = ["C:\\", "D:\\", r"\\server\share", ""];
+        let mut walked: HashMap<&str, Instant> = HashMap::new();
+        let mut now = t0;
+        for _ in 0..5000 {
+            now += Duration::from_secs(next(20));
+            let root = roots[next(roots.len() as u64) as usize];
+            let mut started = Vec::new();
+            if next(2) == 0 {
+                if pace.request(root, now, next(4) == 0) {
+                    started.push(root.to_string());
+                }
+            } else {
+                let busy = roots[next(roots.len() as u64) as usize];
+                started = pace.due(now, |r| r == busy);
+            }
+            for r in &started {
+                let r = roots.iter().find(|x| **x == r.as_str()).unwrap();
+                if let Some(&t) = walked.get(r) {
+                    assert!(now.duration_since(t) >= gap, "{r} walked again too soon");
+                }
+                walked.insert(r, now);
+            }
+            let mut d = pace.deferred.clone();
+            d.sort();
+            d.dedup();
+            assert_eq!(d.len(), pace.deferred.len(), "a root deferred twice");
+        }
     }
 
     #[test]
