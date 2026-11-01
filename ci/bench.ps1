@@ -20,7 +20,7 @@ function Time-It([scriptblock]$block) {
 
 function InstaFind([string]$q) {
     $o = Join-Path $env:RUNNER_TEMP 'bench-out.txt'
-    $line = "-s `"$q`" --all --scope `"C:\`" --count"
+    $line = "-s `"$q`" --all --scope C: --count"
     Start-Process -FilePath $Exe -ArgumentList $line -NoNewWindow -Wait -RedirectStandardOutput $o | Out-Null
     $t = [IO.File]::ReadAllText($o).Trim()
     if ($t -match '(\d+)') { return [int]$Matches[1] } else { return 0 }
@@ -32,7 +32,7 @@ function Dir-S([string]$pattern) {
     return @(Get-Content -LiteralPath $o -Encoding utf8 -ErrorAction SilentlyContinue).Count
 }
 
-function Gci([string]$pattern) {
+function Walk-Tree([string]$pattern) {
     return @(Get-ChildItem -LiteralPath 'C:\' -Recurse -Force -Filter $pattern -ErrorAction SilentlyContinue).Count
 }
 
@@ -60,7 +60,7 @@ foreach ($case in @(
     $rows += [pscustomobject]@{ Query = $q; Note = $case.Note; Tool = 'InstaFind (command line, loads the index each run)'; Seconds = $best.Seconds; Found = $best.Count }
     $r = Time-It { Dir-S $case.Pattern }
     $rows += [pscustomobject]@{ Query = $q; Note = $case.Note; Tool = 'cmd: dir /s'; Seconds = $r.Seconds; Found = $r.Count }
-    $r = Time-It { Gci $case.Pattern }
+    $r = Time-It { Walk-Tree $case.Pattern }
     $rows += [pscustomobject]@{ Query = $q; Note = $case.Note; Tool = 'PowerShell: Get-ChildItem -Recurse'; Seconds = $r.Seconds; Found = $r.Count }
     try {
         $r = Time-It { WinSearch $q }
@@ -84,3 +84,4 @@ $md -join "`n" | Set-Content -LiteralPath (Join-Path $Out 'bench.md') -Encoding 
 $rows | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Out 'bench.json') -Encoding utf8
 Get-Content (Join-Path $Out 'bench.md') | Write-Host
 if ($env:GITHUB_STEP_SUMMARY) { Get-Content (Join-Path $Out 'bench.md') | Add-Content $env:GITHUB_STEP_SUMMARY }
+exit 0

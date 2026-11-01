@@ -43,6 +43,7 @@ public static class Win {
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, string l);
     [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+    [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out RECT r, int size);
     static INPUT Key(ushort vk, ushort scan, uint flags) {
         var i = new INPUT(); i.type = 1; i.ki.vk = vk; i.ki.scan = scan; i.ki.flags = flags; return i;
     }
@@ -83,8 +84,10 @@ public static class Win {
     public static void VKey(ushort vk) {
         SendInput(2, new[] { Key(vk, 0, 0), Key(vk, 0, 2) }, Marshal.SizeOf(typeof(INPUT)));
     }
+    // The visible frame, without the invisible resize borders.
     public static void Snap(IntPtr h, string path) {
-        RECT r; GetWindowRect(h, out r);
+        RECT r;
+        if (DwmGetWindowAttribute(h, 9, out r, Marshal.SizeOf(typeof(RECT))) != 0) GetWindowRect(h, out r);
         using (var bmp = new Bitmap(r.R - r.L, r.B - r.T))
         using (var g = Graphics.FromImage(bmp)) {
             g.CopyFromScreen(r.L, r.T, 0, 0, bmp.Size);
@@ -174,6 +177,21 @@ function Set-Inside([bool]$on, [string[]]$names) {
     if ([Win]::Checked($cb.H) -ne $on) { [Win]::Click($cb.H) }
 }
 
+# Limits the search to the Documents folder through the "Choose folder…"
+# dialog, so the inside-documents scene reads the sample files, not the drive.
+function Set-Scope([string[]]$names) {
+    $b = Controls | Where-Object { $_.Class -eq 'Button' -and $names -contains $_.Text } | Select-Object -First 1
+    if (-not $b) { Write-Host "::warning::folder button not found"; return }
+    [Win]::SetForegroundWindow($script:hwnd) | Out-Null
+    [Win]::Click($b.H)
+    Start-Sleep -Seconds 3
+    foreach ($c in $docs.ToCharArray()) { [Win]::Char($c); Start-Sleep -Milliseconds 20 }
+    Start-Sleep -Milliseconds 500
+    [Win]::VKey(0x0D)
+    Start-Sleep -Seconds 2
+    [Win]::SetForegroundWindow($script:hwnd) | Out-Null
+}
+
 function Record([string]$lang, [scriptblock]$scenes) {
     $script:frame = 0
     $script:dir = Join-Path $Out "frames-$lang"
@@ -201,6 +219,7 @@ $insideAr = @('البحث داخل المستندات أيضاً')
 $insideEn = @('Also search inside documents')
 
 Record 'ar' {
+    Set-Scope @('اختيار مجلد…')
     Set-Inside $false $insideAr
     Hold 1
     Type-Text 'احمد';      Hold 2.5
@@ -215,6 +234,7 @@ Record 'ar' {
 }
 
 Record 'en' {
+    Set-Scope @('Choose folder…')
     Set-Inside $false $insideEn
     Hold 1
     Type-Text 'invoice';     Hold 2.5
