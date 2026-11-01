@@ -180,6 +180,25 @@ fn shell_execute(verb: Option<&str>, file: &str, args: &str) -> bool {
     r as isize > 32
 }
 
+/// A classic tool named without a folder ("taskmgr", "devmgmt.msc", the
+/// settings table's non-`ms-settings:` pages) as its file in the Windows
+/// system folder, when it is there. `ShellExecute` looks in the current
+/// directory first, which for a portable copy started from Downloads is
+/// Downloads, where a program of that name could have been planted.
+fn system_tool(target: &str) -> String {
+    if target.contains(['\\', '/', ':']) {
+        return target.to_string();
+    }
+    let mut buf = [0u16; 260];
+    let n = unsafe { winapi::um::sysinfoapi::GetSystemDirectoryW(buf.as_mut_ptr(), buf.len() as UINT) } as usize;
+    if n == 0 || n >= buf.len() {
+        return target.to_string();
+    }
+    let name = if std::path::Path::new(target).extension().is_some() { target.to_string() } else { format!("{target}.exe") };
+    let path = std::path::PathBuf::from(String::from_utf16_lossy(&buf[..n])).join(name);
+    if path.is_file() { path.to_string_lossy().into_owned() } else { target.to_string() }
+}
+
 /// Whether `path` is something Windows can start as administrator.
 fn runs_as_admin(path: &str) -> bool {
     let p = path.to_ascii_lowercase();
@@ -483,7 +502,9 @@ impl App {
             rows: res.rows.iter().map(|(p, d)| Row::file(p, *d)).collect(),
         };
         self.popup_refresh();
-        if self.popup.enter_pending.get() && self.popup.files.borrow().done {
+        // The results of what is typed now (final or, while the index still
+        // loads, what was found so far).
+        if self.popup.enter_pending.get() && self.popup.files.borrow().query == current {
             self.popup.enter_pending.set(false);
             self.popup_open_selected(How::Open);
         }
@@ -757,6 +778,8 @@ impl App {
 
         // Icons first, outside the drawing closure (it can't borrow mutably).
         let icon_px = unsafe { GetSystemMetrics(SM_CXSMICON) };
+        // Trimmed before this paint looks icons up, never while it holds some.
+        self.popup_trim_icons();
         let icons: Vec<Option<HICON>> = rows.iter().map(|r| self.popup_icon(&r.icon)).collect();
 
         let text_x = px(48, s);
@@ -844,6 +867,14 @@ impl App {
         let w = shell::wide(&name);
         let mut info: SHFILEINFOW = unsafe { std::mem::zeroed() };
         unsafe { SHGetFileInfoW(w.as_ptr(), attrs, &mut info, std::mem::size_of::<SHFILEINFOW>() as UINT, SHGFI_ICON | SHGFI_SMALLICON | flags) };
+        self.popup.icons.borrow_mut().insert(key, info.hIcon as usize);
+        (!info.hIcon.is_null()).then_some(info.hIcon)
+    }
+
+    /// Empties the icon cache when it grew large. Only called before a paint
+    /// looks up its icons: emptying it in the middle would destroy icons the
+    /// same paint is about to draw.
+    fn popup_trim_icons(&self) {
         let mut icons = self.popup.icons.borrow_mut();
         if icons.len() > 400 {
             for (_, h) in icons.drain() {
@@ -852,8 +883,6 @@ impl App {
                 }
             }
         }
-        icons.insert(key, info.hIcon as usize);
-        (!info.hIcon.is_null()).then_some(info.hIcon)
     }
 
     // ---------------------------------------------------------------- opening
@@ -865,10 +894,27 @@ impl App {
 
     fn popup_open_selected(&self, how: How) {
         let Some(row) = self.popup_selected_row() else { return };
-        // Enter before the files arrived, on a placeholder row: wait for them.
-        if how == How::Enter && row.group == Group::More && self.popup.file_running.get() {
-            self.popup.enter_pending.set(true);
-            return;
+        // Enter before the files for what is typed arrived: wait for them.
+        // The top row is only chosen by default, and the files can still
+        // replace it: it may be a file of an earlier, shorter query, the web
+        // fallback, or a weak match that a file will beat. Then open the top
+        // row of the final list instead. (Pins, answers and names that start
+        // with the query stay on top, so they open at once.)
+        if how == How::Enter && self.popup.file_running.get() {
+            let first = self.popup.selected.get() == Some(0);
+            let may_change = match row.group {
+                Group::Pinned => false,
+                Group::More | Group::Web => true,
+                _ if matches!(row.target, Target::Launcher(Action::CopyText(_))) => false,
+                _ => matches!(row.target, Target::File { .. }) || self.popup.files.borrow().rows.is_empty(),
+            };
+            if (first && may_change) || row.group == Group::More {
+                if first {
+                    self.popup.selected.set(None);
+                }
+                self.popup.enter_pending.set(true);
+                return;
+            }
         }
         self.popup_open(&row, how);
     }
@@ -952,7 +998,7 @@ impl App {
     /// default button.
     fn run_action(&self, action: &Action, admin: bool) -> Option<bool> {
         Some(match action {
-            Action::Launch { target, args } => shell_execute(admin.then_some("runas"), target, args),
+            Action::Launch { target, args } => shell_execute(admin.then_some("runas"), &system_tool(target), args),
             Action::OpenUri(uri) => shell::open(uri),
             Action::CopyText(text) => {
                 nwg::Clipboard::set_data_text(&self.window, text);

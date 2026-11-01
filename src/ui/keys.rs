@@ -11,7 +11,9 @@ use super::startup::log;
 pub(super) const HOTKEY_ID: i32 = 1;
 pub(super) const HOTKEY_TEXT: &str = "Ctrl+Alt+F";
 /// Id of the optional Alt+Space hotkey (quick search), off by default.
-pub(super) const ALT_SPACE_ID: i32 = 2;
+/// Not 2: that is Ctrl+Alt+G (`quickswitch::HOTKEY_ID`) on the same window.
+pub(super) const ALT_SPACE_ID: i32 = 3;
+const _: () = assert!(ALT_SPACE_ID != HOTKEY_ID && ALT_SPACE_ID != super::quickswitch::HOTKEY_ID);
 
 impl App {
     // ---------------------------------------------------------------- hotkey

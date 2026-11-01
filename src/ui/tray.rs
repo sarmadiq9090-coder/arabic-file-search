@@ -304,7 +304,9 @@ impl App {
         if tick == 25 && used {
             self.start_catalog();
         }
-        if !asked && tick >= 14 && self.crash_checked.get() && self.window.visible() {
+        // Not while a message box of the window is open (the crash report
+        // offer, say): its modal loop keeps this tick running.
+        if !asked && tick >= 14 && self.crash_checked.get() && self.window.visible() && self.window.enabled() {
             self.ask_floating_once();
         }
     }

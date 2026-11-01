@@ -278,8 +278,10 @@ impl Parser {
         self.toks.get(self.pos + k).copied()
     }
 
+    /// Whether `t` starts the right operand of a modulo ("10 % 3"). A sign
+    /// does not: "10% + 5" is ten percent plus five, not 10 mod 5.
     fn starts_operand(t: Option<Tok>) -> bool {
-        matches!(t, Some(Tok::Num(_) | Tok::LParen | Tok::Sqrt | Tok::Minus | Tok::Plus))
+        matches!(t, Some(Tok::Num(_) | Tok::LParen | Tok::Sqrt))
     }
 
     fn enter(&mut self) -> Result<(), ()> {
@@ -508,6 +510,11 @@ mod tests {
         assert!(close(ev("200-10%"), 180.0));
         assert!(close(ev("10%3"), 1.0));
         assert!(close(ev("10 % 4"), 2.0));
+        assert!(close(ev("10 % (4)"), 2.0));
+        // A percentage followed by + or - is not a modulo.
+        assert!(close(ev("10% + 5"), 5.1));
+        assert!(close(ev("50%-10"), -9.5));
+        assert!(close(ev("20%*50"), 10.0));
         assert!(close(ev("50٪"), 0.5));
         assert_eq!(ev("10%0"), None);
     }
