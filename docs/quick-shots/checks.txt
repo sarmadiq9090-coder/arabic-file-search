@@ -1,0 +1,35 @@
+﻿[ar] floating box at 392,676 size 236x36 on a 1024x768 screen
+[ar] floating box idle vs hovered: mean difference 2.27
+[ar] popup from the box at 392,572 size 480x96
+[ar] popup empty: height 96, mean 51
+[ar] 'المفكرة': height 207 (empty 96), sd 38.6
+[ar] 'كروم': height 173 (empty 96), sd 40.0
+[ar] 'واي فاي': height 239 (empty 96), sd 37.7
+[ar] '250*12': height 173 (empty 96), sd 39.9
+[ar] '5 kg to lb': height 173 (empty 96), sd 40.8
+[ar] 'هجري': height 239 (empty 96), sd 38.0
+[ar] 'يوتيوب قرآن': height 207 (empty 96), sd 39.3
+[ar] 'اطفاء': height 239 (empty 96), sd 37.6
+[ar] 'مشكلة': height 339 (empty 96), sd 37.0
+[ar] 'qzxwvkjh': height 207 (empty 96), sd 39.8
+[en] floating box at 392,676 size 236x36 on a 1024x768 screen
+[en] floating box idle vs hovered: mean difference 2.26
+[en] popup from the box at 392,572 size 480x96
+[en] popup empty: height 96, mean 51
+[en] 'notepad': height 319 (empty 96), sd 37.8
+[en] 'paint': height 439 (empty 96), sd 36.6
+[en] 'واي فاي': height 239 (empty 96), sd 39.0
+[en] '250*12': height 173 (empty 96), sd 40.1
+[en] '5 kg to lb': height 173 (empty 96), sd 41.0
+[en] 'هجري': height 239 (empty 96), sd 39.2
+[en] 'يوتيوب قرآن': height 207 (empty 96), sd 40.5
+[en] 'اطفاء': height 239 (empty 96), sd 38.4
+[en] 'مشكلة': height 339 (empty 96), sd 37.6
+[en] 'qzxwvkjh': height 207 (empty 96), sd 40.9
+[ar-light] floating box at 392,676 size 236x36 on a 1024x768 screen
+[ar-light] floating box idle vs hovered: mean difference 7.31
+[ar-light] popup empty: height 96, mean 173
+[ar-light] 'calculator': height 439 (empty 96), sd 58.7
+[ar-light] '250*12': height 173 (empty 96), sd 69.6
+[ar-light] 'مشكلة': height 339 (empty 96), sd 60.9
+catalog: launcher catalog: 144 apps, 188 settings pages in 102 ms
