@@ -61,6 +61,7 @@ jobs:
 
   assemble:
     needs: record
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -13,24 +13,69 @@ $Out = (Resolve-Path $Out).Path
 $data = Join-Path $env:LOCALAPPDATA 'BahthSari'
 $index = Join-Path $data 'index.bin'
 
-Add-Type -AssemblyName System.Drawing, System.Windows.Forms, UIAutomationClient, UIAutomationTypes
+Add-Type -AssemblyName System.Drawing
 Add-Type -ReferencedAssemblies System.Drawing @'
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
+using System.Text;
 public static class Win {
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
     [StructLayout(LayoutKind.Sequential)] struct KEYBDINPUT { public ushort vk, scan; public uint flags, time; public IntPtr extra; }
-    [StructLayout(LayoutKind.Explicit, Size = 40)] struct INPUT { [FieldOffset(0)] public uint type; [FieldOffset(8)] public KEYBDINPUT ki; }
+    [StructLayout(LayoutKind.Sequential)] struct MOUSEINPUT { public int dx, dy; public uint data, flags, time; public IntPtr extra; }
+    [StructLayout(LayoutKind.Explicit, Size = 40)] struct INPUT {
+        [FieldOffset(0)] public uint type; [FieldOffset(8)] public KEYBDINPUT ki; [FieldOffset(8)] public MOUSEINPUT mi;
+    }
+    delegate bool EnumProc(IntPtr h, IntPtr l);
     [DllImport("user32.dll")] static extern uint SendInput(uint n, INPUT[] inputs, int size);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
     [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int hh, uint flags);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
+    [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr p, EnumProc f, IntPtr l);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, string l);
+    [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+    [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
     static INPUT Key(ushort vk, ushort scan, uint flags) {
         var i = new INPUT(); i.type = 1; i.ki.vk = vk; i.ki.scan = scan; i.ki.flags = flags; return i;
     }
+    static INPUT Mouse(uint flags) { var i = new INPUT(); i.type = 0; i.mi.flags = flags; return i; }
+    public static string Class(IntPtr h) { var s = new StringBuilder(256); GetClassName(h, s, 256); return s.ToString(); }
+    public static string Text(IntPtr h) { var s = new StringBuilder(512); GetWindowText(h, s, 512); return s.ToString(); }
+    // The process's largest visible top-level window.
+    public static IntPtr MainWindow(int pid) {
+        IntPtr best = IntPtr.Zero; long area = 0;
+        EnumWindows((h, l) => {
+            uint p; GetWindowThreadProcessId(h, out p);
+            if (p == pid && IsWindowVisible(h)) {
+                RECT r; GetWindowRect(h, out r);
+                long a = (long)(r.R - r.L) * (r.B - r.T);
+                if (a > area) { area = a; best = h; }
+            }
+            return true;
+        }, IntPtr.Zero);
+        return best;
+    }
+    public static List<IntPtr> Children(IntPtr parent) {
+        var list = new List<IntPtr>();
+        EnumChildWindows(parent, (h, l) => { list.Add(h); return true; }, IntPtr.Zero);
+        return list;
+    }
+    public static void Click(IntPtr h) {
+        RECT r; GetWindowRect(h, out r);
+        SetCursorPos((r.L + r.R) / 2, (r.T + r.B) / 2);
+        SendInput(2, new[] { Mouse(2), Mouse(4) }, Marshal.SizeOf(typeof(INPUT)));
+        SetCursorPos(2000, 2000);
+    }
+    public static void SetText(IntPtr h, string t) { SendMessage(h, 0x000C, IntPtr.Zero, t); }
+    public static bool Checked(IntPtr h) { return SendMessage(h, 0x00F0, IntPtr.Zero, IntPtr.Zero) == (IntPtr)1; }
     // Types one character as Unicode input, so Arabic needs no keyboard layout.
     public static void Char(char c) {
         SendInput(2, new[] { Key(0, c, 4), Key(0, c, 4 | 2) }, Marshal.SizeOf(typeof(INPUT)));
@@ -84,25 +129,17 @@ function Start-App([string]$lang) {
     Set-ItemProperty 'HKCU:\Software\BahthSari' -Name Language -Value $lang
     $p = Start-Process -FilePath $Exe -PassThru
     $deadline = (Get-Date).AddMinutes(2)
-    while ((Get-Date) -lt $deadline) {
-        $p.Refresh()
-        if ($p.MainWindowHandle -ne [IntPtr]::Zero) { break }
+    $h = [IntPtr]::Zero
+    while ((Get-Date) -lt $deadline -and $h -eq [IntPtr]::Zero) {
         Start-Sleep -Milliseconds 500
+        $h = [Win]::MainWindow($p.Id)
     }
-    if ($p.MainWindowHandle -eq [IntPtr]::Zero) { throw "no window for $lang" }
-    $script:hwnd = $p.MainWindowHandle
+    if ($h -eq [IntPtr]::Zero) { throw "no window for $lang" }
+    $script:hwnd = $h
     [Win]::ShowWindow($script:hwnd, 9) | Out-Null   # SW_RESTORE
     [Win]::SetWindowPos($script:hwnd, [IntPtr]::Zero, 8, 8, 960, 600, 0x0040) | Out-Null
     [Win]::SetForegroundWindow($script:hwnd) | Out-Null
     return $p
-}
-
-function Element([string]$type) {
-    $root = [System.Windows.Automation.AutomationElement]::FromHandle($script:hwnd)
-    $cond = New-Object System.Windows.Automation.PropertyCondition(
-        [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
-        [System.Windows.Automation.ControlType]::$type)
-    return $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $cond)
 }
 
 function Snap { [Win]::Snap($script:hwnd, (Join-Path $script:dir ('{0:D4}.png' -f $script:frame))); $script:frame++ }
@@ -111,27 +148,30 @@ function Hold([double]$seconds) {
 }
 function Still([string]$name) { [Win]::Snap($script:hwnd, (Join-Path $Out $name)) }
 
-function Query-Box { (Element 'Edit')[0] }
+function Controls {
+    foreach ($h in [Win]::Children($script:hwnd)) {
+        [pscustomobject]@{ H = $h; Class = [Win]::Class($h); Text = [Win]::Text($h) }
+    }
+}
+function Show-Controls { Controls | ForEach-Object { Write-Host "  $($_.Class) | $($_.Text)" } }
+function Query-Box {
+    $box = Controls | Where-Object Class -eq 'Edit' | Select-Object -First 1
+    if (-not $box) { Show-Controls; throw 'search box not found' }
+    return $box.H
+}
 function Clear-Query {
-    $box = Query-Box
-    $box.SetFocus()
-    $box.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue('')
+    [Win]::SetText((Query-Box), '')
     Hold 0.5
 }
 function Type-Text([string]$text) {
-    (Query-Box).SetFocus()
+    [Win]::SetForegroundWindow($script:hwnd) | Out-Null
+    [Win]::Click((Query-Box))
     foreach ($c in $text.ToCharArray()) { [Win]::Char($c); Start-Sleep -Milliseconds 90; Snap }
 }
 function Set-Inside([bool]$on, [string[]]$names) {
-    foreach ($cb in (Element 'CheckBox')) {
-        if ($names -contains $cb.Current.Name) {
-            $t = $cb.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
-            $want = if ($on) { 'On' } else { 'Off' }
-            if ($t.Current.ToggleState.ToString() -ne $want) { $t.Toggle() }
-            return
-        }
-    }
-    Write-Host "::warning::checkbox not found: $($names -join ' / ')"
+    $cb = Controls | Where-Object { $_.Class -eq 'Button' -and $names -contains $_.Text } | Select-Object -First 1
+    if (-not $cb) { Write-Host "::warning::checkbox not found: $($names -join ' / ')"; Show-Controls; return }
+    if ([Win]::Checked($cb.H) -ne $on) { [Win]::Click($cb.H) }
 }
 
 function Record([string]$lang, [scriptblock]$scenes) {
@@ -140,6 +180,8 @@ function Record([string]$lang, [scriptblock]$scenes) {
     New-Item -ItemType Directory -Force $script:dir | Out-Null
     $p = Start-App $lang
     Start-Sleep -Seconds 4
+    Still "start-$lang.png"
+    Show-Controls
     & $scenes
     Stop-Process -Id $p.Id -Force
     Start-Sleep -Seconds 2

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="InstaFind — بحث سريع"><title>InstaFind — بحث سريع</title><defs>
+<linearGradient id="ig" x1="0" y1="0" x2="1" y2="1"><stop offset="0.00" stop-color="#2563eb"/><stop offset="0.20" stop-color="#236ce4"/><stop offset="0.40" stop-color="#1d80d4"/><stop offset="0.60" stop-color="#1599c1"/><stop offset="0.80" stop-color="#0fadb1"/><stop offset="1.00" stop-color="#0db6aa"/></linearGradient>
+<radialGradient id="ih" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff" stop-opacity="0.16"/><stop offset="0.6" stop-color="#fff" stop-opacity="0.10"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<filter id="is" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="25.6"/></filter>
+<clipPath id="ic"><rect x="30.72" y="30.72" width="961.56" height="961.56" rx="225.28"/></clipPath>
+</defs>
+<g clip-path="url(#ic)">
+<rect width="1024" height="1024" fill="url(#ig)"/>
+<ellipse cx="512.0" cy="-281.6" rx="972.8" ry="768.0" fill="url(#ih)"/>
+<g transform="translate(12.3 25.6)" stroke="#051e3c" fill="#051e3c" opacity="0.45" filter="url(#is)"><circle cx="430.08" cy="430.08" r="220.16" fill="none" stroke-width="71.68"/><line x1="603.50" y1="603.50" x2="762.79" y2="762.79" stroke-width="111.10"/><circle cx="762.79" cy="762.79" r="55.55" stroke="none"/></g>
+</g>
+<circle cx="430.08" cy="430.08" r="220.16" fill="#fff" fill-opacity="0.157"/>
+<g stroke="#fff" fill="#fff"><circle cx="430.08" cy="430.08" r="220.16" fill="none" stroke-width="71.68"/><line x1="603.50" y1="603.50" x2="762.79" y2="762.79" stroke-width="111.10"/><circle cx="762.79" cy="762.79" r="55.55" stroke="none"/></g>
+<path fill="#fff" transform="translate(292.25 454.91) scale(2.7472)" d="M43.95 7.57H51.27V14.89H43.95ZM92.09 -32.67Q94.53 -20.17 89.11 -13.33Q83.54 -6.4 72.56 -3.37Q58.79 0.39 40.04 0.49Q28.61 0.54 22.46 -0.88Q6.4 -4.64 6.35 -18.7Q6.3 -25.44 9.42 -29.93Q9.42 -29.93 26.9 -29.93Q24.41 -25.34 24.41 -20.95Q24.41 -16.5 33.64 -13.28Q37.16 -12.06 41.26 -12.06Q51.27 -12.06 58.89 -14.36Q70.7 -17.82 73.14 -22.12Q76.27 -27.64 74.61 -32.67Q74.61 -32.67 92.09 -32.67Z"/></svg>

@@ -1,0 +1,44 @@
+{
+    "version": "0.6.0",
+    "description": "InstaFind (بحث سريع): Instant file search for Windows, in Arabic and English, even inside documents.",
+    "homepage": "https://github.com/sarmadiq9090-coder/arabic-file-search",
+    "license": "MIT",
+    "notes": [
+        "InstaFind updates itself from GitHub (it offers new versions in the app). That is harmless,",
+        "but 'scoop update instafind' remains the way to keep Scoop's records in step.",
+        "Index, settings and log live in %LOCALAPPDATA%\\BahthSari (not in the Scoop folder);",
+        "delete that folder and HKCU\\Software\\BahthSari yourself to remove all data."
+    ],
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.6.0/bahth.exe",
+            "hash": "c30c5a67eab3f71f3af61358e4aaa197eca9ce0057c077c5b404a7964d4483f6"
+        }
+    },
+    "bin": [
+        "bahth.exe",
+        ["bahth.exe", "instafind"]
+    ],
+    "shortcuts": [
+        ["bahth.exe", "InstaFind"]
+    ],
+    "uninstaller": {
+        "script": [
+            "if ($cmd -eq 'uninstall') {",
+            "    $run = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'",
+            "    $value = (Get-ItemProperty -Path $run -Name 'BahthSari' -ErrorAction SilentlyContinue).BahthSari",
+            "    if ($value -and $value.ToLower().Contains((Split-Path $dir).ToLower())) {",
+            "        Remove-ItemProperty -Path $run -Name 'BahthSari' -ErrorAction SilentlyContinue",
+            "    }",
+            "}"
+        ]
+    },
+    "checkver": "github",
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v$version/bahth.exe"
+            }
+        }
+    }
+}
