@@ -392,6 +392,7 @@ impl App {
             self.crash_checked.set(true);
             self.offer_crash_report();
         }
+        self.quick_tick(t);
     }
 
     pub(super) fn poll_scan(&self) {

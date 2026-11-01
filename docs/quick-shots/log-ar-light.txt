@@ -1,0 +1,33 @@
+1793568779 index load: 0 entries in 0 ms
+1793568779 startup ms (v0.7.0): single-instance=20 init=22 font=24 settings=24 window=61 list=120 controls=152 tray=160 events=162 layout=211 built=212 loop=212 first-tick=353
+1793568779 floating box built in 10 ms
+1793568785 launcher catalog: 144 apps, 188 settings pages in 765 ms
+1793569326 index build: 1216511 entries in 546883 ms
+1793569328 watch: C:\ D:\
+1793569334 content index open: 0 documents, 0 KB in 2 ms
+1793569353 startup ms (v0.7.0): single-instance=10 init=12 font=12 settings=12 window=46 list=99 controls=123 tray=131 events=133 layout=171 built=172 loop=172 first-tick=326
+1793569353 floating box built in 7 ms
+1793569353 index load: 1216511 entries in 474 ms
+1793569353 watch: C:\ D:\
+1793569358 launcher catalog: 144 apps, 188 settings pages in 114 ms
+1793569359 content index open: 400 documents, 5249 KB in 1 ms
+1793569362 quick search window built in 3 ms
+1793569362 quick search shown in 12 ms
+1793569363 quick search shown in 13 ms
+1793569392 startup ms (v0.7.0): single-instance=10 init=12 font=14 settings=14 window=46 list=87 controls=109 tray=118 events=118 layout=155 built=155 loop=155 first-tick=311
+1793569392 floating box built in 4 ms
+1793569392 index load: 1216511 entries in 473 ms
+1793569392 watch: C:\ D:\
+1793569397 launcher catalog: 144 apps, 188 settings pages in 115 ms
+1793569398 content index open: 7397 documents, 17823 KB in 3 ms
+1793569401 quick search window built in 3 ms
+1793569401 quick search shown in 7 ms
+1793569402 quick search shown in 14 ms
+1793569431 startup ms (v0.7.0): single-instance=12 init=13 font=13 settings=15 window=59 list=107 controls=132 tray=140 events=141 layout=180 built=182 loop=182 first-tick=334
+1793569431 floating box built in 4 ms
+1793569431 index load: 1216525 entries in 483 ms
+1793569432 watch: C:\ D:\
+1793569436 launcher catalog: 144 apps, 188 settings pages in 111 ms
+1793569437 content index open: 12193 documents, 35979 KB in 6 ms
+1793569440 quick search window built in 4 ms
+1793569440 quick search shown in 9 ms

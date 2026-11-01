@@ -10,6 +10,10 @@ use super::startup::log;
 /// Id of the global "show the program" hotkey, Ctrl+Alt+F.
 pub(super) const HOTKEY_ID: i32 = 1;
 pub(super) const HOTKEY_TEXT: &str = "Ctrl+Alt+F";
+/// Id of the optional Alt+Space hotkey (quick search), off by default.
+/// Not 2: that is Ctrl+Alt+G (`quickswitch::HOTKEY_ID`) on the same window.
+pub(super) const ALT_SPACE_ID: i32 = 3;
+const _: () = assert!(ALT_SPACE_ID != HOTKEY_ID && ALT_SPACE_ID != super::quickswitch::HOTKEY_ID);
 
 impl App {
     // ---------------------------------------------------------------- hotkey
@@ -24,9 +28,28 @@ impl App {
         }
     }
 
-    /// The global hotkey shows the window, or hides it if it is already in front.
+    /// Alt+Space for the quick search; false when another program has it.
+    pub(super) fn register_alt_space(&self) -> bool {
+        use winapi::um::winuser::{MOD_ALT, MOD_NOREPEAT, RegisterHotKey, VK_SPACE};
+        let Some(h) = self.window.handle.hwnd() else { return false };
+        unsafe { RegisterHotKey(h, ALT_SPACE_ID, (MOD_ALT | MOD_NOREPEAT) as u32, VK_SPACE as u32) != 0 }
+    }
+
+    pub(super) fn unregister_alt_space(&self) {
+        if let Some(h) = self.window.handle.hwnd() {
+            unsafe { winapi::um::winuser::UnregisterHotKey(h, ALT_SPACE_ID) };
+        }
+    }
+
+    /// The global hotkey opens the quick search near the bottom of the
+    /// active screen (or closes it); with "hotkey_opens=main" it shows the
+    /// window, or hides it if it is already in front, as before 0.8.
     pub(super) fn on_hotkey(&self) {
         use winapi::um::winuser::GetForegroundWindow;
+        if self.state.borrow().settings.hotkey_opens == crate::settings::HotkeyOpens::Quick {
+            self.show_quick(crate::quick::Anchor::CenterBottom);
+            return;
+        }
         let front = self.window.handle.hwnd().is_some_and(|h| unsafe { GetForegroundWindow() } == h);
         if front && self.window.visible() {
             self.hide_to_tray();

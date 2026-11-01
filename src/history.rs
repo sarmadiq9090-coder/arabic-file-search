@@ -1,6 +1,11 @@
 //! Search history, saved searches and how often files are opened, kept in a
 //! small JSON file next to the index cache. Often and recently opened files
 //! are boosted to the top of the results.
+//!
+//! The quick search (0.8) keeps two more lists here: how often launcher
+//! results were opened (`launches`, keyed by `crate::launcher::action_key`),
+//! which `Catalog::query` uses as a boost, and the pinned favourites
+//! (`pinned`), shown first in the quick search when they match.
 
 // Only the Windows UI and the tests use this module.
 
@@ -19,6 +24,10 @@ const MAX_SAVED: usize = 30;
 const MAX_OPENS: usize = 500;
 /// A larger history file is corrupt (a full one is well under 1 MB).
 const MAX_FILE_BYTES: u64 = 16 << 20;
+/// How many launcher results are remembered.
+const MAX_LAUNCHES: usize = 500;
+/// How many favourites can be pinned.
+pub const MAX_PINS: usize = 30;
 /// After this long an open counts half as much.
 const HALF_LIFE_SECS: f64 = 14.0 * 24.0 * 3600.0;
 
@@ -37,6 +46,20 @@ pub struct SavedSearch {
     pub content: bool,
 }
 
+/// A favourite pinned from the quick search: a file, a folder or a program.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(default)]
+pub struct Pin {
+    /// Shown name ("Report.docx", "Google Chrome").
+    pub title: String,
+    /// A file or folder path, or for a program the launch target (a `.lnk`
+    /// or `.exe` path, or `shell:AppsFolder\<AUMID>`).
+    pub target: String,
+    /// A program (opened with `ShellExecute`) rather than a file or folder.
+    pub app: bool,
+    pub dir: bool,
+}
+
 /// A usize written by any build: a 64-bit value read by the 32-bit build
 /// saturates instead of discarding the whole history.
 fn saturating_usize<'de, D: serde::Deserializer<'de>>(d: D) -> Result<usize, D::Error> {
@@ -51,6 +74,10 @@ pub struct History {
     pub saved: Vec<SavedSearch>,
     /// Opened files: path → (times opened, last open in Unix seconds).
     opens: HashMap<String, (u32, i64)>,
+    /// Opened quick-search results: action key → (times, last time).
+    launches: HashMap<String, (u32, i64)>,
+    /// Pinned favourites, oldest first.
+    pub pinned: Vec<Pin>,
 }
 
 /// Frecency: the open count, halved for every [`HALF_LIFE_SECS`] since the last open.
@@ -96,6 +123,14 @@ impl History {
             v.truncate(MAX_OPENS);
             h.opens = v.into_iter().collect();
         }
+        if h.launches.len() > MAX_LAUNCHES {
+            let mut v: Vec<(String, (u32, i64))> = h.launches.drain().collect();
+            v.sort_by(|a, b| b.1.1.cmp(&a.1.1).then_with(|| a.0.cmp(&b.0)));
+            v.truncate(MAX_LAUNCHES);
+            h.launches = v.into_iter().collect();
+        }
+        h.pinned.retain(|p| !p.target.is_empty());
+        h.pinned.truncate(MAX_PINS);
         h
     }
 
@@ -158,6 +193,73 @@ impl History {
                 self.opens.remove(&k);
             }
         }
+    }
+
+    /// Counts an open of a quick-search result by its action key (empty keys,
+    /// such as copying a calculation, are not counted).
+    pub fn record_launch(&mut self, key: &str, now: i64) {
+        if key.is_empty() {
+            return;
+        }
+        let e = self.launches.entry(key.to_string()).or_insert((0, now));
+        e.0 = e.0.saturating_add(1);
+        e.1 = now;
+        if self.launches.len() > MAX_LAUNCHES {
+            let worst = self
+                .launches
+                .iter()
+                .filter(|(k, _)| k.as_str() != key)
+                .min_by(|a, b| score(a.1.0, a.1.1, now).total_cmp(&score(b.1.0, b.1.1, now)))
+                .map(|(k, _)| k.clone());
+            if let Some(k) = worst {
+                self.launches.remove(&k);
+            }
+        }
+    }
+
+    /// How often a quick-search result was opened, fading with time like the
+    /// file boost: 0 when never, at least 1 when ever.
+    pub fn launch_count(&self, key: &str, now: i64) -> u32 {
+        match self.launches.get(key) {
+            Some(&(c, t)) if c > 0 => (score(c, t, now).round() as u32).clamp(1, c),
+            _ => 0,
+        }
+    }
+
+    pub fn is_pinned(&self, target: &str) -> bool {
+        self.pinned.iter().any(|p| p.target.eq_ignore_ascii_case(target))
+    }
+
+    /// Pins `pin`, or unpins it when its target is already pinned. True when
+    /// it is pinned afterwards; false too when the list is full.
+    pub fn toggle_pin(&mut self, pin: Pin) -> bool {
+        if pin.target.is_empty() {
+            return false;
+        }
+        if self.is_pinned(&pin.target) {
+            self.pinned.retain(|p| !p.target.eq_ignore_ascii_case(&pin.target));
+            return false;
+        }
+        if self.pinned.len() >= MAX_PINS {
+            return false;
+        }
+        self.pinned.push(pin);
+        true
+    }
+
+    /// Pinned favourites whose name (or file name) contains every word of
+    /// `query`, compared like file names (Arabic letter forms, case); all of
+    /// them for an empty query.
+    pub fn pinned_matching(&self, query: &str) -> Vec<&Pin> {
+        let words: Vec<String> = crate::normalize::normalize(query).split_whitespace().map(str::to_string).collect();
+        self.pinned
+            .iter()
+            .filter(|p| {
+                let file = p.target.rsplit(['\\', '/']).find(|s| !s.is_empty()).unwrap_or("");
+                let hay = crate::normalize::normalize(&format!("{} {file}", p.title));
+                words.iter().all(|w| hay.contains(w.as_str()))
+            })
+            .collect()
     }
 
     /// Follows a rename of a file or folder (everything inside it too).
@@ -267,6 +369,45 @@ mod tests {
     }
 
     #[test]
+    fn launches_and_pins() {
+        let now = 1_700_000_000;
+        let mut h = History::default();
+        assert_eq!(h.launch_count("launch:c:\\x.lnk", now), 0);
+        h.record_launch("launch:c:\\x.lnk", now);
+        h.record_launch("launch:c:\\x.lnk", now);
+        h.record_launch("", now);
+        assert_eq!(h.launch_count("launch:c:\\x.lnk", now), 2);
+        // Old launches fade, but never to zero.
+        assert_eq!(h.launch_count("launch:c:\\x.lnk", now + 400 * DAY), 1);
+        assert!(h.launches.len() == 1);
+        for i in 0..MAX_LAUNCHES + 5 {
+            h.record_launch(&format!("uri:{i}"), now + i as i64);
+        }
+        assert_eq!(h.launches.len(), MAX_LAUNCHES);
+        assert!(h.launch_count(&format!("uri:{}", MAX_LAUNCHES + 4), now) > 0);
+
+        let pin = |title: &str, target: &str| Pin { title: title.into(), target: target.into(), app: false, dir: false };
+        assert!(h.toggle_pin(pin("التقرير السنوي.docx", r"D:\عمل\التقرير السنوي.docx")));
+        assert!(h.toggle_pin(Pin { app: true, ..pin("Google Chrome", r"C:\ProgramData\Chrome.lnk") }));
+        assert!(!h.toggle_pin(pin("", "")));
+        assert!(h.is_pinned(r"d:\عمل\التقرير السنوي.docx"));
+        // Matching ignores Arabic letter forms and case; every word must match.
+        assert_eq!(h.pinned_matching("تقرير").len(), 1);
+        assert_eq!(h.pinned_matching("التقریر").len(), 1);
+        assert_eq!(h.pinned_matching("chrome").len(), 1);
+        assert_eq!(h.pinned_matching("google chr").len(), 1);
+        assert!(h.pinned_matching("chrome تقرير").is_empty());
+        assert_eq!(h.pinned_matching("  ").len(), 2);
+        // Pinning again unpins.
+        assert!(!h.toggle_pin(pin("x", r"C:\PROGRAMDATA\chrome.lnk")));
+        assert_eq!(h.pinned.len(), 1);
+        for i in 0..MAX_PINS + 3 {
+            h.toggle_pin(pin("p", &format!("C:\\p{i}")));
+        }
+        assert_eq!(h.pinned.len(), MAX_PINS);
+    }
+
+    #[test]
     fn save_and_load() {
         let dir = std::env::temp_dir().join(format!("bahth_hist_{}", std::process::id()));
         let file = dir.join("history.json");
@@ -282,8 +423,12 @@ mod tests {
             content: true,
         });
         h.record_open(r"C:\x.txt", 5);
+        h.record_launch("uri:ms-settings:display", 7);
+        h.toggle_pin(Pin { title: "x".into(), target: r"C:\x.txt".into(), app: false, dir: false });
         h.save_to(&file).unwrap();
         let l = History::load_from(&file);
+        assert_eq!(l.launches, h.launches);
+        assert_eq!(l.pinned, h.pinned);
         assert_eq!(l.recent, h.recent);
         assert_eq!(l.saved, h.saved);
         assert_eq!(l.opens, h.opens);

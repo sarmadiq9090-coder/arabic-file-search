@@ -85,6 +85,21 @@ pub fn issue_url(kind: Kind, info: &SystemInfo, crash: Option<&str>) -> String {
     url
 }
 
+/// A new issue, from the quick search, about a search that did not find
+/// what the user expected: the form is filled as for a bug, with the query
+/// in "what happened" (cut to a sane length) for the user to complete.
+pub fn search_issue_url(info: &SystemInfo, query: &str, english: bool) -> String {
+    let q: String = query.trim().chars().filter(|c| !c.is_control()).take(200).collect();
+    let what = if english {
+        format!("The quick search for “{q}” did not find what I expected.\n\nI expected to find: ")
+    } else {
+        format!("البحث السريع عن «{q}» لم يجد ما توقعته.\n\nكنت أتوقع أن أجد: ")
+    };
+    let mut url = issue_url(Kind::Bug, info, None);
+    let _ = write!(url, "&title={}&what={}", crate::web::percent_encode("[Search] "), crate::web::percent_encode(&what));
+    url
+}
+
 /// The longest start of `text` (whole lines where possible) whose
 /// percent-encoding fits in `budget` bytes, with a note when cut.
 fn fit_encoded(text: &str, budget: usize) -> String {
@@ -283,6 +298,20 @@ mod tests {
         assert!(url.contains("template=feature_request.yml"));
         assert!(!url.contains("crash="));
         assert!(!url.contains(' '));
+    }
+
+    #[test]
+    fn search_feedback_carries_the_query() {
+        let url = search_issue_url(&info(), "  تقرير\u{7}  ", false);
+        assert!(url.contains("template=bug_report.yml"));
+        let q = query(&url);
+        let what = &q.iter().find(|(k, _)| k == "what").unwrap().1;
+        assert!(what.contains("«تقرير»"), "{what}");
+        assert!(q.contains(&("title".into(), "[Search] ".into())));
+        assert!(q.contains(&("version".into(), "0.7.0".into())));
+        let url = search_issue_url(&info(), &"x".repeat(5000), true);
+        assert!(url.len() < MAX_URL);
+        assert!(query(&url).iter().any(|(k, v)| k == "what" && v.starts_with("The quick search")));
     }
 
     #[test]
