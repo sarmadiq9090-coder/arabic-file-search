@@ -57,6 +57,12 @@ pub fn default_log_path() -> PathBuf {
     crate::index::cache_path().with_file_name("log.txt")
 }
 
+/// `crash.txt`, where the panic reports are kept (see `feedback`).
+#[cfg(windows)]
+pub fn crash_path() -> PathBuf {
+    default_log_path().with_file_name("crash.txt")
+}
+
 /// Installs the panic hook, writing to `log` (and `crash.txt` beside it).
 /// The previous hook still runs after it. Only the first call counts.
 pub fn install(log: PathBuf) {

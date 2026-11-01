@@ -41,6 +41,8 @@ mod dupes;
 #[cfg(any(windows, test))]
 mod extract;
 #[cfg(any(windows, test))]
+mod feedback;
+#[cfg(any(windows, test))]
 mod folder_sizes;
 #[cfg(any(windows, test))]
 mod franco;

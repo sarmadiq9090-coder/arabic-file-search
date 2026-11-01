@@ -49,7 +49,7 @@ scoop install instafind
 
 - **التحديث تلقائي**: يتحقق البرنامج مرة يومياً من GitHub ويعرض تثبيت الإصدار الجديد بنقرة ثم يعيد التشغيل، ويمكن التحقق يدوياً من «خيارات…». من لديه 0.3.1 أو أحدث يصله كل تحديث وحده.
 - **المتطلبات**: ويندوز 10 أو 11، بنسخ 64 بت وARM64 و32 بت (Rust لم تعد تدعم الأقدم). البحث داخل الصور يحتاج حزمة اللغة العربية في ويندوز لقراءة النص العربي.
-- **الخصوصية**: كل شيء يبقى على جهازك. الاتصال الوحيد بالإنترنت هو التحقق من التحديثات على GitHub، والبحث من الهاتف مطفأ ما لم تشغّله.
+- **الخصوصية**: كل شيء يبقى على جهازك، ولا يجمع البرنامج أي بيانات استخدام. الاتصال الوحيد بالإنترنت هو التحقق من التحديثات على GitHub، والبحث من الهاتف مطفأ ما لم تشغّله، والملاحظات وتقارير الأخطاء لا تُرسل إلا حين تضغط أنت (انظر [الملاحظات والبلاغات](#الملاحظات-والبلاغات)).
 - **بيانات البرنامج** في `%LOCALAPPDATA%\BahthSari\` (الفهرس والسجل والإعدادات)، وتفضيلاته في `HKCU\Software\BahthSari`. لإزالته: أطفئ «التشغيل مع ويندوز» من «خيارات…»، ثم احذف `bahth.exe` وذلك المجلد.
 
 ## السرعة
@@ -157,6 +157,13 @@ bahth.exe -s عقد --json
 - دعم ملفات doc القديمة تقريبي.
 - المشاكل والاقتراحات مرحّب بها في [Issues](https://github.com/sarmadiq9090-coder/arabic-file-search/issues)، ويفيد إرفاق `%LOCALAPPDATA%\BahthSari\log.txt`.
 
+## الملاحظات والبلاغات
+
+- **«خيارات ← أرسل ملاحظة»** يفتح في المتصفح صفحة GitHub جاهزة فيها رقم الإصدار ونظام ويندوز: «أبلغ عن مشكلة»، أو «اقترح ميزة جديدة»، أو «اسأل أو ناقش مع المستخدمين». تراجعها ثم تضغط «Submit» بنفسك، ويمكنك الكتابة بالعربية.
+- **تقارير الأخطاء**: إن حدث خطأ داخلي، يسألك البرنامج مرة واحدة عند التشغيل التالي إن كنت تريد فتح صفحة GitHub فيها التقرير. التقرير محفوظ على جهازك فقط في `%LOCALAPPDATA%\BahthSari\crash.txt`، واسم المستخدم في المسارات يُستبدل بـ`<user>`.
+- **لا يُرسَل شيء تلقائياً**: لا تتبّع ولا إحصاءات، ولا اتصال بالإنترنت لهذا الغرض دون نقرتك.
+- أو اكتب مباشرة في [Issues](https://github.com/sarmadiq9090-coder/arabic-file-search/issues) أو [Discussions](https://github.com/sarmadiq9090-coder/arabic-file-search/discussions).
+
 ## للمطوّرين
 
 البناء من المصدر وخريطة الكود وطريقة النشر في [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). باختصار: `cargo build --release` على ويندوز، و`cargo test` يعمل على لينكس أيضاً.
@@ -193,7 +200,7 @@ The first run indexes your drives in the background (a minute or more, depending
 
 - **Automatic updates**: once a day the app checks GitHub, offers the new version with one click and restarts. You can also check from **Options…**. Version 0.3.1 and later update themselves.
 - **Requirements**: Windows 10 or 11: x64, ARM64 or 32-bit (Rust no longer supports older versions). Text recognition in images needs the Windows language pack for each OCR language.
-- **Privacy**: everything stays on your PC. The only internet connection is the update check against GitHub; phone search is off unless you turn it on.
+- **Privacy**: everything stays on your PC and the app collects no usage data. The only internet connection is the update check against GitHub; phone search is off unless you turn it on; feedback and crash reports are sent only when you click (see [Feedback](#feedback)).
 - **Data** lives in `%LOCALAPPDATA%\BahthSari\` (index, log, settings) and `HKCU\Software\BahthSari`. To remove the app, turn off *Start with Windows* in **Options…**, then delete `bahth.exe` and that folder.
 
 ### Speed
@@ -299,6 +306,13 @@ A Flow Launcher plugin (keyword `bs`) and PowerShell, AutoHotkey and Windows Ter
 - OCR is slower than document extraction. Only the first 50 pages of a scanned PDF are read, and images over 30 MB are skipped.
 - Support for legacy `.doc` files is approximate.
 - Bugs and ideas are welcome in [Issues](https://github.com/sarmadiq9090-coder/arabic-file-search/issues); attaching `%LOCALAPPDATA%\BahthSari\log.txt` helps.
+
+### Feedback
+
+- **Options → Send feedback** opens a prefilled GitHub page in your browser, with the app version and Windows version filled in: **Report a problem**, **Suggest a feature**, or **Ask or discuss with other users**. You review it and press **Submit** yourself; Arabic or English are both fine.
+- **Crash reports**: if the app hit an internal error, at the next start it asks once whether to open a prefilled GitHub issue with the report. The report is kept only on your PC in `%LOCALAPPDATA%\BahthSari\crash.txt`, and user names in paths are replaced with `<user>`.
+- **Nothing is ever sent automatically**: no telemetry, and no network connection for this without your click.
+- Or go straight to [Issues](https://github.com/sarmadiq9090-coder/arabic-file-search/issues) or [Discussions](https://github.com/sarmadiq9090-coder/arabic-file-search/discussions).
 
 ### Developers
 
