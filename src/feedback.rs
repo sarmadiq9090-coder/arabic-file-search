@@ -244,7 +244,7 @@ fn reg_string(key: &str, name: &str) -> Option<String> {
     const RRF_RT_REG_SZ: u32 = 0x0000_0002;
     let mut buf = [0u8; 256];
     let n = reg_value(key, name, RRF_RT_REG_SZ, &mut buf)?.min(buf.len());
-    let units: Vec<u16> = buf[..n].chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).take_while(|&u| u != 0).collect();
+    let units: Vec<u16> = buf[..n].as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).take_while(|&u| u != 0).collect();
     let s = String::from_utf16_lossy(&units).trim().to_string();
     (!s.is_empty()).then_some(s)
 }
