@@ -19,19 +19,16 @@ pub const LATEST_URL: &str =
 pub const SINGLE_INSTANCE_MUTEX: &str = "Local\\BahthSari.SingleInstance";
 /// Name of the release asset that holds the program for this CPU. The x64
 /// name must never change: every copy installed since 0.3.0 looks for it.
-#[cfg(not(any(target_arch = "aarch64", target_arch = "x86")))]
-pub const ASSET_NAME: &str = ASSET_X64;
-#[cfg(target_arch = "aarch64")]
-pub const ASSET_NAME: &str = ASSET_ARM64;
-#[cfg(target_arch = "x86")]
-pub const ASSET_NAME: &str = ASSET_X86;
-/// The release assets for each CPU (build.yml publishes all three). Each
-/// build uses only its own; the others are named for the tests.
-#[allow(dead_code)]
+pub const ASSET_NAME: &str = if cfg!(target_arch = "aarch64") {
+    ASSET_ARM64
+} else if cfg!(target_arch = "x86") {
+    ASSET_X86
+} else {
+    ASSET_X64
+};
+/// The release assets for each CPU (build.yml publishes all three).
 pub const ASSET_X64: &str = "bahth.exe";
-#[allow(dead_code)]
 pub const ASSET_ARM64: &str = "bahth-arm64.exe";
-#[allow(dead_code)]
 pub const ASSET_X86: &str = "bahth-x86.exe";
 /// Upper bound for the JSON answer.
 #[cfg(windows)]
@@ -791,8 +788,8 @@ mod tests {
             let r = parse_release_for(SAMPLE, "0.2.2", name).unwrap().unwrap();
             assert!(r.exe_url.ends_with(&format!("/v0.3.1/{name}")), "{name}: {}", r.exe_url);
         }
-        // A release without this CPU's program is not offered (no fallback
-        // to another CPU's exe, which validate_pe would refuse anyway).
+        // The API path does not offer a release without this CPU's program
+        // (no fallback to another CPU's exe, which validate_pe would refuse).
         let x64_only = SAMPLE
             .replace(&format!("\"{ASSET_ARM64}\""), "\"a.zip\"")
             .replace(&format!("\"{ASSET_X86}\""), "\"b.zip\"");
@@ -926,14 +923,15 @@ mod tests {
             r#"{"tag_name": 5}"#.into(),
             r#"{"tag_name": "v9.0.0", "assets": "nope"}"#.into(),
             r#"{"tag_name": "v9.0.0", "assets": [null, 1, "x", {"name": 5}]}"#.into(),
-            r#"{"tag_name": "v9.0.0", "assets": [{"name": "bahth.exe"}]}"#.into(),
-            r#"{"tag_name": "v9.0.0", "assets": [{"name": "bahth.exe", "browser_download_url": "https://github.com/a", "size": -1}]}"#.into(),
-            r#"{"tag_name": "v9.0.0", "assets": [{"name": "bahth.exe", "browser_download_url": "https://github.com/a", "size": 1.5}]}"#.into(),
-            r#"{"tag_name": "v9.0.0", "assets": [{"name": "bahth.exe", "browser_download_url": "https://github.com/a", "size": 0}]}"#.into(),
+            r#"{"tag_name": "v9.0.0", "assets": [{"name": "ASSET"}]}"#.into(),
+            r#"{"tag_name": "v9.0.0", "assets": [{"name": "ASSET", "browser_download_url": "https://github.com/a", "size": -1}]}"#.into(),
+            r#"{"tag_name": "v9.0.0", "assets": [{"name": "ASSET", "browser_download_url": "https://github.com/a", "size": 1.5}]}"#.into(),
+            r#"{"tag_name": "v9.0.0", "assets": [{"name": "ASSET", "browser_download_url": "https://github.com/a", "size": 0}]}"#.into(),
             r#"{"tag_name": "v9.0.0", "draft": "yes", "prerelease": null, "body": 7, "assets": []}"#.into(),
             format!("{}1{}", "[".repeat(10_000), "]".repeat(10_000)),
             format!("{{\"tag_name\": \"v9.0.0\", \"body\": \"{}\"}}", "\\u0628".repeat(10_000)),
-        ];
+        ]
+        .map(|c| c.replace("\"ASSET\"", &format!("\"{ASSET_NAME}\"")));
         for c in &cases {
             let r = std::panic::catch_unwind(|| parse_release(c, "0.5.1"));
             assert!(r.is_ok(), "panic for {c:.80}");
@@ -957,8 +955,8 @@ mod tests {
             assert_eq!(download_host_ok(url), ok, "{url}");
         }
         let evil = SAMPLE.replace(
-            "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.3.1/bahth.exe",
-            "https://evil.example/bahth.exe",
+            &format!("https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.3.1/{ASSET_NAME}\""),
+            "https://evil.example/bahth.exe\"",
         );
         assert!(parse_release(&evil, "0.2.2").is_err());
     }

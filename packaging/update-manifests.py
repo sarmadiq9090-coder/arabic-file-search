@@ -299,6 +299,8 @@ def main():
     shas = {k: v.strip().lower() for k, v in shas.items() if v and v.strip()}
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         sys.exit(f"bad version: {a.version!r} (expected X.Y.Z)")
+    if "x64" not in shas:
+        sys.exit("the sha256 of bahth.exe (x64) is required")
     for arch, sha in shas.items():
         if not re.fullmatch(r"[0-9a-f]{64}", sha):
             sys.exit(f"bad sha256 for {arch}: {sha!r}")

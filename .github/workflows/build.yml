@@ -59,9 +59,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: i686-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
       - name: Test
         run: cargo test --release
+      # 32-bit (usize, the x86 updater asset) under WOW64.
+      - name: Test (32-bit)
+        run: cargo test --release --target i686-pc-windows-msvc
 
   # The x64 and x86 exes exactly as they are published: cross-built on Linux
   # with mingw.

@@ -56,6 +56,7 @@ jobs:
           dl=$(mktemp -d)
           # bahth.exe (x64) always; the x86 and ARM64 exes exist since v0.7.0.
           gh release download "$TAG" --pattern 'bahth*.exe' --dir "$dl"
+          test -s "$dl/bahth.exe"
           sha=$(sha256sum "$dl/bahth.exe" | cut -d' ' -f1)
           extra=()
           [ -f "$dl/bahth-x86.exe" ] && extra+=(--sha-x86 "$(sha256sum "$dl/bahth-x86.exe" | cut -d' ' -f1)")
