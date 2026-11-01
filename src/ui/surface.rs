@@ -61,7 +61,7 @@ pub(super) fn app() -> Option<Rc<App>> {
 /// The shared window procedure. A panic is reported and the message gets
 /// its default handling, never unwinding into Windows.
 unsafe extern "system" fn proc(hwnd: HWND, msg: UINT, w: WPARAM, l: LPARAM) -> LRESULT {
-    let kind = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) };
+    let kind = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as isize;
     let answer = crate::crash_log::catch(|| {
         let app = app()?;
         match kind {
@@ -81,7 +81,7 @@ const POPUP_CLASS: &str = "InstaFindQuickSearch";
 const BOX_CLASS: &str = "InstaFindFloatingBox";
 
 /// Registers the two window classes once. The popup's class asks for a
-/// drop shadow (Windows 10; Windows 11 gives rounded windows one anyway).
+/// drop shadow on Windows 10 (Windows 11 shadows rounded windows itself).
 fn register_classes() -> bool {
     use std::sync::atomic::{AtomicU8, Ordering};
     use winapi::um::libloaderapi::GetModuleHandleW;
@@ -94,7 +94,10 @@ fn register_classes() -> bool {
         _ => {}
     }
     let mut ok = true;
-    for (name, style) in [(POPUP_CLASS, CS_DROPSHADOW), (BOX_CLASS, 0)] {
+    // Windows 11 shadows the rounded popup itself (a class shadow would
+    // stay square there).
+    let shadow = if crate::quick::has_round_corners(windows_build()) { 0 } else { CS_DROPSHADOW };
+    for (name, style) in [(POPUP_CLASS, shadow), (BOX_CLASS, 0)] {
         let class = wide(name);
         let wc = WNDCLASSEXW {
             cbSize: std::mem::size_of::<WNDCLASSEXW>() as UINT,
@@ -144,8 +147,31 @@ pub(super) fn create_window(kind: isize, ex_style: DWORD, title: &str) -> Option
     if hwnd.is_null() {
         return None;
     }
-    unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, kind) };
+    unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, kind as _) };
     Some(hwnd)
+}
+
+/// Brings `hwnd` to the front with the keyboard focus. The hotkey, a click
+/// on the box and the tray icon all give this program the right to; should
+/// Windows refuse anyway, the input of the window in front is joined for a
+/// moment, the usual way round the foreground lock.
+pub(super) fn bring_to_front(hwnd: HWND) {
+    use winapi::um::processthreadsapi::GetCurrentThreadId;
+    use winapi::um::winuser::{AttachThreadInput, BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow};
+    unsafe {
+        SetForegroundWindow(hwnd);
+        let front = GetForegroundWindow();
+        if front == hwnd || front.is_null() {
+            return;
+        }
+        let theirs = GetWindowThreadProcessId(front, std::ptr::null_mut());
+        let mine = GetCurrentThreadId();
+        if theirs != 0 && theirs != mine && AttachThreadInput(mine, theirs, TRUE) != 0 {
+            BringWindowToTop(hwnd);
+            SetForegroundWindow(hwnd);
+            AttachThreadInput(mine, theirs, 0);
+        }
+    }
 }
 
 // ------------------------------------------------------------------ theme
@@ -345,7 +371,9 @@ pub(super) fn taskbar() -> Option<Taskbar> {
     let notify_class = wide("TrayNotifyWnd");
     let notify = unsafe { FindWindowExW(tray, std::ptr::null_mut(), notify_class.as_ptr(), std::ptr::null()) };
     let mut nr = RECT { left: 0, top: 0, right: 0, bottom: 0 };
-    let clock_left = if edge.horizontal() && !notify.is_null() && unsafe { GetWindowRect(notify, &mut nr) } != 0 && nr.right > nr.left {
+    let found = !notify.is_null() && unsafe { GetWindowRect(notify, &mut nr) } != 0;
+    // Only a notification area that really lies on the taskbar tells.
+    let clock_left = if edge.horizontal() && found && rect(&nr).intersect(&bar).width() > 0 {
         (nr.left + nr.right) / 2 < bar.center().0
     } else {
         let ex = unsafe { GetWindowLongPtrW(tray, GWL_EXSTYLE) } as u32;

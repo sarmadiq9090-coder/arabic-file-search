@@ -107,6 +107,8 @@ impl App {
         if !h.is_null() {
             unsafe { DestroyWindow(h) };
             self.floating.hwnd.set(0);
+            self.floating.interval.set(0);
+            self.floating.asleep.set(false);
             *self.floating.image.borrow_mut() = None;
         }
     }

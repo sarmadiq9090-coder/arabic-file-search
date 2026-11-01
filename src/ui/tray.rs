@@ -197,9 +197,14 @@ impl App {
         Anchor::Tray { clock_left: surface::taskbar().is_some_and(|t| t.clock_left) }
     }
 
-    /// A left click on the tray icon opens the quick search.
+    /// A left click on the tray icon opens the quick search (the full
+    /// window when the hotkey is set to open that, as before 0.8).
     pub(super) fn on_tray_click(&self) {
-        self.show_quick(self.tray_anchor());
+        if self.state.borrow().settings.hotkey_opens == HotkeyOpens::Main {
+            self.show_window();
+        } else {
+            self.show_quick(self.tray_anchor());
+        }
     }
 
     /// The tray menu, with the box's check mark up to date.

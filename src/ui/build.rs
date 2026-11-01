@@ -387,7 +387,11 @@ impl NativeUi<AppUi> for App {
                     } else if handle == app.menu_delete {
                         app.delete_selected();
                     } else if handle == app.menu_hotkey {
-                        app.set_status(&trf!("اضغط {HOTKEY_TEXT} من أي برنامج لإظهار بحث سريع أو إخفائه.", "Press {HOTKEY_TEXT} in any program to show or hide InstaFind."));
+                        if app.state.borrow().settings.hotkey_opens == crate::settings::HotkeyOpens::Quick {
+                            app.set_status(&trf!("اضغط {HOTKEY_TEXT} من أي برنامج لفتح نافذة البحث الصغيرة.", "Press {HOTKEY_TEXT} in any program to open the quick search."));
+                        } else {
+                            app.set_status(&trf!("اضغط {HOTKEY_TEXT} من أي برنامج لإظهار بحث سريع أو إخفائه.", "Press {HOTKEY_TEXT} in any program to show or hide InstaFind."));
+                        }
                     } else if handle == app.menu_autostart {
                         let on = !app.menu_autostart.checked();
                         if autostart::set_enabled(on) {

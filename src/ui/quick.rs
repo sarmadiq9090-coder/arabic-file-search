@@ -352,7 +352,7 @@ impl App {
         self.popup_text_changed();
         unsafe {
             ShowWindow(hwnd, SW_SHOW);
-            SetForegroundWindow(hwnd);
+            surface::bring_to_front(hwnd);
             SetFocus(self.popup_edit());
         }
         self.wake_floating(true);
@@ -418,6 +418,9 @@ impl App {
     /// Starts the name search for `text` on a background thread; while one
     /// runs, later keystrokes fold into one more search when it ends.
     fn popup_search_files(&self, text: String) {
+        if text.trim().is_empty() {
+            return;
+        }
         if self.popup.file_running.get() {
             self.popup.file_pending.set(true);
             return;
@@ -556,8 +559,12 @@ impl App {
         unsafe {
             SetWindowPos(hwnd, HWND_TOPMOST, r.left, r.top, r.width(), r.height(), SWP_NOACTIVATE);
         }
+        // The backdrop shows through the list; a solid Windows 11 popup still
+        // extends one (opaque) row, which gets it DWM's shadow.
         if look.backdrop {
             surface::extend_frame(hwnd, list_h);
+        } else if quick::has_round_corners(surface::windows_build()) {
+            surface::extend_frame(hwnd, 1);
         }
         // The box: after the magnifier, one line of its font, centred in the strip.
         let edit_h = px(26, s);
@@ -620,16 +627,18 @@ impl App {
                 Some(0)
             }
             WM_LBUTTONUP => {
-                let p = point_of(l);
-                if let Some(i) = quick::row_at(&self.popup.slots.borrow(), p.1) {
+                // Not borrowed inside: opening a row lays the list out again.
+                let row = quick::row_at(&self.popup.slots.borrow(), point_of(l).1);
+                if let Some(i) = row {
                     self.popup.selected.set(Some(i));
                     self.popup_open_selected(How::Open);
                 }
                 Some(0)
             }
             WM_RBUTTONUP => {
-                let p = point_of(l);
-                if let Some(i) = quick::row_at(&self.popup.slots.borrow(), p.1) {
+                // Not borrowed inside: opening a row lays the list out again.
+                let row = quick::row_at(&self.popup.slots.borrow(), point_of(l).1);
+                if let Some(i) = row {
                     self.popup.selected.set(Some(i));
                     unsafe { InvalidateRect(hwnd, std::ptr::null(), 0) };
                     self.popup_action_menu();
@@ -789,7 +798,9 @@ impl App {
                             let top = Rect::at(tx, slot.y + px(3, s), text_w, half - px(2, s));
                             let bottom = Rect::at(tx, slot.y + half, text_w, half - px(3, s));
                             surface::draw_text(dc, font, p.text, &row.title, &top, rtl, false);
-                            surface::draw_text(dc, &look.small, p.muted, &super::format::ltr_path(&row.subtitle), &bottom, rtl, false);
+                            // A folder reads left to right; other second lines as written.
+                            let sub = if matches!(row.target, Target::File { .. }) { super::format::ltr_path(&row.subtitle) } else { row.subtitle.clone() };
+                            surface::draw_text(dc, &look.small, p.muted, &sub, &bottom, rtl, false);
                         }
                     }
                 }
