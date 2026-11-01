@@ -16,6 +16,12 @@ mod members;
 #[cfg(test)]
 mod robustness;
 
+/// Most match positions collected for each alternative (or regex, or
+/// proximity search) when counting the matches in one text: a one-letter
+/// term in a 64 MB document would otherwise take hundreds of MB per search
+/// thread. Counts stop growing there.
+const MAX_SPANS: usize = 1_000_000;
+
 /// One search term: it matches when any of its alternatives is contained.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Term {
@@ -44,9 +50,9 @@ impl Term {
         let mut spans: Vec<(usize, usize)> = Vec::new();
         for a in self.alts.iter().filter(|a| !a.is_empty()) {
             if whole_word {
-                spans.extend(word_matches(hay, a).map(|s| (s, s + a.len())));
+                spans.extend(word_matches(hay, a).take(MAX_SPANS).map(|s| (s, s + a.len())));
             } else {
-                spans.extend(hay.match_indices(a.as_str()).map(|(s, _)| (s, s + a.len())));
+                spans.extend(hay.match_indices(a.as_str()).take(MAX_SPANS).map(|(s, _)| (s, s + a.len())));
             }
         }
         merge_spans(spans)
@@ -148,14 +154,26 @@ pub struct Near {
 }
 
 impl Near {
-    /// For each word of `hay` that contains one of the terms: (word number,
-    /// term number, byte offset of the match), in text order.
-    fn hits(&self, hay: &str) -> Vec<(u32, usize, usize)> {
+    /// How many times each word must occur: a word typed twice (`"a a"~3`)
+    /// needs two occurrences. Indexed by term number; repeats of an earlier
+    /// term get 0 and count towards that term.
+    fn needs(&self) -> Vec<u32> {
+        let mut need = vec![0u32; self.words.len()];
+        let mut first: std::collections::HashMap<&[String], usize> = std::collections::HashMap::new();
+        for (t, term) in self.words.iter().enumerate() {
+            need[*first.entry(&term.alts[..]).or_insert(t)] += 1;
+        }
+        need
+    }
+
+    /// For each word of `hay` that contains one of the terms with a non-zero
+    /// `need`: (word number, term number, byte offset of the match), in text order.
+    fn hits(&self, hay: &str, need: &[u32]) -> Vec<(u32, usize, usize)> {
         let mut hits = Vec::new();
         for (n, (off, word)) in split_words(hay).enumerate() {
-            for (t, term) in self.words.iter().enumerate() {
+            for (t, term) in self.words.iter().enumerate().filter(|&(t, _)| need[t] > 0) {
                 if let Some(p) = term.find_in(word) {
-                    hits.push((n as u32, t, off + p));
+                    hits.push((u32::try_from(n).unwrap_or(u32::MAX), t, off + p));
                 }
             }
         }
@@ -165,19 +183,21 @@ impl Near {
     /// Byte offset in `hay` of the first window holding every word within
     /// `dist` words, if there is one.
     fn find(&self, hay: &str) -> Option<usize> {
-        let hits = self.hits(hay);
+        let need = self.needs();
+        let distinct = need.iter().filter(|&&k| k > 0).count();
+        let hits = self.hits(hay, &need);
         let mut counts = vec![0u32; self.words.len()];
         let (mut covered, mut left) = (0, 0);
         for &(n, t, _) in &hits {
             counts[t] += 1;
-            covered += usize::from(counts[t] == 1);
-            while covered == self.words.len() {
+            covered += usize::from(counts[t] == need[t]);
+            while covered == distinct {
                 let (first, lt, off) = hits[left];
                 if n - first <= self.dist {
                     return Some(off);
                 }
+                covered -= usize::from(counts[lt] == need[lt]);
                 counts[lt] -= 1;
-                covered -= usize::from(counts[lt] == 0);
                 left += 1;
             }
         }
@@ -187,18 +207,22 @@ impl Near {
     /// Byte offsets of every word occurrence that has each of the other words
     /// within `dist` words of it (exact for two words, which is the usual case).
     fn all(&self, hay: &str) -> Vec<usize> {
-        let hits = self.hits(hay);
+        let need = self.needs();
+        let hits = self.hits(hay, &need);
         let mut by_term: Vec<Vec<u32>> = vec![Vec::new(); self.words.len()];
         for &(n, t, _) in &hits {
             by_term[t].push(n);
         }
-        let close = |list: &[u32], n: u32| {
-            let i = list.partition_point(|&m| m + self.dist < n);
-            list.get(i).is_some_and(|&m| m <= n + self.dist)
+        // Occurrences in `list` within `dist` words of word `n` (`n` itself included).
+        let near = |list: &[u32], n: u32| {
+            let lo = list.partition_point(|&m| m.saturating_add(self.dist) < n);
+            let hi = list.partition_point(|&m| m <= n.saturating_add(self.dist));
+            hi - lo
         };
         hits.iter()
-            .filter(|&&(n, t, _)| by_term.iter().enumerate().all(|(o, list)| o == t || close(list, n)))
+            .filter(|&&(n, _, _)| by_term.iter().zip(&need).all(|(list, &k)| near(list, n) >= k as usize))
             .map(|&(_, _, off)| off)
+            .take(MAX_SPANS)
             .collect()
     }
 }
@@ -743,14 +767,14 @@ impl Query {
                         join = false;
                         continue;
                     }
-                    pieces = vec![&tok[len..]];
+                    pieces = tok[len..].split('|').collect();
                 } else if let Some(len) = folder_prefix(&tok) {
                     q.dirs_only = true;
                     if tok.len() == len {
                         join = false;
                         continue;
                     }
-                    pieces = vec![&tok[len..]];
+                    pieces = tok[len..].split('|').collect();
                 } else if let Some(word) = exclude_word(&tok) {
                     let n = normalize(word);
                     if !n.trim().is_empty() {
@@ -1128,7 +1152,7 @@ fn text_matches(text: &str, norm: &str, map: &[u32], q: &Query, all: bool) -> Op
         let first = re.find(text)?.start();
         let before = src.len();
         if all {
-            src.extend(r.ranges(text).map(|(s, _)| s));
+            src.extend(r.ranges(text).take(MAX_SPANS).map(|(s, _)| s));
         }
         if src.len() == before {
             // Only empty matches (`^`), or the first match is enough.
@@ -2102,6 +2126,45 @@ mod tests {
         // Name search uses the file name's words.
         let entries = vec![entry(r"C:\عقد شقة إيجار.pdf", false), entry(r"C:\عقد 1 2 3 4 إيجار.pdf", false)];
         assert_eq!(search_names(&entries, &q, ""), vec![0]);
+    }
+
+    #[test]
+    fn match_counts_are_capped() {
+        // Each part of the query collects at most MAX_SPANS positions.
+        let text = "a ".repeat(MAX_SPANS + 10);
+        let (count, lines) = all_matches(&text, &at("a"), 3);
+        assert_eq!((count, lines.len(), lines[0].0), (MAX_SPANS as u32, 1, 1));
+        assert_eq!(all_matches(&text, &at("re:a"), 1).0, MAX_SPANS as u32);
+    }
+
+    #[test]
+    fn proximity_with_a_repeated_word() {
+        // A word typed twice must occur twice within the distance.
+        let q = at(r#""تقرير تقرير"~3"#);
+        assert!(match_text("تقرير واحد فقط", &q).is_none());
+        assert!(match_text("تقرير ثم تقرير", &q).is_some());
+        assert!(match_text("تقرير 1 2 3 4 تقرير", &q).is_none());
+        assert_eq!(all_matches("تقرير وحيد", &q, 50).0, 0);
+        assert_eq!(all_matches("تقرير x تقرير y z w v تقرير", &q, 50).0, 2);
+        let q = at(r#""a b a"~2"#);
+        assert!(match_text("a b", &q).is_none());
+        assert!(match_text("a b a", &q).is_some());
+        assert_eq!(all_matches("a b", &q, 50).0, 0);
+        let entries = vec![entry(r"C:\تقرير.pdf", false), entry(r"C:\تقرير و تقرير.pdf", false)];
+        assert_eq!(search_names(&entries, &at(r#""تقرير تقرير"~2"#), ""), vec![1]);
+    }
+
+    #[test]
+    fn folder_and_mode_prefixes_split_alternatives() {
+        let q = Query::parse("folder:صور|ملفات");
+        assert!(q.dirs_only);
+        assert_eq!(alts(&q), vec![vec!["صور", "ملفات"]]);
+        assert_eq!(alts(&Query::parse("مجلد:a| b c")), vec![vec!["a", "b"], vec!["c"]]);
+        let q = Query::parse("fuzzy:تقرير|عقد");
+        assert!(q.fuzzy);
+        assert_eq!(alts(&q), vec![vec!["تقرير", "عقد"]]);
+        assert_eq!(alts(&Query::parse("x folder:|y")), vec![vec!["x", "y"]]);
+        assert!(Query::parse("folder:|").is_empty());
     }
 
     // --------------------------------------------------- all matches in text

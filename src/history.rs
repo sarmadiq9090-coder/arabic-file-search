@@ -17,6 +17,8 @@ const MAX_RECENT: usize = 20;
 const MAX_SAVED: usize = 30;
 /// How many opened files are remembered.
 const MAX_OPENS: usize = 500;
+/// A larger history file is corrupt (a full one is well under 1 MB).
+const MAX_FILE_BYTES: u64 = 16 << 20;
 /// After this long an open counts half as much.
 const HALF_LIFE_SECS: f64 = 14.0 * 24.0 * 3600.0;
 
@@ -46,7 +48,8 @@ pub struct History {
 
 /// Frecency: the open count, halved for every [`HALF_LIFE_SECS`] since the last open.
 fn score(count: u32, last: i64, now: i64) -> f64 {
-    let age = (now - last).max(0) as f64;
+    // Saturating: `last` comes from a file that may be corrupt.
+    let age = now.saturating_sub(last).max(0) as f64;
     count as f64 * 0.5f64.powf(age / HALF_LIFE_SECS)
 }
 
@@ -68,9 +71,25 @@ impl History {
         Self::load_from(&Self::path())
     }
 
-    /// Reads `path`; a missing or corrupt file gives an empty history.
+    /// Reads `path`; a missing, corrupt or oversized file gives an empty
+    /// history. Lists longer than their caps (an edited file) are cut back.
     pub fn load_from(path: &Path) -> History {
-        fs::read(path).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+        if fs::metadata(path).is_ok_and(|m| m.len() > MAX_FILE_BYTES) {
+            return History::default();
+        }
+        let mut h: History = fs::read(path).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        h.recent.truncate(MAX_RECENT);
+        if h.saved.len() > MAX_SAVED {
+            h.saved.drain(..h.saved.len() - MAX_SAVED);
+        }
+        if h.opens.len() > MAX_OPENS {
+            let now = h.opens.values().map(|v| v.1).max().unwrap_or(0);
+            let mut v: Vec<(String, (u32, i64))> = h.opens.drain().collect();
+            v.sort_by(|a, b| score(b.1.0, b.1.1, now).total_cmp(&score(a.1.0, a.1.1, now)).then_with(|| a.0.cmp(&b.0)));
+            v.truncate(MAX_OPENS);
+            h.opens = v.into_iter().collect();
+        }
+        h
     }
 
     /// Saves to the default location, ignoring errors (history is a convenience).
@@ -266,6 +285,47 @@ mod tests {
         assert_eq!(History::load_from(&file).recent, vec!["x1"]);
         fs::write(&file, "not json").unwrap();
         assert!(History::load_from(&file).saved.is_empty());
+        for bad in ["", "\u{0}\u{FFFD}", "{", "[]", "null", r#"{"recent":"x"}"#, r#"{"opens":{"a":[1]}}"#, "\u{FEFF}{}"] {
+            fs::write(&file, bad).unwrap();
+            assert!(History::load_from(&file).recent.is_empty(), "{bad:?}");
+        }
+        fs::write(&file, [0xFF, 0xFE, b'{', 0x80]).unwrap();
+        assert!(History::load_from(&file).recent.is_empty());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn corrupt_values_and_oversized_lists() {
+        let dir = std::env::temp_dir().join(format!("bahth_hist_bad_{}", std::process::id()));
+        let file = dir.join("history.json");
+        fs::create_dir_all(&dir).unwrap();
+        // Extreme times used to overflow `now - last` (a panic in debug builds).
+        let json = format!(
+            r#"{{"recent":[{}],"saved":[{}],"opens":{{"old":[4294967295,{}],"new":[1,{}]{}}}}}"#,
+            (0..100).map(|i| format!("\"q{i}\"")).collect::<Vec<_>>().join(","),
+            (0..100).map(|i| format!(r#"{{"name":"s{i}","kind":18446744073709551615}}"#)).collect::<Vec<_>>().join(","),
+            i64::MIN,
+            i64::MAX,
+            (0..MAX_OPENS + 50).map(|i| format!(r#","f{i}":[1,0]"#)).collect::<String>(),
+        );
+        fs::write(&file, json).unwrap();
+        let mut h = History::load_from(&file);
+        assert_eq!(h.recent.len(), MAX_RECENT);
+        assert_eq!(h.recent[0], "q0");
+        assert_eq!(h.saved.len(), MAX_SAVED);
+        assert_eq!(h.saved.last().unwrap().name, "s99");
+        assert_eq!(h.opens.len(), MAX_OPENS);
+        assert!(h.opens.contains_key("new"));
+        assert!(score(u32::MAX, i64::MIN, i64::MAX).is_finite());
+        assert!(score(u32::MAX, i64::MAX, i64::MIN) > 0.0);
+        h.record_open("x", i64::MIN);
+        h.record_open("y", i64::MAX);
+        h.add_saved(SavedSearch::default());
+        assert_eq!(h.saved.len(), MAX_SAVED);
+        assert!(h.boosted(&Index::default(), i64::MIN).is_empty());
+        // An oversized file is not read at all.
+        fs::write(&file, vec![b' '; (MAX_FILE_BYTES + 1) as usize]).unwrap();
+        assert!(History::load_from(&file).recent.is_empty());
         fs::remove_dir_all(&dir).unwrap();
     }
 }

@@ -112,6 +112,30 @@ mod tests {
     }
 
     #[test]
+    fn random_words_never_panic() {
+        // Arabic letters (with the ones that drive the patterns over-represented) and a few others.
+        let letters: Vec<char> = ('\u{0621}'..='\u{064A}').chain("استمنيوالتكه".chars()).chain(['a', '1', ' ', 'ـ']).collect();
+        let mut s: u64 = 0x0123_4567_89AB_CDEF;
+        let mut next = |n: usize| {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            (s % n as u64) as usize
+        };
+        for _ in 0..50_000 {
+            let w: String = (0..next(12)).map(|_| letters[next(letters.len())]).collect();
+            if let Some(r) = root(&w) {
+                assert_eq!(r.chars().count(), 3, "{w}");
+                assert!(r.chars().all(|c| w.contains(c)), "{w} {r}");
+            }
+            let _ = root(&normalize(&w));
+        }
+        for w in ["", "ا", "اا", "ااا", "استستستست", "مستمستمست", "والالالال", "\u{0640}\u{0640}\u{0640}"] {
+            let _ = root(w);
+        }
+    }
+
+    #[test]
     fn no_root() {
         assert_eq!(r("report"), None);
         assert_eq!(r("في"), None);
