@@ -18,6 +18,8 @@
 <link rel="preload" href="../fonts/plex-arabic-latin-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="../fonts/plex-arabic-latin-700.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../style.css">
+<script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<script src="../site.js" defer></script>
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="InstaFind — بحث سريع">
@@ -47,7 +49,7 @@
   "image": "https://sarmadiq9090-coder.github.io/arabic-file-search/img/social-preview.png",
   "operatingSystem": "Windows",
   "applicationCategory": "UtilitiesApplication",
-  "softwareVersion": "0.6.0",
+  "softwareVersion": "0.6.1",
   "downloadUrl": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe",
   "installUrl": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest",
   "softwareRequirements": "Windows 10 or 11, 64-bit",
@@ -69,7 +71,8 @@
     { "@type": "Question", "name": "Does it need an internet connection?", "acceptedAnswer": { "@type": "Answer", "text": "No. Indexing and search run on your PC. The only connection is the update check against GitHub." } },
     { "@type": "Question", "name": "What are the requirements?", "acceptedAnswer": { "@type": "Answer", "text": "Windows 10 or 11, 64-bit. Text recognition in images needs the Windows language pack for each OCR language." } },
     { "@type": "Question", "name": "Why does SmartScreen warn me?", "acceptedAnswer": { "@type": "Answer", "text": "Because the file is not code-signed. Click More info, then Run anyway. All the source code is on GitHub." } },
-    { "@type": "Question", "name": "How do I uninstall it?", "acceptedAnswer": { "@type": "Answer", "text": "Turn off Start with Windows in Options…, then delete bahth.exe and the %LOCALAPPDATA%\\BahthSari\\ folder." } }
+    { "@type": "Question", "name": "How do I uninstall it?", "acceptedAnswer": { "@type": "Answer", "text": "Turn off Start with Windows in Options…, then delete bahth.exe and the %LOCALAPPDATA%\\BahthSari\\ folder." } },
+    { "@type": "Question", "name": "Does it run on ARM or 32-bit Windows?", "acceptedAnswer": { "@type": "Answer", "text": "Not natively yet. ARM64 and 32-bit builds are coming in version 0.7. The current release is for 64-bit (x64) Windows 10 or 11, and it also runs on Windows 11 on ARM through emulation." } }
   ]
 }
 </script>
@@ -80,14 +83,20 @@
 <header class="site-header">
   <div class="wrap">
     <a class="brand" href="./" aria-label="InstaFind — بحث سريع, home">
-      <img src="../img/logo.svg" width="34" height="34" alt="">
+      <img src="../img/logo.svg" width="32" height="32" alt="">
       <span>InstaFind <small lang="ar">بحث سريع</small></span>
     </a>
     <nav class="nav" aria-label="Main">
       <a class="opt" href="#features">Features</a>
-      <a class="opt" href="#install">Download</a>
+      <a class="opt" href="#speed">Speed</a>
+      <a class="opt" href="#soon">Coming soon</a>
       <a class="opt" href="#faq">FAQ</a>
       <a class="lang" href="../" hreflang="ar" lang="ar">العربية</a>
+      <button class="theme-btn" type="button" aria-label="Toggle dark mode">
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <a class="nav-cta" href="#install">Download</a>
     </nav>
   </div>
 </header>
@@ -96,172 +105,293 @@
 
 <section class="hero" aria-labelledby="hero-title">
   <div class="wrap">
-    <div>
-      <p class="eyebrow">Free · Open source · For Windows</p>
-      <h1 id="hero-title"><span class="grad">Fast file search</span> for Windows, in Arabic and English</h1>
-      <p class="lead">Find any file on Windows as you type, even inside documents. InstaFind indexes all your drives once and shows results while you type, even with millions of files. And it understands Arabic the way people actually type it.</p>
-      <div class="cta">
-        <a class="btn btn-primary" href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
-          Free download for Windows
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/sarmadiq9090-coder/arabic-file-search">
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.3-1.69-1.3-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
-          Source on GitHub
-        </a>
-      </div>
-      <p class="fine">Version 0.6.0 · a single <code>bahth.exe</code>, nothing to install · Windows 10 or 11, 64-bit · MIT license</p>
+    <a class="pill" href="#new"><b>New</b> Version 0.6.1: hide system files and a cleaner interface</a>
+    <h1 id="hero-title">Find any file <span class="grad">as you type</span>, in English and Arabic</h1>
+    <p class="lead">InstaFind is a free, open-source file search for Windows. It indexes your drives once, then shows results instantly, even inside PDF and Word files. And it understands Arabic the way people actually type it.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
+        Free download for Windows
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/sarmadiq9090-coder/arabic-file-search">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.3-1.69-1.3-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+        Source on GitHub
+      </a>
     </div>
-    <figure class="shot">
-      <img src="../img/demo-en.gif" width="800" height="501" alt="Demo on Windows: instant name search for invoice and report 2026, then a search inside documents for budget" fetchpriority="high">
-      <figcaption>Recorded on Windows: results appear while you type, then a search inside documents.</figcaption>
-    </figure>
+    <p class="fine">Version 0.6.1<span class="dot">·</span>a single <code>bahth.exe</code>, nothing to install, about 7 MB<span class="dot">·</span>Windows 10 or 11, 64-bit</p>
+    <p class="hint">Once it runs, <span class="keys"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F</kbd></span> brings it up from anywhere</p>
+
+    <div class="frame-wrap">
+      <figure class="frame">
+        <img src="../img/demo-en.gif" width="800" height="501" alt="Demo on Windows: instant name search for invoice and report 2026, then a search inside documents for budget" fetchpriority="high">
+        <figcaption>Recorded on real Windows: results appear while you type, then a search inside documents.</figcaption>
+      </figure>
+    </div>
+
+    <ul class="trust" aria-label="Why you can trust it">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Works offline</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 22 12a14 14 0 0 1-3 3.8M6.6 6.6A14 14 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/></svg>No tracking, no telemetry</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 6-6 6 6 6M16 6l6 6-6 6"/></svg>Open source, MIT license</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>Tested on real Windows before every release</li>
+    </ul>
   </div>
 </section>
 
 <section id="features" aria-labelledby="features-title">
   <div class="wrap">
-    <div class="section-head">
+    <div class="section-head center fade">
+      <span class="kicker">Features</span>
       <h2 id="features-title">Everything you need to find your files</h2>
-      <p>A file search tool for Windows written in Rust. The index keeps itself current as files are added, deleted or renamed.</p>
+      <p>Written in Rust. The index keeps itself current as files are added, deleted or renamed.</p>
     </div>
-    <div class="grid">
-      <article class="card">
-        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></span>Instant filename search</h3>
-        <p>Across all drives or one folder, with ready-made filters: documents, pictures, audio, video, archives, programs, folders. Often-opened files come first.</p>
+
+    <div class="bento">
+      <article class="tile t-arabic fade" id="arabic" aria-labelledby="arabic-title">
+        <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></span>
+        <h3 id="arabic-title">Arabic search that understands how people type</h3>
+        <p>Hamza forms, ta marbuta, alef maqsura, diacritics, tatweel and the <span lang="ar">ال</span> prefix are ignored, and Arabic-Indic digits are accepted. When nothing matches, it retries with the other keyboard layout, then Arabizi, then near spellings.</p>
+        <div class="mini-search" data-typing>
+          <div class="bar" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
+            <span class="typed">reprot</span><span class="caret"></span>
+          </div>
+          <ul aria-label="Examples: what you type and what it finds">
+            <li data-q="reprot" class="on"><span class="q">reprot</span><span class="arrow" aria-label="finds">→</span><span class="r"><mark>report</mark> 2026.xlsx</span><span class="why">Tolerates a typo or two</span></li>
+            <li data-q="احمد"><span class="q" lang="ar">احمد</span><span class="arrow" aria-label="finds">→</span><span class="r"><bdi lang="ar"><mark>أحمد</mark></bdi>.docx</span><span class="why">Hamza forms don't matter</span></li>
+            <li data-q="التقرير"><span class="q" lang="ar">التقرير</span><span class="arrow" aria-label="finds">→</span><span class="r"><bdi lang="ar"><mark>تقرير</mark> المبيعات</bdi>.xlsx</span><span class="why">The <span lang="ar">ال</span> prefix doesn't block a match</span></li>
+            <li data-q="hgjrvdv"><span class="q">hgjrvdv</span><span class="arrow" aria-label="finds">→</span><span class="r"><bdi lang="ar"><mark>التقرير</mark> السنوي</bdi>.pdf</span><span class="why">Typed on the wrong keyboard layout</span></li>
+            <li data-q="3abd"><span class="q">3abd</span><span class="arrow" aria-label="finds">→</span><span class="r"><bdi lang="ar"><mark>عبد</mark> الله</bdi>.jpg</span><span class="why">Arabizi is read as Arabic</span></li>
+            <li data-q="root: كتاب"><span class="q"><bdi>root:</bdi> <span lang="ar">كتاب</span></span><span class="arrow" aria-label="finds">→</span><span class="r" lang="ar" dir="rtl"><mark>مكتبة</mark>، <mark>الكاتب</mark>، <mark>كتابات</mark></span><span class="why">Words sharing an Arabic root</span></li>
+          </ul>
+        </div>
       </article>
-      <article class="card">
-        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>Inside documents</h3>
-        <p>PDF, Word, Excel, PowerPoint, e-mail and epub, with a snippet of the matching text. Images and archives too.</p>
+
+      <article class="tile t-docs fade" aria-labelledby="docs-tile">
+        <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
+        <h3 id="docs-tile">Inside documents</h3>
+        <p>PDF, Word, Excel, PowerPoint, e-mail and epub, with a snippet of the matching text. Images and scanned PDFs too, through the OCR engine built into Windows, and archives without extracting them.</p>
+        <ul class="chips" aria-label="Supported file types">
+          <li>pdf</li><li>docx</li><li>doc</li><li>xlsx</li><li>xls</li><li>pptx</li><li>odt</li><li>ods</li><li>rtf</li><li>txt</li><li>csv</li><li>eml</li><li>msg</li><li>epub</li><li>zip</li><li>7z</li><li>tar.gz</li><li>png</li><li>jpg</li>
+        </ul>
       </article>
-      <article class="card">
-        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h10M4 17h7"/><path d="m16 15 2 2 3-4"/></svg></span>Rich query syntax</h3>
-        <p>Phrases, OR, NOT, extensions, size, date modified, regex, whole word and word proximity, e.g. <code>ext:pdf size:&gt;10mb dm:thismonth</code>.</p>
+
+      <article class="tile t-3 fade">
+        <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg></span>
+        <h3>Instant filename search</h3>
+        <p>Across all drives or one folder, with ready-made filters for documents, pictures, video and more. Often-opened files come first.</p>
       </article>
-      <article class="card">
-        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></svg></span>From anywhere</h3>
-        <p><kbd>Ctrl+Alt+F</kbd> shows the app from anywhere; <kbd>Ctrl+Alt+G</kbd> in any program's Save or Open dialog jumps the dialog to the folder of a result.</p>
+
+      <article class="tile t-3 fade">
+        <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></svg></span>
+        <h3>From anywhere</h3>
+        <p>One shortcut brings the app up; another jumps any program's Save or Open dialog to a result's folder.</p>
+        <dl class="shortcuts">
+          <div><dt>Show InstaFind</dt><dd class="keys"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F</kbd></dd></div>
+          <div><dt>In Save / Open dialogs</dt><dd class="keys"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd></dd></div>
+        </dl>
       </article>
-      <article class="card">
-        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></span>Handy tools</h3>
-        <p>Duplicate finder, folder sizes, thumbnail view, find &amp; replace in text files with undo, CSV export, drag &amp; drop into WhatsApp or mail, a command line and a Flow Launcher plugin.</p>
+
+      <article class="tile t-3 fade">
+        <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h10M4 17h7"/><path d="m16 15 2 2 3-4"/></svg></span>
+        <h3>Rich query syntax</h3>
+        <p>Phrases, OR, NOT, extensions, size, date modified, regex and word proximity, e.g. <code>ext:pdf size:&gt;10mb dm:thismonth</code>.</p>
       </article>
-      <article class="card">
-        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>English or Arabic interface</h3>
-        <p>Follows the Windows display language; switch any time in Options → Language / <span lang="ar">اللغة</span>. Starts with Windows in the background and updates itself with one click.</p>
+
+      <article class="tile t-3 fade">
+        <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></span>
+        <h3>Handy tools</h3>
+        <p>Duplicate finder, folder sizes, thumbnails, find &amp; replace across text files with undo, CSV export, and drag &amp; drop into WhatsApp or mail.</p>
+      </article>
+
+      <article class="tile t-3 fade">
+        <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 22 12a14 14 0 0 1-3 3.8M6.6 6.6A14 14 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/></svg></span>
+        <h3>Clean results</h3>
+        <p>System files and temp folders are hidden by default, so you only see your own files. Show them with one option, or type <code>system:</code>.</p>
+      </article>
+
+      <article class="tile t-3 fade">
+        <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
+        <h3>English or Arabic</h3>
+        <p>The interface follows your Windows language and can be switched any time. It starts with Windows in the background and updates itself with one click.</p>
       </article>
     </div>
   </div>
 </section>
 
-<section id="arabic" class="soft" aria-labelledby="arabic-title">
-  <div class="wrap">
-    <div class="section-head">
-      <h2 id="arabic-title">Arabic file search that understands how people type</h2>
-      <p>Hamza forms, ta marbuta, alef maqsura, diacritics, tatweel and the <span lang="ar">ال</span> prefix are ignored; Arabic-Indic digits and Persian letters are accepted. When nothing matches, it retries with the other keyboard layout, then Arabizi, then near spellings.</p>
-    </div>
-    <ul class="examples">
-      <li><span class="q" lang="ar">احمد</span><span class="arrow" aria-label="finds">→</span><span class="r" lang="ar">أحمد</span><span class="why">Hamza forms don't matter</span></li>
-      <li><span class="q" lang="ar">التقرير</span><span class="arrow" aria-label="finds">→</span><span class="r"><bdi lang="ar">تقرير</bdi>.pdf</span><span class="why">The <span lang="ar">ال</span> prefix doesn't block a match</span></li>
-      <li><span class="q">hgjrvdv</span><span class="arrow" aria-label="finds">→</span><span class="r" lang="ar">التقرير</span><span class="why">Typed on the wrong keyboard layout? Still found</span></li>
-      <li><span class="q">3abd</span><span class="arrow" aria-label="finds">→</span><span class="r" lang="ar">عبد</span><span class="why">Arabizi (Franco-Arabic) is read as Arabic</span></li>
-      <li><span class="q">fuzzy: reprot</span><span class="arrow" aria-label="finds">→</span><span class="r">report</span><span class="why">Tolerates one or two typos</span></li>
-      <li><span class="q"><bdi>root:</bdi> <span lang="ar">كتاب</span></span><span class="arrow" aria-label="finds">→</span><span class="r" lang="ar" dir="rtl">مكتبة، الكاتب، كتابات</span><span class="why">Words sharing the Arabic root</span></li>
-    </ul>
-  </div>
-</section>
-
-<section id="documents" aria-labelledby="documents-title">
+<section id="documents" class="soft" aria-labelledby="documents-title">
   <div class="wrap split">
-    <div>
+    <div class="fade">
+      <span class="kicker">Content search</span>
       <h2 id="documents-title">Search inside PDF, Word and more</h2>
-      <p>Tick <strong>Also search inside documents</strong> and press Enter: every file that contains your words is listed with a snippet of the matching text. Size and date filters work here too.</p>
-      <ul class="chips" aria-label="Supported file types">
-        <li>pdf</li><li>docx</li><li>doc</li><li>xlsx</li><li>xls</li><li>pptx</li><li>odt</li><li>ods</li><li>rtf</li><li>txt</li><li>csv</li><li>eml</li><li>msg</li><li>epub</li><li>zip</li><li>7z</li><li>tar</li><li>tar.gz</li>
-      </ul>
+      <p>Tick <strong>Also search inside documents</strong> and press Enter: every file that contains your words is listed. Size and date filters work here too.</p>
       <ul class="checks">
-        <li><strong>Persistent content index:</strong> each document's text is extracted once in the background, so later content searches are near-instant.</li>
+        <li><strong>Persistent content index:</strong> each document's text is extracted once in the background, so later searches are near-instant.</li>
         <li><strong>Images and scanned PDFs</strong> through the OCR engine built into Windows, with no download.</li>
-        <li><strong>Archives</strong> are read in memory without extracting, with zip-bomb limits.</li>
-        <li><strong>Reversed Arabic text in PDFs is repaired</strong>, and <kbd>F4</kbd> lists all matches in a file with line numbers.</li>
+        <li><strong>Reversed Arabic text in PDFs is repaired</strong>, and <kbd>F4</kbd> lists every match in a file with line numbers.</li>
       </ul>
     </div>
-    <figure class="shot">
+    <figure class="frame fade">
       <img src="../img/inside-en.png" width="946" height="593" loading="lazy" decoding="async" alt="Searching inside documents for budget in the Documents folder: two files found">
-      <figcaption>Searching inside the documents of one folder for “budget”.</figcaption>
+      <figcaption>Searching inside the documents of one folder for “budget”, on real Windows.</figcaption>
     </figure>
   </div>
 </section>
 
-<section id="speed" class="soft" aria-labelledby="speed-title">
+<section id="speed" aria-labelledby="speed-title">
   <div class="wrap">
-    <div class="section-head">
-      <h2 id="speed-title">Speed comparison</h2>
-      <p>Every release is run on real Windows before it is published: it indexes the whole drive and searches in Arabic, and it is not released if anything fails.</p>
+    <div class="section-head center fade">
+      <span class="kicker">Speed</span>
+      <h2 id="speed-title">One second instead of a minute and a half</h2>
+      <p>File-name search across the whole C: drive of a real Windows machine on GitHub Actions (an index of 1.2 million files).</p>
     </div>
-    <!-- BENCH -->
-    <div class="table-wrap"><table class="bench-table">
-      <caption>File-name search across the whole C: drive of a real Windows machine on GitHub Actions (Windows Server 2025, an index of 1.2 million files)</caption>
-      <thead><tr><th scope="col">Search</th><th scope="col">InstaFind</th><th scope="col"><code>dir /s</code></th><th scope="col"><code>Get-ChildItem</code></th></tr></thead>
-      <tbody>
-        <tr><th scope="row"><code>report</code></th><td><strong>1 s</strong></td><td>73–108 s</td><td>29–51 s</td></tr>
-        <tr><th scope="row"><code>احمد</code> (files named <span lang="ar">أحمد</span>)</th><td><strong>1 s</strong>, finds both</td><td>19–33 s, finds none</td><td>29–50 s, finds none</td></tr>
-      </tbody>
-    </table></div>
+    <div class="speed">
+      <div class="race reveal" role="group" aria-label="Searching for report">
+        <h3>Searching for <code>report</code></h3>
+        <div class="lane us"><span class="who">InstaFind</span><div class="track"><div class="fill" style="--w:1%"></div><span>1 s</span></div></div>
+        <div class="lane"><span class="who">Get-ChildItem</span><div class="track"><div class="fill" style="--w:47%"></div><span>29–51 s</span></div></div>
+        <div class="lane"><span class="who">dir /s</span><div class="track"><div class="fill" style="--w:100%"></div><span>73–108 s</span></div></div>
+      </div>
+      <div class="race reveal" role="group" aria-label="Searching for احمد">
+        <h3>Searching for <code>احمد</code> (files named <span lang="ar">أحمد</span>)</h3>
+        <div class="lane us"><span class="who">InstaFind</span><div class="track"><div class="fill" style="--w:1%"></div><span>1 s, finds both</span></div></div>
+        <div class="lane"><span class="who">Get-ChildItem</span><div class="track"><div class="fill" style="--w:46%"></div><span>29–50 s, finds none</span></div></div>
+        <div class="lane"><span class="who">dir /s</span><div class="track"><div class="fill" style="--w:31%"></div><span>19–33 s, finds none</span></div></div>
+      </div>
+    </div>
     <p class="bench-note">The second includes starting the command-line tool and loading the index from disk. In the open window, results appear as you type, in milliseconds. <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/blob/main/docs/media/bench.md">Raw results</a></p>
   </div>
 </section>
 
-<section id="privacy" aria-labelledby="privacy-title">
-  <div class="wrap split">
-    <div>
-      <h2 id="privacy-title">Your files stay on your PC</h2>
-      <p>InstaFind works offline. The index and every search live on your computer; nothing is uploaded anywhere.</p>
+<section id="new" class="soft" aria-labelledby="new-title">
+  <div class="wrap">
+    <div class="section-head fade">
+      <span class="kicker">What's new</span>
+      <h2 id="new-title">Latest releases</h2>
+      <p>InstaFind updates itself, so these improvements reach you without doing anything.</p>
     </div>
-    <ul class="checks">
-      <li>The only internet connection is the daily update check against GitHub.</li>
-      <li>Search from your phone over the home network is off by default; when on, it is PIN-protected and read-only.</li>
-      <li>No telemetry. Feedback and crash reports are optional and reach GitHub only when you press <strong>Submit</strong> yourself.</li>
-      <li>Open source under the MIT license: anyone can read the code on GitHub.</li>
-      <li>Its data lives in <code>%LOCALAPPDATA%\BahthSari\</code> and can be deleted at any time.</li>
-    </ul>
+    <div class="releases">
+      <article class="rel latest fade">
+        <header><span class="v">0.6.1</span><span class="tag">Current</span><time datetime="2026-11-01">Nov 1, 2026</time></header>
+        <ul>
+          <li>The underline under the matched word in the Arabic interface now sits exactly under it.</li>
+        </ul>
+      </article>
+      <article class="rel fade">
+        <header><span class="v">0.6.0</span><span class="tag">Major</span><time datetime="2026-11-01">Nov 1, 2026</time></header>
+        <ul>
+          <li><strong>Hide system files</strong> (on by default): the Windows folder, temp folders and the Recycle Bin stay out of your results.</li>
+          <li><strong>Cleaner interface:</strong> consistent buttons with icons, even spacing, and a layout that adapts to narrow windows.</li>
+          <li><strong>About 45 fixes</strong> for issues that could crash or freeze the app; automated tests grew from 262 to 364.</li>
+        </ul>
+      </article>
+      <article class="rel fade">
+        <header><span class="v">0.5.1</span><time datetime="2026-10-30">Oct 30, 2026</time></header>
+        <ul>
+          <li>E-mails and HTML pages whose text extraction used to fail are now read in full.</li>
+        </ul>
+      </article>
+    </div>
+    <p class="more-link"><a href="https://github.com/sarmadiq9090-coder/arabic-file-search/blob/main/CHANGELOG.md">Full changelog</a></p>
   </div>
 </section>
 
-<section id="install" class="soft" aria-labelledby="install-title">
+<section id="soon" aria-labelledby="soon-title">
   <div class="wrap">
-    <div class="section-head">
-      <h2 id="install-title">Download and install</h2>
-      <p>Pick whichever way suits you. The current version is 0.6.0.</p>
+    <div class="section-head center fade">
+      <span class="kicker">Coming soon</span>
+      <h2 id="soon-title">What we're working on</h2>
+      <p>These features are in development and not in the current release yet. They will reach you through the automatic update when they're ready.</p>
     </div>
-    <div class="steps">
-      <article class="card step direct">
+    <div class="roadmap">
+      <article class="stage fade">
+        <header><span class="v">0.7</span><span class="status testing">Very soon</span></header>
+        <h3>Every Windows PC, and easier feedback</h3>
+        <p>New builds for more hardware, and a simple way to send your ideas.</p>
+        <ul class="soon-list">
+          <li><span class="si" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></span><div><b>ARM64 and 32-bit builds</b><span>Native on Snapdragon and Surface devices, and on 32-bit Windows.</span></div></li>
+          <li><span class="si" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><div><b>Send feedback from the app</b><span>A suggestion or a problem, one click from the app's menu.</span></div></li>
+          <li><span class="si" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span><div><b>Opt-in crash reports</b><span>Nothing is sent unless you agree, and you can review it first.</span></div></li>
+        </ul>
+      </article>
+
+      <article class="stage fade">
+        <header><span class="v">0.8</span><span class="status">In development</span></header>
+        <h3>Search from anywhere in Windows</h3>
+        <div class="concept" role="img" aria-label="Concept: a small transparent search box above the taskbar clock">
+          <span class="label">Concept</span>
+          <div class="float"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><span class="ph">Search files and apps…</span><span class="k">Ctrl+Alt+F</span></div>
+          <div class="taskbar"><i></i><i></i><i></i><i></i><i></i><span class="clock">9:41 AM<br>11/1/2026</span></div>
+        </div>
+        <ul class="soon-list">
+          <li><span class="si" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></span><div><b>A floating search box above the clock</b><span>Transparent and unobtrusive: nearly invisible when the pointer is away, it fades in as you approach, and it can be turned off.</span></div></li>
+          <li><span class="si" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><div><b>Apps and Windows settings</b><span>Launch any app or open any settings page by typing its name, in English or Arabic.</span></div></li>
+          <li><span class="si" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="14" height="11" rx="2"/><path d="M8 19h12a2 2 0 0 0 2-2V9"/></svg></span><div><b>Switch between open windows</b><span>Type a window's name and jump straight to it.</span></div></li>
+          <li><span class="si" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 18h.01M12 18h4"/></svg></span><div><b>Calculator, unit conversion and Hijri date</b><span>Type a sum, a value to convert, or “hijri”, and the answer shows in the results.</span></div></li>
+          <li><span class="si" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg></span><div><b>System commands, with confirmation</b><span>Shut down, restart or lock, always with a confirmation first.</span></div></li>
+        </ul>
+      </article>
+    </div>
+    <p class="disclaimer">Details may change during development. Follow progress or suggest an idea on <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/issues">GitHub</a>.</p>
+  </div>
+</section>
+
+<section id="privacy" class="soft" aria-labelledby="privacy-title">
+  <div class="wrap">
+    <div class="section-head fade">
+      <span class="kicker">Privacy</span>
+      <h2 id="privacy-title">Your files stay on your PC</h2>
+      <p>The index and every search live on your computer; nothing is uploaded anywhere.</p>
+    </div>
+    <div class="privacy-grid">
+      <div class="pcard fade"><b>Offline</b><p>The only connection is a daily update check against GitHub.</p></div>
+      <div class="pcard fade"><b>No tracking</b><p>No telemetry, no ads, no accounts.</p></div>
+      <div class="pcard fade"><b>Phone access is off</b><p>Search from your phone over the home network only works if you turn it on, and then it is PIN-protected and read-only.</p></div>
+      <div class="pcard fade"><b>Open code</b><p>MIT licensed. Its data lives in <code>%LOCALAPPDATA%\BahthSari\</code> and can be deleted any time.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="install" aria-labelledby="install-title">
+  <div class="wrap">
+    <div class="section-head fade">
+      <span class="kicker">Download</span>
+      <h2 id="install-title">Ready in a minute</h2>
+      <p>Pick whichever way suits you. The current version is 0.6.1.</p>
+    </div>
+    <div class="install">
+      <article class="icard main fade">
         <h3>Direct download <span class="badge">Recommended</span></h3>
-        <p>A single file; nothing to install. Put it in a permanent folder, for example <code>%LOCALAPPDATA%\Programs\Bahth\</code>, and run it.</p>
+        <p>A single file, nothing to install. Put it in a permanent folder, for example <code>%LOCALAPPDATA%\Programs\Bahth\</code>, and run it. The first run indexes your drives in the background; after that it opens instantly.</p>
         <a class="btn btn-primary" href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
           Download bahth.exe
         </a>
       </article>
-      <article class="card step scoop">
+      <article class="icard fade">
         <h3>With Scoop</h3>
         <p>If you use the Scoop package manager:</p>
-<pre><code>scoop bucket add instafind https://github.com/sarmadiq9090-coder/arabic-file-search
+<pre><button class="copy" type="button" data-done="Copied ✓">Copy</button><code>scoop bucket add instafind https://github.com/sarmadiq9090-coder/arabic-file-search
 scoop install instafind</code></pre>
       </article>
-      <article class="card step winget">
+      <article class="icard fade">
         <h3>With winget <span class="badge soon">Coming soon</span></h3>
-        <p>Coming soon to the official winget repository:</p>
-<pre><code>winget install InstaFind</code></pre>
+        <p>Waiting for Microsoft to accept it into the official winget repository:</p>
+<pre><button class="copy" type="button" data-done="Copied ✓">Copy</button><code>winget install InstaFind</code></pre>
       </article>
     </div>
-    <p class="note">The first run indexes your drives in the background (a minute or more, depending on the number of files); after that the app opens instantly. If SmartScreen warns because the file is not code-signed: <strong>More info → Run anyway</strong>. Updates are automatic from then on.</p>
+    <div class="smartscreen fade">
+      <span class="shield" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="M12 9v4M12 16h.01"/></svg></span>
+      <p><strong>Seeing a SmartScreen warning?</strong> It appears because the file is not code-signed yet, not because it is harmful, and all the code is open on GitHub. Click <span class="steps-inline"><span class="s">More info</span> → <span class="s">Run anyway</span></span>. Updates are automatic from then on.</p>
+    </div>
   </div>
 </section>
 
-<section id="faq" aria-labelledby="faq-title">
+<section id="faq" class="soft" aria-labelledby="faq-title">
   <div class="wrap faq">
-    <h2 id="faq-title">Frequently asked questions</h2>
+    <div class="section-head center">
+      <span class="kicker">FAQ</span>
+      <h2 id="faq-title">Frequently asked questions</h2>
+    </div>
     <details>
       <summary>Is InstaFind free?</summary>
       <div><p>Yes. It is free and open source under the MIT license.</p></div>
@@ -283,6 +413,10 @@ scoop install instafind</code></pre>
       <div><p>Windows 10 or 11, 64-bit. Text recognition in images needs the Windows language pack for each OCR language.</p></div>
     </details>
     <details>
+      <summary>Does it run on ARM or 32-bit Windows?</summary>
+      <div><p>Not natively yet. ARM64 and 32-bit builds are coming in version 0.7. The current release is for 64-bit (x64) Windows 10 or 11, and it also runs on Windows 11 on ARM through emulation.</p></div>
+    </details>
+    <details>
       <summary>Why does SmartScreen warn me?</summary>
       <div><p>Because the file is not code-signed. Click <strong>More info</strong>, then <strong>Run anyway</strong>. All the source code is on <a href="https://github.com/sarmadiq9090-coder/arabic-file-search">GitHub</a>.</p></div>
     </details>
@@ -293,16 +427,17 @@ scoop install instafind</code></pre>
   </div>
 </section>
 
-<section class="final soft" aria-labelledby="final-title">
+<section class="final" aria-labelledby="final-title">
   <div class="wrap">
+    <img class="logo" src="../img/logo.svg" width="64" height="64" alt="">
     <h2 id="final-title">Try it now, for free</h2>
     <p>One file, nothing to install, and it finds any file as you type.</p>
     <div class="cta">
       <a class="btn btn-primary" href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
-        Download InstaFind 0.6.0
+        Download InstaFind 0.6.1
       </a>
-      <a class="btn btn-ghost" href="https://github.com/sarmadiq9090-coder/arabic-file-search/issues">Report a bug or suggest an idea</a>
+      <a class="btn btn-ghost" href="https://github.com/sarmadiq9090-coder/arabic-file-search/issues/new/choose">Report a bug or suggest an idea</a>
     </div>
   </div>
 </section>
