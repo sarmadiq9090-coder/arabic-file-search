@@ -272,6 +272,7 @@ impl NativeUi<AppUi> for App {
             .parent(&app.options_menu)
             .build(&mut app.menu_autostart)?;
         super::lang_menu::build(&app.options_menu, &mut app.lang_menu, &mut app.menu_lang_ar, &mut app.menu_lang_en)?;
+        super::feedback::build(&app.options_menu, &mut app.feedback_menu, [&mut app.menu_feedback_bug, &mut app.menu_feedback_idea, &mut app.menu_feedback_talk])?;
 
         // Tray icon, so a hidden window comes back instantly.
         app.tray_icon.handle = crate::icon::load_icon(true) as _;
@@ -385,7 +386,7 @@ impl NativeUi<AppUi> for App {
                         } else {
                             app.set_status(tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting."));
                         }
-                    } else if app.on_lang_item(handle) {
+                    } else if app.on_lang_item(handle) || app.on_feedback_item(handle) {
                     } else if handle == app.menu_update {
                         app.check_for_update(true);
                     } else if handle == app.menu_digits {

@@ -29,11 +29,14 @@ pub struct Settings {
     /// Leave Windows system files (the Windows folder, temp and cache
     /// folders…) out of search results.
     pub hide_system: bool,
+    /// Time of the newest crash report the user was already asked about
+    /// (seconds since 1970), so each report is offered once.
+    pub crash_seen: u64,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, auto_index: true, hide_system: true }
+        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, auto_index: true, hide_system: true, crash_seen: 0 }
     }
 }
 
@@ -56,6 +59,7 @@ impl Settings {
                 "content_index" => s.content_index = value != "0",
                 "auto_index" => s.auto_index = value != "0",
                 "hide_system" => s.hide_system = value != "0",
+                "crash_seen" => s.crash_seen = value.parse().unwrap_or(0),
                 _ => {}
             }
         }
@@ -65,7 +69,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let cols: Vec<String> = self.columns.iter().map(i32::to_string).collect();
         format!(
-            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\n",
+            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\n",
             self.width,
             self.height,
             self.maximized as u8,
@@ -77,7 +81,8 @@ impl Settings {
             self.update_check,
             self.content_index as u8,
             self.auto_index as u8,
-            self.hide_system as u8
+            self.hide_system as u8,
+            self.crash_seen
         )
     }
 
@@ -121,7 +126,7 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, auto_index: false, hide_system: false };
+        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, auto_index: false, hide_system: false, crash_seen: 1_800_000_000 };
         assert_eq!(Settings::parse(&s.to_text()), s);
         assert_eq!(Settings::parse("garbage\nwidth=abc"), Settings::default());
     }

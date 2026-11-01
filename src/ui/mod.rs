@@ -9,6 +9,7 @@
 //! - `files`: renaming and deleting files, and saving the edited index
 //! - `history_menu`: the menu of recent and saved searches
 //! - `updates`: checking for, downloading and installing new versions
+//! - `feedback`: the "Send feedback" menu and the offer to report a crash
 //! - `content_index`: the stored document text and its background warm-up
 //! - `watching`: applying changes from the drive watcher to the index
 //! - `keys`: keyboard handling and the global hotkey
@@ -25,6 +26,7 @@ mod build;
 mod content_index;
 mod dupes_window;
 mod disk_usage;
+mod feedback;
 mod files;
 mod format;
 mod history_menu;
@@ -231,6 +233,13 @@ pub struct App {
     lang_menu: nwg::Menu,
     menu_lang_ar: nwg::MenuItem,
     menu_lang_en: nwg::MenuItem,
+    /// Options ▸ "Send feedback": report a problem, suggest an idea, discuss.
+    feedback_menu: nwg::Menu,
+    menu_feedback_bug: nwg::MenuItem,
+    menu_feedback_idea: nwg::MenuItem,
+    menu_feedback_talk: nwg::MenuItem,
+    /// The crash reports of the last run were already offered (or none).
+    crash_checked: Cell<bool>,
     menu_export: nwg::MenuItem,
     menu_hide: nwg::MenuItem,
     tray_icon: nwg::Icon,

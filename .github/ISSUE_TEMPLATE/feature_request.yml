@@ -1,0 +1,48 @@
+name: "اقترح ميزة / Suggest a feature"
+description: "فكرة لتحسين InstaFind — بحث سريع / An idea to make InstaFind better"
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        يمكنك الكتابة بالعربية أو بالإنكليزية. / You can write in Arabic or English.
+  - type: textarea
+    id: idea
+    attributes:
+      label: "ماذا تريد؟ / What would you like?"
+      description: "صف الميزة أو التحسين. / Describe the feature or improvement."
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: "ما المشكلة التي تحلّها؟ / What problem does it solve?"
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: "إصدار البرنامج / App version"
+    validations:
+      required: false
+  - type: input
+    id: os
+    attributes:
+      label: "إصدار ويندوز / Windows version"
+    validations:
+      required: false
+  - type: input
+    id: arch
+    attributes:
+      label: "معمارية المعالج / Processor architecture"
+      description: "x86_64 / aarch64 / x86"
+    validations:
+      required: false
+  - type: input
+    id: lang
+    attributes:
+      label: "لغة الواجهة / Interface language"
+      description: "ar / en"
+    validations:
+      required: false
