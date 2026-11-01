@@ -95,12 +95,6 @@ public static class Win {
 }
 '@
 
-# Sample files. Empty documents are enough for name search; the two text files
-# carry the words the "inside documents" scene looks for.
-$docs = [Environment]::GetFolderPath('MyDocuments')
-$files = @{
-    'العمل\تقرير المبيعات 2026.xlsx' = ''
-
 $docs = [Environment]::GetFolderPath('MyDocuments')
 foreach ($f in @('العمل\تقرير المبيعات 2026.xlsx', 'العمل\التقرير السنوي النهائي.pdf', 'العمل\تقرير الاجتماع الأسبوعي.docx', 'Work\Quarterly report Q3 2026.xlsx')) {
     $p = Join-Path $docs $f
