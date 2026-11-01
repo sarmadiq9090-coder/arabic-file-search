@@ -22,13 +22,13 @@ cargo build --release --target x86_64-pc-windows-gnu
 
 ## Checks
 
-Every push and pull request runs [`.github/workflows/build.yml`](../.github/workflows/build.yml): `cargo clippy --all-targets -D warnings` on Linux and Windows, `cargo test` on both, and a release build uploaded as the `bahth-windows` artifact.
+Every push and pull request runs [`.github/workflows/build.yml`](../.github/workflows/build.yml): `cargo clippy --all-targets -D warnings` on Linux and Windows, `cargo test` (debug and release) on Linux and `cargo test --release` on Windows, then the gnu cross-build of `bahth.exe` (artifact `bahth-exe`) and a smoke test of that exact exe on real Windows ([`ci/smoke.ps1`](../ci/smoke.ps1)): the GUI indexes the runner's drives, the command line searches the index (Arabic, emoji, long names, filters), and any `crash.txt` or early exit fails the job.
 
 ## Releases
 
 1. Bump `version` in `Cargo.toml` and add the entry to [CHANGELOG.md](../CHANGELOG.md).
 2. Write `releases/vX.Y.Z-notes.md`. The first line, `# title`, becomes the release title; the rest is the release body (Arabic first, then a short **English:** line).
-3. Push to `main`. When the version has no tag yet, the `release` job builds `bahth.exe` with the gnu toolchain, creates the tag and publishes the GitHub Release as *latest*.
+3. Push to `main`. When the version has no tag yet and the smoke test passed, the `release` job publishes the very `bahth.exe` the smoke test ran, creates the tag and marks the GitHub Release as *latest*.
 
 The in-app updater (`src/update.rs`) reads the latest release and downloads the asset named exactly **`bahth.exe`**, so keep that name, keep releases out of draft/prerelease, and keep the repository URL. Editing a `releases/*-notes.md` file later re-syncs that release's title and body ([`release-notes.yml`](../.github/workflows/release-notes.yml)); assets are never touched.
 
