@@ -9,3 +9,11 @@ pub struct OpenWindow {
     pub exe: String,
     pub pid: u32,
 }
+
+use super::{Context, Item};
+
+/// "Switch to" results for open windows whose title or program matches `query`.
+pub fn matches(query: &str, ctx: &Context) -> Vec<Item> {
+    let _ = (query, ctx);
+    Vec::new()
+}
