@@ -10,14 +10,14 @@
         "Query":  "report",
         "Note":  "English word",
         "Tool":  "cmd: dir /s",
-        "Seconds":  108.79,
+        "Seconds":  107.31,
         "Found":  3068
     },
     {
         "Query":  "report",
         "Note":  "English word",
         "Tool":  "PowerShell: Get-ChildItem -Recurse",
-        "Seconds":  51.19,
+        "Seconds":  49.31,
         "Found":  2370
     },
     {
@@ -39,14 +39,14 @@
         "Query":  "احمد",
         "Note":  "Arabic, typed without hamza (the file is named أحمد)",
         "Tool":  "cmd: dir /s",
-        "Seconds":  32.73,
+        "Seconds":  32.76,
         "Found":  0
     },
     {
         "Query":  "احمد",
         "Note":  "Arabic, typed without hamza (the file is named أحمد)",
         "Tool":  "PowerShell: Get-ChildItem -Recurse",
-        "Seconds":  50.48,
+        "Seconds":  49.11,
         "Found":  0
     },
     {
