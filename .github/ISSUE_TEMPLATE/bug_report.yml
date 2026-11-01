@@ -1,0 +1,72 @@
+name: "أبلغ عن مشكلة / Report a problem"
+description: "شيء لا يعمل كما يجب في InstaFind — بحث سريع / Something in InstaFind does not work as it should"
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        شكراً لأنك تساعد في تحسين البرنامج! يمكنك الكتابة بالعربية أو بالإنكليزية. لا تكتب أسماء ملفات أو مسارات خاصة بك، والصور (لقطات الشاشة) مرحّب بها: اسحبها إلى المربع.
+
+        Thanks for helping improve the app! You can write in Arabic or English. Please don't include private file names or paths. Screenshots are welcome: drag them into a box.
+  - type: textarea
+    id: what
+    attributes:
+      label: "ما المشكلة؟ / What went wrong?"
+      description: "ماذا حدث؟ / What happened?"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: "خطوات إعادة المشكلة / Steps to reproduce"
+      description: "ماذا فعلت قبل أن تظهر؟ / What did you do before it happened?"
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: false
+  - type: textarea
+    id: expected
+    attributes:
+      label: "ما الذي توقعته؟ / What did you expect?"
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: "إصدار البرنامج / App version"
+      description: "تجده في قائمة «خيارات» بجانب «التحقق من التحديثات» / Shown in the Options menu next to “Check for updates”"
+      placeholder: "0.7.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: "إصدار ويندوز / Windows version"
+      placeholder: "Windows 11 24H2"
+    validations:
+      required: false
+  - type: input
+    id: arch
+    attributes:
+      label: "معمارية المعالج / Processor architecture"
+      description: "x86_64 / aarch64 / x86"
+    validations:
+      required: false
+  - type: input
+    id: lang
+    attributes:
+      label: "لغة الواجهة / Interface language"
+      description: "ar / en"
+    validations:
+      required: false
+  - type: textarea
+    id: crash
+    attributes:
+      label: "تقرير الخطأ / Crash report"
+      description: "يُملأ تلقائياً حين يعرض البرنامج الإبلاغ عن خطأ داخلي. / Filled in automatically when the app offers to report an internal error."
+      render: text
+    validations:
+      required: false
