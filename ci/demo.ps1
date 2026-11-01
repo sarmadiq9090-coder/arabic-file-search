@@ -201,7 +201,7 @@ function Set-Inside([bool]$on, [string[]]$names) {
 # dialog, so the inside-documents scene reads the sample files, not the drive.
 function Set-Scope([string[]]$names) {
     $b = Controls | Where-Object { $_.Class -eq 'Button' -and $names -contains $_.Text } | Select-Object -First 1
-    if (-not $b) { Write-Host "::warning::folder button not found"; return }
+    if (-not $b) { throw 'folder button not found' }
     [Win]::SetForegroundWindow($script:hwnd) | Out-Null
     [Win]::Click($b.H)
     $dlg = [IntPtr]::Zero
@@ -209,13 +209,25 @@ function Set-Scope([string[]]$names) {
         Start-Sleep -Milliseconds 500
         $dlg = [Win]::TopWindows($script:appPid) | Where-Object { [Win]::Class($_) -eq '#32770' } | Select-Object -First 1
     }
-    if (-not $dlg) { Write-Host '::warning::folder dialog did not open'; return }
-    $kids = [Win]::Children($dlg)
-    $edit = $kids | Where-Object { [Win]::Class($_) -eq 'Edit' -and [Win]::ParentClass($_) -eq 'ComboBox' } | Select-Object -First 1
-    if ($edit) { [Win]::SetText($edit, $docs) }
-    Start-Sleep -Milliseconds 500
-    $ok = $kids | Where-Object { [Win]::Class($_) -eq 'Button' -and [Win]::Text($_) -eq 'Select Folder' } | Select-Object -First 1
-    if ($ok) { [Win]::Press($ok) } else { Write-Host '::warning::Select Folder button not found'; $kids | ForEach-Object { Write-Host "  $([Win]::Class($_)) | $([Win]::Text($_))" } }
+    if (-not $dlg) { throw 'folder dialog did not open' }
+    # The dialog builds its controls after it appears: wait for them, then
+    # retry until it closes, and fail the run rather than record it open.
+    for ($try = 0; $try -lt 20; $try++) {
+        Start-Sleep -Milliseconds 500
+        if (-not ([Win]::TopWindows($script:appPid) -contains $dlg)) { break }
+        $kids = [Win]::Children($dlg)
+        $edit = $kids | Where-Object { [Win]::Class($_) -eq 'Edit' -and [Win]::ParentClass($_) -eq 'ComboBox' } | Select-Object -First 1
+        $ok = $kids | Where-Object { [Win]::Class($_) -eq 'Button' -and [Win]::Text($_) -eq 'Select Folder' } | Select-Object -First 1
+        if ($edit -and $ok) {
+            [Win]::SetText($edit, $docs)
+            Start-Sleep -Milliseconds 300
+            [Win]::Press($ok)
+        }
+    }
+    if ([Win]::TopWindows($script:appPid) -contains $dlg) {
+        [Win]::Children($dlg) | ForEach-Object { Write-Host "  $([Win]::Class($_)) | $([Win]::Text($_))" }
+        throw 'the folder dialog did not close'
+    }
     Start-Sleep -Seconds 2
     [Win]::SetForegroundWindow($script:hwnd) | Out-Null
 }
