@@ -54,7 +54,7 @@ if (Test-Path $index) {
     if ($r.Code -ne 0) { Fail 'Unicode name search failed' }
     $r = Run-Cli @('-s', 'longxxxxxxxxxx')
     if ($r.Code -ne 0) { Fail 'long name search failed' }
-    foreach ($q in @('ext:dll', 'size:>1mb', 'regex:^a.*z$', '"a b"~3', 'ـــ', '*')) {
+    foreach ($q in @('ext:dll', 'sys: notepad', 'نظام: ext:exe', 'size:>1mb', 'regex:^a.*z$', '"a b"~3', 'ـــ', '*')) {
         $r = Run-Cli @('-s', $q, '--count')
         if ($r.Code -gt 1) { Fail "query '$q' failed with exit $($r.Code)" }
     }
