@@ -37,11 +37,15 @@ if ($r.Code -ne 0) { Fail "--help failed" }
 
 Write-Host 'Starting the GUI…'
 $gui = Start-Process -FilePath $Exe -PassThru
-$deadline = (Get-Date).AddSeconds(420)
+# A runner's drives hold millions of files (toolchains, SDKs); the first scan
+# of all of them takes a while.
+$started = Get-Date
+$deadline = $started.AddMinutes(25)
 while ((Get-Date) -lt $deadline -and -not (Test-Path $index)) {
     if ($gui.HasExited) { break }
     Start-Sleep -Seconds 5
 }
+if (Test-Path $index) { Write-Host ("index saved after {0:N0} s" -f ((Get-Date) - $started).TotalSeconds) }
 Start-Sleep -Seconds 15   # let it settle: content indexing, watcher, timers
 if ($gui.HasExited) { Fail "the GUI exited by itself (code $($gui.ExitCode))" }
 if (Test-Path $crash) { Fail "crash report written:"; Get-Content $crash | Write-Host }
