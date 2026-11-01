@@ -642,6 +642,55 @@ mod tests {
         assert!(Query::parse("franco: 3abd").terms[0].alts.len() <= 1 + franco::MAX_CANDIDATES * 2);
     }
 
+    /// A tiny xorshift generator: the same cases on every run.
+    fn rng(state: &mut u64, n: usize) -> usize {
+        *state ^= *state << 13;
+        *state ^= *state >> 7;
+        *state ^= *state << 17;
+        (*state % n as u64) as usize
+    }
+
+    #[test]
+    fn random_names_and_queries_never_panic() {
+        // Letters that confuse, articles, digits, marks that normalise away,
+        // combining marks, emoji and separators.
+        let pieces = [
+            "ض", "ظ", "ت", "ط", "ا", "ل", "ال", "وال", "ب", "ي", "ء", "ه", "ة", "ك", "م", "س", "ر", "ق", "re", "port", "o",
+            "x", "1", "2024", " ", "_", ".", "-", "\u{064E}", "\u{0640}", "\u{0301}", "😀", "\u{200D}", "İ", "ß", "\u{FEFB}",
+            "\u{FFFD}", "تقرير", "مستخدم",
+        ];
+        let mut s = 0xC0FF_EE00_1234_5678;
+        let words = |s: &mut u64, max: usize| -> String { (0..rng(s, max)).map(|_| pieces[rng(s, pieces.len())]).collect() };
+        let names: Vec<String> = (0..200).map(|_| words(&mut s, 12)).collect();
+        let es: Vec<Entry> = names.iter().map(|n| entry(&format!(r"C:\d\{n}"))).collect();
+        for _ in 0..400 {
+            let mode = ["fuzzy:", "root:", "fuzzy: root:", "جذر:", "تقريب:"][rng(&mut s, 5)];
+            let text = format!("{mode} {} {}", words(&mut s, 8), words(&mut s, 3));
+            let q = Query::parse(&text);
+            for &i in &fuzzy_search_names(&es, &q, "") {
+                assert!((i as usize) < es.len());
+            }
+            for e in es.iter().take(20) {
+                for (a, b) in word_spans(&e.norm_name, &q) {
+                    assert!(a < b && b <= e.norm_name.len() && e.norm_name.is_char_boundary(a) && e.norm_name.is_char_boundary(b));
+                }
+                let r = search::match_ranges(e.name(), &q);
+                assert!(r.iter().all(|&(a, b)| a < b && b <= e.name().len() && e.name().is_char_boundary(a)));
+            }
+            let _ = name_fallback(&es, &text[mode.len()..], "", &|t: &str| Query::parse(t));
+        }
+        // Distances on random character slices, including terms past the length cap.
+        for _ in 0..20_000 {
+            let t: Vec<char> = words(&mut s, 20).chars().collect();
+            let w: Vec<char> = words(&mut s, 20).chars().collect();
+            for max in [0, 1, 2, 3, 4, 5, 255] {
+                if let Some(d) = prefix_distance(&t, &w, max) {
+                    assert!(d <= max);
+                }
+            }
+        }
+    }
+
     #[test]
     #[ignore = "benchmark: cargo test --release -- --ignored --nocapture"]
     fn fuzzy_two_million() {

@@ -176,6 +176,61 @@ mod tests {
         }
     }
 
+    /// Random strings from the code point ranges normalisation treats
+    /// specially (and any scalar value now and then), same on every run.
+    fn random_strings(seed: u64, count: usize) -> Vec<String> {
+        const RANGES: &[(u32, u32)] = &[
+            (0x20, 0x7E),
+            (0xC0, 0x24F),
+            (0x300, 0x36F),
+            (0x390, 0x3CF),
+            (0x600, 0x6FF),
+            (0x200B, 0x206F),
+            (0xFB00, 0xFB06),
+            (0xFB50, 0xFDFF),
+            (0xFE70, 0xFEFF),
+            (0x1F468, 0x1F469),
+            (0x200D, 0x200D),
+        ];
+        let mut s = seed;
+        let mut next = |n: u32| {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            (s % u64::from(n)) as u32
+        };
+        (0..count)
+            .map(|_| {
+                (0..next(24))
+                    .map(|_| {
+                        let c = if next(40) == 0 {
+                            next(0x11_0000)
+                        } else {
+                            let (lo, hi) = RANGES[next(RANGES.len() as u32) as usize];
+                            lo + next(hi - lo + 1)
+                        };
+                        char::from_u32(c).unwrap_or('\u{FFFD}')
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn random_text_map_invariants() {
+        for s in random_strings(0x5EED_0001, 20_000) {
+            let (n, map) = normalize_with_map(&s);
+            assert_eq!(n, normalize(&s), "{s:?}");
+            assert_eq!(map.len(), n.len(), "{s:?}");
+            assert!(map.windows(2).all(|w| w[0] <= w[1]), "{s:?}");
+            assert!(map.iter().all(|&m| s.is_char_boundary(m as usize) && (m as usize) < s.len()), "{s:?}");
+            // Every normalised character starts at a byte that maps to a source character start.
+            assert!(n.char_indices().all(|(i, _)| s.is_char_boundary(map[i] as usize)), "{s:?}");
+            // Nothing that normalisation drops survives it.
+            assert!(!n.contains(['\u{0640}', '\u{064E}', '\u{200F}', '\u{FEFF}']), "{s:?}");
+        }
+    }
+
     #[test]
     fn map_agrees_with_normalize() {
         for s in SAMPLES {

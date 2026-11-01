@@ -20,6 +20,10 @@ const LETTER_DIGITS: &[u8] = b"2356789";
 /// almost every Arabic name.
 const MIN_LEN: usize = 2;
 
+/// Longest word read as Arabizi. Real words are far shorter, and spelling
+/// takes time quadratic in the length (a pasted line of text would hang).
+const MAX_WORD: usize = 48;
+
 /// True when `word` (normalised: lower-case ASCII) looks like an Arabizi
 /// word: letters, possibly with letter digits, at least two letters, and
 /// no more digits than letters.
@@ -28,6 +32,7 @@ pub fn is_arabizi(word: &str) -> bool {
     let letters = b.iter().filter(|c| c.is_ascii_lowercase()).count();
     let digits = b.iter().filter(|c| c.is_ascii_digit()).count();
     letters >= 2
+        && b.len() <= MAX_WORD
         && digits <= letters
         && b.iter().all(|c| c.is_ascii_lowercase() || LETTER_DIGITS.contains(c))
 }
@@ -300,5 +305,39 @@ mod tests {
         assert!(!worth_trying(&Query::parse("ab")));
         assert!(!worth_trying(&Query::parse("2024")));
         assert!(!worth_trying(&Query::parse("ext:pdf")));
+    }
+
+    #[test]
+    fn long_words_are_not_arabizi() {
+        // A pasted run of Latin letters used to take seconds to spell out.
+        let w = "ba".repeat(20_000);
+        let t = std::time::Instant::now();
+        assert!(candidates(&w).is_empty() && !is_arabizi(&w));
+        assert!(t.elapsed() < std::time::Duration::from_secs(1));
+        assert!(!candidates(&"a".repeat(MAX_WORD)).is_empty());
+    }
+
+    /// A tiny xorshift generator: the same cases on every run.
+    fn rng(state: &mut u64, n: usize) -> usize {
+        *state ^= *state << 13;
+        *state ^= *state >> 7;
+        *state ^= *state << 17;
+        (*state % n as u64) as usize
+    }
+
+    #[test]
+    fn random_words_never_panic() {
+        let alphabet = b"abcdeghiklmnoqrstuwxyz2356789 0";
+        let mut s = 0x9E37_79B9_7F4A_7C15;
+        for _ in 0..20_000 {
+            let len = rng(&mut s, 60);
+            let w: String = (0..len).map(|_| alphabet[rng(&mut s, alphabet.len())] as char).collect();
+            let c = candidates(&w);
+            assert!(c.len() <= MAX_CANDIDATES, "{w}");
+            assert!(c.iter().all(|a| a.chars().count() >= MIN_LEN && !a.is_ascii()), "{w}");
+        }
+        for w in ["", "a", "ü", "\u{0}", "aaaaaaaa", "2222", "allahallah", "shshsh"] {
+            let _ = candidates(w);
+        }
     }
 }

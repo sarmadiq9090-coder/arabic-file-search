@@ -189,6 +189,29 @@ mod tests {
     }
 
     #[test]
+    fn random_input_never_panics() {
+        let pieces = [
+            "h", "g", "J", "b", "T", "[", ";", "'", ".", "/", "`", "ا", "ل", "لا", "لأ", "أ", "ى", "ة", "ؤ", "ء", " ", "  ",
+            "ext:", "*.", ".pdf", "folder:", "مجلد:", "\u{064E}", "\u{0640}", "😀", "\u{200D}", "\u{0301}", "ڤ", "İ", "1",
+            "\t", "\u{FEFB}", "\u{0}",
+        ];
+        let mut s: u64 = 0xA5A5_5A5A_1234_4321;
+        let mut next = |n: usize| {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            (s % n as u64) as usize
+        };
+        for _ in 0..30_000 {
+            let input: String = (0..next(10)).map(|_| pieces[next(pieces.len())]).collect();
+            if let Some(out) = convert_layout(&input) {
+                assert_ne!(out, input.split_whitespace().collect::<Vec<_>>().join(" "));
+                assert_eq!(out.split(' ').count(), input.split_whitespace().count(), "{input:?}");
+            }
+        }
+    }
+
+    #[test]
     fn converted_text_matches_after_normalising() {
         use crate::normalize::normalize;
         assert_eq!(normalize(&convert_layout("hgjrvdv").unwrap()), normalize("التقرير"));
