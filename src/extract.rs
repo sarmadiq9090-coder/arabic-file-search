@@ -525,7 +525,12 @@ fn workbook_zip_ok<R: Read + Seek>(r: &mut R) -> bool {
         if !zip_ratio_ok(f.size(), f.compressed_size()) {
             return false;
         }
-        total = total.saturating_add(f.size());
+        // Sheets are streamed cell by cell; only the other members (shared
+        // strings above all) are read whole, so only they count.
+        let name = f.name().map(|n| n.to_ascii_lowercase()).unwrap_or_default();
+        if !(name.starts_with("xl/worksheets/") && (name.ends_with(".xml") || name.ends_with(".bin"))) {
+            total = total.saturating_add(f.size());
+        }
     }
     total <= MAX_WORKBOOK_UNZIPPED
 }
@@ -624,7 +629,8 @@ fn xls_stream_size_ok(stream: &[u8]) -> bool {
                 0x00BD if data.len() >= 6 => {
                     let first = u16_at(data, 2);
                     add(u16_at(data, 0), first);
-                    add(u16_at(data, 0), first + (data.len() as u32 - 6) / 6);
+                    // rw, colFirst, 6-byte cells, colLast: the last column is first + cells - 1.
+                    add(u16_at(data, 0), first + ((data.len() as u32 - 6) / 6).saturating_sub(1));
                 }
                 _ => {}
             }

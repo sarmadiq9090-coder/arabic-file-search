@@ -46,7 +46,11 @@ const SYSTEM_PROFILES: &[&str] = &["default", "default user", "all users"];
 const PROFILE_FILES: &[&str] = &["ntuser.ini", "ntuser.pol", "usrclass.dat"];
 
 /// Folders under `AppData\Local` that hold only Windows and app data.
-const LOCAL_DIRS: &[&str] = &["temp", "microsoft", "packages", "crashdumps", "d3dscache"];
+const LOCAL_DIRS: &[&str] = &["temp", "packages", "crashdumps", "d3dscache"];
+
+/// Folders under `AppData\Local\Microsoft` that hold the user's own files
+/// (Outlook data files, Office autosaves); the rest is Windows' caches.
+const MICROSOFT_USER_DIRS: &[&str] = &["outlook", "office"];
 
 /// Cache folders of browsers and Electron apps, hidden anywhere below
 /// `AppData\Local\<app>` or `AppData\Roaming\<app>`.
@@ -103,7 +107,12 @@ pub fn is_system_path(path: &str) -> bool {
         return any_eq(top, ROOT_DIRS) || any_eq(top, ROOT_FILES);
     };
     if any_eq(top, ROOT_DIRS) {
-        return true;
+        // The shared Start menu shortcuts are what people look for there.
+        let start_menu = eq(top, "programdata")
+            && eq(second, "microsoft")
+            && parts.next().is_some_and(|p| eq(p, "windows"))
+            && parts.next().is_some_and(|p| eq(p, "start menu"));
+        return !start_menu;
     }
     if !eq(top, "users") {
         return false;
@@ -132,6 +141,10 @@ pub fn is_system_path(path: &str) -> bool {
     if local && any_eq(app, LOCAL_DIRS) {
         return true;
     }
+    if local && eq(app, "microsoft") {
+        // `Local\Microsoft` itself shows; inside it only the user's folders.
+        return parts.next().is_some_and(|p| !any_eq(p, MICROSOFT_USER_DIRS));
+    }
     parts.any(|p| any_eq(p, CACHE_DIRS))
 }
 
@@ -144,6 +157,20 @@ pub fn show_system(hide: bool, scope: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::is_system_path as sys;
+
+    #[test]
+    fn users_own_microsoft_and_start_menu_files_show() {
+        assert!(!sys(r"C:\Users\a\AppData\Local\Microsoft\Outlook\mail.pst"));
+        assert!(!sys(r"C:\Users\a\AppData\Local\Microsoft\Office\UnsavedFiles\Book1.xlsx"));
+        assert!(!sys(r"C:\Users\a\AppData\Local\Microsoft"));
+        assert!(sys(r"C:\Users\a\AppData\Local\Microsoft\Windows\INetCache\x.dat"));
+        assert!(sys(r"C:\Users\a\AppData\Local\Microsoft\Edge\User Data\x"));
+        assert!(!sys(r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Word.lnk"));
+        assert!(sys(r"C:\ProgramData\Microsoft\Windows\WER\x.wer"));
+        assert!(sys(r"C:\ProgramData\Package Cache\x.msi"));
+    }
+
     use super::*;
 
     #[test]
@@ -167,7 +194,7 @@ mod tests {
             r"C:\PerfLogs",
             r"C:\System Volume Information\tracking.log",
             r"C:\MSOCache\All Users\x.msi",
-            r"C:\ProgramData\Microsoft\Windows\Start Menu\x.lnk",
+            r"C:\ProgramData\Microsoft\Windows\Caches\x.db",
             r"C:\programdata",
             r"C:\Windows.old\Users\a\Documents\x.docx",
         ] {

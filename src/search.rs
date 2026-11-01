@@ -158,10 +158,12 @@ impl Near {
     /// needs two occurrences. Indexed by term number; repeats of an earlier
     /// term get 0 and count towards that term.
     fn needs(&self) -> Vec<u32> {
+        // A handful of words: a linear scan beats a hash map, and this runs
+        // once per entry name checked.
         let mut need = vec![0u32; self.words.len()];
-        let mut first: std::collections::HashMap<&[String], usize> = std::collections::HashMap::new();
         for (t, term) in self.words.iter().enumerate() {
-            need[*first.entry(&term.alts[..]).or_insert(t)] += 1;
+            let first = self.words[..t].iter().position(|w| w.alts == term.alts).unwrap_or(t);
+            need[first] += 1;
         }
         need
     }
@@ -951,7 +953,12 @@ impl Query {
         (!self.dirs_only || e.is_dir)
             && self.ext_ok(e)
             && self.meta_ok(e)
-            && (self.show_system || !crate::system_files::is_system_path(&e.path))
+    }
+
+    /// The "hide system files" filter; checked last, on entries that already
+    /// matched, as it walks the whole path.
+    pub(crate) fn system_ok(&self, e: &Entry) -> bool {
+        self.show_system || !crate::system_files::is_system_path(&e.path)
     }
 
     /// Regex, whole-word and proximity filters on an entry's name.
@@ -964,7 +971,7 @@ impl Query {
     /// Every filter on an entry's name: type, folder, size, date, excluded
     /// words, regex, whole word and proximity.
     pub(crate) fn entry_ok(&self, e: &Entry) -> bool {
-        self.kind_ok(e) && !self.excludes.iter().any(|x| e.norm_name.contains(x.as_str())) && self.name_ok(e)
+        self.kind_ok(e) && !self.excludes.iter().any(|x| e.norm_name.contains(x.as_str())) && self.name_ok(e) && self.system_ok(e)
     }
 }
 
@@ -1065,7 +1072,7 @@ pub fn search_content(
     let candidates: Vec<u32> = entries
         .par_iter()
         .enumerate()
-        .filter(|(_, e)| content_cache::is_document(e) && q.kind_ok(e))
+        .filter(|(_, e)| content_cache::is_document(e) && q.kind_ok(e) && q.system_ok(e))
         .filter(|(_, e)| in_scope(&e.path, &scope_lower))
         .map(|(i, _)| i as u32)
         .collect();

@@ -931,6 +931,10 @@ fn download(path: &str, shared: &Shared) -> Response {
     if path.is_empty() || path.contains('\0') {
         return not_found();
     }
+    // Hidden system files are not offered for download either.
+    if !shared.show_system.load(Ordering::Relaxed) && crate::system_files::is_system_path(path) {
+        return not_found();
+    }
     let index = shared.index();
     let Some(entry) = index.find(path).and_then(|i| index.entries.get(i)) else { return not_found() };
     if entry.is_dir {
