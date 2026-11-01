@@ -349,6 +349,10 @@ pub fn parse_head(head: &[u8]) -> Result<Request, HttpError> {
     if req.header("transfer-encoding").is_some() {
         return Err(HttpError::Bad);
     }
+    // Two `Host` headers could each be read differently: refused (RFC 9112).
+    if req.headers.iter().filter(|(n, _)| n == "host").count() > 1 {
+        return Err(HttpError::Bad);
+    }
     Ok(req)
 }
 
@@ -610,7 +614,7 @@ fn fmt_date(mtime: i64) -> String {
     if mtime <= 0 {
         return String::new();
     }
-    let iso = crate::cli::iso_time(mtime + crate::search::utc_offset_secs() as i64);
+    let iso = crate::cli::iso_time(mtime.saturating_add(crate::search::utc_offset_secs() as i64));
     iso.get(..16).map(|s| s.replace('T', " ")).unwrap_or_default()
 }
 
@@ -768,6 +772,14 @@ impl Shared {
         self.secrets.read().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
+    /// The token and PIN the server checks right now, `(token, pin)`: what
+    /// the window must show, even if saving them to the registry failed.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    pub fn current_secrets(&self) -> (String, String) {
+        let s = self.secrets();
+        (s.token, s.pin)
+    }
+
     fn limiter(&self) -> std::sync::MutexGuard<'_, Limiter> {
         self.limiter.lock().unwrap_or_else(|e| e.into_inner())
     }
@@ -803,6 +815,26 @@ fn after_login(req: &Request) -> String {
     if rest.is_empty() { base.to_string() } else { format!("{base}?{}", rest.join("&")) }
 }
 
+/// True when the browser says the request comes from another web site:
+/// `Sec-Fetch-Site: cross-site`, or an `Origin` that is not this server.
+/// (`Origin: null` is allowed: our own form sends it, as our pages use
+/// `Referrer-Policy: no-referrer`.) Such a request must not log in, nor
+/// count as a wrong guess, or any web page the phone or PC visits could
+/// lock the PIN out by posting wrong ones.
+fn cross_site(req: &Request) -> bool {
+    if req.header("sec-fetch-site").is_some_and(|s| s.eq_ignore_ascii_case("cross-site")) {
+        return true;
+    }
+    match req.header("origin") {
+        None => false,
+        Some(o) if o.eq_ignore_ascii_case("null") => false,
+        Some(o) => {
+            let host = o.split_once("://").map_or("", |(_, h)| h).trim_end_matches('/');
+            !req.header("host").is_some_and(|h| h.trim().eq_ignore_ascii_case(host))
+        }
+    }
+}
+
 /// Answers one request. `peer` has already passed [`accept_ok`]; it is
 /// checked again so this function is safe on its own.
 pub fn handle(req: &Request, peer: IpAddr, shared: &Shared, now: Instant) -> Response {
@@ -822,6 +854,9 @@ pub fn handle(req: &Request, peer: IpAddr, shared: &Shared, now: Instant) -> Res
     let secrets = shared.secrets();
 
     if is_login {
+        if cross_site(req) {
+            return Response::html(403, login_page(Some(tr!("طلب من موقع آخر.", "Request from another site."))));
+        }
         if let Err(wait) = shared.limiter().check(now) {
             return locked_response(wait);
         }
@@ -847,7 +882,12 @@ pub fn handle(req: &Request, peer: IpAddr, shared: &Shared, now: Instant) -> Res
             shared.limiter().success();
             return Response::redirect(after_login(req), Some(session_cookie(&secrets.token)));
         }
-        shared.limiter().fail(now);
+        // A wrong token from another site's page is not a guess worth
+        // counting (128 random bits), and counting it would let any page
+        // lock the phone out.
+        if !cross_site(req) {
+            shared.limiter().fail(now);
+        }
         return Response::html(401, login_page(Some(tr!("الرابط قديم أو غير صحيح.", "The link is old or wrong."))));
     }
 
@@ -921,11 +961,33 @@ fn error_response(e: &HttpError) -> Option<Response> {
     }
 }
 
+/// Reads from a socket but never past `until`: each read waits at most the
+/// time left (and at most [`READ_TIMEOUT`]), so a sender trickling a byte
+/// just before every timeout is still cut off at [`REQUEST_DEADLINE`].
+struct DeadlineReader<'a> {
+    stream: &'a TcpStream,
+    until: Instant,
+}
+
+impl Read for DeadlineReader<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let left = self.until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(io::ErrorKind::TimedOut.into());
+        }
+        // A zero timeout would mean "wait for ever".
+        self.stream.set_read_timeout(Some(left.min(READ_TIMEOUT).max(Duration::from_millis(1))))?;
+        let mut s: &TcpStream = self.stream;
+        s.read(buf)
+    }
+}
+
 fn serve_connection(mut stream: TcpStream, peer: IpAddr, shared: &Shared, stop: &AtomicBool) {
     let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
     let _ = stream.set_write_timeout(Some(WRITE_TIMEOUT));
     let _ = stream.set_nodelay(true);
-    match read_request(&mut stream) {
+    let mut reader = DeadlineReader { stream: &stream, until: Instant::now() + REQUEST_DEADLINE };
+    match read_request(&mut reader) {
         Ok(req) => {
             let head_only = req.method == "HEAD";
             let resp = handle(&req, peer, shared, Instant::now());
@@ -1413,5 +1475,181 @@ mod tests {
         server.stop();
         std::thread::sleep(Duration::from_millis(50));
         assert!(TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_err(), "stopped");
+    }
+
+    /// A tiny xorshift generator: the same cases on every run.
+    struct Rng(u64);
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+        fn below(&mut self, n: usize) -> usize {
+            (self.next() % n as u64) as usize
+        }
+    }
+
+    #[test]
+    fn two_host_headers_are_refused() {
+        let bad = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nHost: evil.example\r\n\r\n";
+        assert_eq!(read_request(&mut bad.as_bytes()).err(), Some(HttpError::Bad));
+    }
+
+    #[test]
+    fn cross_site_login_is_refused_and_not_counted() {
+        let s = shared_with(vec![]);
+        let now = Instant::now();
+        let post = |extra: &str, pin: &str| {
+            let b = format!("pin={pin}");
+            req(&format!(
+                "POST /login HTTP/1.1\r\nHost: 192.168.1.5:8765\r\n{extra}Content-Length: {}\r\n\r\n{b}",
+                b.len()
+            ))
+        };
+        // Another site's page posting guesses (or even the right PIN).
+        for extra in [
+            "Sec-Fetch-Site: cross-site\r\n",
+            "Origin: http://evil.example\r\n",
+            "Origin: http://192.168.1.5:9999\r\n",
+        ] {
+            for _ in 0..MAX_FAILURES * 2 {
+                assert_eq!(handle(&post(extra, "00000000"), LAN, &s, now).status, 403, "{extra}");
+            }
+            assert_eq!(handle(&post(extra, PIN), LAN, &s, now).status, 403, "{extra}");
+        }
+        // ... has not locked the real user out.
+        assert_eq!(handle(&post("", PIN), LAN, &s, now).status, 303);
+        // Our own form: same origin, or `null` (no-referrer policy).
+        for extra in ["Origin: http://192.168.1.5:8765\r\nSec-Fetch-Site: same-origin\r\n", "Origin: null\r\n"] {
+            assert_eq!(handle(&post(extra, PIN), LAN, &s, now).status, 303, "{extra}");
+        }
+        // Wrong tokens from another site (an <img> tag) are not counted.
+        let img = |t: &str| {
+            req(&format!("GET /?t={t} HTTP/1.1\r\nHost: 192.168.1.5:8765\r\nSec-Fetch-Site: cross-site\r\n\r\n"))
+        };
+        for _ in 0..MAX_FAILURES * 2 {
+            assert_eq!(handle(&img("bad"), LAN, &s, now).status, 401);
+        }
+        assert_eq!(handle(&post("", PIN), LAN, &s, now).status, 303);
+        // A link opened from another site (a chat page) still logs in.
+        assert_eq!(handle(&img(TOKEN), LAN, &s, now).status, 303);
+    }
+
+    #[test]
+    fn current_secrets_follow_set_secrets() {
+        let s = shared_with(vec![]);
+        assert_eq!(s.current_secrets(), (TOKEN.to_string(), PIN.to_string()));
+        s.set_secrets("f".repeat(32), "87654321".into());
+        assert_eq!(s.current_secrets(), ("f".repeat(32), "87654321".to_string()));
+    }
+
+    #[test]
+    fn far_future_dates_do_not_overflow() {
+        for t in [i64::MAX, i64::MAX - 1, i64::MIN, -1, 0, 1] {
+            let _ = fmt_date(t);
+        }
+        let mut e = entry(r"C:\x\big.bin", u64::MAX, false);
+        e.mtime = i64::MAX;
+        let _ = fmt_size(&e);
+        let s = shared_with(vec![e]);
+        assert_eq!(handle(&get("/?q=big", Some(TOKEN)), LAN, &s, Instant::now()).status, 200);
+    }
+
+    #[test]
+    fn slow_senders_are_cut_off_at_the_deadline() {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let client = std::thread::spawn(move || {
+            let mut c = TcpStream::connect(addr).unwrap();
+            // Starts a request, then trickles a byte every 50 ms.
+            for _ in 0..40 {
+                if c.write_all(b"G").is_err() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        });
+        let (server, _) = listener.accept().unwrap();
+        let start = Instant::now();
+        let mut r = DeadlineReader { stream: &server, until: Instant::now() + Duration::from_millis(300) };
+        assert_eq!(read_request(&mut r).err(), Some(HttpError::Io));
+        let took = start.elapsed();
+        assert!(took < Duration::from_millis(1500), "{took:?}");
+        drop(server);
+        client.join().unwrap();
+    }
+
+    /// Random bytes and mangled requests never panic the parser or the
+    /// handler, and what parses obeys the limits.
+    #[test]
+    fn random_requests_never_panic() {
+        const PIECES: &[&str] = &[
+            "GET", "POST", "HEAD", " ", "/", "?", "&", "=", "%", "%2", "%ZZ", "%00", "%D9%81", "+", "#", "\r\n", "\n",
+            "\r\n\r\n", ":", "Host", "Cookie", "Content-Length", "Transfer-Encoding", "bahth_t=", ";", "HTTP/1.1",
+            "HTTP/1.0", "ف", "\u{200F}", "\0", "\t", "999999999999999999999999", "-1", "t=", "q=", "\u{1F600}",
+        ];
+        let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
+        let s = shared_with(vec![entry(r"C:\docs\تقرير.pdf", 10, false)]);
+        s.allow_download.store(true, Ordering::Relaxed);
+        for i in 0..20_000 {
+            let raw: Vec<u8> = if i % 4 == 0 {
+                (0..rng.below(300)).map(|_| rng.next() as u8).collect()
+            } else {
+                let mut t = String::from(["GET /", "POST /login", "HEAD /f"][rng.below(3)]);
+                for _ in 0..rng.below(40) {
+                    t.push_str(PIECES[rng.below(PIECES.len())]);
+                }
+                t.into_bytes()
+            };
+            let parsed = std::panic::catch_unwind(|| read_request(&mut raw.as_slice()));
+            let Ok(parsed) = parsed else { panic!("panic for {:?}", String::from_utf8_lossy(&raw)) };
+            if let Ok(r) = parsed {
+                assert!(r.body.len() <= MAX_BODY);
+                assert!(r.headers.len() <= 64);
+                let resp = std::panic::catch_unwind(|| handle(&r, LAN, &s, Instant::now()));
+                assert!(resp.is_ok(), "handle panicked for {:?}", String::from_utf8_lossy(&raw));
+            }
+        }
+    }
+
+    #[test]
+    fn random_text_round_trips_and_escapes() {
+        let mut rng = Rng(42);
+        let chars = ['a', 'ف', '<', '>', '&', '"', '\'', '%', '+', '=', ' ', '\0', '\u{FFFD}', '\u{1F600}', '\u{0651}', '\\', ':', '['];
+        for _ in 0..5_000 {
+            let t: String = (0..rng.below(30)).map(|_| chars[rng.below(chars.len())]).collect();
+            assert_eq!(percent_decode(&percent_encode(&t), true), t);
+            let e = esc(&t);
+            assert!(!e.contains(['<', '>', '"', '\'']), "{e}");
+            let _ = parse_form(&t);
+            let _ = percent_decode(&t, false);
+            let _ = host_ok(Some(&t));
+            let _ = pin_display(&t);
+            let _ = folder_of(&t);
+        }
+    }
+
+    /// The download name never breaks out of its header.
+    #[test]
+    fn download_headers_stay_on_one_line() {
+        let dir = std::env::temp_dir().join(format!("bahth-web-hdr-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("a\"b;c=d ف.txt");
+        std::fs::write(&file, b"x").unwrap();
+        let path = file.to_string_lossy().into_owned();
+        let s = shared_with(vec![entry(&path, 1, false)]);
+        s.allow_download.store(true, Ordering::Relaxed);
+        let r = handle(&get(&format!("/f?p={}", percent_encode(&path)), Some(TOKEN)), LAN, &s, Instant::now());
+        assert_eq!(r.status, 200);
+        let cd = r.header("Content-Disposition").unwrap();
+        assert!(!cd.contains(['\r', '\n']));
+        assert!(cd.starts_with("attachment; filename=\"a_b;c=d _.txt\";"), "{cd}");
+        let mut out = Vec::new();
+        write_response(&mut out, r, true, &AtomicBool::new(false)).unwrap();
+        let head = String::from_utf8(out).unwrap();
+        assert_eq!(head.matches("\r\n\r\n").count(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

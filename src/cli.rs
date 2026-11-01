@@ -694,6 +694,57 @@ mod tests {
     }
 
     #[test]
+    fn extreme_times_and_sizes() {
+        assert!(!iso_time(i64::MAX).is_empty());
+        assert_eq!(iso_time(i64::MIN), "");
+        let index = || {
+            let mut index = sample();
+            index.entries.push(entry(r"C:\z\huge.bin", u64::MAX, i64::MAX, false));
+            index
+        };
+        for fmt in ["--csv", "--json", "--count"] {
+            let (code, out, _) = run_cli(&["-s", "huge", fmt], Some(index()));
+            assert_eq!(code, EXIT_FOUND, "{fmt}");
+            assert!(!out.is_empty());
+        }
+        let (code, out, _) = run_cli(&["-s", "huge", "-n", "18446744073709551615", "--sort", "size", "--desc"], Some(index()));
+        assert_eq!((code, out.as_str()), (EXIT_FOUND, "C:\\z\\huge.bin\r\n"));
+        assert!(parse_args(&args(&["-s", "x", "-n", "18446744073709551616"])).is_err());
+    }
+
+    /// Random argument lists never panic; whatever parses has a query.
+    #[test]
+    fn random_args_never_panic() {
+        let pieces = [
+            "-s", "--search", "-n", "--max", "--max=", "--max=5", "--sort", "--sort=date", "--desc", "--desc=1", "--scope",
+            "--scope=", "--count", "--csv", "--json", "-h", "/?", "--version", "--", "-", "--=", "=", "5", "-1", "فاتورة",
+            "ext:pdf", "", " ", "\u{200F}", "\0", "C:\\", "/", "😀", "\"", "--x", "-قديم", "date", "size",
+        ];
+        let mut state = 0x1357_9BDFu64;
+        let mut below = |n: usize| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state % n as u64) as usize
+        };
+        for _ in 0..5_000 {
+            let a: Vec<String> = (0..below(7)).map(|_| pieces[below(pieces.len())].to_string()).collect();
+            let r = std::panic::catch_unwind(|| parse_args(&a));
+            let Ok(r) = r else { panic!("panic for {a:?}") };
+            if let Ok(Command::Search(o)) = &r {
+                assert!(!Query::parse(&o.query).is_empty(), "{a:?}");
+                assert!(o.scope.is_empty() || o.scope.ends_with('\\'));
+                let (mut out, mut err) = (Vec::new(), Vec::new());
+                let cmd = r.unwrap();
+                assert!(execute(&cmd, || Some(sample()), &mut out, &mut err).is_ok());
+            }
+            if let Some(first) = a.first() {
+                let _ = is_cli_arg(first);
+            }
+        }
+    }
+
+    #[test]
     fn help_and_version() {
         let (code, out, _) = run_cli(&["--help"], None);
         assert_eq!(code, EXIT_FOUND);

@@ -299,7 +299,13 @@ pub enum Outcome {
 /// `s` cut to about [`SAMPLE_CHARS`] characters, starting a little before
 /// the character at byte `at`.
 fn clip(s: &str, at: usize) -> String {
-    let lead = s[..at.min(s.len())].chars().count().saturating_sub(30);
+    // `at` comes from the original line; in the replaced copy it may fall
+    // inside a letter, so step back to the start of that letter.
+    let mut at = at.min(s.len());
+    while !s.is_char_boundary(at) {
+        at -= 1;
+    }
+    let lead = s[..at].chars().count().saturating_sub(30);
     let mut out: String = if lead > 0 { "…".into() } else { String::new() };
     let mut chars = s.chars().skip(lead);
     out.extend(chars.by_ref().take(SAMPLE_CHARS));
@@ -395,7 +401,12 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         replace_with(&tmp, path)
     })();
     if result.is_err() {
-        let _ = fs::remove_file(&tmp);
+        // `ReplaceFileW` can fail half-way with the original already gone
+        // (ERROR_UNABLE_TO_MOVE_REPLACEMENT); then the temporary file holds
+        // the only copy of the content and must stay.
+        if fs::symlink_metadata(path).is_ok() || !tmp.exists() {
+            let _ = fs::remove_file(&tmp);
+        }
     }
     result
 }
@@ -454,7 +465,7 @@ fn write_index(dir: &Path, index: &OpIndex) -> std::io::Result<()> {
 
 /// `YYYYMMDD-HHMMSS` of Unix seconds shifted by `offset` seconds.
 fn stamp(secs: i64, offset: i32) -> String {
-    let t = secs + offset as i64;
+    let t = secs.saturating_add(offset as i64);
     let (days, rem) = (t.div_euclid(86_400), t.rem_euclid(86_400));
     // Civil date from a day number (H. Hinnant's algorithm).
     let z = days + 719_468;
@@ -499,7 +510,8 @@ fn new_op_dir(root: &Path, secs: i64) -> std::io::Result<PathBuf> {
     fs::create_dir_all(root)?;
     let mut seq = op_dir_keys(root).into_iter().filter_map(|(k, _)| k.0).max().unwrap_or(0);
     for _ in 0..1000 {
-        seq += 1;
+        // A folder named with the largest number must not overflow.
+        seq = seq.checked_add(1).ok_or_else(|| std::io::Error::other("no free backup folder name"))?;
         let dir = root.join(op_dir_name(seq, secs));
         match fs::create_dir(&dir) {
             Ok(()) => return Ok(dir),
@@ -563,8 +575,14 @@ pub fn apply(paths: &[String], m: &Matcher, opts: &Options, root: &Path, progres
         .map_err(|e| trf!("تعذر إنشاء مجلد النسخ الاحتياطية: {e}", "Could not create the backup folder: {e}"))?;
     let mut index = OpIndex { version: 1, created, find: opts.find.clone(), replace: opts.replace.clone(), files: Vec::new() };
     let mut report = ApplyReport::default();
+    let mut seen = std::collections::HashSet::new();
     for (i, p) in paths.iter().enumerate() {
         progress(i);
+        // The same file twice would be replaced twice (and backed up
+        // half-done the second time).
+        if !seen.insert(p.as_str()) {
+            continue;
+        }
         match apply_one(Path::new(p), m, &dir, &mut index) {
             Ok(0) => report.unchanged += 1,
             Ok(n) => report.done.push((p.clone(), n)),
@@ -615,7 +633,11 @@ fn apply_one(path: &Path, m: &Matcher, dir: &Path, index: &mut OpIndex) -> Resul
         return Err(Skip::Changed);
     }
     if let Err(e) = write_atomic(path, &new_bytes) {
-        forget(index);
+        // The backup is only dropped while the original is still intact;
+        // otherwise it is kept, and recorded, so nothing is lost.
+        if fs::read(path).is_ok_and(|b| b == f.bytes) {
+            forget(index);
+        }
         return Err(io_err(e));
     }
     Ok(n)
@@ -638,8 +660,15 @@ pub fn undo(dir: &Path) -> Result<UndoReport, String> {
         .and_then(|b| serde_json::from_slice(&b).ok())
         .ok_or_else(|| tr!("لا توجد عملية استبدال يمكن التراجع عنها.", "There is no replace to undo.").to_string())?;
     let mut report = UndoReport::default();
-    for f in &index.files {
+    // Newest first: if one file was changed twice, the later change is
+    // undone before the earlier one, back to the very first content.
+    for f in index.files.iter().rev() {
         let path = Path::new(&f.path);
+        // Backups are plain names inside the folder, never a path elsewhere.
+        if f.backup.is_empty() || f.backup.contains(['/', '\\', ':']) || f.backup.starts_with('.') {
+            report.failed.push((f.path.clone(), tr!("النسخة الاحتياطية تالفة", "The backup is damaged").into()));
+            continue;
+        }
         let Ok(current) = fs::read(path) else {
             report.conflicts.push(f.path.clone());
             continue;
@@ -767,6 +796,139 @@ mod tests {
         let s = samples(&long, &matcher(&opts("foo", "bar")));
         assert!(s[0].before.starts_with('…') && s[0].before.contains("foo") && s[0].before.ends_with('…'));
         assert!(s[0].after.contains("bar"));
+    }
+
+    /// `^` matches at the start of the line on its own but not inside the
+    /// whole text, so the line's replaced copy has a longer text before the
+    /// sampled match, and the match's byte offset fell inside a letter.
+    #[test]
+    fn sample_offsets_inside_a_replaced_letter() {
+        let o = Options { regex: true, ..opts("^x|y", "ببب") };
+        let s = samples("q\nxy", &matcher(&o));
+        assert_eq!(s.len(), 1);
+        assert_eq!((s[0].line, s[0].before.as_str()), (2, "xy"));
+        assert_eq!(s[0].after, "بببببب");
+        assert_eq!(clip("ب", 1), "ب");
+        assert_eq!(clip("ab", 99), "ab");
+    }
+
+    /// Random texts, patterns and replacements: no panic, and the samples
+    /// and counts agree with the replace.
+    #[test]
+    fn random_matching_never_panics() {
+        struct Rng(u64);
+        impl Rng {
+            fn below(&mut self, n: usize) -> usize {
+                self.0 ^= self.0 << 13;
+                self.0 ^= self.0 >> 7;
+                self.0 ^= self.0 << 17;
+                (self.0 % n as u64) as usize
+            }
+        }
+        let pieces = ["a", "b", "x", "ب", "ة", "\u{0651}", "\u{0640}", "\u{200F}", "😀", "\n", "\r\n", " ", "\t", "$", "İ"];
+        let patterns = ["^x|y", "x$|b", "(?m)^a", r"\bب", "a*", "ب+", "(a)(b)?", "$", "^", ".", r"\s", "(?i)i", "😀|x"];
+        let replacements = ["", "ببب", "$1", "${2}x", "😀😀", "\r\n", "$0$0"];
+        let mut rng = Rng(0xDEAD_BEEF);
+        for _ in 0..3_000 {
+            let text: String = (0..rng.below(30)).map(|_| pieces[rng.below(pieces.len())]).collect();
+            let regex = rng.below(2) == 0;
+            let find = if regex { patterns[rng.below(patterns.len())].to_string() } else { pieces[rng.below(pieces.len())].to_string() };
+            let o = Options { find, replace: replacements[rng.below(replacements.len())].into(), ignore_case: rng.below(2) == 0, regex };
+            let Ok(m) = Matcher::new(&o) else { continue };
+            let r = std::panic::catch_unwind(|| {
+                let (after, n) = m.replace_all(&text);
+                assert_eq!(n, m.count(&text));
+                let s = samples(&text, &m);
+                assert!(s.len() <= SAMPLE_LINES && (n == 0) == s.is_empty());
+                for enc in [TextEncoding::Utf8Bom, TextEncoding::Utf16Le, TextEncoding::Utf16Be] {
+                    let b = encode(&after, enc).expect("Unicode encodings hold everything");
+                    assert_eq!(decode(&b), Some((after.to_string(), enc)));
+                }
+                if let Some(b) = encode(&after, TextEncoding::Windows1256) {
+                    let _ = decode(&b);
+                }
+            });
+            assert!(r.is_ok(), "panic for {o:?} on {text:?}");
+        }
+    }
+
+    #[test]
+    fn same_file_twice_is_replaced_once_and_undone_fully() {
+        let t = TempDir::new("twice");
+        let p = t.0.join("a.txt");
+        fs::write(&p, "a").unwrap();
+        let ps = p.to_string_lossy().into_owned();
+        let o = opts("a", "aa");
+        let report = apply(&[ps.clone(), ps.clone()], &matcher(&o), &o, &t.0.join("bk"), &|_| {}).unwrap();
+        assert_eq!(report.done, [(ps.clone(), 1)]);
+        assert_eq!(fs::read(&p).unwrap(), b"aa");
+        assert!(undo(&report.dir.unwrap()).unwrap().conflicts.is_empty());
+        assert_eq!(fs::read(&p).unwrap(), b"a");
+    }
+
+    /// An operation that changed one file twice (two records, as an older
+    /// version could write) is undone newest first, back to the original.
+    #[test]
+    fn undo_goes_newest_first() {
+        let t = TempDir::new("undo_order");
+        let p = t.0.join("a.txt");
+        let ps = p.to_string_lossy().into_owned();
+        let dir = t.0.join("op");
+        fs::create_dir_all(&dir).unwrap();
+        let (v0, v1, v2) = (b"v0".as_slice(), b"v1".as_slice(), b"v2".as_slice());
+        fs::write(dir.join("0001.bak"), v0).unwrap();
+        fs::write(dir.join("0002.bak"), v1).unwrap();
+        fs::write(&p, v2).unwrap();
+        let rec = |backup: &str, from: &[u8], to: &[u8]| OpFile {
+            path: ps.clone(),
+            backup: backup.into(),
+            original_sha256: sha256_hex(from),
+            new_sha256: sha256_hex(to),
+            count: 1,
+        };
+        let index = OpIndex { version: 1, files: vec![rec("0001.bak", v0, v1), rec("0002.bak", v1, v2)], ..Default::default() };
+        write_index(&dir, &index).unwrap();
+        let u = undo(&dir).unwrap();
+        assert!(u.conflicts.is_empty() && u.failed.is_empty(), "{u:?}");
+        assert_eq!(fs::read(&p).unwrap(), v0);
+    }
+
+    /// A damaged index pointing a backup outside its folder is refused.
+    #[test]
+    fn undo_refuses_backup_paths() {
+        let t = TempDir::new("undo_paths");
+        let p = t.0.join("a.txt");
+        fs::write(&p, "new").unwrap();
+        let outside = t.0.join("outside.txt");
+        fs::write(&outside, "old").unwrap();
+        let dir = t.0.join("op");
+        fs::create_dir_all(&dir).unwrap();
+        for backup in ["../outside.txt", outside.to_string_lossy().as_ref(), "", ".."] {
+            let index = OpIndex {
+                version: 1,
+                files: vec![OpFile {
+                    path: p.to_string_lossy().into_owned(),
+                    backup: backup.into(),
+                    original_sha256: sha256_hex(b"old"),
+                    new_sha256: sha256_hex(b"new"),
+                    count: 1,
+                }],
+                ..Default::default()
+            };
+            write_index(&dir, &index).unwrap();
+            let u = undo(&dir).unwrap();
+            assert_eq!(u.failed.len(), 1, "{backup}");
+            assert_eq!(fs::read(&p).unwrap(), b"new");
+        }
+    }
+
+    #[test]
+    fn backup_sequence_at_the_top_does_not_overflow() {
+        let t = TempDir::new("seq_max");
+        fs::create_dir_all(t.0.join(format!("s{}-19700101-000000Z", u64::MAX))).unwrap();
+        assert!(new_op_dir(&t.0, 0).is_err());
+        assert!(!stamp(i64::MAX, i32::MAX).is_empty());
+        let _ = stamp(i64::MIN, i32::MIN);
     }
 
     #[test]

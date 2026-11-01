@@ -165,6 +165,9 @@ pub fn parse_release(json: &str, current: &str) -> Result<Option<Release>, Strin
     if !exe_url.starts_with("https://") {
         return Err("asset URL is not https".into());
     }
+    if !download_host_ok(&exe_url) {
+        return Err("asset URL is not on GitHub".into());
+    }
     let exe_size = asset["size"].as_u64().ok_or("asset has no size")?;
     if exe_size == 0 || exe_size > MAX_DOWNLOAD {
         return Err(format!("asset size {exe_size} is out of range"));
@@ -178,6 +181,17 @@ pub fn parse_release(json: &str, current: &str) -> Result<Option<Release>, Strin
     Ok(Some(Release { version, tag, notes, exe_url, exe_size, sha256 }))
 }
 
+/// The program is only ever downloaded from GitHub (`github.com`, which
+/// redirects to its own download hosts), whatever the API answer says.
+pub fn download_host_ok(url: &str) -> bool {
+    let Ok((host, port, _)) = split_https_url(url) else { return false };
+    let host = host.to_ascii_lowercase();
+    port == 443
+        && (host == "github.com"
+            || host.ends_with(".github.com")
+            || host.ends_with(".githubusercontent.com"))
+}
+
 /// Checks that `head` (the first bytes of a file) is a PE image for this
 /// architecture: "MZ", a sane e_lfanew, "PE\0\0" and a matching machine type.
 pub fn validate_pe(head: &[u8]) -> Result<(), String> {
@@ -185,7 +199,8 @@ pub fn validate_pe(head: &[u8]) -> Result<(), String> {
         return Err("downloaded file is not a Windows program (no MZ)".into());
     }
     let lfanew = u32::from_le_bytes([head[0x3c], head[0x3d], head[0x3e], head[0x3f]]) as usize;
-    if lfanew < 0x40 || lfanew + 6 > head.len() {
+    // Checked: on a 32-bit build `lfanew + 6` can wrap past the length test.
+    if lfanew < 0x40 || lfanew.checked_add(6).is_none_or(|end| end > head.len()) {
         return Err("downloaded file has a bad PE header offset".into());
     }
     if &head[lfanew..lfanew + 4] != b"PE\0\0" {
@@ -231,6 +246,59 @@ pub fn split_https_url(url: &str) -> Result<(String, u16, String), String> {
     };
     let path = if path.starts_with('?') { format!("/{path}") } else { path.to_string() };
     Ok((host.to_string(), port, path))
+}
+
+/// `exe` with `suffix` added to its file name (`bahth.exe.old`).
+#[cfg_attr(not(windows), allow(dead_code))]
+fn sibling(exe: &std::path::Path, suffix: &str) -> std::path::PathBuf {
+    let mut name = exe.file_name().unwrap_or_default().to_os_string();
+    name.push(suffix);
+    exe.with_file_name(name)
+}
+
+/// Puts the downloaded `new` program in the place of `exe`, keeping the
+/// current one as `old`. On any failure `exe` is a working program again:
+/// the original is renamed back, or copied back if even that fails.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn swap_in(exe: &std::path::Path, new: &std::path::Path, old: &std::path::Path) -> Result<(), String> {
+    use std::fs;
+    if !new.is_file() {
+        return Err("the downloaded update is missing".into());
+    }
+    // A leftover from an earlier update; if it cannot be removed (still
+    // running?) the rename below reports the problem.
+    let _ = fs::remove_file(old);
+    fs::rename(exe, old).map_err(|e| format!("cannot move the running program aside: {e}"))?;
+    if let Err(e) = fs::rename(new, exe) {
+        // Roll back: put the original program back under its name. A copy
+        // works where a rename may not (a scanner holding the file).
+        let back = fs::rename(old, exe).or_else(|_| fs::copy(old, exe).map(drop));
+        return Err(match back {
+            Ok(()) => format!("cannot put the update in place: {e}"),
+            Err(e2) => format!(
+                "cannot put the update in place: {e}; restoring the old program also failed: {e2} (it is at {})",
+                old.display()
+            ),
+        });
+    }
+    Ok(())
+}
+
+/// What is left by an update next to `exe`. The old copy is only deleted
+/// while `exe` itself is there: if an interrupted update left nothing but
+/// `bahth.exe.old`, it is the user's only working program, so it is put
+/// back instead.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn cleanup_beside(exe: &std::path::Path) {
+    use std::fs;
+    let (old, new) = (sibling(exe, ".old"), sibling(exe, ".new"));
+    if !exe.exists() && old.is_file() {
+        let _ = fs::rename(&old, exe).or_else(|_| fs::copy(&old, exe).map(drop));
+    }
+    if exe.is_file() {
+        let _ = fs::remove_file(&old);
+        let _ = fs::remove_file(&new);
+    }
 }
 
 #[cfg(windows)]
@@ -282,12 +350,6 @@ mod win {
             Some(rest) if !rest.starts_with("UNC\\") => PathBuf::from(rest),
             _ => p,
         }
-    }
-
-    fn sibling(exe: &Path, suffix: &str) -> PathBuf {
-        let mut name = exe.file_name().unwrap_or_default().to_os_string();
-        name.push(suffix);
-        exe.with_file_name(name)
     }
 
     // ---------------------------------------------------------------- HTTP
@@ -558,25 +620,6 @@ mod win {
         validate_pe(&head)
     }
 
-    fn swap_in(exe: &Path, new: &Path, old: &Path) -> Result<(), String> {
-        // A leftover from an earlier update; if it cannot be removed (still
-        // running?) the rename below reports the problem.
-        let _ = fs::remove_file(old);
-        fs::rename(exe, old).map_err(|e| format!("cannot move the running program aside: {e}"))?;
-        if let Err(e) = fs::rename(new, exe) {
-            // Roll back: put the original program back under its name.
-            let back = fs::rename(old, exe);
-            return Err(match back {
-                Ok(()) => format!("cannot put the update in place: {e}"),
-                Err(e2) => format!(
-                    "cannot put the update in place: {e}; restoring the old program also failed: {e2} (it is at {})",
-                    old.display()
-                ),
-            });
-        }
-        Ok(())
-    }
-
     /// Starts the (new) program at its original path with `--updated`. The
     /// caller should exit right after a successful return.
     pub fn restart_new_version() -> Result<(), String> {
@@ -621,8 +664,7 @@ mod win {
     /// Call at every startup; errors are ignored.
     pub fn cleanup_old() {
         if let Ok(exe) = original_exe() {
-            let _ = fs::remove_file(sibling(exe, ".old"));
-            let _ = fs::remove_file(sibling(exe, ".new"));
+            cleanup_beside(exe);
         }
     }
 }
@@ -779,5 +821,198 @@ mod tests {
         assert_eq!(split_https_url("https://h?x=1").unwrap(), ("h".into(), 443, "/?x=1".into()));
         assert!(split_https_url("http://h/").is_err());
         assert!(split_https_url("https://u@h/").is_err());
+    }
+
+    /// A tiny xorshift generator: the same cases on every run.
+    struct Rng(u64);
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+        fn below(&mut self, n: usize) -> usize {
+            (self.next() % n as u64) as usize
+        }
+    }
+
+    #[test]
+    fn version_edge_cases() {
+        assert!(is_newer("0.10.0", "0.9.9"));
+        assert!(!is_newer("0.9.9", "0.10.0"));
+        assert!(is_newer("v1.0.0", "0.99"));
+        assert!(!is_newer("V0.5.1", "0.5.1"));
+        // Too big for u64, other digits, signs, spaces inside, pre-releases.
+        for bad in ["99999999999999999999999.0", "١.٢.٣", "+1.0", " 1 .0", "1.0-rc.1", "1.0+build", "vv1", "v", ".", "1."] {
+            assert!(!is_newer(bad, "0.0.1"), "{bad}");
+        }
+        // Garbage as the current version never offers anything.
+        assert!(!is_newer("9.9.9", "garbage"));
+        assert!(!is_newer("9.9.9", ""));
+    }
+
+    #[test]
+    fn is_newer_is_a_strict_order() {
+        let mut rng = Rng(7);
+        let parts = ["0", "1", "2", "9", "10", "010", "99999999999999999999", "", "a", "-1"];
+        let mut v = || -> String {
+            let n = 1 + rng.below(4);
+            let s: Vec<&str> = (0..n).map(|_| parts[rng.below(parts.len())]).collect();
+            format!("{}{}", ["", "v", "V", " "][rng.below(4)], s.join("."))
+        };
+        for _ in 0..5_000 {
+            let (a, b, c) = (v(), v(), v());
+            assert!(!is_newer(&a, &a), "{a}");
+            assert!(!(is_newer(&a, &b) && is_newer(&b, &a)), "{a} {b}");
+            if is_newer(&a, &b) && is_newer(&b, &c) {
+                assert!(is_newer(&a, &c), "{a} {b} {c}");
+            }
+        }
+    }
+
+    #[test]
+    fn hostile_release_json() {
+        let cases = [
+            "".to_string(),
+            "null".into(),
+            "\"x\"".into(),
+            "{}".into(),
+            r#"{"tag_name": 5}"#.into(),
+            r#"{"tag_name": "v9.0.0", "assets": "nope"}"#.into(),
+            r#"{"tag_name": "v9.0.0", "assets": [null, 1, "x", {"name": 5}]}"#.into(),
+            r#"{"tag_name": "v9.0.0", "assets": [{"name": "bahth.exe"}]}"#.into(),
+            r#"{"tag_name": "v9.0.0", "assets": [{"name": "bahth.exe", "browser_download_url": "https://github.com/a", "size": -1}]}"#.into(),
+            r#"{"tag_name": "v9.0.0", "assets": [{"name": "bahth.exe", "browser_download_url": "https://github.com/a", "size": 1.5}]}"#.into(),
+            r#"{"tag_name": "v9.0.0", "assets": [{"name": "bahth.exe", "browser_download_url": "https://github.com/a", "size": 0}]}"#.into(),
+            r#"{"tag_name": "v9.0.0", "draft": "yes", "prerelease": null, "body": 7, "assets": []}"#.into(),
+            format!("{}1{}", "[".repeat(10_000), "]".repeat(10_000)),
+            format!("{{\"tag_name\": \"v9.0.0\", \"body\": \"{}\"}}", "\\u0628".repeat(10_000)),
+        ];
+        for c in &cases {
+            let r = std::panic::catch_unwind(|| parse_release(c, "0.5.1"));
+            assert!(r.is_ok(), "panic for {c:.80}");
+            assert!(!matches!(r.unwrap(), Ok(Some(_))), "{c:.80}");
+        }
+    }
+
+    #[test]
+    fn download_url_must_be_on_github() {
+        for (url, ok) in [
+            ("https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v1/bahth.exe", true),
+            ("https://objects.githubusercontent.com/x", true),
+            ("https://GitHub.com/x", true),
+            ("https://evil.example/bahth.exe", false),
+            ("https://github.com.evil.example/bahth.exe", false),
+            ("https://evilgithub.com/x", false),
+            ("https://github.com:8443/x", false),
+            ("https://u@github.com/x", false),
+            ("http://github.com/x", false),
+        ] {
+            assert_eq!(download_host_ok(url), ok, "{url}");
+        }
+        let evil = SAMPLE.replace(
+            "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.3.1/bahth.exe",
+            "https://evil.example/bahth.exe",
+        );
+        assert!(parse_release(&evil, "0.2.2").is_err());
+    }
+
+    #[test]
+    fn pe_offset_near_the_top_of_u32() {
+        let mut v = pe(0x8664);
+        for off in [u32::MAX, u32::MAX - 5, u32::MAX - 6, 0x3f, 0] {
+            v[0x3c..0x40].copy_from_slice(&off.to_le_bytes());
+            assert!(validate_pe(&v).is_err(), "{off:#x}");
+        }
+        let mut rng = Rng(99);
+        for _ in 0..5_000 {
+            let n = rng.below(600);
+            let mut b: Vec<u8> = (0..n).map(|_| rng.next() as u8).collect();
+            if n >= 2 && rng.below(2) == 0 {
+                b[0] = b'M';
+                b[1] = b'Z';
+            }
+            let _ = validate_pe(&b);
+        }
+    }
+
+    #[test]
+    fn random_notes_and_urls_never_panic() {
+        let mut rng = Rng(1234);
+        let pieces = ["a", " ", "\n", "\r\n", "ب", "\u{0651}", "\u{1F600}", "/releases/tag/", "?", "#", "/", "https://", ":", "@", "v1.2"];
+        for _ in 0..5_000 {
+            let t: String = (0..rng.below(40)).map(|_| pieces[rng.below(pieces.len())]).collect();
+            let max = rng.below(30);
+            let n = trim_notes(&t, max);
+            assert!(n.chars().count() <= max + 1, "{t:?} {max} {n:?}");
+            let _ = tag_from_release_url(&t);
+            let _ = split_https_url(&t);
+            let _ = download_host_ok(&t);
+            if let Some(tag) = tag_from_release_url(&t)
+                && let Some(r) = release_from_tag(&tag, "0.0.1")
+            {
+                assert!(r.exe_url.starts_with("https://github.com/") && !r.exe_url.contains(['?', '#', ' ']));
+            }
+        }
+    }
+
+    struct TempDir(std::path::PathBuf);
+    impl TempDir {
+        fn new(name: &str) -> TempDir {
+            let d = std::env::temp_dir().join(format!("bahth_update_{name}_{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&d);
+            std::fs::create_dir_all(&d).unwrap();
+            TempDir(d)
+        }
+    }
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn swap_in_never_leaves_no_program() {
+        let t = TempDir::new("swap");
+        let exe = t.0.join("bahth.exe");
+        let (new, old) = (sibling(&exe, ".new"), sibling(&exe, ".old"));
+        assert!(old.ends_with("bahth.exe.old"));
+        std::fs::write(&exe, b"v1").unwrap();
+        // The download is missing: nothing is touched.
+        assert!(swap_in(&exe, &new, &old).is_err());
+        assert_eq!(std::fs::read(&exe).unwrap(), b"v1");
+        // The download is a folder (cannot be renamed over a file): rolled back.
+        std::fs::create_dir(&new).unwrap();
+        std::fs::write(new.join("x"), b"").unwrap();
+        assert!(swap_in(&exe, &new, &old).is_err());
+        assert_eq!(std::fs::read(&exe).unwrap(), b"v1");
+        std::fs::remove_dir_all(&new).unwrap();
+        // The normal case, with a stale .old from before.
+        std::fs::write(&old, b"v0").unwrap();
+        std::fs::write(&new, b"v2").unwrap();
+        swap_in(&exe, &new, &old).unwrap();
+        assert_eq!(std::fs::read(&exe).unwrap(), b"v2");
+        assert_eq!(std::fs::read(&old).unwrap(), b"v1");
+        assert!(!new.exists());
+    }
+
+    #[test]
+    fn cleanup_keeps_the_only_program() {
+        let t = TempDir::new("cleanup");
+        let exe = t.0.join("bahth.exe");
+        let (new, old) = (sibling(&exe, ".new"), sibling(&exe, ".old"));
+        // Normal start after an update: leftovers go.
+        std::fs::write(&exe, b"v2").unwrap();
+        std::fs::write(&old, b"v1").unwrap();
+        std::fs::write(&new, b"half").unwrap();
+        cleanup_beside(&exe);
+        assert!(exe.exists() && !old.exists() && !new.exists());
+        // An interrupted update left only the old copy: it is put back.
+        std::fs::remove_file(&exe).unwrap();
+        std::fs::write(&old, b"v1").unwrap();
+        cleanup_beside(&exe);
+        assert_eq!(std::fs::read(&exe).unwrap(), b"v1");
+        assert!(!old.exists());
     }
 }
