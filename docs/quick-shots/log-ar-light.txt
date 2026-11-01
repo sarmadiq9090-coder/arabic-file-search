@@ -1,33 +1,33 @@
-1793567181 index load: 0 entries in 0 ms
-1793567181 startup ms (v0.7.0): single-instance=10 init=13 font=13 settings=13 window=40 list=623 controls=643 tray=652 events=653 layout=919 built=919 loop=919 first-tick=919
-1793567181 floating box built in 7 ms
-1793567188 launcher catalog: 144 apps, 188 settings pages in 2028 ms
-1793568133 index build: 1216551 entries in 952212 ms
-1793568137 watch: C:\ D:\
-1793568142 content index open: 0 documents, 0 KB in 1 ms
-1793568161 startup ms (v0.7.0): single-instance=9 init=11 font=11 settings=11 window=35 list=75 controls=92 tray=100 events=100 layout=126 built=128 loop=128 first-tick=295
-1793568161 floating box built in 5 ms
-1793568161 index load: 1216551 entries in 404 ms
-1793568161 watch: C:\ D:\
-1793568166 launcher catalog: 144 apps, 188 settings pages in 82 ms
-1793568166 content index open: 800 documents, 12360 KB in 0 ms
-1793568170 quick search window built in 2 ms
-1793568170 quick search shown in 9 ms
-1793568170 quick search shown in 8 ms
-1793568200 startup ms (v0.7.0): single-instance=7 init=9 font=9 settings=9 window=34 list=63 controls=79 tray=85 events=87 layout=113 built=113 loop=113 first-tick=281
-1793568200 floating box built in 3 ms
-1793568200 index load: 1216551 entries in 405 ms
-1793568200 watch: C:\ D:\
-1793568205 launcher catalog: 144 apps, 188 settings pages in 80 ms
-1793568205 content index open: 6997 documents, 16494 KB in 2 ms
-1793568208 quick search window built in 2 ms
-1793568208 quick search shown in 5 ms
-1793568209 quick search shown in 8 ms
-1793568238 startup ms (v0.7.0): single-instance=9 init=11 font=11 settings=11 window=33 list=62 controls=81 tray=87 events=88 layout=114 built=114 loop=114 first-tick=283
-1793568239 floating box built in 3 ms
-1793568239 index load: 1216568 entries in 408 ms
-1793568239 watch: C:\ D:\
-1793568243 launcher catalog: 144 apps, 188 settings pages in 79 ms
-1793568244 content index open: 10196 documents, 28495 KB in 4 ms
-1793568247 quick search window built in 3 ms
-1793568247 quick search shown in 5 ms
+1793568779 index load: 0 entries in 0 ms
+1793568779 startup ms (v0.7.0): single-instance=20 init=22 font=24 settings=24 window=61 list=120 controls=152 tray=160 events=162 layout=211 built=212 loop=212 first-tick=353
+1793568779 floating box built in 10 ms
+1793568785 launcher catalog: 144 apps, 188 settings pages in 765 ms
+1793569326 index build: 1216511 entries in 546883 ms
+1793569328 watch: C:\ D:\
+1793569334 content index open: 0 documents, 0 KB in 2 ms
+1793569353 startup ms (v0.7.0): single-instance=10 init=12 font=12 settings=12 window=46 list=99 controls=123 tray=131 events=133 layout=171 built=172 loop=172 first-tick=326
+1793569353 floating box built in 7 ms
+1793569353 index load: 1216511 entries in 474 ms
+1793569353 watch: C:\ D:\
+1793569358 launcher catalog: 144 apps, 188 settings pages in 114 ms
+1793569359 content index open: 400 documents, 5249 KB in 1 ms
+1793569362 quick search window built in 3 ms
+1793569362 quick search shown in 12 ms
+1793569363 quick search shown in 13 ms
+1793569392 startup ms (v0.7.0): single-instance=10 init=12 font=14 settings=14 window=46 list=87 controls=109 tray=118 events=118 layout=155 built=155 loop=155 first-tick=311
+1793569392 floating box built in 4 ms
+1793569392 index load: 1216511 entries in 473 ms
+1793569392 watch: C:\ D:\
+1793569397 launcher catalog: 144 apps, 188 settings pages in 115 ms
+1793569398 content index open: 7397 documents, 17823 KB in 3 ms
+1793569401 quick search window built in 3 ms
+1793569401 quick search shown in 7 ms
+1793569402 quick search shown in 14 ms
+1793569431 startup ms (v0.7.0): single-instance=12 init=13 font=13 settings=15 window=59 list=107 controls=132 tray=140 events=141 layout=180 built=182 loop=182 first-tick=334
+1793569431 floating box built in 4 ms
+1793569431 index load: 1216525 entries in 483 ms
+1793569432 watch: C:\ D:\
+1793569436 launcher catalog: 144 apps, 188 settings pages in 111 ms
+1793569437 content index open: 12193 documents, 35979 KB in 6 ms
+1793569440 quick search window built in 4 ms
+1793569440 quick search shown in 9 ms
