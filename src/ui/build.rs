@@ -236,6 +236,11 @@ impl NativeUi<AppUi> for App {
             .check(settings.content_index)
             .parent(&app.options_menu)
             .build(&mut app.menu_content_index)?;
+        nwg::MenuItem::builder()
+            .text(tr!("إخفاء ملفات النظام", "Hide system files"))
+            .check(settings.hide_system)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_hide_system)?;
         nwg::MenuItem::builder().text(tr!("تصدير النتائج إلى Excel (CSV)", "Export results to Excel (CSV)")).parent(&app.options_menu).build(&mut app.menu_export)?;
         nwg::MenuItem::builder().text(tr!("إخفاء إلى شريط المهام\tEsc", "Hide to the taskbar tray\tEsc")).parent(&app.options_menu).build(&mut app.menu_hide)?;
         nwg::MenuItem::builder()
@@ -374,6 +379,8 @@ impl NativeUi<AppUi> for App {
                         app.toggle_content_index();
                     } else if handle == app.menu_auto_index {
                         app.toggle_auto_index();
+                    } else if handle == app.menu_hide_system {
+                        app.toggle_hide_system();
                     } else if handle == app.menu_export {
                         app.export_csv();
                     } else if handle == app.menu_hide {

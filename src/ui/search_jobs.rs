@@ -13,6 +13,7 @@ use super::{App, ContentJob, LoadJob, Matches, Row, ScanJob};
 use crate::index::{self, Index, ScanProgress};
 use crate::fuzzy;
 use crate::search::{self, ContentHit, ContentProgress, Query, SortKey};
+use crate::system_files;
 
 /// The outcome of a background filename search.
 pub(super) struct NameResult {
@@ -139,6 +140,19 @@ impl App {
         }
     }
 
+    /// Switches "hide system files" and runs the current search again.
+    pub(super) fn toggle_hide_system(&self) {
+        let hide = !self.menu_hide_system.checked();
+        self.menu_hide_system.set_checked(hide);
+        self.state.borrow_mut().settings.hide_system = hide;
+        if let Some(shared) = self.web_running_shared() {
+            self.set_web_show_system(&shared);
+        }
+        if !self.content_mode() || !self.query.text().trim().is_empty() {
+            self.on_search();
+        }
+    }
+
     pub(super) fn on_kind_changed(&self) {
         self.state.borrow_mut().settings.kind = self.kind();
         if !self.content_mode() {
@@ -163,6 +177,7 @@ impl App {
         let (sort, desc) = (SortKey::from_column(st.settings.sort_col.max(-1) as usize), st.settings.sort_desc);
         let sort = if st.settings.sort_col < 0 { SortKey::Relevance } else { sort };
         let boosted = if sort == SortKey::Relevance { st.history.boosted(&index, index::now_secs()) } else { Vec::new() };
+        let show_system = system_files::show_system(st.settings.hide_system, &scope);
         drop(st);
 
         let text = self.query.text();
@@ -170,6 +185,7 @@ impl App {
         let parse = move |t: &str| {
             let mut q = Query::parse(t);
             q.apply_kind(kind);
+            q.show_system |= show_system;
             q
         };
         let slot = self.name_result.clone();
@@ -267,7 +283,7 @@ impl App {
 
     pub(super) fn search_content(&self) {
         self.cancel_content();
-        let q = self.parse_query(&self.query.text());
+        let mut q = self.parse_query(&self.query.text());
         if !q.has_text_criteria() {
             self.set_status(tr!("اكتب الكلمة أو العبارة التي تريد البحث عنها داخل المستندات.", "Type the word or phrase to search for inside documents."));
             return;
@@ -277,6 +293,7 @@ impl App {
         st.history.add_recent(&self.query.text());
         let index = st.index.clone();
         let scope = st.scope.clone();
+        q.show_system |= system_files::show_system(st.settings.hide_system, &scope);
         let progress = Arc::new(ContentProgress::default());
         let hits = Arc::new(Mutex::new(Vec::new()));
         let (p, h, idx) = (progress.clone(), hits.clone(), index.clone());

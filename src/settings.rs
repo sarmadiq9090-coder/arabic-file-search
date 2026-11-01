@@ -26,11 +26,14 @@ pub struct Settings {
     pub content_index: bool,
     /// Keep the index current by watching the drives for changes.
     pub auto_index: bool,
+    /// Leave Windows system files (the Windows folder, temp and cache
+    /// folders…) out of search results.
+    pub hide_system: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, auto_index: true }
+        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, auto_index: true, hide_system: true }
     }
 }
 
@@ -52,6 +55,7 @@ impl Settings {
                 "update_check" => s.update_check = value.parse().unwrap_or(0),
                 "content_index" => s.content_index = value != "0",
                 "auto_index" => s.auto_index = value != "0",
+                "hide_system" => s.hide_system = value != "0",
                 _ => {}
             }
         }
@@ -61,7 +65,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let cols: Vec<String> = self.columns.iter().map(i32::to_string).collect();
         format!(
-            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\n",
+            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\n",
             self.width,
             self.height,
             self.maximized as u8,
@@ -72,7 +76,8 @@ impl Settings {
             self.sort_desc as u8,
             self.update_check,
             self.content_index as u8,
-            self.auto_index as u8
+            self.auto_index as u8,
+            self.hide_system as u8
         )
     }
 
@@ -116,7 +121,7 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, auto_index: false };
+        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, auto_index: false, hide_system: false };
         assert_eq!(Settings::parse(&s.to_text()), s);
         assert_eq!(Settings::parse("garbage\nwidth=abc"), Settings::default());
     }
@@ -138,6 +143,8 @@ mod tests {
         assert!(Settings::parse("content_index=yes").content_index && !Settings::parse("content_index=0").content_index);
         // Automatic indexing is on unless explicitly turned off.
         assert!(d.auto_index && Settings::parse("auto_index=yes").auto_index && !Settings::parse("auto_index=0").auto_index);
+        // System files are hidden unless explicitly shown.
+        assert!(d.hide_system && Settings::parse("hide_system=yes").hide_system && !Settings::parse("hide_system=0").hide_system);
     }
 
     #[test]

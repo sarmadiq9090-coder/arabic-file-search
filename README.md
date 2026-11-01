@@ -52,6 +52,7 @@
 - **عربية حقيقية**: لا فرق بين أ إ آ ا، ولا ة ه، ولا ى ي، ويتجاهل التشكيل والتطويل و«ال»، ويقبل الأرقام العربية (٠١٢٣) والحروف الفارسية.
 - **يسامح الأخطاء**: إن لم يجد شيئاً جرّب وحده لوحة المفاتيح الأخرى، ثم الفرانكو (`3abd` ← عبد)، ثم الكلمات القريبة إملائياً (`تقريز` ← التقرير). و`جذر:` يبحث بجذر الكلمة.
 - **صيغة بحث قوية**: عبارة بين علامتي تنصيص، «أو» و«ليس»، نوع الملف، الحجم، تاريخ التعديل، التعبيرات المنتظمة، الكلمة كاملة، والتقارب بين كلمتين. انظر [الجدول أدناه](#طريقة-البحث).
+- **إخفاء ملفات النظام** (مفعّل افتراضياً): مجلد Windows وسلة المحذوفات وملفات الصفحات ومجلدات المؤقت والذاكرة المخبأة داخل AppData لا تظهر في النتائج. يُطفأ من «خيارات ← إخفاء ملفات النظام»، أو اكتب `نظام:` لبحث واحد. مجلد Program Files وملفاتك تبقى ظاهرة.
 - **الملفات الأكثر فتحاً أولاً**، وخط تحت الجزء المطابق، وترتيب بالنقر على عنوان أي عمود.
 - **سجل البحث والبحوث المحفوظة** (Ctrl+H).
 
@@ -99,6 +100,7 @@
 | `تقريب: تقريز` أو `fuzzy:` | يتحمّل خطأً إملائياً أو خطأين |
 | `فرانكو: 3abd` أو `franco:` | الحروف اللاتينية تُقرأ عربية |
 | `جذر: كتاب` أو `root:` | «مكتبة» و«الكاتب» و«كتابات» |
+| `نظام: hosts` أو `sys:` | يُظهر ملفات النظام في هذا البحث |
 
 للبحث داخل المستندات فعّل «البحث داخل المستندات أيضاً» ثم اضغط Enter. فلاتر الحجم والتاريخ تعمل في الحالتين، والأرقام العربية مقبولة في كل الفلاتر.
 
@@ -127,7 +129,7 @@ bahth.exe -s تقرير -n 20 --sort date --desc --scope "D:\العمل"
 bahth.exe -s عقد --json
 ```
 
-الخيارات: `-n`/`--max`، و`--sort name|path|size|date` مع `--desc`، و`--scope`، و`--count`، و`--csv`، و`--json`، و`--help`. رمز الخروج 0 عند وجود نتائج، و1 عند عدمها، و2 عند الخطأ.
+الخيارات: `-n`/`--max`، و`--sort name|path|size|date` مع `--desc`، و`--scope`، و`--count`، و`--csv`، و`--json`، و`--all` (لإظهار ملفات النظام)، و`--help`. رمز الخروج 0 عند وجود نتائج، و1 عند عدمها، و2 عند الخطأ.
 
 إضافة Flow Launcher جاهزة (اكتب `ب فاتورة`) وأمثلة PowerShell وAutoHotkey وWindows Terminal في [`integrations/`](integrations/).
 
@@ -173,6 +175,7 @@ The first run indexes your drives in the background (a minute or more, depending
 - **Real Arabic matching**: hamza forms, ta marbuta, alef maqsura, diacritics, tatweel and the `ال` prefix are ignored; Arabic-Indic digits and Persian letters are accepted.
 - **Forgiving**: when nothing matches, it retries with the other keyboard layout, then Arabizi (`3abd` → عبد), then near spellings (one or two typos). `root:` searches by the Arabic triliteral root.
 - **Rich query syntax**: phrases, OR, NOT, extensions, size, date modified, regex, whole word, and word proximity. See [Query syntax](#query-syntax).
+- **System files hidden** (on by default): the Windows folder, Recycle Bin, page files and temp/cache folders under AppData stay out of the results. Turn it off in **Options → Hide system files**, or type `sys:` for one search. Program Files and your own files always show.
 - **Often-opened files first**, match underlining, sort by any column, search history and saved searches (Ctrl+H).
 
 #### Inside files
@@ -219,6 +222,7 @@ The first run indexes your drives in the background (a minute or more, depending
 | `fuzzy: reprot` | tolerate one or two typos |
 | `franco: ta2rer` | read Latin letters as Arabizi |
 | `root: كتاب` | words sharing the Arabic root |
+| `sys: hosts` | include Windows system files in this search |
 
 Every filter also has an Arabic spelling (`حجم:`, `تاريخ:`, `كلمة:`, `مجلد:` …). To search inside documents, tick **Also search inside documents** and press Enter.
 
@@ -247,7 +251,7 @@ bahth.exe -s report -n 20 --sort date --desc --scope "D:\Work"
 bahth.exe -s contract --json
 ```
 
-Options: `-n`/`--max`, `--sort name|path|size|date` with `--desc`, `--scope`, `--count`, `--csv`, `--json`, `--help`. Exit code 0 = results, 1 = none, 2 = error.
+Options: `-n`/`--max`, `--sort name|path|size|date` with `--desc`, `--scope`, `--count`, `--csv`, `--json`, `--all` (include system files), `--help`. Exit code 0 = results, 1 = none, 2 = error.
 
 A Flow Launcher plugin (keyword `bs`) and PowerShell, AutoHotkey and Windows Terminal examples are in [`integrations/`](integrations/).
 

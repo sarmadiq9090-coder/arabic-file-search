@@ -302,6 +302,7 @@ impl App {
             return false;
         };
         shared.set_index(self.state.borrow().index.clone());
+        self.set_web_show_system(&shared);
         match web::Server::start(port, shared) {
             Ok(server) => {
                 log(&format!("web: listening on {} address(es), port {port}", server.addrs.len()));
@@ -319,6 +320,16 @@ impl App {
                 false
             }
         }
+    }
+
+    /// Phone searches follow the "hide system files" option.
+    pub(super) fn set_web_show_system(&self, shared: &web::Shared) {
+        shared.show_system.store(!self.state.borrow().settings.hide_system, Ordering::Relaxed);
+    }
+
+    /// The running server's shared state, if any.
+    pub(super) fn web_running_shared(&self) -> Option<Arc<web::Shared>> {
+        self.web.shared.borrow().clone()
     }
 
     /// Stops the server, if running. Also called when the program closes.

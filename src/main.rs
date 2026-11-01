@@ -59,6 +59,8 @@ mod root;
 #[cfg(any(windows, test))]
 mod search;
 #[cfg(any(windows, test))]
+mod system_files;
+#[cfg(any(windows, test))]
 mod settings;
 #[cfg(any(windows, test))]
 mod thumb_cache;
