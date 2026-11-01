@@ -113,8 +113,8 @@
       <p class="fine">Version 0.6.0 · a single <code>bahth.exe</code>, nothing to install · Windows 8 or later, 64-bit · MIT license</p>
     </div>
     <figure class="shot">
-      <img src="../img/search.png" width="1100" height="700" alt="The InstaFind window showing instant results while typing “report”, with the matching part of each name underlined" fetchpriority="high">
-      <figcaption>Results appear while you type, with the matching part underlined.</figcaption>
+      <img src="../img/demo-en.gif" width="800" height="501" alt="Demo on Windows: instant name search for invoice and report 2026, then a search inside documents for budget" fetchpriority="high">
+      <figcaption>Recorded on Windows: results appear while you type, then a search inside documents.</figcaption>
     </figure>
   </div>
 </section>
@@ -187,8 +187,8 @@
       </ul>
     </div>
     <figure class="shot">
-      <img src="../img/inside-documents.png" width="1100" height="700" loading="lazy" decoding="async" alt="Search results inside documents, with a column showing a snippet of the matching text from each file">
-      <figcaption>Searching inside documents, with a snippet of the matching text.</figcaption>
+      <img src="../img/inside-en.png" width="946" height="593" loading="lazy" decoding="async" alt="Searching inside documents for budget in the Documents folder: two files found">
+      <figcaption>Searching inside the documents of one folder for “budget”.</figcaption>
     </figure>
   </div>
 </section>
@@ -200,9 +200,15 @@
       <p>Every release is run on real Windows before it is published: it indexes the whole drive and searches in Arabic, and it is not released if anything fails.</p>
     </div>
     <!-- BENCH -->
-    <div class="bench">
-      <p>Measured indexing and search times on a real machine are coming soon.</p>
-    </div>
+    <div class="table-wrap"><table class="bench-table">
+      <caption>File-name search across the whole C: drive of a real Windows machine on GitHub Actions (Windows Server 2025, 150 MB index)</caption>
+      <thead><tr><th scope="col">Search</th><th scope="col">InstaFind</th><th scope="col"><code>dir /s</code></th><th scope="col"><code>Get-ChildItem</code></th></tr></thead>
+      <tbody>
+        <tr><th scope="row"><code>report</code></th><td><strong>1 s</strong></td><td>96 s</td><td>50 s</td></tr>
+        <tr><th scope="row"><code>احمد</code> (files named <span lang="ar">أحمد</span>)</th><td><strong>1 s</strong>, finds both</td><td>33 s, finds none</td><td>50 s, finds none</td></tr>
+      </tbody>
+    </table></div>
+    <p class="bench-note">The second includes starting the command-line tool and loading the index from disk. In the open window, results appear as you type, in milliseconds. <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/blob/main/docs/media/bench.md">Raw results</a></p>
   </div>
 </section>
 

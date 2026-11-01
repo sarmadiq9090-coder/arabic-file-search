@@ -113,8 +113,8 @@
       <p class="fine">الإصدار 0.6.0 · ملف واحد <code class="ltr">bahth.exe</code> لا يحتاج تثبيتاً · ويندوز 8 أو أحدث، 64 بت · رخصة MIT</p>
     </div>
     <figure class="shot">
-      <img src="img/search.png" width="1100" height="700" alt="نافذة InstaFind تعرض نتائج فورية أثناء كتابة كلمة report مع تسطير الجزء المطابق في كل اسم" fetchpriority="high">
-      <figcaption>نتائج فورية أثناء الكتابة، مع خط تحت الجزء المطابق (الواجهة الإنكليزية).</figcaption>
+      <img src="img/demo-ar.gif" width="800" height="501" alt="عرض على ويندوز: «احمد» تجد «أحمد»، و«التقرير» تجد «تقرير»، وhgjrvdv المكتوبة بلوحة المفاتيح الخطأ تجد «التقرير»، ثم البحث داخل المستندات" fetchpriority="high">
+      <figcaption>مسجَّل على ويندوز: «احمد» تجد «أحمد»، والكتابة بلوحة المفاتيح الخطأ تجد «التقرير»، ثم البحث داخل المستندات.</figcaption>
     </figure>
   </div>
 </section>
@@ -187,8 +187,8 @@
       </ul>
     </div>
     <figure class="shot">
-      <img src="img/inside-documents.png" width="1100" height="700" loading="lazy" decoding="async" alt="نتائج البحث داخل المستندات مع عمود يعرض مقتطفاً من النص المطابق في كل ملف">
-      <figcaption>البحث داخل المستندات مع مقتطف من النص المطابق.</figcaption>
+      <img src="img/inside-ar.png" width="946" height="593" loading="lazy" decoding="async" alt="البحث عن «الميزانية» داخل المستندات في مجلد المستندات: وُجد ملفان">
+      <figcaption>البحث عن «الميزانية» داخل المستندات في مجلد واحد.</figcaption>
     </figure>
   </div>
 </section>
@@ -200,9 +200,15 @@
       <p>كل إصدار يُشغَّل فعلياً على ويندوز قبل نشره: يفهرس القرص كله ويبحث بالعربية، ولا يُنشر إن ظهر أي خطأ.</p>
     </div>
     <!-- BENCH -->
-    <div class="bench">
-      <p>نعمل على قياسات منشورة لزمن الفهرسة والبحث على جهاز حقيقي، وستظهر هنا قريباً.</p>
-    </div>
+    <div class="table-wrap"><table class="bench-table">
+      <caption>البحث في اسم الملف على قرص C كامل لجهاز ويندوز حقيقي في GitHub Actions (Windows Server 2025، فهرس بحجم 150 ميغابايت)</caption>
+      <thead><tr><th scope="col">البحث عن</th><th scope="col">InstaFind</th><th scope="col"><code>dir /s</code></th><th scope="col"><code>Get-ChildItem</code></th></tr></thead>
+      <tbody>
+        <tr><th scope="row"><code>report</code></th><td><strong>1 ثانية</strong></td><td>96 ثانية</td><td>50 ثانية</td></tr>
+        <tr><th scope="row"><code>احمد</code> (الملفات اسمها «أحمد»)</th><td><strong>1 ثانية</strong>، وجد الملفين</td><td>33 ثانية، لم يجد شيئاً</td><td>50 ثانية، لم يجد شيئاً</td></tr>
+      </tbody>
+    </table></div>
+    <p class="bench-note">الثانية تشمل تشغيل البرنامج من سطر الأوامر وقراءة الفهرس من القرص. داخل النافذة المفتوحة تظهر النتائج أثناء الكتابة في أجزاء من الثانية. <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/blob/main/docs/media/bench.md">النتائج الخام</a></p>
   </div>
 </section>
 
