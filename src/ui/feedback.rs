@@ -34,7 +34,7 @@ impl App {
         true
     }
 
-    fn open_feedback_page(&self, url: &str) {
+    pub(super) fn open_feedback_page(&self, url: &str) {
         if shell::open(url) {
             self.set_status(tr!(
                 "فُتحت صفحة GitHub في المتصفح. راجعها ثم اضغط «Submit» لإرسالها. شكراً لك!",

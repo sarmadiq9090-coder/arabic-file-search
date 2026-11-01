@@ -274,8 +274,12 @@ impl NativeUi<AppUi> for App {
         super::lang_menu::build(&app.options_menu, &mut app.lang_menu, &mut app.menu_lang_ar, &mut app.menu_lang_en)?;
         super::feedback::build(&app.options_menu, &mut app.feedback_menu, [&mut app.menu_feedback_bug, &mut app.menu_feedback_idea, &mut app.menu_feedback_talk])?;
 
-        // Tray icon, so a hidden window comes back instantly.
-        app.tray_icon.handle = crate::icon::load_icon(true) as _;
+        // Tray icon, so a hidden window comes back instantly: a monochrome
+        // magnifier in the taskbar's colours (the app icon if that fails).
+        app.tray_icon.handle = app.mono_icons.get(super::surface::taskbar_dark()) as _;
+        if app.tray_icon.handle.is_null() {
+            app.tray_icon.handle = crate::icon::load_icon(true) as _;
+        }
         if app.tray_icon.handle.is_null() {
             nwg::Icon::builder().source_system(Some(nwg::OemIcon::Information)).build(&mut app.tray_icon)?;
         }
@@ -283,9 +287,18 @@ impl NativeUi<AppUi> for App {
             .parent(w)
             .icon(Some(&app.tray_icon))
             .tip(Some(&format!("{} ({HOTKEY_TEXT})", title())))
+            .visible(settings.tray_icon)
             .build(&mut app.tray)?;
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.tray_menu)?;
-        nwg::MenuItem::builder().text(tr!("إظهار بحث سريع", "Show InstaFind")).parent(&app.tray_menu).build(&mut app.tray_show)?;
+        nwg::MenuItem::builder().text(&trf!("فتح نافذة البحث\t{HOTKEY_TEXT}", "Open quick search\t{HOTKEY_TEXT}")).parent(&app.tray_menu).build(&mut app.tray_quick)?;
+        nwg::MenuItem::builder()
+            .text(tr!("إظهار المربع العائم", "Show the floating box"))
+            .check(settings.floating_mode != crate::settings::FloatingMode::Off)
+            .parent(&app.tray_menu)
+            .build(&mut app.tray_floating)?;
+        nwg::MenuItem::builder().text(tr!("النافذة الكاملة", "Full window")).parent(&app.tray_menu).build(&mut app.tray_show)?;
+        nwg::MenuItem::builder().text(tr!("الإعدادات…", "Settings…")).parent(&app.tray_menu).build(&mut app.tray_settings)?;
+        nwg::MenuItem::builder().text(tr!("حول InstaFind", "About InstaFind")).parent(&app.tray_menu).build(&mut app.tray_about)?;
         nwg::MenuItem::builder().text(tr!("خروج", "Exit")).parent(&app.tray_menu).build(&mut app.tray_exit)?;
 
         phase("tray");
@@ -295,6 +308,7 @@ impl NativeUi<AppUi> for App {
         app.build_disk_usage()?;
         app.build_web_ui()?;
         app.build_thumbs()?;
+        app.build_quick_menus(&settings)?;
         app.state.get_mut().settings = settings.clone();
         app.state.get_mut().history = History::load();
         let ui = AppUi { inner: Rc::new(app), handlers: Default::default(), raw_handlers: Default::default() };
@@ -352,8 +366,8 @@ impl NativeUi<AppUi> for App {
                 E::OnListViewItemChanged if handle == app.list => app.show_selected_path(),
                 E::OnListViewRightClick if handle == app.list => app.show_menu(&app.menu),
                 E::OnListViewColumnClick if handle == app.list => app.on_column_click(data.on_list_view_item_index().1),
-                E::OnMousePress(nwg::MousePressEvent::MousePressLeftUp) if handle == app.tray => app.show_window(),
-                E::OnContextMenu if handle == app.tray => app.show_menu(&app.tray_menu),
+                E::OnMousePress(nwg::MousePressEvent::MousePressLeftUp) if handle == app.tray => app.on_tray_click(),
+                E::OnContextMenu if handle == app.tray => app.show_tray_menu(),
                 E::OnMenuItemSelected => {
                     if app.on_history_item(handle) {
                     } else if handle == app.menu_open {
@@ -500,6 +514,9 @@ impl NativeUi<AppUi> for App {
         ui.handlers.borrow_mut().push(ui.inner.setup_disk_usage());
         ui.handlers.borrow_mut().push(ui.inner.setup_web());
         let (handler, raw) = ui.inner.setup_thumbs()?;
+        ui.handlers.borrow_mut().push(handler);
+        ui.raw_handlers.borrow_mut().push(raw);
+        let (handler, raw) = ui.inner.setup_quick()?;
         ui.handlers.borrow_mut().push(handler);
         ui.raw_handlers.borrow_mut().push(raw);
 

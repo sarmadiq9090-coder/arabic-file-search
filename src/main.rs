@@ -52,12 +52,17 @@ mod fuzzy;
 mod history;
 #[cfg(any(windows, test))]
 mod index;
+// TEMPORARY: `allow(dead_code)` until the launcher implementations land
+// (the stubs in src/launcher/ leave items unused); remove it at merge.
 #[cfg(any(windows, test))]
+#[allow(dead_code)]
 mod launcher;
 #[cfg(any(windows, test))]
 mod layout;
 #[cfg(any(windows, test))]
 mod normalize;
+#[cfg(any(windows, test))]
+mod quick;
 #[cfg(any(windows, test))]
 mod replace;
 #[cfg(any(windows, test))]
