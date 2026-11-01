@@ -51,6 +51,8 @@ mod history;
 #[cfg(any(windows, test))]
 mod index;
 #[cfg(any(windows, test))]
+mod launcher;
+#[cfg(any(windows, test))]
 mod layout;
 #[cfg(any(windows, test))]
 mod normalize;
