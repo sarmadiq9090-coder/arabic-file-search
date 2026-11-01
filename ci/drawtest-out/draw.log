@@ -1,0 +1,501 @@
+=== ar mode 0
+ALL mode=0 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=0 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=0 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+ALL mode=0 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=0 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=0 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+ALL mode=0 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=0 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=0 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+ALL mode=0 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=0 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=0 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+ALL mode=0 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=0 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=0 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+ALL mode=0 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=0 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=0 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+ALL mode=0 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=0 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=0 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=0 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=0 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+=== ar mode 4
+ALL mode=4 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=4 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=4 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+ALL mode=4 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=4 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=4 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+ALL mode=4 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=4 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=4 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+ALL mode=4 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=4 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=4 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+ALL mode=4 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=4 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=4 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+ALL mode=4 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=4 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=4 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+ALL mode=4 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=49 r=54
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=54 r=62
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=62 r=69
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=69 r=74
+mode=4 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=74 r=80
+ALL mode=4 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=48 r=52
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=52 r=57
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=82 r=88
+ALL mode=4 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=57 r=62
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=62 r=70
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=70 r=77
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=77 r=82
+mode=4 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=82 r=88
+=== ar mode 5
+ALL mode=5 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=143 r=148
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=135 r=143
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=128 r=135
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=123 r=128
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=117 r=123
+ALL mode=5 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=156 r=160
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=151 r=156
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=146 r=151
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=138 r=146
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=131 r=138
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=126 r=131
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=120 r=126
+ALL mode=5 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=165 r=170
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=157 r=165
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=150 r=157
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=145 r=150
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=139 r=145
+ALL mode=5 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=143 r=148
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=135 r=143
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=128 r=135
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=123 r=128
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=117 r=123
+ALL mode=5 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=156 r=160
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=151 r=156
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=146 r=151
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=138 r=146
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=131 r=138
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=126 r=131
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=120 r=126
+ALL mode=5 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=165 r=170
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=157 r=165
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=150 r=157
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=145 r=150
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=139 r=145
+ALL mode=5 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=143 r=148
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=135 r=143
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=128 r=135
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=123 r=128
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=117 r=123
+ALL mode=5 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=156 r=160
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=151 r=156
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=146 r=151
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=138 r=146
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=131 r=138
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=126 r=131
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=120 r=126
+ALL mode=5 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=165 r=170
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=157 r=165
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=150 r=157
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=145 r=150
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=139 r=145
+ALL mode=5 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=143 r=148
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=135 r=143
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=128 r=135
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=123 r=128
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=117 r=123
+ALL mode=5 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=156 r=160
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=151 r=156
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=146 r=151
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=138 r=146
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=131 r=138
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=126 r=131
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=120 r=126
+ALL mode=5 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=165 r=170
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=157 r=165
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=150 r=157
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=145 r=150
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=139 r=145
+ALL mode=5 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=143 r=148
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=135 r=143
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=128 r=135
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=123 r=128
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=117 r=123
+ALL mode=5 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=156 r=160
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=151 r=156
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=146 r=151
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=138 r=146
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=131 r=138
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=126 r=131
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=120 r=126
+ALL mode=5 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=165 r=170
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=157 r=165
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=150 r=157
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=145 r=150
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=139 r=145
+ALL mode=5 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=143 r=148
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=135 r=143
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=128 r=135
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=123 r=128
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=117 r=123
+ALL mode=5 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=156 r=160
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=151 r=156
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=146 r=151
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=138 r=146
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=131 r=138
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=126 r=131
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=120 r=126
+ALL mode=5 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=165 r=170
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=157 r=165
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=150 r=157
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=145 r=150
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=139 r=145
+ALL mode=5 width=153 ت:126-121 ق:121-113 ر:113-106 ي:106-101 ر:101-95  :95-91 ا:91-87 ل:87-82 م:82-73 ب:73-68 ي:68-63 ع:63-54 ا:54-50 ت:50-36  :36-32 2:0-8 0:8-16 2:16-24 6:24-32 .:126-129 x:129-136 l:136-140 s:140-146 x:146-153 
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=0 ch='ت' x0=126 x1=121 l=143 r=148
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=1 ch='ق' x0=121 x1=113 l=135 r=143
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=2 ch='ر' x0=113 x1=106 l=128 r=135
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=3 ch='ي' x0=106 x1=101 l=123 r=128
+mode=5 mirrored=true rtl=true label=(20,24,260,48) start=22 avail=236 width=153 shown=24 u=4 ch='ر' x0=101 x1=95 l=117 r=123
+ALL mode=5 width=164 ا:138-134 ل:134-129 ت:129-124 ق:124-116 ر:116-109 ي:109-104 ر:104-98  :98-94 ا:94-90 ل:90-85 س:85-72 ن:72-67 و:67-59 ي:59-48  :48-44 ا:44-40 ل:40-35 ن:35-30 ه:30-22 ا:22-18 ئ:18-13 ي:13-0 .:138-141 p:141-150 d:150-159 f:159-164 
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=0 ch='ا' x0=138 x1=134 l=156 r=160
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=1 ch='ل' x0=134 x1=129 l=151 r=156
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=2 ch='ت' x0=129 x1=124 l=146 r=151
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=3 ch='ق' x0=124 x1=116 l=138 r=146
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=4 ch='ر' x0=116 x1=109 l=131 r=138
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=5 ch='ي' x0=109 x1=104 l=126 r=131
+mode=5 mirrored=true rtl=true label=(20,48,260,72) start=22 avail=236 width=164 shown=26 u=6 ch='ر' x0=104 x1=98 l=120 r=126
+ALL mode=5 width=183 ت:148-143 ق:143-135 ر:135-128 ي:128-123 ر:123-117  :117-113 ا:113-109 ل:109-105 ا:105-100 ج:100-91 ت:91-86 م:86-77 ا:77-73 ع:73-65  :65-61 ا:61-57 ل:57-53 أ:53-48 س:48-35 ب:35-30 و:30-22 ع:22-13 ي:13-0 .:148-151 d:151-160 o:160-169 c:169-176 x:176-183 
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=0 ch='ت' x0=148 x1=143 l=165 r=170
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=1 ch='ق' x0=143 x1=135 l=157 r=165
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=2 ch='ر' x0=135 x1=128 l=150 r=157
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=3 ch='ي' x0=128 x1=123 l=145 r=150
+mode=5 mirrored=true rtl=true label=(20,72,260,96) start=22 avail=236 width=183 shown=28 u=4 ch='ر' x0=123 x1=117 l=139 r=145
+=== en mode 4
+ALL mode=4 width=192 Q:0-11 u:11-19 a:19-27 r:27-32 t:32-37 e:37-45 r:45-50 l:50-54 y:54-61  :61-65 r:65-70 e:70-78 p:78-87 o:87-96 r:96-101 t:101-106  :106-110 Q:110-121 3:121-129  :129-133 2:133-141 0:141-149 2:149-157 6:157-165 .:165-168 x:168-175 l:175-179 s:179-185 x:185-192 
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=10 ch='r' x0=65 x1=70 l=87 r=92
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=11 ch='e' x0=70 x1=78 l=92 r=100
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=12 ch='p' x0=78 x1=87 l=100 r=109
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=13 ch='o' x0=87 x1=96 l=109 r=118
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=14 ch='r' x0=96 x1=101 l=118 r=123
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=15 ch='t' x0=101 x1=106 l=123 r=128
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=20 ch='2' x0=133 x1=141 l=155 r=163
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=21 ch='0' x0=141 x1=149 l=163 r=171
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=22 ch='2' x0=149 x1=157 l=171 r=179
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=23 ch='6' x0=157 x1=165 l=179 r=187
+ALL mode=4 width=192 Q:0-11 u:11-19 a:19-27 r:27-32 t:32-37 e:37-45 r:45-50 l:50-54 y:54-61  :61-65 r:65-70 e:70-78 p:78-87 o:87-96 r:96-101 t:101-106  :106-110 Q:110-121 3:121-129  :129-133 2:133-141 0:141-149 2:149-157 6:157-165 .:165-168 x:168-175 l:175-179 s:179-185 x:185-192 
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=10 ch='r' x0=65 x1=70 l=87 r=92
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=11 ch='e' x0=70 x1=78 l=92 r=100
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=12 ch='p' x0=78 x1=87 l=100 r=109
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=13 ch='o' x0=87 x1=96 l=109 r=118
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=14 ch='r' x0=96 x1=101 l=118 r=123
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=15 ch='t' x0=101 x1=106 l=123 r=128
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=20 ch='2' x0=133 x1=141 l=155 r=163
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=21 ch='0' x0=141 x1=149 l=163 r=171
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=22 ch='2' x0=149 x1=157 l=171 r=179
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=23 ch='6' x0=157 x1=165 l=179 r=187
+ALL mode=4 width=192 Q:0-11 u:11-19 a:19-27 r:27-32 t:32-37 e:37-45 r:45-50 l:50-54 y:54-61  :61-65 r:65-70 e:70-78 p:78-87 o:87-96 r:96-101 t:101-106  :106-110 Q:110-121 3:121-129  :129-133 2:133-141 0:141-149 2:149-157 6:157-165 .:165-168 x:168-175 l:175-179 s:179-185 x:185-192 
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=10 ch='r' x0=65 x1=70 l=87 r=92
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=11 ch='e' x0=70 x1=78 l=92 r=100
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=12 ch='p' x0=78 x1=87 l=100 r=109
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=13 ch='o' x0=87 x1=96 l=109 r=118
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=14 ch='r' x0=96 x1=101 l=118 r=123
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=15 ch='t' x0=101 x1=106 l=123 r=128
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=20 ch='2' x0=133 x1=141 l=155 r=163
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=21 ch='0' x0=141 x1=149 l=163 r=171
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=22 ch='2' x0=149 x1=157 l=171 r=179
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=23 ch='6' x0=157 x1=165 l=179 r=187
+ALL mode=4 width=192 Q:0-11 u:11-19 a:19-27 r:27-32 t:32-37 e:37-45 r:45-50 l:50-54 y:54-61  :61-65 r:65-70 e:70-78 p:78-87 o:87-96 r:96-101 t:101-106  :106-110 Q:110-121 3:121-129  :129-133 2:133-141 0:141-149 2:149-157 6:157-165 .:165-168 x:168-175 l:175-179 s:179-185 x:185-192 
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=10 ch='r' x0=65 x1=70 l=87 r=92
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=11 ch='e' x0=70 x1=78 l=92 r=100
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=12 ch='p' x0=78 x1=87 l=100 r=109
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=13 ch='o' x0=87 x1=96 l=109 r=118
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=14 ch='r' x0=96 x1=101 l=118 r=123
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=15 ch='t' x0=101 x1=106 l=123 r=128
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=20 ch='2' x0=133 x1=141 l=155 r=163
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=21 ch='0' x0=141 x1=149 l=163 r=171
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=22 ch='2' x0=149 x1=157 l=171 r=179
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=23 ch='6' x0=157 x1=165 l=179 r=187
+ALL mode=4 width=192 Q:0-11 u:11-19 a:19-27 r:27-32 t:32-37 e:37-45 r:45-50 l:50-54 y:54-61  :61-65 r:65-70 e:70-78 p:78-87 o:87-96 r:96-101 t:101-106  :106-110 Q:110-121 3:121-129  :129-133 2:133-141 0:141-149 2:149-157 6:157-165 .:165-168 x:168-175 l:175-179 s:179-185 x:185-192 
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=10 ch='r' x0=65 x1=70 l=87 r=92
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=11 ch='e' x0=70 x1=78 l=92 r=100
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=12 ch='p' x0=78 x1=87 l=100 r=109
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=13 ch='o' x0=87 x1=96 l=109 r=118
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=14 ch='r' x0=96 x1=101 l=118 r=123
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=15 ch='t' x0=101 x1=106 l=123 r=128
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=20 ch='2' x0=133 x1=141 l=155 r=163
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=21 ch='0' x0=141 x1=149 l=163 r=171
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=22 ch='2' x0=149 x1=157 l=171 r=179
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=23 ch='6' x0=157 x1=165 l=179 r=187
+ALL mode=4 width=192 Q:0-11 u:11-19 a:19-27 r:27-32 t:32-37 e:37-45 r:45-50 l:50-54 y:54-61  :61-65 r:65-70 e:70-78 p:78-87 o:87-96 r:96-101 t:101-106  :106-110 Q:110-121 3:121-129  :129-133 2:133-141 0:141-149 2:149-157 6:157-165 .:165-168 x:168-175 l:175-179 s:179-185 x:185-192 
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=10 ch='r' x0=65 x1=70 l=87 r=92
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=11 ch='e' x0=70 x1=78 l=92 r=100
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=12 ch='p' x0=78 x1=87 l=100 r=109
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=13 ch='o' x0=87 x1=96 l=109 r=118
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=14 ch='r' x0=96 x1=101 l=118 r=123
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=15 ch='t' x0=101 x1=106 l=123 r=128
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=20 ch='2' x0=133 x1=141 l=155 r=163
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=21 ch='0' x0=141 x1=149 l=163 r=171
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=22 ch='2' x0=149 x1=157 l=171 r=179
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=23 ch='6' x0=157 x1=165 l=179 r=187
+ALL mode=4 width=192 Q:0-11 u:11-19 a:19-27 r:27-32 t:32-37 e:37-45 r:45-50 l:50-54 y:54-61  :61-65 r:65-70 e:70-78 p:78-87 o:87-96 r:96-101 t:101-106  :106-110 Q:110-121 3:121-129  :129-133 2:133-141 0:141-149 2:149-157 6:157-165 .:165-168 x:168-175 l:175-179 s:179-185 x:185-192 
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=10 ch='r' x0=65 x1=70 l=87 r=92
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=11 ch='e' x0=70 x1=78 l=92 r=100
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=12 ch='p' x0=78 x1=87 l=100 r=109
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=13 ch='o' x0=87 x1=96 l=109 r=118
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=14 ch='r' x0=96 x1=101 l=118 r=123
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=15 ch='t' x0=101 x1=106 l=123 r=128
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=20 ch='2' x0=133 x1=141 l=155 r=163
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=21 ch='0' x0=141 x1=149 l=163 r=171
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=22 ch='2' x0=149 x1=157 l=171 r=179
+mode=4 mirrored=false rtl=false label=(20,24,260,48) start=22 avail=236 width=192 shown=29 u=23 ch='6' x0=157 x1=165 l=179 r=187
