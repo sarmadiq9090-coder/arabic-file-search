@@ -74,7 +74,12 @@ fn wide(s: &str) -> Vec<u16> {
 }
 
 /// Normalises a path for the shell: backslashes, no `\\?\` verbatim prefix.
+/// Empty (so skipped) for a path with a NUL, which would end the string
+/// early, or split one entry of a CF_HDROP list into two other paths.
 fn shell_path(p: &str) -> String {
+    if p.contains('\0') {
+        return String::new();
+    }
     let p = p.replace('/', "\\");
     if let Some(rest) = p.strip_prefix("\\\\?\\UNC\\") {
         format!("\\\\{rest}")
@@ -136,7 +141,7 @@ fn hdrop_bytes(paths: &[String]) -> Vec<u8> {
 /// Puts `paths` on the clipboard as files (CF_HDROP + "Preferred DropEffect"
 /// = copy), so Ctrl+V in Explorer / WhatsApp / Word pastes the files.
 pub fn copy_files(hwnd: HWND, paths: &[String]) -> bool {
-    if !paths.iter().any(|p| !p.is_empty()) {
+    if !paths.iter().any(|p| !shell_path(p).is_empty()) {
         return false;
     }
     unsafe {
@@ -514,3 +519,39 @@ pub fn drag_files_from(hwnd: HWND, paths: &[String]) -> bool {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn list(bytes: &[u8]) -> Vec<String> {
+        let header = std::mem::size_of::<DropFiles>();
+        let units: Vec<u16> = bytes[header..].chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+        assert_eq!(&units[units.len() - 2..], &[0, 0], "double-NUL terminated");
+        String::from_utf16(&units[..units.len() - 2]).unwrap().split('\0').map(str::to_string).collect()
+    }
+
+    #[test]
+    fn shell_paths() {
+        assert_eq!(shell_path(r"\\?\C:\a\b.txt"), r"C:\a\b.txt");
+        assert_eq!(shell_path(r"\\?\UNC\srv\share\f"), r"\\srv\share\f");
+        assert_eq!(shell_path("C:/a/ملف 😀.txt"), "C:\\a\\ملف 😀.txt");
+        assert_eq!(shell_path("C:\\a\0C:\\Windows\\x"), "");
+        assert_eq!(shell_path(""), "");
+    }
+
+    #[test]
+    fn hdrop_list_has_only_real_paths() {
+        let long = format!("C:\\{}\\f.txt", "د".repeat(300));
+        let paths = vec![
+            r"C:\a.txt".to_string(),
+            String::new(),
+            "C:\\x\0C:\\Windows\\system32".to_string(),
+            long.clone(),
+            "C:\\\u{200F}\u{0651}.txt".to_string(),
+        ];
+        assert_eq!(list(&hdrop_bytes(&paths)), [r"C:\a.txt".to_string(), long, "C:\\\u{200F}\u{0651}.txt".to_string()]);
+        // Nothing usable: still a valid, empty list.
+        let b = hdrop_bytes(&[String::new(), "a\0b".into()]);
+        assert_eq!(b.len(), std::mem::size_of::<DropFiles>() + 2);
+    }
+}

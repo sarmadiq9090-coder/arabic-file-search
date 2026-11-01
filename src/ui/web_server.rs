@@ -362,7 +362,11 @@ impl App {
     }
 
     fn new_web_secrets(&self) {
-        let Some((t, p)) = new_secrets() else { return };
+        let Some((t, p)) = new_secrets() else {
+            *self.web.error.borrow_mut() = Some(tr!("تعذر إنشاء رمز سري آمن.", "Could not create a secure PIN.").into());
+            self.refresh_web_window();
+            return;
+        };
         if let Some(s) = self.web.shared.borrow().as_ref() {
             s.set_secrets(t, p);
         }
@@ -392,7 +396,10 @@ impl App {
             text.push_str(e);
             text.push_str("\r\n\r\n");
         }
-        let secrets = running.then(load_secrets).flatten();
+        // What the server checks, not a fresh registry read: if saving new
+        // secrets failed, `load_secrets` would make up others that the
+        // running server does not know.
+        let secrets = if running { w.shared.borrow().as_ref().map(|s| s.current_secrets()) } else { None };
         match (server.as_ref(), secrets) {
             (Some(s), Some((token, pin))) => {
                 let urls: Vec<String> = s.lan_addrs().map(|a| format!("http://{a}/")).collect();
