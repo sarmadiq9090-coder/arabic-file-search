@@ -38,6 +38,7 @@ pub struct SavedSearch {
     pub name: String,
     pub query: String,
     /// Selected entry of [`crate::search::KINDS`].
+    #[serde(deserialize_with = "saturating_usize")]
     pub kind: usize,
     /// Folder the search is limited to, "" for everywhere.
     pub scope: String,
@@ -57,6 +58,12 @@ pub struct Pin {
     /// A program (opened with `ShellExecute`) rather than a file or folder.
     pub app: bool,
     pub dir: bool,
+}
+
+/// A usize written by any build: a 64-bit value read by the 32-bit build
+/// saturates instead of discarding the whole history.
+fn saturating_usize<'de, D: serde::Deserializer<'de>>(d: D) -> Result<usize, D::Error> {
+    Ok(usize::try_from(u64::deserialize(d)?).unwrap_or(usize::MAX))
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]

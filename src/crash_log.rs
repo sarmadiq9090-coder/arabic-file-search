@@ -247,8 +247,9 @@ fn image_base() -> Option<usize> {
     None
 }
 
+/// The release asset name, so offsets name the right build (x64, x86 or ARM64).
 fn exe_name() -> &'static str {
-    "bahth.exe"
+    crate::update::ASSET_NAME
 }
 
 /// Appends a timestamped entry to the log; never fails loudly. Moves a log
@@ -292,6 +293,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_pointer_width = "64")] // 64-bit addresses
     fn frames_get_offsets_into_the_program() {
         let bt = "   0:     0x140489519 - <unknown>\n   1:     0x7ffa00001000 - <unknown>\n  at src/x.rs:1\n";
         let out = annotate_frames(bt, Some(0x1_4000_0000), "bahth.exe");
@@ -337,10 +339,15 @@ mod tests {
             seed ^= seed << 17;
             (seed % n as u64) as usize
         };
+        // The usual image base of a 64-bit exe; 32-bit images load lower.
+        #[cfg(target_pointer_width = "64")]
+        const IMAGE_BASE: usize = 0x1_4000_0000;
+        #[cfg(not(target_pointer_width = "64"))]
+        const IMAGE_BASE: usize = 0x40_0000;
         for _ in 0..3000 {
             let s: String = (0..below(12)).map(|_| PIECES[below(PIECES.len())]).collect();
             let _ = frame_address(&s);
-            let base = [None, Some(0), Some(usize::MAX), Some(0x1_4000_0000)][below(4)];
+            let base = [None, Some(0), Some(usize::MAX), Some(IMAGE_BASE)][below(4)];
             let _ = annotate_frames(&s, base, "bahth.exe");
             let r = report(&s, Some((&s, u32::MAX, 0)), &s, &s);
             assert!(r.ends_with("END PANIC"));

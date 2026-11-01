@@ -1,9 +1,22 @@
 # Smoke test of the exact bahth.exe that would be published: starts the GUI on
 # a real Windows machine, lets it index the drive, then drives the command line
 # against that index. Fails on a crash report, an early exit or a wrong result.
-param([Parameter(Mandatory)][string]$Exe)
+# -Machine checks the exe is built for that CPU (x64, x86 or arm64), so a
+# mislabelled asset can never be published.
+param([Parameter(Mandatory)][string]$Exe, [string]$Machine)
 $ErrorActionPreference = 'Stop'
 $Exe = (Resolve-Path $Exe).Path
+if ($Machine) {
+    $bytes = [IO.File]::ReadAllBytes($Exe)
+    $pe = [BitConverter]::ToInt32($bytes, 0x3c)
+    $code = [BitConverter]::ToUInt16($bytes, $pe + 4)
+    $want = @{ x64 = 0x8664; x86 = 0x014c; arm64 = 0xaa64 }[$Machine]
+    if ($null -eq $want) { throw "unknown -Machine $Machine" }
+    Write-Host ("PE machine {0:x4}, OS arch {1}, process arch {2}" -f $code, `
+        [Runtime.InteropServices.RuntimeInformation]::OSArchitecture, `
+        [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)
+    if ($code -ne $want) { throw ("{0} is machine {1:x4}, not {2}" -f $Exe, $code, $Machine) }
+}
 $data = Join-Path $env:LOCALAPPDATA 'BahthSari'
 $crash = Join-Path $data 'crash.txt'
 $index = Join-Path $data 'index.bin'

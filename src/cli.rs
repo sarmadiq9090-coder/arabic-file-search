@@ -112,8 +112,9 @@ pub fn parse_args(args: &[String]) -> Result<Command, String> {
         match name {
             "-s" | "--search" => words.push(value),
             "-n" | "--max" => {
-                let n = value.trim().parse::<usize>().map_err(|_| trf!("{name}: ليس رقماً: {value}", "{name}: not a number: {value}"))?;
-                o.max = Some(n);
+                let n = value.trim().parse::<u64>().map_err(|_| trf!("{name}: ليس رقماً: {value}", "{name}: not a number: {value}"))?;
+                // Any 64-bit count is accepted, also by the 32-bit build.
+                o.max = Some(usize::try_from(n).unwrap_or(usize::MAX));
             }
             "--sort" => {
                 o.sort = match value.to_ascii_lowercase().as_str() {
