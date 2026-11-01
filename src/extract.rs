@@ -21,6 +21,8 @@ use quick_xml::events::Event;
 mod archive;
 mod bidi_fix;
 mod epub;
+#[cfg(test)]
+mod fuzz;
 mod mail;
 mod pdf_images;
 
@@ -32,6 +34,12 @@ const MAX_TEXT_READ: u64 = 20 * 1024 * 1024;
 const MAX_ZIP_ENTRY: u64 = 64 * 1024 * 1024;
 /// Upper bound (in bytes) for text produced from spreadsheets / zip documents.
 const MAX_OUTPUT: usize = 64 * 1024 * 1024;
+/// Upper bound for everything a zip-based workbook (xlsx, xlsb) declares it
+/// unpacks to: calamine reads its parts (shared strings…) whole.
+const MAX_WORKBOOK_UNZIPPED: u64 = 256 * 1024 * 1024;
+/// Upper bound for the cells calamine lays out densely (bounding box of each
+/// sheet, summed) when it opens an .xls file.
+const MAX_XLS_CELLS: u64 = 6_000_000;
 
 const TEXT_EXTS: &[&str] = &[
     "txt", "md", "csv", "tsv", "log", "json", "xml", "html", "htm", "ini", "cfg", "yaml", "yml",
@@ -106,8 +114,8 @@ fn extract_by_ext(path: &Path, ext: &str) -> Option<String> {
         "odt" | "odp" => extract_odf(path),
         "xlsx" | "xlsm" | "xlsb" | "xls" | "ods" => extract_spreadsheet(path, ext),
         "pdf" => extract_pdf(path),
-        "rtf" => Some(rtf_to_text(&std::fs::read(path).ok()?)),
-        "doc" => Some(extract_doc_heuristic(&std::fs::read(path).ok()?)),
+        "rtf" => Some(rtf_to_text(&read_file_capped(path)?)),
+        "doc" => Some(extract_doc_heuristic(&read_file_capped(path)?)),
         "eml" => mail::extract_eml(path),
         "msg" => mail::extract_msg(path),
         "epub" => epub::extract_epub(path),
@@ -127,6 +135,12 @@ fn read_capped(r: impl Read, cap: u64) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
     r.take(cap).read_to_end(&mut buf).ok()?;
     Some(buf)
+}
+
+/// The whole file, but never more than [`MAX_FILE_SIZE`]: the size checked
+/// before may be stale (a file still being written, or replaced meanwhile).
+fn read_file_capped(path: &Path) -> Option<Vec<u8>> {
+    read_capped(File::open(path).ok()?, MAX_FILE_SIZE)
 }
 
 fn read_text_file(path: &Path) -> Option<String> {
@@ -278,7 +292,17 @@ fn open_zip(path: &Path) -> Option<Zip> {
 /// Reads one zip member as text (size-capped). Missing members yield None.
 fn read_zip_entry<R: Read + Seek>(zip: &mut zip::ZipArchive<R>, name: &str) -> Option<String> {
     let entry = zip.by_name(name).ok()?;
+    if !zip_ratio_ok(entry.size(), entry.compressed_size()) {
+        return None; // zip bomb
+    }
     Some(decode_bytes(&read_capped(entry, MAX_ZIP_ENTRY)?))
+}
+
+/// False for a zip member that expands suspiciously much (the same bound as
+/// for members of archives). The zip crate never reads past a member's
+/// declared size, so the declared sizes are what count.
+fn zip_ratio_ok(size: u64, packed: u64) -> bool {
+    size <= archive::RATIO_FLOOR || size <= packed.saturating_mul(archive::MAX_RATIO)
 }
 
 /// Names of members whose name is `{prefix}{N}.xml`, sorted by N.
@@ -444,47 +468,246 @@ fn odf_text<R: Read + Seek>(mut zip: zip::ZipArchive<R>) -> Option<String> {
 // ---------------------------------------------------------------------------
 
 fn extract_spreadsheet(path: &Path, ext: &str) -> Option<String> {
-    use calamine::{Ods, Xls, Xlsb, Xlsx, open_workbook};
+    spreadsheet_text(std::io::BufReader::new(File::open(path).ok()?), ext)
+}
+
+/// Text of a spreadsheet (`ext` lowercase: xlsx, xlsm, xlsb, xls or ods).
+///
+/// calamine is only handed files it can open within bounded memory: it lays
+/// out a sheet as a dense grid, so one cell at A1 and one at XFD1048576 (or
+/// an .xls `DIMENSIONS` record claiming as much) would make it allocate
+/// hundreds of gigabytes, an abort that no `catch_unwind` can catch.
+fn spreadsheet_text<R: Read + Seek>(mut r: R, ext: &str) -> Option<String> {
+    use calamine::{Xls, Xlsb, Xlsx};
     // Dispatch on our lowercase extension (calamine's auto-detection is
     // case-sensitive, so "REPORT.XLSX" would go through slow guessing).
     let book: Sheets<_> = match ext {
-        "xlsx" | "xlsm" => Sheets::Xlsx(open_workbook::<Xlsx<_>, _>(path).ok()?),
-        "xlsb" => Sheets::Xlsb(open_workbook::<Xlsb<_>, _>(path).ok()?),
-        "xls" => Sheets::Xls(open_workbook::<Xls<_>, _>(path).ok()?),
-        "ods" => Sheets::Ods(open_workbook::<Ods<_>, _>(path).ok()?),
+        // Our own streaming ODF reader: calamine expands repeated rows and
+        // cells (`table:number-columns-repeated`) in memory.
+        "ods" => return odf_text(zip::ZipArchive::new(r).ok()?),
+        "xls" => {
+            if !xls_size_ok(&mut r) {
+                // Too big for calamine (or not a readable compound file):
+                // the strings still come out of the raw bytes.
+                r.rewind().ok()?;
+                let data = read_capped(r, MAX_FILE_SIZE)?;
+                // BIFF strings are not word-aligned: try both alignments.
+                let mut text = extract_doc_heuristic(&data);
+                text.push_str(&extract_doc_heuristic(data.get(1..).unwrap_or_default()));
+                return Some(text);
+            }
+            r.rewind().ok()?;
+            Sheets::Xls(Xls::new(r).ok()?)
+        }
+        "xlsx" | "xlsm" | "xlsb" => {
+            if !workbook_zip_ok(&mut r) {
+                return None;
+            }
+            r.rewind().ok()?;
+            if ext == "xlsb" {
+                Sheets::Xlsb(Xlsb::new(r).ok()?)
+            } else {
+                Sheets::Xlsx(Xlsx::new(r).ok()?)
+            }
+        }
         _ => return None,
     };
     sheets_text(book)
 }
 
+/// True when no member of a zip-based workbook is a zip bomb and all of them
+/// together declare at most [`MAX_WORKBOOK_UNZIPPED`].
+fn workbook_zip_ok<R: Read + Seek>(r: &mut R) -> bool {
+    let Ok(mut zip) = zip::ZipArchive::new(r) else { return false };
+    let mut total = 0u64;
+    for i in 0..zip.len() {
+        let Ok(f) = zip.by_index_raw(i) else { return false };
+        if !zip_ratio_ok(f.size(), f.compressed_size()) {
+            return false;
+        }
+        total = total.saturating_add(f.size());
+    }
+    total <= MAX_WORKBOOK_UNZIPPED
+}
+
+/// True when calamine can open the .xls compound file in `r` without laying
+/// out more than [`MAX_XLS_CELLS`] cells (see [`xls_stream_size_ok`]).
+fn xls_size_ok<R: Read + Seek>(r: &mut R) -> bool {
+    let Ok(mut comp) = cfb::CompoundFile::open(r) else { return false };
+    let stream = match comp.open_stream("Workbook") {
+        Ok(s) => read_capped(s, MAX_FILE_SIZE),
+        Err(_) => match comp.open_stream("Book") {
+            Ok(s) => read_capped(s, MAX_FILE_SIZE),
+            Err(_) => return false,
+        },
+    };
+    stream.is_some_and(|s| xls_stream_size_ok(&s))
+}
+
+/// BIFF records of an .xls workbook stream, as calamine walks them:
+/// `(type, data)`, stopping at the first one that does not fit.
+fn biff_records(stream: &[u8]) -> impl Iterator<Item = (u16, &[u8])> {
+    let mut rest = stream;
+    std::iter::from_fn(move || {
+        let typ = u16::from_le_bytes([*rest.first()?, *rest.get(1)?]);
+        let len = usize::from(u16::from_le_bytes([*rest.get(2)?, *rest.get(3)?]));
+        let data = rest.get(4..4 + len)?;
+        rest = &rest[4 + len..];
+        Some((typ, data))
+    })
+}
+
+/// Mirrors how calamine's `Xls::new` sizes its sheets: for every sheet the
+/// `BOUNDSHEET` records point at, the bounding box of its cell records and
+/// the capacity its `DIMENSIONS` record asks for. False when that comes to
+/// more than [`MAX_XLS_CELLS`].
+fn xls_stream_size_ok(stream: &[u8]) -> bool {
+    let u16_at = |d: &[u8], i: usize| d.get(i..i + 2).map_or(0, |b| u32::from(u16::from_le_bytes([b[0], b[1]])));
+    let u32_at = |d: &[u8], i: usize| d.get(i..i + 4).map_or(0, |b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]));
+
+    // Sheet positions, from the workbook globals (up to their EOF).
+    let mut sheets: Vec<usize> = Vec::new();
+    for (typ, data) in biff_records(stream) {
+        match typ {
+            0x0085 if data.len() >= 4 => sheets.push(u32_at(data, 0) as usize),
+            0x000A => break,
+            _ => {}
+        }
+    }
+    let mut total: u64 = 0;
+    for pos in sheets {
+        let Some(sheet) = stream.get(pos..) else { continue };
+        // (row min, row max, col min, col max) of the cells.
+        let mut bbox: Option<(u32, u32, u32, u32)> = None;
+        let mut add = |row: u32, col: u32| {
+            bbox = Some(match bbox {
+                None => (row, row, col, col),
+                Some((r0, r1, c0, c1)) => (r0.min(row), r1.max(row), c0.min(col), c1.max(col)),
+            });
+        };
+        let (mut seen_bof, mut depth) = (false, 0usize);
+        for (typ, data) in biff_records(sheet) {
+            if depth > 0 {
+                match typ {
+                    0x0809 => depth += 1,
+                    0x000A => depth -= 1,
+                    _ => {}
+                }
+                continue;
+            }
+            match typ {
+                0x0809 if seen_bof => depth += 1,
+                0x0809 => seen_bof = true,
+                0x000A => break,
+                0x0200 => {
+                    // DIMENSIONS: calamine reserves rows × columns up front.
+                    let (rf, rl, cf, cl) = match data.len() {
+                        10 => (u16_at(data, 0), u16_at(data, 2), u16_at(data, 4), u16_at(data, 6)),
+                        14 | 16 => (u32_at(data, 0), u32_at(data, 4), u16_at(data, 8), u16_at(data, 10)),
+                        _ => continue,
+                    };
+                    let cf = if cf > 0xFF || cl < cf { 0 } else { cf };
+                    if rl >= 1 && cl >= 1 {
+                        if rf > rl - 1 || cf > cl - 1 {
+                            return false; // calamine's arithmetic would wrap
+                        }
+                        if u64::from(rl - rf) * u64::from(cl - cf) > MAX_XLS_CELLS {
+                            return false;
+                        }
+                    }
+                }
+                // Number, Label, RString, BoolErr, Rk, LabelSst, Formula.
+                0x0203 | 0x0204 | 0x00D6 | 0x0205 | 0x027E | 0x00FD | 0x0006 if data.len() >= 4 => {
+                    add(u16_at(data, 0), u16_at(data, 2));
+                }
+                // MulRk: one row, a run of columns.
+                0x00BD if data.len() >= 6 => {
+                    let first = u16_at(data, 2);
+                    add(u16_at(data, 0), first);
+                    add(u16_at(data, 0), first + (data.len() as u32 - 6) / 6);
+                }
+                _ => {}
+            }
+        }
+        if let Some((r0, r1, c0, c1)) = bbox {
+            total = total.saturating_add(u64::from(r1 - r0 + 1) * u64::from(c1 - c0 + 1));
+            if total > MAX_XLS_CELLS {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// A cell value as calamine's owned [`Data`].
+fn owned_data(d: calamine::DataRef<'_>) -> Data {
+    use calamine::DataRef;
+    match d {
+        DataRef::Int(v) => Data::Int(v),
+        DataRef::Float(v) => Data::Float(v),
+        DataRef::String(s) => Data::String(s),
+        DataRef::SharedString(s) => Data::String(s.to_owned()),
+        DataRef::Bool(v) => Data::Bool(v),
+        DataRef::DateTime(v) => Data::DateTime(v),
+        DataRef::DateTimeIso(s) => Data::DateTimeIso(s),
+        DataRef::DurationIso(s) => Data::DurationIso(s),
+        DataRef::Error(e) => Data::Error(e),
+        DataRef::Empty => Data::Empty,
+    }
+}
+
+/// Appends one sheet's cells (row number, value; in row order): a row's
+/// non-empty cells joined by tabs, then a newline. True once the text has
+/// grown past [`MAX_OUTPUT`].
+fn push_sheet_cells(cells: impl Iterator<Item = (u32, Data)>, out: &mut String) -> bool {
+    let mut row = None;
+    for (r, cell) in cells {
+        if matches!(cell, Data::Empty) {
+            continue;
+        }
+        match row {
+            Some(cur) if cur == r => out.push('\t'),
+            Some(_) => out.push('\n'),
+            None => {}
+        }
+        row = Some(r);
+        match cell {
+            Data::String(s) => out.push_str(&s),
+            other => out.push_str(&other.to_string()),
+        }
+        if out.len() > MAX_OUTPUT {
+            return true;
+        }
+    }
+    if row.is_some() {
+        out.push('\n');
+    }
+    false
+}
+
 fn sheets_text<RS: Read + Seek>(mut book: Sheets<RS>) -> Option<String> {
     let mut out = String::new();
-    let sheet_count = book.sheet_names().len();
-    for i in 0..sheet_count {
-        let Some(Ok(range)) = book.worksheet_range_at(i) else {
-            continue;
+    for (i, name) in book.sheet_names().into_iter().enumerate() {
+        // xlsx / xlsb are streamed cell by cell: calamine's ranges are dense
+        // grids (see `spreadsheet_text`).
+        let full = match &mut book {
+            Sheets::Xlsx(x) => {
+                let Ok(mut cells) = x.worksheet_cells_reader(&name) else { continue };
+                let iter = std::iter::from_fn(|| cells.next_cell().ok().flatten());
+                push_sheet_cells(iter.map(|c| (c.get_position().0, owned_data(c.get_value().clone()))), &mut out)
+            }
+            Sheets::Xlsb(x) => {
+                let Ok(mut cells) = x.worksheet_cells_reader(&name) else { continue };
+                let iter = std::iter::from_fn(|| cells.next_cell().ok().flatten());
+                push_sheet_cells(iter.map(|c| (c.get_position().0, owned_data(c.get_value().clone()))), &mut out)
+            }
+            _ => {
+                let Some(Ok(range)) = book.worksheet_range_at(i) else { continue };
+                push_sheet_cells(range.used_cells().map(|(r, _, d)| (r as u32, d.clone())), &mut out)
+            }
         };
-        for row in range.rows() {
-            let mut first = true;
-            for cell in row {
-                if matches!(cell, Data::Empty) {
-                    continue;
-                }
-                if !first {
-                    out.push('\t');
-                }
-                first = false;
-                match cell {
-                    Data::String(s) => out.push_str(s),
-                    other => out.push_str(&other.to_string()),
-                }
-            }
-            if !first {
-                out.push('\n');
-            }
-            if out.len() > MAX_OUTPUT {
-                return Some(out);
-            }
+        if full {
+            return Some(out);
         }
         out.push('\n');
     }
@@ -496,7 +719,7 @@ fn sheets_text<RS: Read + Seek>(mut book: Sheets<RS>) -> Option<String> {
 // ---------------------------------------------------------------------------
 
 fn extract_pdf(path: &Path) -> Option<String> {
-    let bytes = std::fs::read(path).ok()?;
+    let bytes = read_file_capped(path)?;
     // pdf-extract is known to panic on malformed files; contain it here even
     // though `extract_text` has an outer guard as well. (It does not print to
     // stdout in normal operation; in a GUI-subsystem build there is no console
@@ -1014,13 +1237,11 @@ fn presentation_form_base(c: char) -> Option<&'static str> {
                 0xFE70 | 0xFE71 => 0,
                 0xFE72 => 1,
                 0xFE74 => 2,
+                // Unassigned / not a haraka (and below 0xFE76: no subtraction).
+                0xFE73 | 0xFE75 => return None,
                 _ => (cp - 0xFE76) as usize / 2 + 3,
             };
-            if cp == 0xFE73 || cp == 0xFE75 {
-                None
-            } else {
-                MARKS.get(idx).copied()
-            }
+            MARKS.get(idx).copied()
         }
         0xFE80..=0xFEF4 => {
             let (k, _) = fe80_form(cp)?;
@@ -1055,7 +1276,7 @@ fn normalize_arabic_forms(s: &str) -> Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
+    use std::io::{Cursor, Write};
     use std::path::PathBuf;
 
     fn temp_path(name: &str) -> PathBuf {
@@ -1220,15 +1441,14 @@ mod tests {
         assert!(t.contains("آخر"));
     }
 
-    #[test]
-    fn xlsx_inline_strings() {
+    /// A one-sheet xlsx whose worksheet XML is `sheet`.
+    fn write_xlsx(name: &str, sheet: &str) -> PathBuf {
         let ct = r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>"#;
         let rels = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#;
         let wb = r#"<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="ورقة1" sheetId="1" r:id="rId1"/></sheets></workbook>"#;
         let wbrels = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#;
-        let sheet = r#"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>مرحبا</t></is></c><c r="B1"><v>42</v></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>تقرير</t></is></c></row></sheetData></worksheet>"#;
-        let p = write_zip(
-            "t.xlsx",
+        write_zip(
+            name,
             &[
                 ("[Content_Types].xml", ct),
                 ("_rels/.rels", rels),
@@ -1236,10 +1456,74 @@ mod tests {
                 ("xl/_rels/workbook.xml.rels", wbrels),
                 ("xl/worksheets/sheet1.xml", sheet),
             ],
-        );
-        let t = extract_text(&p).unwrap();
+        )
+    }
+
+    #[test]
+    fn xlsx_inline_strings() {
+        let sheet = r#"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>مرحبا</t></is></c><c r="B1"><v>42</v></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>تقرير</t></is></c></row></sheetData></worksheet>"#;
+        let t = extract_text(&write_xlsx("t.xlsx", sheet)).unwrap();
         assert!(t.contains("مرحبا\t42"), "{t:?}");
         assert!(t.contains("تقرير"), "{t:?}");
+    }
+
+    #[test]
+    fn xlsx_far_apart_cells_do_not_exhaust_memory() {
+        // A1 and XFD1048576: as one dense calamine range that is 17 billion
+        // cells, and the failed allocation aborted the whole program.
+        let sheet = r#"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:XFD1048576"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>مرحبا</t></is></c><c r="B1"><v>42</v></c></row><row r="1048576"><c r="XFD1048576" t="inlineStr"><is><t>تقرير</t></is></c></row></sheetData></worksheet>"#;
+        let t = extract_text(&write_xlsx("far.xlsx", sheet)).unwrap();
+        assert_eq!(t, "مرحبا\t42\nتقرير\n\n");
+    }
+
+    #[test]
+    fn xls_oversized_sheets_do_not_reach_calamine() {
+        use super::fuzz::xls_with;
+        // An ordinary sheet goes through calamine.
+        let ok = xls_with((0, 2, 0, 2), &[(0, 0, "خلية"), (1, 1, "ثانية")]);
+        assert!(xls_size_ok(&mut Cursor::new(&ok)));
+        assert_eq!(spreadsheet_text(Cursor::new(&ok), "xls").unwrap(), "خلية\nثانية\n\n");
+        // calamine reserves DIMENSIONS rows × columns up front, and lays out
+        // the cells' bounding box densely: both used to abort the program.
+        for bad in [
+            xls_with((0, 1_000_000, 0, 255), &[(0, 0, "خلية")]),
+            xls_with((0, 1, 0, 1), &[(0, 0, "خلية"), (65_535, 65_535, "بعيدة")]),
+            xls_with((70_000, 1, 0, 1), &[(0, 0, "خلية")]), // first row after the last
+        ] {
+            assert!(!xls_size_ok(&mut Cursor::new(&bad)));
+            // The text still comes out of the raw bytes.
+            let t = spreadsheet_text(Cursor::new(&bad), "xls").unwrap();
+            assert!(t.contains("خلية"), "{t:?}");
+        }
+        assert!(!xls_size_ok(&mut Cursor::new(b"not a compound file")));
+    }
+
+    #[test]
+    fn ods_repeated_cells_are_not_expanded() {
+        // calamine expanded repeated rows / cells in memory (up to 100
+        // million cells); our own reader keeps each cell's text once.
+        let content = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="o" xmlns:table="t" xmlns:text="x"><office:body><office:spreadsheet><table:table table:name="s"><table:table-row table:number-rows-repeated="1048576"><table:table-cell table:number-columns-repeated="16384"><text:p>خلية</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell><text:p>تقرير</text:p></table:table-cell><table:table-cell><text:p>42</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        let p = write_zip("rep.ods", &[("mimetype", "application/vnd.oasis.opendocument.spreadsheet"), ("content.xml", content)]);
+        let t = extract_text(&p).unwrap();
+        assert_eq!(t.matches("خلية").count(), 1, "{t:?}");
+        assert!(t.contains("تقرير\n\t42"), "{t:?}");
+    }
+
+    #[test]
+    fn zip_bomb_members_are_skipped() {
+        // 8 MB of one repeated byte deflates more than 200 times.
+        let bomb = format!(
+            "<w:document xmlns:w=\"w\"><w:body><w:p><w:r><w:t>{}</w:t></w:r></w:p></w:body></w:document>",
+            "a".repeat(8 << 20)
+        );
+        assert!(extract_text(&write_zip("bomb.docx", &[("word/document.xml", &bomb)])).is_none());
+        let sheet = format!(
+            "<worksheet><sheetData><row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is><t>{}</t></is></c></row></sheetData></worksheet>",
+            "a".repeat(8 << 20)
+        );
+        assert!(extract_text(&write_xlsx("bomb.xlsx", &sheet)).is_none());
+        assert!(zip_ratio_ok(1 << 20, 1)); // small members pass whatever their ratio
+        assert!(!zip_ratio_ok((1 << 20) + 1, 1));
     }
 
     #[test]
@@ -1308,6 +1592,12 @@ mod tests {
             normalize_arabic_forms("plain مرحبا"),
             Cow::Borrowed(_)
         ));
+        // U+FE73 / U+FE75 used to underflow `cp - 0xFE76` (a panic in debug
+        // builds, outside `extract_text`'s guard).
+        for c in '\u{FE70}'..='\u{FE7F}' {
+            let _ = presentation_form_base(c);
+        }
+        assert_eq!(normalize_arabic_forms("\u{FE73}\u{FE75}\u{FE76}\u{FE7F}"), "\u{FE73}\u{FE75}\u{064E}\u{0652}");
     }
 
     #[test]
@@ -1340,7 +1630,7 @@ mod tests {
     }
 
     /// Builds a minimal valid one-page PDF with correct xref offsets.
-    fn tiny_pdf(text: &str) -> Vec<u8> {
+    pub(super) fn tiny_pdf(text: &str) -> Vec<u8> {
         let stream = format!("BT /F1 24 Tf 72 720 Td ({text}) Tj ET");
         let objs = [
             "<< /Type /Catalog /Pages 2 0 R >>".to_owned(),

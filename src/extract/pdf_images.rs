@@ -214,7 +214,9 @@ fn encode_image(doc: &Document, s: &Stream) -> Option<Vec<u8>> {
     let (w, h) = (width as usize, height as usize);
     let row_bytes = (w * comps as usize * bpc as usize).div_ceil(8);
     let raw_len = row_bytes.checked_mul(h)?;
-    if raw_len > MAX_RAW_BYTES {
+    // The BMP holds a byte per pixel even for 1-bit samples: a bilevel scan
+    // within the sample cap could still expand eight times.
+    if raw_len > MAX_RAW_BYTES || w.checked_mul(h)? > MAX_RAW_BYTES {
         return None;
     }
     let mut data = s.content.clone();
@@ -588,6 +590,22 @@ mod tests {
             image(40, 40, dictionary! { "ColorSpace" => "DeviceGray", "BitsPerComponent" => 8 }, vec![0; 100]),
             image(40, 40, dictionary! { "ColorSpace" => "DeviceGray", "BitsPerComponent" => 8, "Filter" => "DCTDecode" }, b"not a jpeg".to_vec()),
         ]]);
+        let doc = Document::load_mem(&pdf).unwrap();
+        assert!(page_images(&doc, MAX_PAGES).is_empty());
+    }
+
+    #[test]
+    fn bilevel_image_within_sample_cap_but_huge_in_pixels_is_skipped() {
+        // 16 MB of 1-bit samples would become a 128 MB pixel buffer and BMP.
+        let (w, h) = (32_768usize, 4096usize);
+        let mut e = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
+        e.write_all(&vec![0u8; w / 8 * h]).unwrap();
+        let pdf = pdf_with(vec![vec![image(
+            w as i64,
+            h as i64,
+            dictionary! { "ImageMask" => true, "Filter" => "FlateDecode" },
+            e.finish().unwrap(),
+        )]]);
         let doc = Document::load_mem(&pdf).unwrap();
         assert!(page_images(&doc, MAX_PAGES).is_empty());
     }
