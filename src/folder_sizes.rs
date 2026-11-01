@@ -147,10 +147,12 @@ impl FolderSizes {
             if p == NONE {
             } else if p & TOP != 0 {
                 let t = &mut tops[(p & !TOP) as usize];
-                t.size += size[i];
-                t.files += u64::from(files[i]);
+                // Saturating: sizes come from the index cache, which may
+                // be damaged (an overflow panics in debug builds).
+                t.size = t.size.saturating_add(size[i]);
+                t.files = t.files.saturating_add(u64::from(files[i]));
             } else {
-                size[p as usize] += size[i];
+                size[p as usize] = size[p as usize].saturating_add(size[i]);
                 files[p as usize] = files[p as usize].saturating_add(files[i]);
             }
         }
@@ -176,7 +178,7 @@ impl FolderSizes {
     /// Size and file count of a node.
     pub fn node_total(&self, node: Node) -> (u64, u64) {
         match node {
-            Node::All => self.tops.iter().fold((0, 0), |(s, f), t| (s + t.size, f + t.files)),
+            Node::All => self.tops.iter().fold((0, 0), |(s, f): (u64, u64), t| (s.saturating_add(t.size), f.saturating_add(t.files))),
             Node::Top(t) => self.tops.get(t as usize).map_or((0, 0), |t| (t.size, t.files)),
             Node::Entry(i) => (self.total(i as usize), self.files(i as usize)),
         }
@@ -518,5 +520,64 @@ mod tests {
         assert!(t.elapsed().as_secs() < 10);
         assert_eq!(s.tops()[0].size, 2000 * 99);
         assert_eq!(s.total(at(&v, r"C:\d0007")), 99);
+    }
+
+    #[test]
+    fn sizes_past_u64_saturate() {
+        // A damaged cache can hold any size: totals stop at the maximum
+        // instead of overflowing (a panic in debug builds).
+        let v = entries(&[
+            (r"C:\a", 0, true),
+            (r"C:\a\x", u64::MAX - 1, false),
+            (r"C:\a\y", u64::MAX / 2, false),
+            (r"D:\z", u64::MAX, false),
+        ]);
+        let s = FolderSizes::compute(&v);
+        assert_eq!(s.total(at(&v, r"C:\a")), u64::MAX);
+        assert_eq!(s.node_total(Node::All), (u64::MAX, 3));
+    }
+
+    /// Random paths full of odd separators and characters: never a panic,
+    /// a parent is always shallower, and navigation stays in bounds.
+    #[test]
+    fn random_paths_never_panic() {
+        const PIECES: &[&str] = &["C:", "\\", "/", "\\\\", "a", "A", "مجلد", "\u{0640}", "😀", " ", ".", "ß", "\u{200F}"];
+        let mut seed = 0x2468_ACE0_u64;
+        let mut below = |n: usize| {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed % n as u64) as usize
+        };
+        for _ in 0..40 {
+            let list: Vec<(String, u64, bool)> = (0..1 + below(60))
+                .map(|_| {
+                    let p: String = (0..1 + below(7)).map(|_| PIECES[below(PIECES.len())]).collect();
+                    (p, [0, 1, 1000, u64::MAX][below(4)], below(2) == 0)
+                })
+                .collect();
+            let v = entries(&list.iter().map(|(p, s, d)| (p.as_str(), *s, *d)).collect::<Vec<_>>());
+            for e in &v {
+                if let Some(p) = parent_path(&e.path) {
+                    assert!(depth(p) < depth(&e.path) || depth(&e.path) == 0, "{p:?} of {:?}", e.path);
+                }
+            }
+            let s = FolderSizes::compute(&v);
+            let mut nodes = vec![Node::All];
+            for (i, e) in v.iter().enumerate() {
+                let _ = s.locate(&v, &e.path);
+                nodes.push(Node::Entry(i as u32));
+            }
+            nodes.extend((0..s.tops().len() as u32 + 1).map(Node::Top));
+            nodes.push(Node::Entry(u32::MAX));
+            for n in nodes {
+                let _ = (s.node_total(n), s.node_path(&v, n), s.children(&v, n));
+                let mut up = Some(n);
+                for _ in 0..20 {
+                    up = up.and_then(|n| s.parent(n));
+                }
+                assert_eq!(up, None, "walking up from {n:?} ends");
+            }
+        }
     }
 }

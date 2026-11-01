@@ -77,7 +77,8 @@ pub struct Group {
 impl Group {
     /// Space freed by keeping only one copy.
     pub fn wasted(&self) -> u64 {
-        self.size * (self.files.len().saturating_sub(1)) as u64
+        // Saturating: sizes come from the index cache, which may be damaged.
+        self.size.saturating_mul(self.files.len().saturating_sub(1) as u64)
     }
 }
 
@@ -91,7 +92,7 @@ pub struct Report {
 
 impl Report {
     pub fn wasted(&self) -> u64 {
-        self.groups.iter().map(Group::wasted).sum()
+        self.groups.iter().map(Group::wasted).fold(0, u64::saturating_add)
     }
 
     pub fn file_count(&self) -> usize {
@@ -150,7 +151,8 @@ fn partial_hash(path: &str, size: u64, progress: &Progress) -> Option<[u8; 32]> 
     let mut h = Sha256::new();
     if size <= 2 * EDGE {
         let mut buf = Vec::with_capacity(size as usize);
-        f.read_to_end(&mut buf).ok()?;
+        // One byte more than expected is enough to see that it grew.
+        (&mut f).take(size + 1).read_to_end(&mut buf).ok()?;
         if buf.len() as u64 != size {
             return None;
         }
@@ -170,7 +172,9 @@ fn partial_hash(path: &str, size: u64, progress: &Progress) -> Option<[u8; 32]> 
 /// SHA-256 of the whole file, or `None` when it can't be read or the search
 /// was cancelled.
 fn full_hash(path: &str, size: u64, progress: &Progress) -> Option<[u8; 32]> {
-    let mut f = File::open(path).ok()?;
+    // A file that keeps growing (a log being written, a device) would
+    // otherwise be read for as long as it grows: stop one byte past `size`.
+    let mut f = File::open(path).ok()?.take(size.saturating_add(1));
     let mut h = Sha256::new();
     let mut buf = vec![0u8; 1 << 20];
     let mut total = 0u64;
@@ -229,7 +233,7 @@ fn split_by<K: std::hash::Hash + Eq + Clone>(
 
 fn start_stage(progress: &Progress, stage: usize, entries: &[Entry], groups: &[Vec<usize>], bytes: impl Fn(u64) -> u64) {
     let files: usize = groups.iter().map(Vec::len).sum();
-    let total: u64 = groups.iter().flatten().map(|&i| bytes(entries[i].size)).sum();
+    let total = groups.iter().flatten().map(|&i| bytes(entries[i].size)).fold(0, u64::saturating_add);
     progress.files_done.store(0, Ordering::Relaxed);
     progress.files_total.store(files, Ordering::Relaxed);
     progress.bytes_done.store(0, Ordering::Relaxed);
@@ -500,6 +504,65 @@ mod tests {
         assert_eq!(r.groups.len(), 1);
         assert_eq!(r.groups[0].files, vec![f("d"), f("e")]);
         assert_eq!(r.wasted(), 5);
+    }
+
+    #[test]
+    fn huge_sizes_from_a_damaged_index_do_not_overflow() {
+        let f = |p: &str| DupFile { path: p.into(), mtime: 0 };
+        let g = Group { size: u64::MAX / 2 + 1, files: vec![f("a"), f("b"), f("c")] };
+        assert_eq!(g.wasted(), u64::MAX);
+        let r = Report { groups: vec![g.clone(), g], unreadable: 0 };
+        assert_eq!(r.wasted(), u64::MAX);
+        // Entries claiming exabytes: grouped, the files' real sizes differ,
+        // so they are unreadable rather than a panic in the byte totals.
+        let d = temp("huge");
+        let mut idx = index_of(&d.0, &[("a", b"x".to_vec()), ("b", b"x".to_vec()), ("c", b"x".to_vec())]);
+        for e in &mut idx.entries {
+            e.size = u64::MAX - 1;
+        }
+        let p = Progress::default();
+        let r = find(&idx, &all(&idx), Mode::Content, 0, &p).unwrap();
+        assert!(r.groups.is_empty() && r.unreadable == 3);
+        let r = find(&idx, &all(&idx), Mode::NameAndSize, 0, &p).unwrap();
+        assert!(r.groups.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn endless_files_are_not_read_forever() {
+        // /dev/zero never ends; a growing file behaves the same way.
+        let p = Progress::default();
+        assert_eq!(full_hash("/dev/zero", 3 << 20, &p), None);
+        assert!(p.bytes_done.load(Ordering::Relaxed) <= (3 << 20) + 1);
+        assert_eq!(partial_hash("/dev/zero", 10, &p), None);
+        // A folder where the index says file.
+        assert_eq!(full_hash("/", 10, &p), None);
+    }
+
+    #[test]
+    fn random_scopes_and_entries_never_panic() {
+        let mut seed = 0x1357_9BDF_u64;
+        let mut below = |n: usize| {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed % n as u64) as usize
+        };
+        const PIECES: &[&str] = &["C:", "\\", "/", "a", "A", "İ", "ß", "ẞ", "صور", "\u{0651}", "😀", "", ".", "Σ", "ς"];
+        fn s(below: &mut dyn FnMut(usize) -> usize, n: usize) -> String {
+            (0..below(n)).map(|_| PIECES[below(PIECES.len())]).collect()
+        }
+        for _ in 0..2000 {
+            let (path, folder) = (s(&mut below, 8), s(&mut below, 5));
+            let _ = under(&path, &folder);
+            assert!(under(&path, ""));
+        }
+        let entries: Vec<Entry> =
+            (0..300).map(|i| entry(&format!("e{i}"), [0, 1, 7, u64::MAX][below(4)], below(3) == 0)).collect();
+        let ids: Vec<usize> = (0..600).map(|_| below(400)).collect();
+        for g in size_groups(&entries, ids.into_iter(), below(10) as u64) {
+            assert!(g.len() >= 2 && g.iter().all(|&i| entries[i].size == entries[g[0]].size && !entries[i].is_dir));
+        }
     }
 
     #[test]
