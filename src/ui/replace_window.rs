@@ -255,7 +255,6 @@ impl App {
         if let Some(h) = r.list.handle.hwnd() {
             unsafe { SendMessageW(h, winapi::um::winuser::WM_SETFONT, self.font.handle as usize, 1) };
         }
-        let scale = nwg::scale_factor();
         for (i, (text, width)) in [(tr!("الملف", "File"), 500), (tr!("التطابقات", "Matches"), 90), (tr!("الترميز / الحالة", "Encoding / status"), 190)]
             .into_iter()
             .enumerate()
@@ -263,7 +262,7 @@ impl App {
             r.list.insert_column(nwg::InsertListViewColumn {
                 index: Some(i as i32),
                 fmt: None,
-                width: Some((width as f64 * scale).round() as i32),
+                width: Some(width), // nwg scales it for the DPI
                 text: Some(text.to_string()),
             });
         }

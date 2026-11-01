@@ -203,12 +203,11 @@ impl App {
                 winapi::um::uxtheme::SetWindowTheme(h, theme.as_ptr(), std::ptr::null());
             }
         }
-        let scale = nwg::scale_factor();
         for (i, (ar, en, width)) in COLS.iter().enumerate() {
             d.list.insert_column(nwg::InsertListViewColumn {
                 index: Some(i as i32),
                 fmt: None,
-                width: Some((*width as f64 * scale).round() as i32),
+                width: Some(*width), // nwg scales it for the DPI
                 text: Some(tr!(*ar, *en).to_string()),
             });
         }

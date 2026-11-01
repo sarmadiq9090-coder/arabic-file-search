@@ -134,7 +134,7 @@ impl App {
         } else {
             nwg::CheckBoxState::Unchecked
         });
-        self.scope_input.set_text(if s.scope.is_empty() { tr!("كل الأقراص", "All drives") } else { &s.scope });
+        self.show_scope(&s.scope);
         self.state.borrow_mut().scope = s.scope.clone();
         self.query.set_text(&s.query);
         self.focus_query();
