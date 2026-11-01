@@ -1,0 +1,59 @@
+name: drawtest
+# TEMPORARY: real-Windows screenshots of the Arabic match underline.
+on:
+  push:
+    branches: ["claude/project-thread-kuhy0f"]
+    paths: ["ci/drawtest.ps1", ".github/workflows/drawtest.yml", "src/draw.rs"]
+permissions:
+  contents: read
+jobs:
+  exe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+      - uses: Swatinem/rust-cache@v2
+      - run: |
+          sudo apt-get update -q && sudo apt-get install -y -q mingw-w64
+          cargo build --release --target x86_64-pc-windows-gnu
+          cp target/x86_64-pc-windows-gnu/release/bahth.exe bahth.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bahth-exe
+          path: bahth.exe
+  shots:
+    needs: exe
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bahth-exe
+      - shell: powershell
+        run: ./ci/drawtest.ps1 -Exe ./bahth.exe -Out ./drawtest-out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: drawtest-out
+          path: drawtest-out
+  commit:
+    needs: shots
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: drawtest-out
+          path: ci/drawtest-out
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci/drawtest-out
+          git commit -m "drawtest results [skip ci]"
+          git push
