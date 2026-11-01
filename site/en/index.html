@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InstaFind — Fast File Search for Windows, in Arabic and English | Free</title>
+<meta name="description" content="InstaFind is a free, open-source fast file search for Windows. Results appear as you type, it searches inside PDF, Word and Excel files, and it understands Arabic file names. An Everything alternative that works offline.">
+<link rel="canonical" href="https://sarmadiq9090-coder.github.io/arabic-file-search/en/">
+<link rel="alternate" hreflang="ar" href="https://sarmadiq9090-coder.github.io/arabic-file-search/">
+<link rel="alternate" hreflang="en" href="https://sarmadiq9090-coder.github.io/arabic-file-search/en/">
+<link rel="alternate" hreflang="x-default" href="https://sarmadiq9090-coder.github.io/arabic-file-search/">
+<meta name="theme-color" content="#2563eb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preload" href="../fonts/plex-arabic-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../fonts/plex-arabic-latin-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../style.css">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="InstaFind — بحث سريع">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="ar_AR">
+<meta property="og:title" content="InstaFind — find any file on Windows as you type">
+<meta property="og:description" content="Free, open-source file search for Windows. Instant results in Arabic or English, even inside PDF and Word documents.">
+<meta property="og:url" content="https://sarmadiq9090-coder.github.io/arabic-file-search/en/">
+<meta property="og:image" content="https://sarmadiq9090-coder.github.io/arabic-file-search/img/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="InstaFind — بحث سريع logo with the tagline: Instant file search for Windows, in Arabic and English">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="InstaFind — find any file on Windows as you type">
+<meta name="twitter:description" content="Free, open-source file search for Windows. Instant results in Arabic or English, even inside PDF and Word documents.">
+<meta name="twitter:image" content="https://sarmadiq9090-coder.github.io/arabic-file-search/img/social-preview.png">
+<meta name="twitter:image:alt" content="InstaFind logo">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "InstaFind",
+  "alternateName": ["InstaFind — بحث سريع", "بحث سريع", "bahth"],
+  "description": "Free, open-source file search for Windows that shows results as you type, in Arabic or English, and searches inside documents (PDF, Word, Excel and more), images and archives.",
+  "url": "https://sarmadiq9090-coder.github.io/arabic-file-search/en/",
+  "image": "https://sarmadiq9090-coder.github.io/arabic-file-search/img/social-preview.png",
+  "operatingSystem": "Windows",
+  "applicationCategory": "UtilitiesApplication",
+  "softwareVersion": "0.6.0",
+  "downloadUrl": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe",
+  "installUrl": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest",
+  "softwareRequirements": "Windows 10 or 11, 64-bit",
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "inLanguage": ["en", "ar"],
+  "sameAs": ["https://github.com/sarmadiq9090-coder/arabic-file-search"],
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Is InstaFind free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. It is free and open source under the MIT license." } },
+    { "@type": "Question", "name": "Can it search inside PDF and Word files?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Tick “Also search inside documents” and press Enter. It reads docx, xlsx, xls, pptx, pdf, odt, ods, rtf, doc, txt, csv, e-mail (eml, msg), epub and source code, repairs reversed Arabic text in PDFs, and reads images and scanned PDFs with the OCR engine built into Windows 10 and 11." } },
+    { "@type": "Question", "name": "Is it an alternative to Everything?", "acceptedAnswer": { "@type": "Answer", "text": "If you want instant filename search across all drives, like Everything, plus real Arabic matching and search inside documents, that is what InstaFind is built for." } },
+    { "@type": "Question", "name": "Does it need an internet connection?", "acceptedAnswer": { "@type": "Answer", "text": "No. Indexing and search run on your PC. The only connection is the update check against GitHub." } },
+    { "@type": "Question", "name": "What are the requirements?", "acceptedAnswer": { "@type": "Answer", "text": "Windows 10 or 11, 64-bit. Text recognition in images needs the Windows language pack for each OCR language." } },
+    { "@type": "Question", "name": "Why does SmartScreen warn me?", "acceptedAnswer": { "@type": "Answer", "text": "Because the file is not code-signed. Click More info, then Run anyway. All the source code is on GitHub." } },
+    { "@type": "Question", "name": "How do I uninstall it?", "acceptedAnswer": { "@type": "Answer", "text": "Turn off Start with Windows in Options…, then delete bahth.exe and the %LOCALAPPDATA%\\BahthSari\\ folder." } }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="InstaFind — بحث سريع, home">
+      <img src="../img/logo.svg" width="34" height="34" alt="">
+      <span>InstaFind <small lang="ar">بحث سريع</small></span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a class="opt" href="#features">Features</a>
+      <a class="opt" href="#install">Download</a>
+      <a class="opt" href="#faq">FAQ</a>
+      <a class="lang" href="../" hreflang="ar" lang="ar">العربية</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">Free · Open source · For Windows</p>
+      <h1 id="hero-title"><span class="grad">Fast file search</span> for Windows, in Arabic and English</h1>
+      <p class="lead">Find any file on Windows as you type, even inside documents. InstaFind indexes all your drives once and shows results while you type, even with millions of files. And it understands Arabic the way people actually type it.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
+          Free download for Windows
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/sarmadiq9090-coder/arabic-file-search">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.3-1.69-1.3-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+          Source on GitHub
+        </a>
+      </div>
+      <p class="fine">Version 0.6.0 · a single <code>bahth.exe</code>, nothing to install · Windows 10 or 11, 64-bit · MIT license</p>
+    </div>
+    <figure class="shot">
+      <img src="../img/demo-en.gif" width="800" height="501" alt="Demo on Windows: instant name search for invoice and report 2026, then a search inside documents for budget" fetchpriority="high">
+      <figcaption>Recorded on Windows: results appear while you type, then a search inside documents.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="features" aria-labelledby="features-title">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="features-title">Everything you need to find your files</h2>
+      <p>A file search tool for Windows written in Rust. The index keeps itself current as files are added, deleted or renamed.</p>
+    </div>
+    <div class="grid">
+      <article class="card">
+        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></span>Instant filename search</h3>
+        <p>Across all drives or one folder, with ready-made filters: documents, pictures, audio, video, archives, programs, folders. Often-opened files come first.</p>
+      </article>
+      <article class="card">
+        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>Inside documents</h3>
+        <p>PDF, Word, Excel, PowerPoint, e-mail and epub, with a snippet of the matching text. Images and archives too.</p>
+      </article>
+      <article class="card">
+        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h10M4 17h7"/><path d="m16 15 2 2 3-4"/></svg></span>Rich query syntax</h3>
+        <p>Phrases, OR, NOT, extensions, size, date modified, regex, whole word and word proximity, e.g. <code>ext:pdf size:&gt;10mb dm:thismonth</code>.</p>
+      </article>
+      <article class="card">
+        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></svg></span>From anywhere</h3>
+        <p><kbd>Ctrl+Alt+F</kbd> shows the app from anywhere; <kbd>Ctrl+Alt+G</kbd> in any program's Save or Open dialog jumps the dialog to the folder of a result.</p>
+      </article>
+      <article class="card">
+        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></span>Handy tools</h3>
+        <p>Duplicate finder, folder sizes, thumbnail view, find &amp; replace in text files with undo, CSV export, drag &amp; drop into WhatsApp or mail, a command line and a Flow Launcher plugin.</p>
+      </article>
+      <article class="card">
+        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>English or Arabic interface</h3>
+        <p>Follows the Windows display language; switch any time in Options → Language / <span lang="ar">اللغة</span>. Starts with Windows in the background and updates itself with one click.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="arabic" class="soft" aria-labelledby="arabic-title">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="arabic-title">Arabic file search that understands how people type</h2>
+      <p>Hamza forms, ta marbuta, alef maqsura, diacritics, tatweel and the <span lang="ar">ال</span> prefix are ignored; Arabic-Indic digits and Persian letters are accepted. When nothing matches, it retries with the other keyboard layout, then Arabizi, then near spellings.</p>
+    </div>
+    <ul class="examples">
+      <li><span class="q" lang="ar">احمد</span><span class="arrow" aria-label="finds">→</span><span class="r" lang="ar">أحمد</span><span class="why">Hamza forms don't matter</span></li>
+      <li><span class="q" lang="ar">التقرير</span><span class="arrow" aria-label="finds">→</span><span class="r"><bdi lang="ar">تقرير</bdi>.pdf</span><span class="why">The <span lang="ar">ال</span> prefix doesn't block a match</span></li>
+      <li><span class="q">hgjrvdv</span><span class="arrow" aria-label="finds">→</span><span class="r" lang="ar">التقرير</span><span class="why">Typed on the wrong keyboard layout? Still found</span></li>
+      <li><span class="q">3abd</span><span class="arrow" aria-label="finds">→</span><span class="r" lang="ar">عبد</span><span class="why">Arabizi (Franco-Arabic) is read as Arabic</span></li>
+      <li><span class="q">fuzzy: reprot</span><span class="arrow" aria-label="finds">→</span><span class="r">report</span><span class="why">Tolerates one or two typos</span></li>
+      <li><span class="q"><bdi>root:</bdi> <span lang="ar">كتاب</span></span><span class="arrow" aria-label="finds">→</span><span class="r" lang="ar" dir="rtl">مكتبة، الكاتب، كتابات</span><span class="why">Words sharing the Arabic root</span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="documents" aria-labelledby="documents-title">
+  <div class="wrap split">
+    <div>
+      <h2 id="documents-title">Search inside PDF, Word and more</h2>
+      <p>Tick <strong>Also search inside documents</strong> and press Enter: every file that contains your words is listed with a snippet of the matching text. Size and date filters work here too.</p>
+      <ul class="chips" aria-label="Supported file types">
+        <li>pdf</li><li>docx</li><li>doc</li><li>xlsx</li><li>xls</li><li>pptx</li><li>odt</li><li>ods</li><li>rtf</li><li>txt</li><li>csv</li><li>eml</li><li>msg</li><li>epub</li><li>zip</li><li>7z</li><li>tar</li><li>tar.gz</li>
+      </ul>
+      <ul class="checks">
+        <li><strong>Persistent content index:</strong> each document's text is extracted once in the background, so later content searches are near-instant.</li>
+        <li><strong>Images and scanned PDFs</strong> through the OCR engine built into Windows, with no download.</li>
+        <li><strong>Archives</strong> are read in memory without extracting, with zip-bomb limits.</li>
+        <li><strong>Reversed Arabic text in PDFs is repaired</strong>, and <kbd>F4</kbd> lists all matches in a file with line numbers.</li>
+      </ul>
+    </div>
+    <figure class="shot">
+      <img src="../img/inside-en.png" width="946" height="593" loading="lazy" decoding="async" alt="Searching inside documents for budget in the Documents folder: two files found">
+      <figcaption>Searching inside the documents of one folder for “budget”.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="speed" class="soft" aria-labelledby="speed-title">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="speed-title">Speed comparison</h2>
+      <p>Every release is run on real Windows before it is published: it indexes the whole drive and searches in Arabic, and it is not released if anything fails.</p>
+    </div>
+    <!-- BENCH -->
+    <div class="table-wrap"><table class="bench-table">
+      <caption>File-name search across the whole C: drive of a real Windows machine on GitHub Actions (Windows Server 2025, an index of 1.2 million files)</caption>
+      <thead><tr><th scope="col">Search</th><th scope="col">InstaFind</th><th scope="col"><code>dir /s</code></th><th scope="col"><code>Get-ChildItem</code></th></tr></thead>
+      <tbody>
+        <tr><th scope="row"><code>report</code></th><td><strong>1 s</strong></td><td>107 s</td><td>49 s</td></tr>
+        <tr><th scope="row"><code>احمد</code> (files named <span lang="ar">أحمد</span>)</th><td><strong>1 s</strong>, finds both</td><td>33 s, finds none</td><td>49 s, finds none</td></tr>
+      </tbody>
+    </table></div>
+    <p class="bench-note">The second includes starting the command-line tool and loading the index from disk. In the open window, results appear as you type, in milliseconds. <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/blob/main/docs/media/bench.md">Raw results</a></p>
+  </div>
+</section>
+
+<section id="privacy" aria-labelledby="privacy-title">
+  <div class="wrap split">
+    <div>
+      <h2 id="privacy-title">Your files stay on your PC</h2>
+      <p>InstaFind works offline. The index and every search live on your computer; nothing is uploaded anywhere.</p>
+    </div>
+    <ul class="checks">
+      <li>The only internet connection is the daily update check against GitHub.</li>
+      <li>Search from your phone over the home network is off by default; when on, it is PIN-protected and read-only.</li>
+      <li>Open source under the MIT license: anyone can read the code on GitHub.</li>
+      <li>Its data lives in <code>%LOCALAPPDATA%\BahthSari\</code> and can be deleted at any time.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="install" class="soft" aria-labelledby="install-title">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="install-title">Download and install</h2>
+      <p>Pick whichever way suits you. The current version is 0.6.0.</p>
+    </div>
+    <div class="steps">
+      <article class="card step direct">
+        <h3>Direct download <span class="badge">Recommended</span></h3>
+        <p>A single file; nothing to install. Put it in a permanent folder, for example <code>%LOCALAPPDATA%\Programs\Bahth\</code>, and run it.</p>
+        <a class="btn btn-primary" href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
+          Download bahth.exe
+        </a>
+      </article>
+      <article class="card step scoop">
+        <h3>With Scoop</h3>
+        <p>If you use the Scoop package manager:</p>
+<pre><code>scoop bucket add instafind https://github.com/sarmadiq9090-coder/arabic-file-search
+scoop install instafind</code></pre>
+      </article>
+      <article class="card step winget">
+        <h3>With winget <span class="badge soon">Coming soon</span></h3>
+        <p>Coming soon to the official winget repository:</p>
+<pre><code>winget install InstaFind</code></pre>
+      </article>
+    </div>
+    <p class="note">The first run indexes your drives in the background (a minute or more, depending on the number of files); after that the app opens instantly. If SmartScreen warns because the file is not code-signed: <strong>More info → Run anyway</strong>. Updates are automatic from then on.</p>
+  </div>
+</section>
+
+<section id="faq" aria-labelledby="faq-title">
+  <div class="wrap faq">
+    <h2 id="faq-title">Frequently asked questions</h2>
+    <details>
+      <summary>Is InstaFind free?</summary>
+      <div><p>Yes. It is free and open source under the MIT license.</p></div>
+    </details>
+    <details>
+      <summary>Can it search inside PDF and Word files?</summary>
+      <div><p>Yes. Tick <strong>Also search inside documents</strong> and press Enter. It reads docx, xlsx, xls, pptx, pdf, odt, ods, rtf, doc, txt, csv, e-mail (eml, msg), epub and source code, and repairs reversed Arabic text in PDFs. Images and scanned PDFs are read with the OCR engine built into Windows 10 and 11.</p></div>
+    </details>
+    <details>
+      <summary>Is it an alternative to Everything?</summary>
+      <div><p>If you want instant filename search across all drives, like Everything, plus real Arabic matching and search inside documents, that is what InstaFind is built for.</p></div>
+    </details>
+    <details>
+      <summary>Does it need an internet connection?</summary>
+      <div><p>No. Indexing and search run on your PC. The only connection is the update check against GitHub.</p></div>
+    </details>
+    <details>
+      <summary>What are the requirements?</summary>
+      <div><p>Windows 10 or 11, 64-bit. Text recognition in images needs the Windows language pack for each OCR language.</p></div>
+    </details>
+    <details>
+      <summary>Why does SmartScreen warn me?</summary>
+      <div><p>Because the file is not code-signed. Click <strong>More info</strong>, then <strong>Run anyway</strong>. All the source code is on <a href="https://github.com/sarmadiq9090-coder/arabic-file-search">GitHub</a>.</p></div>
+    </details>
+    <details>
+      <summary>How do I uninstall it?</summary>
+      <div><p>Turn off <em>Start with Windows</em> in <strong>Options…</strong>, then delete <code>bahth.exe</code> and the <code>%LOCALAPPDATA%\BahthSari\</code> folder.</p></div>
+    </details>
+  </div>
+</section>
+
+<section class="final soft" aria-labelledby="final-title">
+  <div class="wrap">
+    <h2 id="final-title">Try it now, for free</h2>
+    <p>One file, nothing to install, and it finds any file as you type.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
+        Download InstaFind 0.6.0
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/sarmadiq9090-coder/arabic-file-search/issues">Report a bug or suggest an idea</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>InstaFind — <span lang="ar">بحث سريع</span> · free and open source under the <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/blob/main/LICENSE">MIT license</a></p>
+    <nav aria-label="Links">
+      <a href="https://github.com/sarmadiq9090-coder/arabic-file-search">GitHub</a>
+      <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases">All releases</a>
+      <a href="../" hreflang="ar" lang="ar">العربية</a>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

@@ -15,7 +15,7 @@
 
 <p align="center">
 <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe"><b>⬇ تنزيل bahth.exe · Download</b></a><br>
-<a href="#العربية">العربية</a> · <a href="#english">English</a> · <a href="CHANGELOG.md">سجل التغييرات · Changelog</a>
+<a href="https://sarmadiq9090-coder.github.io/arabic-file-search/">الموقع · Website</a> · <a href="#العربية">العربية</a> · <a href="#english">English</a> · <a href="CHANGELOG.md">سجل التغييرات · Changelog</a>
 </p>
 
 <table align="center"><tr>
@@ -24,8 +24,7 @@
 </tr></table>
 
 <p align="center">
-<img src="docs/screenshots/search.png" width="49%" alt="نتائج فورية أثناء الكتابة">
-<img src="docs/screenshots/inside-documents.png" width="49%" alt="البحث داخل المستندات مع مقتطف من النص">
+<img src="docs/media/demo-ar.gif" width="800" alt="عرض: «احمد» تجد «أحمد»، و«التقرير» تجد «تقرير»، وhgjrvdv المكتوبة بلوحة المفاتيح الخطأ تجد «التقرير»، ثم البحث داخل المستندات">
 </p>
 
 ## العربية
@@ -38,12 +37,30 @@
 2. ضعه في مجلد دائم، مثلاً `%LOCALAPPDATA%\Programs\Bahth\` (هذا المسار تستعمله إضافات `integrations/`)، ثم شغّله.
 3. إن ظهر تحذير SmartScreen لأن الملف غير موقّع رقمياً: «مزيد من المعلومات» ← «تشغيل على أي حال».
 
+أو ثبّته بأمر واحد عبر [Scoop](https://scoop.sh):
+
+```powershell
+scoop bucket add instafind https://github.com/sarmadiq9090-coder/arabic-file-search
+scoop install instafind
+```
+
 أول تشغيل يفهرس الأقراص في الخلفية (دقيقة أو أكثر حسب عدد الملفات)، وبعدها يفتح البرنامج فوراً ويبقى الفهرس محدَّثاً وحده عند إضافة الملفات أو حذفها أو إعادة تسميتها.
 
 - **التحديث تلقائي**: يتحقق البرنامج مرة يومياً من GitHub ويعرض تثبيت الإصدار الجديد بنقرة ثم يعيد التشغيل، ويمكن التحقق يدوياً من «خيارات…». من لديه 0.3.1 أو أحدث يصله كل تحديث وحده.
-- **المتطلبات**: ويندوز 8 أو أحدث، 64 بت. البحث داخل الصور يحتاج ويندوز 10 أو 11 (وحزمة اللغة العربية في ويندوز لقراءة النص العربي).
+- **المتطلبات**: ويندوز 10 أو 11، 64 بت (Rust لم تعد تدعم الأقدم). البحث داخل الصور يحتاج حزمة اللغة العربية في ويندوز لقراءة النص العربي.
 - **الخصوصية**: كل شيء يبقى على جهازك. الاتصال الوحيد بالإنترنت هو التحقق من التحديثات على GitHub، والبحث من الهاتف مطفأ ما لم تشغّله.
 - **بيانات البرنامج** في `%LOCALAPPDATA%\BahthSari\` (الفهرس والسجل والإعدادات)، وتفضيلاته في `HKCU\Software\BahthSari`. لإزالته: أطفئ «التشغيل مع ويندوز» من «خيارات…»، ثم احذف `bahth.exe` وذلك المجلد.
+
+## السرعة
+
+قِسناها على جهاز ويندوز حقيقي في GitHub Actions (Windows Server 2025، فهرس فيه 1.2 مليون ملف)، بالبحث في اسم الملف على القرص كله:
+
+| البحث عن | InstaFind | `dir /s` في cmd | `Get-ChildItem -Recurse` في PowerShell |
+|---|---:|---:|---:|
+| `report` | **1 ثانية** | 107 ثوانٍ | 49 ثانية |
+| `احمد` (والملفات اسمها «أحمد») | **1 ثانية**، وجد الملفين | 33 ثانية، لم يجد شيئاً | 49 ثانية، لم يجد شيئاً |
+
+الثانية في عمود InstaFind تشمل تشغيل البرنامج من سطر الأوامر وقراءة الفهرس من القرص. داخل نافذة البرنامج المفتوحة يظهر الجواب أثناء الكتابة في أجزاء من الثانية (شريط الحالة في العرض أعلاه يقول 15 إلى 34 ملي ثانية). خدمة فهرسة ويندوز غير موجودة على ذلك الجهاز، وهي أصلاً لا تفهرس إلا مجلدات المستخدم ولا تساوي بين «احمد» و«أحمد». يعيد [`ci/bench.ps1`](ci/bench.ps1) القياس، والنتائج الخام في [`docs/media/bench.md`](docs/media/bench.md).
 
 ## المميزات
 
@@ -153,6 +170,8 @@ bahth.exe -s عقد --json
 
 ## English
 
+<p align="center"><img src="docs/media/demo-en.gif" width="800" alt="Demo: instant name search, then search inside documents with a text snippet"></p>
+
 InstaFind is a free, open-source file search tool for Windows, written in Rust. It indexes all your drives once and shows results while you type, even with millions of files. It understands Arabic the way people actually type it: `احمد` finds `أحمد`, `التقرير` finds `تقرير.pdf`, and `hgjrvdv` typed on the wrong keyboard layout finds `التقرير`.
 
 ### Download and run
@@ -161,12 +180,30 @@ InstaFind is a free, open-source file search tool for Windows, written in Rust. 
 2. Put it in a permanent folder, for example `%LOCALAPPDATA%\Programs\Bahth\` (the path the `integrations/` plugins expect), and run it.
 3. If SmartScreen warns because the file is not code-signed: **More info → Run anyway**.
 
+Or install it with [Scoop](https://scoop.sh):
+
+```powershell
+scoop bucket add instafind https://github.com/sarmadiq9090-coder/arabic-file-search
+scoop install instafind
+```
+
 The first run indexes your drives in the background (a minute or more, depending on the number of files). After that the app opens instantly and keeps the index current by itself as files are added, deleted or renamed.
 
 - **Automatic updates**: once a day the app checks GitHub, offers the new version with one click and restarts. You can also check from **Options…**. Version 0.3.1 and later update themselves.
-- **Requirements**: Windows 8 or later, 64-bit. Text recognition in images needs Windows 10 or 11 (plus the Windows language pack for each OCR language).
+- **Requirements**: Windows 10 or 11, 64-bit (Rust no longer supports older versions). Text recognition in images needs the Windows language pack for each OCR language.
 - **Privacy**: everything stays on your PC. The only internet connection is the update check against GitHub; phone search is off unless you turn it on.
 - **Data** lives in `%LOCALAPPDATA%\BahthSari\` (index, log, settings) and `HKCU\Software\BahthSari`. To remove the app, turn off *Start with Windows* in **Options…**, then delete `bahth.exe` and that folder.
+
+### Speed
+
+Measured on a real Windows machine on GitHub Actions (Windows Server 2025, an index of 1.2 million files), searching file names across the drive:
+
+| Search | InstaFind | cmd `dir /s` | PowerShell `Get-ChildItem -Recurse` |
+|---|---:|---:|---:|
+| `report` | **1 s** | 107 s | 49 s |
+| `احمد` (the files are named `أحمد`) | **1 s**, finds both | 33 s, finds none | 49 s, finds none |
+
+InstaFind's second includes starting the command-line tool and loading the index from disk. In the open window results appear as you type, in milliseconds (the status bar in the demo above shows 15 to 34 ms). The Windows Search indexer is not installed on that machine; by default it covers only user folders and does not treat `احمد` and `أحمد` as the same. [`ci/bench.ps1`](ci/bench.ps1) reproduces the run; raw results are in [`docs/media/bench.md`](docs/media/bench.md).
 
 ### Features
 

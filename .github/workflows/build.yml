@@ -98,6 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v4
       - name: Version
@@ -127,3 +128,13 @@ jobs:
           title=$(head -1 "$notes" | sed 's/^# *//')
           [ -n "$title" ] || title="$TAG"
           gh release create "$TAG" bahth.exe --target "$GITHUB_SHA" --title "$title" --notes-file "$notes" --latest
+      # Package managers: packaging.yml rewrites the Scoop, winget and
+      # Chocolatey manifests and commits them to main (and pushes to
+      # Chocolatey/winget when their secrets exist). A release made with
+      # GITHUB_TOKEN does not fire its `release` event, so start it here.
+      - if: steps.v.outputs.new == 'true'
+        name: Update package manifests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: gh workflow run packaging.yml --ref main -f tag="$TAG"

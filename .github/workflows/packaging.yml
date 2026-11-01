@@ -1,0 +1,112 @@
+name: packaging
+
+# Rewrites the Scoop bucket, winget and Chocolatey manifests for a release
+# (packaging/update-manifests.py) and commits them to main.
+#
+# Note: the release that build.yml creates with GITHUB_TOKEN does NOT fire the
+# `release` event below (GitHub never starts workflows from GITHUB_TOKEN
+# events, except workflow_dispatch). build.yml's `release` job therefore
+# starts this workflow with `gh workflow run`. You can also redo any tag from
+# the Actions tab (Run workflow -> tag); an older tag than the one on main is
+# refused by update-manifests.py.
+#
+# Optional, off until the secrets exist:
+#   CHOCOLATEY_API_KEY  -> packs and pushes the Chocolatey package
+#   WINGET_PAT          -> opens the winget-pkgs PR with wingetcreate
+#                          (classic PAT, public_repo scope, of the account
+#                          whose fork of microsoft/winget-pkgs is used)
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. v0.6.0"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: packaging
+  cancel-in-progress: false
+
+jobs:
+  manifests:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.up.outputs.version }}
+      sha: ${{ steps.up.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Update manifests
+        id: up
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "bad tag: $TAG"; exit 1 ;; esac
+          if [ "$(gh release view "$TAG" --json isPrerelease,isDraft --jq '.isPrerelease or .isDraft')" = true ]; then
+            echo "$TAG is a draft or pre-release; nothing to do."; exit 0
+          fi
+          dl=$(mktemp -d)
+          gh release download "$TAG" --pattern bahth.exe --dir "$dl"
+          sha=$(sha256sum "$dl/bahth.exe" | cut -d' ' -f1)
+          date=$(gh release view "$TAG" --json publishedAt --jq '.publishedAt[0:10]')
+          python3 packaging/update-manifests.py "$TAG" "$sha" "$date"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A bucket packaging
+          if git diff --cached --quiet; then
+            echo "Manifests already up to date."
+          else
+            git commit -q -m "Packaging: update manifests for $TAG"
+            pushed=
+            for i in 1 2 3; do
+              if git push -q origin HEAD:main; then pushed=1; break; fi
+              git pull -q --rebase origin main
+            done
+            [ -n "$pushed" ] || { echo "push to main failed"; exit 1; }
+          fi
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  chocolatey:
+    needs: manifests
+    if: needs.manifests.outputs.version != ''
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.manifests.outputs.sha }}
+      - name: Pack and push
+        shell: pwsh
+        env:
+          KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+          VERSION: ${{ needs.manifests.outputs.version }}
+        run: |
+          choco pack packaging/chocolatey/instafind.nuspec --outputdirectory out
+          if (-not $env:KEY) { Write-Host "CHOCOLATEY_API_KEY not set: packed only, not pushed."; exit 0 }
+          choco push "out/instafind.$env:VERSION.nupkg" --source https://push.chocolatey.org/ --api-key $env:KEY
+
+  winget:
+    needs: manifests
+    if: needs.manifests.outputs.version != ''
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.manifests.outputs.sha }}
+      - name: Submit to winget-pkgs
+        shell: pwsh
+        env:
+          PAT: ${{ secrets.WINGET_PAT }}
+          VERSION: ${{ needs.manifests.outputs.version }}
+        run: |
+          if (-not $env:PAT) { Write-Host "WINGET_PAT not set: skipping the winget-pkgs PR."; exit 0 }
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          ./wingetcreate.exe submit --token $env:PAT "packaging/winget/manifests/s/Sarmad/InstaFind/$env:VERSION"
