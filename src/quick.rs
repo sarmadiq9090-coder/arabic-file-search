@@ -240,7 +240,7 @@ pub fn first_strong_rtl(text: &str) -> Option<bool> {
 /// its own reading order, so "250*12" or "5 kg to lb" quoted in an Arabic
 /// sentence is not reordered by the sentence around it: the inside is put
 /// in a left-to-right or right-to-left embedding, with its mark, by its
-/// first strong letter (left to right for numbers and symbols).
+/// first strong letter; numbers and symbols alone in a left-to-right override.
 pub fn embed_quoted(title: &str) -> String {
     let mut out = String::with_capacity(title.len() + 8);
     let mut rest = title;
@@ -250,10 +250,14 @@ pub fn embed_quoted(title: &str) -> String {
         let Some(j) = after.find(close) else { break };
         let inner = &after[..j];
         out.push_str(&rest[..i + open.len_utf8()]);
-        // The embedding, then a mark of its direction: without one, Windows
-        // still reads "250*12" as a number, a symbol and a number in a
-        // right-to-left sentence and shows "12*250".
-        out.push_str(if first_strong_rtl(inner) == Some(true) { "\u{202B}\u{200F}" } else { "\u{202A}\u{200E}" });
+        // Numbers and symbols alone are forced left to right: in an Arabic
+        // sentence Windows takes their digits for Arabic ones, and even in
+        // an embedding "250*12" came out as "12*250".
+        out.push_str(match first_strong_rtl(inner) {
+            Some(true) => "\u{202B}\u{200F}",
+            Some(false) => "\u{202A}\u{200E}",
+            None => "\u{202D}",
+        });
         out.push_str(inner);
         out.push('\u{202C}');
         out.push(close);
@@ -853,13 +857,13 @@ mod tests {
         assert_eq!(first_strong_rtl("250*12"), None);
         assert_eq!(first_strong_rtl("5 kg to lb"), Some(false));
         assert_eq!(first_strong_rtl("12 تقرير"), Some(true));
-        assert_eq!(embed_quoted("افتح «250*12» في نافذة البحث الكاملة"), "افتح «\u{202A}\u{200E}250*12\u{202C}» في نافذة البحث الكاملة");
+        assert_eq!(embed_quoted("افتح «250*12» في نافذة البحث الكاملة"), "افتح «\u{202D}250*12\u{202C}» في نافذة البحث الكاملة");
         assert_eq!(embed_quoted("ابحث في يوتيوب عن «قرآن»"), "ابحث في يوتيوب عن «\u{202B}\u{200F}قرآن\u{202C}»");
         assert_eq!(embed_quoted("Open “5 kg” and “x”"), "Open “\u{202A}\u{200E}5 kg\u{202C}” and “\u{202A}\u{200E}x\u{202C}”");
         // Nothing quoted, or a quote left open: unchanged.
         for t in ["Wi-Fi", "«open", "a » b «", "", "«»"] {
             let e = embed_quoted(t);
-            assert_eq!(e.replace(['\u{202A}', '\u{200E}', '\u{202C}'], ""), t);
+            assert_eq!(e.replace(['\u{202A}', '\u{200E}', '\u{202C}', '\u{202D}'], ""), t);
         }
     }
     use crate::launcher::SystemCommand;
