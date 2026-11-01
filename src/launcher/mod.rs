@@ -17,9 +17,12 @@
 pub mod aliases;
 pub mod answers;
 pub mod apps;
+mod calc;
+mod hijri;
 mod matching;
 pub mod settings_pages;
 pub mod system;
+mod units;
 pub mod web;
 pub mod windows;
 
@@ -406,7 +409,8 @@ mod tests {
         let cx = ctx(false, 0, &no_launches);
         assert!(c.query("", &cx, 8).is_empty());
         assert!(c.query("   \t", &cx, 8).is_empty());
-        assert!(c.query("zzqqxxvv", &cx, 8).is_empty());
+        // Nothing matches: only the "search the web" fallback is left.
+        assert!(c.query("zzqqxxvv", &cx, 8).iter().all(|i| i.kind == Kind::Web));
         assert!(c.query("a", &cx, 3).len() <= 3);
         let all = c.query("الصوت", &cx, 50);
         let mut keys: Vec<String> = all.iter().map(|i| action_key(&i.action)).collect();
