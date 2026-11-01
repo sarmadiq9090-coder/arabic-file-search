@@ -974,7 +974,10 @@ pub fn in_scope(path: &str, scope_lower: &str) -> bool {
         return true;
     }
     let n = scope_lower.len();
-    path.len() >= n && path.is_char_boundary(n) && path[..n].to_lowercase() == scope_lower
+    // `C:\Docs` covers `C:\Docs` and `C:\Docs\…`, not `C:\Docs2\…`.
+    let whole = scope_lower.ends_with(['\\', '/'])
+        || matches!(path.as_bytes().get(n), None | Some(b'\\') | Some(b'/'));
+    path.len() >= n && path.is_char_boundary(n) && whole && path[..n].to_lowercase() == scope_lower
 }
 
 /// Returns indices into `entries` whose file name matches every term and
@@ -1406,6 +1409,17 @@ pub fn promote(hits: &mut Vec<u32>, boosted: &[(u32, f64)]) {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn scope_matches_whole_folders_only() {
+        assert!(in_scope(r"C:\Docs\a.txt", r"c:\docs"));
+        assert!(in_scope(r"C:\Docs", r"c:\docs"));
+        assert!(in_scope(r"C:\Docs\a.txt", r"c:\docs\"));
+        assert!(in_scope(r"C:\a.txt", r"c:\"));
+        assert!(!in_scope(r"C:\Docs2\a.txt", r"c:\docs"));
+        assert!(!in_scope(r"C:\Documents\a.txt", r"c:\doc"));
+        assert!(in_scope("anything", ""));
+    }
     use super::*;
 
     fn entry(path: &str, is_dir: bool) -> Entry {
