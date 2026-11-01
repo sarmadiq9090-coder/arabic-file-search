@@ -108,7 +108,8 @@ struct Matches {
 
 struct ScanJob {
     progress: Arc<ScanProgress>,
-    result: Arc<Mutex<Option<Index>>>,
+    /// `Some(None)` when the scan failed (a panic, logged).
+    result: Arc<Mutex<Option<Option<Index>>>>,
 }
 
 struct ContentJob {

@@ -50,9 +50,15 @@ pub fn recycle(path: &str) -> bool {
 /// can't go to the Recycle Bin. Returns the paths that are gone.
 pub fn recycle_many(paths: &[String]) -> Vec<String> {
     use winapi::um::shellapi::{FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_WANTNUKEWARNING, SHFILEOPSTRUCTW, SHFileOperationW};
+    // An empty name would end the list early (and none would leave a list
+    // with a single NUL, read past its end).
+    let paths: Vec<String> = paths.iter().filter(|p| !p.is_empty() && !p.contains('\0')).cloned().collect();
+    if paths.is_empty() {
+        return Vec::new();
+    }
     // NUL-separated paths, ending with two NULs.
     let mut from: Vec<u16> = Vec::new();
-    for p in paths {
+    for p in &paths {
         from.extend(p.encode_utf16());
         from.push(0);
     }
@@ -94,9 +100,18 @@ pub fn type_icon(ext: &str) -> i32 {
     }
 }
 
+/// Unix seconds as a FILETIME count (100 ns intervals since 1601-01-01),
+/// or `None` when out of range: a damaged index or a file stamped in the
+/// far future must not overflow (a panic in a debug build, nonsense in a
+/// release one).
+fn unix_to_filetime(secs: i64) -> Option<u64> {
+    let ft = secs.checked_add(11_644_473_600)?.checked_mul(10_000_000)?;
+    // FileTimeToSystemTime takes values below 2^63 only.
+    u64::try_from(ft).ok()
+}
+
 fn local_time(secs: i64) -> Option<SYSTEMTIME> {
-    // FILETIME counts 100 ns intervals since 1601-01-01.
-    let ft = (secs as u64 + 11_644_473_600) * 10_000_000;
+    let ft = unix_to_filetime(secs)?;
     let ft = winapi::shared::minwindef::FILETIME { dwLowDateTime: ft as u32, dwHighDateTime: (ft >> 32) as u32 };
     unsafe {
         let mut utc: SYSTEMTIME = std::mem::zeroed();
@@ -139,4 +154,38 @@ pub fn format_time(secs: i64, relative: bool) -> String {
     }
     let s = format!("{:04}/{:02}/{:02} {hm}", t.wYear, t.wMonth, t.wDay);
     if relative { super::format::digits(s) } else { s }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn filetime_of_unix_seconds() {
+        assert_eq!(unix_to_filetime(0), Some(116_444_736_000_000_000));
+        assert_eq!(unix_to_filetime(1), Some(116_444_736_010_000_000));
+        // Before 1970 down to 1601 is still a valid FILETIME.
+        assert_eq!(unix_to_filetime(-11_644_473_600), Some(0));
+        assert_eq!(unix_to_filetime(-11_644_473_601), None);
+        // Far-future stamps from a damaged index: no overflow.
+        assert_eq!(unix_to_filetime(i64::MAX), None);
+        assert_eq!(unix_to_filetime(i64::MIN), None);
+        assert!(unix_to_filetime(900_000_000_000).is_some());
+        assert_eq!(unix_to_filetime(1_000_000_000_000), None);
+    }
+
+    #[test]
+    fn huge_times_format_without_panicking() {
+        for secs in [1, 1_700_000_000, 900_000_000_000, 1_000_000_000_000, i64::MAX] {
+            let _ = format_time(secs, true);
+            let _ = format_time(secs, false);
+        }
+        assert_eq!(format_time(i64::MAX, false), "");
+    }
+
+    #[test]
+    fn recycling_nothing_does_nothing() {
+        assert!(recycle_many(&[]).is_empty());
+        assert!(recycle_many(&[String::new()]).is_empty());
+    }
 }

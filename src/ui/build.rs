@@ -427,7 +427,7 @@ impl NativeUi<AppUi> for App {
                 weak.upgrade()?.on_hotkey();
                 return Some(0);
             }
-            if msg != WM_NOTIFY {
+            if msg != WM_NOTIFY || l == 0 {
                 return None;
             }
             let hdr = unsafe { &*(l as *const NMHDR) };

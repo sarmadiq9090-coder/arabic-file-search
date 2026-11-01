@@ -332,7 +332,7 @@ impl App {
         let weak = Rc::downgrade(self);
         let list_hwnd = self.dupes.list.handle.hwnd().unwrap_or(std::ptr::null_mut());
         let raw = nwg::bind_raw_event_handler(&self.dupes.window.handle, 0x1_0026, crate::crash_log::guard_raw(move |_h: HWND, msg: UINT, _w: WPARAM, l: LPARAM| {
-            if msg != WM_NOTIFY {
+            if msg != WM_NOTIFY || l == 0 {
                 return None;
             }
             let hdr = unsafe { &*(l as *const NMHDR) };
@@ -446,7 +446,9 @@ impl App {
             self.set_status(tr!("انتظر حتى تكتمل الفهرسة.", "Wait until indexing is complete."));
             return false;
         }
-        let mut slot = d.folder_dialog.borrow_mut();
+        // Taken out while it runs: the dialog pumps messages, and a handler
+        // that runs meanwhile must not find the cell borrowed.
+        let mut slot = d.folder_dialog.take();
         if slot.is_none() {
             let mut dlg = nwg::FileDialog::default();
             let built = nwg::FileDialog::builder()
@@ -456,12 +458,12 @@ impl App {
             if built.is_err() {
                 return false;
             }
-            *slot = Some(dlg);
+            slot = Some(dlg);
         }
         let Some(dialog) = slot.as_ref() else { return false };
         let owner = if d.window.visible() { &d.window } else { &self.window };
         let chosen = if dialog.run(Some(owner)) { dialog.get_selected_item().ok() } else { None };
-        drop(slot);
+        *d.folder_dialog.borrow_mut() = slot;
         let Some(dir) = chosen else { return false };
         let mut dir = dir.to_string_lossy().into_owned();
         if !dir.ends_with('\\') {
@@ -485,13 +487,19 @@ impl App {
         let result = Arc::new(Mutex::new(None));
         {
             let (progress, result) = (progress.clone(), result.clone());
-            std::thread::spawn(move || {
+            let started = crate::crash_log::spawn_named("dupes", move || {
                 background_priority();
-                let r = dupes::find(&index, &scope, mode, min_size, &progress);
+                // A panic (logged by the hook) ends the search as stopped,
+                // so the window never waits for it forever.
+                let r = crate::crash_log::catch(|| dupes::find(&index, &scope, mode, min_size, &progress)).flatten();
                 if let Ok(mut slot) = result.lock() {
                     *slot = Some(r);
                 }
             });
+            if started.is_none() {
+                d.summary.set_text(tr!("أُوقف البحث.", "Search stopped."));
+                return;
+            }
         }
         *d.job.borrow_mut() = Some(Job { progress, result });
         *d.report.borrow_mut() = Report::default();
@@ -730,7 +738,7 @@ impl App {
         }
         dupes::forget_paths(&mut d.report.borrow_mut(), &gone);
         let totals = self.dupes_show_report();
-        let left = paths.len() - gone.len();
+        let left = paths.len().saturating_sub(gone.len());
         let msg = if left == 0 {
             trf!("نُقل {} ملف إلى سلة المحذوفات.", "Moved {} files to the Recycle Bin.", fmt_num(gone.len()))
         } else {
@@ -743,5 +751,22 @@ impl App {
         };
         self.set_status(&msg);
         d.summary.set_text(&format!("{msg}  {totals}"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_path;
+
+    #[test]
+    fn paths_split_into_name_and_folder() {
+        assert_eq!(split_path(r"C:\سيف\تقرير.pdf"), ("تقرير.pdf", r"C:\سيف\"));
+        assert_eq!(split_path(r"C:\"), ("", r"C:\"));
+        assert_eq!(split_path("ملف"), ("ملف", ""));
+        assert_eq!(split_path(""), ("", ""));
+        let long = format!(r"\\?\C:\{}👨‍👩‍👧.txt", "مجلد\\".repeat(200));
+        let (name, folder) = split_path(&long);
+        assert_eq!(name, "👨‍👩‍👧.txt");
+        assert_eq!(format!("{folder}{name}"), long);
     }
 }

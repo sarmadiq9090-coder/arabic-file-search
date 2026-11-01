@@ -100,3 +100,89 @@ pub(super) fn minutes_ago(n: i64) -> String {
         _ => trf!("قبل {n} دقيقة", "{n} minutes ago"),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Awkward pieces of names and paths: Arabic with marks and tatweel,
+    /// bidi marks, emoji with joiners, separators, quotes and formula signs.
+    const PIECES: &[&str] = &[
+        "a", "ب", "تقرير", "\u{064E}", "\u{0651}", "\u{0640}", "\u{200F}", "\u{200E}", "👨‍👩‍👧", "\\", ",", "\"",
+        "\r", "\n", "\t", "=", "+", "-", "@", " ", "١", "\u{FFFD}", "\0",
+    ];
+
+    fn random_strings(seed: u64, n: usize) -> Vec<String> {
+        let mut x = seed;
+        let mut next = |m: usize| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            (x % m as u64) as usize
+        };
+        (0..n)
+            .map(|_| {
+                let len = next(10);
+                (0..len).map(|_| PIECES[next(PIECES.len())]).collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn numbers_get_thousands_separators() {
+        // Arabic-Indic digits are off unless the user turns them on.
+        assert_eq!(fmt_num(0), "0");
+        assert_eq!(fmt_num(999), "999");
+        assert_eq!(fmt_num(1000), "1,000");
+        assert_eq!(fmt_num(1_234_567), "1,234,567");
+        assert_eq!(fmt_num(usize::MAX).replace(',', ""), usize::MAX.to_string());
+    }
+
+    #[test]
+    fn csv_cells() {
+        assert_eq!(csv_field(""), "");
+        assert_eq!(csv_field("تقرير.pdf"), "تقرير.pdf");
+        assert_eq!(csv_field("a,b"), "\"a,b\"");
+        assert_eq!(csv_field("say \"hi\", ok"), "\"say \"\"hi\"\", ok\"");
+        assert_eq!(csv_field("=1+1"), "'=1+1");
+        assert_eq!(csv_field("-x"), "'-x");
+        assert_eq!(csv_field("\r\n"), "\"'\r\n\"");
+    }
+
+    #[test]
+    fn csv_cells_of_random_text_stay_one_cell() {
+        for s in random_strings(0x2545_F491_4F6C_DD1D, 3000) {
+            let c = csv_field(&s);
+            let inner = if c.starts_with('"') && c.len() >= 2 && c.ends_with('"') {
+                let body = &c[1..c.len() - 1];
+                // Every inner quote doubled, so the cell can't end early.
+                assert!(!body.replace("\"\"", "").contains('"'), "{s:?} -> {c:?}");
+                body.replace("\"\"", "\"")
+            } else {
+                assert!(!c.contains([',', '"', '\n', '\r']), "{s:?} -> {c:?}");
+                c.clone()
+            };
+            // The text is kept, behind an apostrophe when Excel would read a formula.
+            let guarded = s.starts_with(['=', '+', '-', '@', '\t', '\r']);
+            assert_eq!(inner, if guarded { format!("'{s}") } else { s.clone() }, "{s:?} -> {c:?}");
+        }
+    }
+
+    #[test]
+    fn display_paths_keep_their_text() {
+        for s in random_strings(0x1234_5678_9ABC_DEF1, 3000) {
+            let shown = ltr_path(&s);
+            // Only left-to-right marks are added.
+            assert_eq!(shown.replace('\u{200E}', ""), s.replace('\u{200E}', ""), "{s:?}");
+        }
+    }
+
+    #[test]
+    fn wide_strings_read_up_to_the_nul() {
+        let buf: Vec<u16> = "ملف 👨‍👩‍👧.txt".encode_utf16().chain([0, b'x' as u16, 0]).collect();
+        assert_eq!(unsafe { wide_to_string(buf.as_ptr()) }, "ملف 👨‍👩‍👧.txt");
+        assert_eq!(unsafe { wide_to_string([0u16].as_ptr()) }, "");
+        // A lone surrogate (possible in an NTFS name) reads as U+FFFD.
+        assert_eq!(unsafe { wide_to_string([0xD800u16, b'a' as u16, 0].as_ptr()) }, "\u{FFFD}a");
+    }
+}

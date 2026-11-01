@@ -159,12 +159,15 @@ impl ReplaceWindow {
         let status_h = 24;
         let detail_h = 110;
         let lh = (h - ly - detail_h - status_h - 3 * m).max(60);
+        // A window narrower than the margins (minimised, or dragged tiny)
+        // must not wrap round to a width of four billion.
+        let iw = (w - 2 * m).max(50) as u32;
         self.list.set_position(m, ly);
-        self.list.set_size((w - 2 * m) as u32, lh as u32);
+        self.list.set_size(iw, lh as u32);
         self.detail.set_position(m, ly + lh + m);
-        self.detail.set_size((w - 2 * m) as u32, detail_h as u32);
+        self.detail.set_size(iw, detail_h as u32);
         self.status.set_position(m, ly + lh + 2 * m + detail_h);
-        self.status.set_size((w - 2 * m) as u32, status_h as u32);
+        self.status.set_size(iw, status_h as u32);
     }
 
     fn set_status(&self, text: &str) {
@@ -380,11 +383,18 @@ impl App {
         let done = r.done.clone();
         let progress = r.progress.clone();
         let sender = r.notice.sender();
-        std::thread::spawn(move || {
-            let result = job(&progress);
+        let started = crate::crash_log::spawn_named("replace", move || {
+            // A panic (logged by the hook) still ends the job, so the
+            // window is not left busy for good.
+            let result = crate::crash_log::catch(|| job(&progress))
+                .unwrap_or_else(|| Done::Applied(Err(tr!("حدث خطأ غير متوقع؛ لم تكتمل العملية.", "An unexpected error stopped the operation.").to_string())));
             *done.lock().unwrap_or_else(|e| e.into_inner()) = Some(result);
             sender.notice();
         });
+        if started.is_none() {
+            r.set_busy(false);
+            r.set_status(tr!("تعذر بدء العملية.", "Could not start the operation."));
+        }
     }
 
     fn replace_preview(&self) {

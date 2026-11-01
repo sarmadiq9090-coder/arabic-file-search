@@ -123,8 +123,10 @@ impl App {
             return;
         }
         let n = paths.len();
-        nwg::Clipboard::set_data_text(&self.window, &paths.join("\r\n"));
+        let text = paths.join("\r\n");
+        // Not borrowed while the clipboard notifies its previous owner.
         drop(st);
+        nwg::Clipboard::set_data_text(&self.window, &text);
         self.set_status(&trf!("تم نسخ {} مسار.", "Copied {} paths.", fmt_num(n)));
     }
 
@@ -248,7 +250,9 @@ impl App {
             self.set_status(tr!("لا توجد نتائج لتصديرها.", "There are no results to export."));
             return;
         }
-        let mut slot = self.export_dialog.borrow_mut();
+        // Taken out while it runs: the dialog pumps messages, and a handler
+        // that runs meanwhile must not find the cell borrowed.
+        let mut slot = self.export_dialog.take();
         if slot.is_none() {
             let mut d = nwg::FileDialog::default();
             let built = nwg::FileDialog::builder()
@@ -259,11 +263,11 @@ impl App {
             if built.is_err() {
                 return;
             }
-            *slot = Some(d);
+            slot = Some(d);
         }
         let Some(dialog) = slot.as_ref() else { return };
         let chosen = if dialog.run(Some(&self.window)) { dialog.get_selected_item().ok() } else { None };
-        drop(slot);
+        *self.export_dialog.borrow_mut() = slot;
         let Some(path) = chosen else { return };
         let mut path = std::path::PathBuf::from(path);
         if path.extension().is_none() {

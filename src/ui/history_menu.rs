@@ -66,7 +66,12 @@ impl App {
         add(&mut hm, tr!("مسح عمليات البحث الأخيرة", "Clear recent searches"), HistoryAction::ClearRecent, st.history.recent.is_empty());
         add(&mut hm, tr!("حذف كل البحوث المحفوظة", "Delete all saved searches"), HistoryAction::ClearSaved, st.history.saved.is_empty());
         drop(st);
-        *self.history_menu.borrow_mut() = hm;
+        // The menu shown last stays borrowed while it is open (its loop
+        // pumps messages); a second request meanwhile is ignored rather
+        // than replacing the menu under it.
+        let Ok(mut slot) = self.history_menu.try_borrow_mut() else { return };
+        *slot = hm;
+        drop(slot);
         self.show_menu(&self.history_menu.borrow().menu);
     }
 

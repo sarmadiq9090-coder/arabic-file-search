@@ -283,7 +283,7 @@ impl App {
         let weak = Rc::downgrade(self);
         let list_hwnd = self.disk.list.handle.hwnd().unwrap_or(std::ptr::null_mut());
         let raw = nwg::bind_raw_event_handler(&self.disk.window.handle, RAW_ID, crate::crash_log::guard_raw(move |_h: HWND, msg: UINT, _w: WPARAM, l: LPARAM| {
-            if msg != WM_NOTIFY {
+            if msg != WM_NOTIFY || l == 0 {
                 return None;
             }
             let hdr = unsafe { &*(l as *const NMHDR) };
@@ -329,11 +329,16 @@ impl App {
         self.disk.pending.set(key);
         self.disk.last_request.set(Some(Instant::now()));
         let notice = self.disk.notice.sender();
-        std::thread::spawn(move || {
-            folder_sizes::for_index(&index);
+        let started = crate::crash_log::spawn_named("folder-sizes", move || {
+            // The notice is sent even after a panic (logged by the hook), so
+            // `pending` is cleared and a later index can ask again.
+            let _ = crate::crash_log::catch(|| folder_sizes::for_index(&index));
             drop(index);
             notice.notice();
         });
+        if started.is_none() {
+            self.disk.pending.set(0);
+        }
     }
 
     fn on_sizes_ready(&self) {
@@ -481,7 +486,8 @@ impl App {
         *self.disk.location.borrow_mut() = up.unwrap_or_default();
         self.render_disk_usage();
         // Keep the folder we came from selected.
-        if let Some(i) = self.disk.rows.borrow().iter().position(|u| u.path == here) {
+        let came_from = self.disk.rows.borrow().iter().position(|u| u.path == here);
+        if let Some(i) = came_from {
             self.disk.list.select_item(0, false);
             self.disk.list.select_item(i, true);
         }
@@ -511,5 +517,32 @@ mod tests {
         assert_eq!(bar_width(0.0001, 100), 1, "a tiny share still shows");
         assert_eq!(bar_width(0.5, 100), 50);
         assert_eq!(bar_width(2.0, 100), 100);
+        assert_eq!(bar_width(f64::NAN, 100), 0, "no share for a 0/0");
+        assert_eq!(bar_width(-1.0, 100), 0);
+        assert_eq!(bar_width(f64::INFINITY, 100), 100);
+    }
+
+    #[test]
+    fn names_of_paths() {
+        assert_eq!(name_of(r"C:\Users\سيف\مستندات"), "مستندات");
+        assert_eq!(name_of(r"C:\Users\سيف\مستندات\"), "مستندات");
+        assert_eq!(name_of(r"C:\"), r"C:\");
+        assert_eq!(name_of(""), "");
+        assert_eq!(name_of(r"\\"), r"\\");
+        assert_eq!(name_of(r"\\?\C:\a\👨‍👩‍👧"), "👨‍👩‍👧");
+        // Random paths: always a piece of the path, never a panic.
+        const PIECES: &[&str] = &["\\", "/", "a", "ب", "\u{0651}", "\u{0640}", "\u{200F}", "👨‍👩‍👧", ".", " ", "C:"];
+        let mut x: u64 = 0xD1B5_4A32_D192_ED03;
+        let mut next = |n: usize| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            (x % n as u64) as usize
+        };
+        for _ in 0..2000 {
+            let path: String = (0..next(10)).map(|_| PIECES[next(PIECES.len())]).collect();
+            assert!(path.contains(name_of(&path)), "{path:?}");
+            let _ = percent(next(1000) as f64 / 7.0);
+        }
     }
 }
