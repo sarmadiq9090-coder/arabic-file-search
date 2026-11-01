@@ -57,6 +57,7 @@ The in-app updater (`src/update.rs`) reads the latest release and downloads the 
 | `src/history.rs`, `src/settings.rs` | Search history, saved searches, often-opened files; window and column settings |
 | `src/update.rs` | Auto-update from GitHub Releases (WinHTTP, SHA-256 check, fallback when the API is rate-limited) |
 | `src/crash_log.rs` | Panic hook writing `log.txt` and `crash.txt` with a backtrace |
+| `src/feedback.rs` | Prefilled GitHub issue links (Options ▸ Send feedback) and the opt-in crash report offered at the next start; nothing is sent without the user (UI in `src/ui/feedback.rs`) |
 | `src/cli.rs` | `bahth.exe -s …` |
 | `integrations/` | Flow Launcher plugin, PowerShell, AutoHotkey and Windows Terminal examples |
 | `assets/` | Icon (`python3 assets/make_icon.py` regenerates it) and the resource script |
