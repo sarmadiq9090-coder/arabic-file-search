@@ -15,7 +15,7 @@
 
 <p align="center">
 <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe"><b>⬇ تنزيل bahth.exe · Download</b></a><br>
-<a href="https://sarmadiq9090-coder.github.io/arabic-file-search/">الموقع · Website</a> · <a href="#العربية">العربية</a> · <a href="#english">English</a> · <a href="CHANGELOG.md">سجل التغييرات · Changelog</a>
+<a href="https://fastkiwi.app/arabic-file-search/">الموقع · Website</a> · <a href="#العربية">العربية</a> · <a href="#english">English</a> · <a href="CHANGELOG.md">سجل التغييرات · Changelog</a>
 </p>
 
 <table align="center"><tr>
