@@ -423,6 +423,11 @@ impl App {
             if h != 0 {
                 unsafe { PostMessageW(h as HWND, WM_APP_CATALOG, 0, 0) };
             }
+            // Exchange rates for the currency answers: the cached ones now, a
+            // download at most every 12 hours (after the catalog, never in its way).
+            if let Some(line) = crate::launcher::currency::refresh_if_due() {
+                log(&line);
+            }
         });
     }
 

@@ -565,6 +565,25 @@ mod win {
         parse_release(&text, env!("CARGO_PKG_VERSION"))
     }
 
+    /// GETs a small JSON document of at most `max` bytes (the exchange rates
+    /// of the currency answers), with the same connection settings as the
+    /// update check.
+    pub fn fetch_json(url: &str, max: u64) -> Result<Vec<u8>, String> {
+        let mut body = Vec::new();
+        http_get(
+            url,
+            "application/json",
+            max,
+            &mut |_| Ok(()),
+            &mut |chunk| {
+                body.extend_from_slice(chunk);
+                Ok(())
+            },
+            None,
+        )?;
+        Ok(body)
+    }
+
     /// Downloads `rel` next to the program and swaps it in place of the
     /// running exe (which is kept as `bahth.exe.old` until the next start).
     /// `progress(done, total)` is called as bytes arrive. Does not restart.
