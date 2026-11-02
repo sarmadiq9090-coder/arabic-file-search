@@ -1202,3 +1202,28 @@ fn group_label(g: Group) -> &'static str {
         Group::More => "",
     }
 }
+
+#[cfg(test)]
+mod dpi_leak_tests {
+    /// Issue #10: the scale used on every floating-box frame leaked a screen
+    /// DC per call (native-windows-gui's `dpi()`), until GDI ran out and a
+    /// size conversion panicked dividing by a DPI of 0.
+    #[test]
+    fn scale_does_not_leak_gdi_handles() {
+        use winapi::um::processthreadsapi::GetCurrentProcess;
+        #[link(name = "user32")]
+        unsafe extern "system" {
+            fn GetGuiResources(process: winapi::um::winnt::HANDLE, flags: u32) -> u32;
+        }
+        const GR_GDIOBJECTS: u32 = 0;
+        let gdi = || unsafe { GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS) };
+        let _ = super::nwg_scale();
+        let before = gdi();
+        for _ in 0..5000 {
+            assert!(super::nwg_scale() > 0.0);
+            assert!(unsafe { native_windows_gui::dpi() } > 0);
+        }
+        let after = gdi();
+        assert!(after <= before + 16, "GDI objects grew from {before} to {after}");
+    }
+}
