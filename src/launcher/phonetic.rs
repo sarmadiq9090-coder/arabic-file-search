@@ -163,6 +163,105 @@ pub fn is_whole_words(query: &[String], name: &[String]) -> bool {
     query.len() >= 2 && query.iter().all(|q| name.contains(q))
 }
 
+/// Whether the query is the name's words themselves, by sound, with four
+/// classes at least in all ("نتفلكس" for "Netflix", not "كل" for "Google"):
+/// a match as good as a whole word of the name.
+pub fn is_exact_words(query: &[String], name: &[String]) -> bool {
+    query.iter().map(|q| q.chars().count()).sum::<usize>() >= 4 && query.iter().all(|q| name.contains(q))
+}
+
+/// Longest skeleton compared with one edit allowed.
+const MAX_TOLERANT: usize = 32;
+
+/// Edits (insert, delete, change, swap two neighbours) between `q` and `n`,
+/// or between `q` and the closest start of `n` when `prefix`; 2 stands for
+/// "more than one".
+fn edits(q: &[u8], n: &[u8], prefix: bool) -> usize {
+    if q.len() > MAX_TOLERANT || n.len() > MAX_TOLERANT || (!prefix && q.len().abs_diff(n.len()) > 1) {
+        return 2;
+    }
+    let n = if prefix { &n[..n.len().min(q.len() + 1)] } else { n };
+    let w = n.len();
+    let mut prev2 = [0usize; MAX_TOLERANT + 2];
+    let mut prev = [0usize; MAX_TOLERANT + 2];
+    let mut cur = [0usize; MAX_TOLERANT + 2];
+    for (j, d) in prev.iter_mut().enumerate().take(w + 1) {
+        *d = j;
+    }
+    for i in 1..=q.len() {
+        cur[0] = i;
+        for j in 1..=w {
+            let cost = usize::from(q[i - 1] != n[j - 1]);
+            let mut d = (prev[j] + 1).min(cur[j - 1] + 1).min(prev[j - 1] + cost);
+            if i > 1 && j > 1 && q[i - 1] == n[j - 2] && q[i - 2] == n[j - 1] {
+                d = d.min(prev2[j - 2] + 1);
+            }
+            cur[j] = d;
+        }
+        prev2 = prev;
+        prev = cur;
+    }
+    let best = if prefix { prev[..=w].iter().copied().min().unwrap_or(2) } else { prev[w] };
+    best.min(2)
+}
+
+/// Whether `q` is one edit from a word of the name (or, for the word still
+/// being typed, from the start of one), keeping the first class. Short
+/// skeletons match too much with any edit: four classes may only miss one
+/// ("ديسكود" for discord), five or more may have any one edit.
+fn near(q: &str, name: &[String], last: bool) -> bool {
+    let qb = q.as_bytes();
+    if qb.len() < 4 {
+        return false;
+    }
+    name.iter().any(|n| {
+        let nb = n.as_bytes();
+        if nb.first() != qb.first() {
+            false
+        } else if qb.len() == 4 {
+            nb.len() == 5 && edits(qb, nb, false) == 1
+        } else {
+            edits(qb, nb, false) <= 1 || (last && edits(qb, nb, true) <= 1)
+        }
+    })
+}
+
+/// Like [`matches`], with one slip allowed: one query word (or the words run
+/// together) one class away from a word of the name ("ديسكود" for
+/// "Discord", "نتفليس" for "Netflix"). Scored below the exact matches.
+pub fn matches_tolerant(query: &[String], name: &[String]) -> bool {
+    if query.is_empty() || name.is_empty() {
+        return false;
+    }
+    let last = query.len() - 1;
+    let mut slips = 0;
+    for (i, q) in query.iter().enumerate() {
+        let exact = name.iter().any(|n| n == q || (i == last && q.chars().count() >= 3 && n.starts_with(q.as_str())));
+        if exact {
+            continue;
+        }
+        if slips == 0 && near(q, name, i == last) {
+            slips = 1;
+            continue;
+        }
+        slips = 2;
+        break;
+    }
+    if slips <= 1 {
+        return true;
+    }
+    if query.len() == 1 {
+        return false;
+    }
+    let mut joined = String::new();
+    for c in query.concat().chars() {
+        if !joined.ends_with(c) {
+            joined.push(c);
+        }
+    }
+    near(&joined, name, true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,6 +300,41 @@ mod tests {
         assert!(!finds("ب", "Bluetooth"));
         // Latin-only queries are matched elsewhere.
         assert!(query_sounds("google").is_none());
+    }
+
+    fn finds_tolerant(query: &str, name: &str) -> bool {
+        query_sounds(&normalize(query)).is_some_and(|q| matches_tolerant(&q, &name_sounds(name)))
+    }
+
+    #[test]
+    fn one_slip_is_tolerated() {
+        assert!(!finds("ديسكود", "Discord") && finds_tolerant("ديسكود", "Discord"));
+        assert!(!finds("نتفليس", "Netflix") && finds_tolerant("نتفليس", "Netflix"));
+        assert!(finds_tolerant("سبوتفاي", "Spotify"));
+        assert!(finds_tolerant("فوتشوب", "Adobe Photoshop"));
+        assert!(finds_tolerant("تلكرم", "Telegram Desktop"));
+        assert!(!finds("انسكرام", "Instagram") && finds_tolerant("انسكرام", "Instagram"));
+        // A slip in a word still being typed: near the start of a longer word.
+        let long = ["FTSBKSM".to_string()];
+        assert!(near("FTXBK", &long, true) && !near("FTXBK", &long, false));
+        // Four classes: only one missing, and the first class kept.
+        assert!(near("TSKT", &["TSKRT".into()], false) && !near("TSKR", &["TSKT".into()], false));
+        assert!(!near("XSKRT", &["TSKRT".into()], false));
+        // Common Arabic words that are one class off a name do not match.
+        assert!(!finds_tolerant("مذكرة", "Task Manager"));
+        assert!(!finds_tolerant("درجات", "Docker Desktop"));
+        assert!(!finds_tolerant("مونتاج", "Minecraft Launcher"));
+        // Short skeletons get no slip.
+        assert!(!finds_tolerant("زوم", "Steam"));
+        assert!(!finds_tolerant("كل", "Zoom"));
+        assert!(!finds_tolerant("نتفلكس", "Notepad"));
+        assert!(!finds_tolerant("ديسكود", "Microsoft Edge"));
+        assert_eq!(edits(b"TSKT", b"TSKRT", false), 1);
+        assert_eq!(edits(b"TSKRT", b"TSKRT", false), 0);
+        assert_eq!(edits(b"FTSB", b"FTSBKS", true), 0);
+        assert_eq!(edits(b"ABCD", b"WXYZ", false), 2);
+        assert!(is_exact_words(&["NTFLKS".into()], &name_sounds("Netflix")));
+        assert!(!is_exact_words(&["KL".into()], &name_sounds("Google Chrome")));
     }
 
     #[test]

@@ -151,6 +151,7 @@ impl App {
         if !self.content_mode() {
             self.search_names();
         }
+        self.show_app_matches();
     }
 
     pub(super) fn on_search(&self) {

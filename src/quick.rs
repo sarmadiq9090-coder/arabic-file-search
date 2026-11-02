@@ -524,21 +524,38 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
     let mut pins: Vec<Row> = parts.pins.into_iter().map(|r| Row { group: Group::Pinned, ..r }).collect();
     pins.truncate(cap(Group::Pinned));
     let pinned = |t: &Target| pins.iter().any(|p| p.target.pin_target().is_some_and(|a| t.pin_target().is_some_and(|b| a.eq_ignore_ascii_case(b))));
+    // Apps matched strongly (a name or its start, Arabic ones too, or a habit) lead over files.
+    let strong: Vec<Target> = parts
+        .items
+        .iter()
+        .filter(|i| i.kind == Kind::App && i.score >= crate::launcher::STRONG_SCORE)
+        .map(|i| Target::Launcher(i.action.clone()))
+        .collect();
+    let answered = parts.items.iter().any(|i| i.kind == Kind::Answer);
     let mut items: Vec<Row> = parts.items.into_iter().map(Row::from_item).filter(|r| !pinned(&r.target)).collect();
     let mut files: Vec<Row> = parts.files.into_iter().filter(|r| !pinned(&r.target)).collect();
+    let nq = crate::normalize::normalize(&query);
+    if answered {
+        // "2+2" is a sum: only files named with the whole of it, not every name with a 2.
+        files.retain(|r| crate::normalize::normalize(&r.title).contains(nq.as_str()));
+    }
     let found = !pins.is_empty() || !files.is_empty() || items.iter().any(|r| r.group != Group::Web);
 
     // The best result, unless pinned favourites already lead.
     let mut best: Option<Row> = None;
     if pins.is_empty() && !query.is_empty() {
-        let nq = crate::normalize::normalize(&query);
-        let starts = |r: &Row| crate::normalize::normalize(&r.title).starts_with(&nq);
+        let starts = |r: &Row| crate::normalize::normalize(&r.title).starts_with(&nq) || strong.contains(&r.target);
+        let has_app = items.iter().any(|r| r.group == Group::Apps);
         if let Some(i) = items.iter().position(|r| r.group == Group::Answers) {
             best = Some(items.remove(i));
         } else if let Some(i) = items.iter().position(|r| r.group != Group::Web && starts(r)) {
             best = Some(items.remove(i));
-        } else if !files.is_empty() {
+        } else if !files.is_empty() && (!has_app || names_query(&files[0].title, &nq)) {
             best = Some(files.remove(0));
+        } else if let Some(i) = items.iter().position(|r| r.group == Group::Apps) {
+            // The files only resemble the query ("notepda"): an app found
+            // despite the typo comes first.
+            best = Some(items.remove(i));
         } else if let Some(i) = items.iter().position(|r| r.group != Group::Web) {
             best = Some(items.remove(i));
         }
@@ -581,6 +598,14 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
         });
     }
     rows
+}
+
+/// Whether a file name holds every word of the normalised query as typed,
+/// rather than only resembling it (a typo match). Words with search syntax
+/// ("ext:pdf", "!old", "a|b", wildcards) count as held.
+fn names_query(title: &str, nq: &str) -> bool {
+    let name = crate::normalize::normalize(title);
+    nq.split_whitespace().all(|w| w.starts_with(['!', '-']) || w.contains([':', '|', '*', '?', '"']) || name.contains(w))
 }
 
 /// A feedback row; its texts are filled by the UI in the interface language.
@@ -1137,11 +1162,72 @@ mod tests {
     fn launcher_results_feed_the_list() {
         let catalog = crate::launcher::Catalog::default();
         let launches = |_: &str| 0;
-        let ctx = crate::launcher::Context { english: false, windows_build: 22631, windows: &[], launches: &launches, today: (2026, 11, 1) };
+        let ctx = crate::launcher::Context { english: false, windows_build: 22631, windows: &[], launches: &launches, picked: &launches, today: (2026, 11, 1) };
         let items = catalog.query("word", &ctx, 20);
         let rows = arrange(Parts { query: "word".into(), pins: vec![], items, files: vec![Row::file("C:\\word.txt", false)], files_done: true });
         assert_eq!(rows[0].group, Group::Best);
         assert_eq!(rows.last().map(|r| &r.target), Some(&Target::OpenInMain("word".into())));
+    }
+
+    fn catalog_items(names: &[&str], q: &str) -> Vec<Item> {
+        let apps = names.iter().map(|n| crate::launcher::apps::App::new(n.to_string(), format!("shell:AppsFolder\\{n}"), None)).collect();
+        let catalog = crate::launcher::Catalog::new(apps, Vec::new());
+        let none = |_: &str| 0;
+        let ctx = crate::launcher::Context { english: true, windows_build: 22631, windows: &[], launches: &none, picked: &none, today: (2026, 11, 1) };
+        catalog.query(q, &ctx, 40)
+    }
+
+    #[test]
+    fn typo_app_before_files_that_only_resemble_the_query() {
+        let items = catalog_items(&["Notepad", "Notepad++", "Paint"], "notepda");
+        assert_eq!(items.first().map(|i| i.title.as_str()), Some("Notepad"));
+        // The file search found these by its typo fallback.
+        let files = vec![Row::file(r"C:\notes\notepad tips.txt", false), Row::file(r"C:\notepad.ini", false)];
+        let rows = arrange(Parts { query: "notepda".into(), pins: vec![], items, files, files_done: true });
+        assert_eq!((rows[0].group, rows[0].title.as_str()), (Group::Best, "Notepad"));
+        let first_file = rows.iter().position(|r| r.group == Group::Files).unwrap();
+        let last_app = rows.iter().rposition(|r| r.group == Group::Apps).unwrap();
+        assert!(last_app < first_file);
+        // A file really named with the query still leads.
+        let items = catalog_items(&["Notepad"], "notepda");
+        let files = vec![Row::file(r"C:\notepda.txt", false)];
+        let rows = arrange(Parts { query: "notepda".into(), pins: vec![], items, files, files_done: true });
+        assert_eq!(rows[0].title, "notepda.txt");
+    }
+
+    #[test]
+    fn strong_app_leads_over_files() {
+        // "جوجل كر" starts an Arabic name of "Google Chrome", not its title.
+        let items = catalog_items(&["Google Chrome"], "جوجل كر");
+        let files = vec![Row::file(r"C:\جوجل كريم.txt", false)];
+        let rows = arrange(Parts { query: "جوجل كر".into(), pins: vec![], items, files, files_done: true });
+        assert_eq!(rows[0].title, "Google Chrome");
+        // A word somewhere in an alias ("لقطة شاشة") is not enough: the file leads.
+        let items = catalog_items(&["Snipping Tool"], "شاشة");
+        assert!(items.iter().any(|i| i.title == "Snipping Tool"));
+        let files = vec![Row::file(r"C:\شاشة.png", false)];
+        let rows = arrange(Parts { query: "شاشة".into(), pins: vec![], items, files, files_done: true });
+        assert_eq!(rows[0].title, "شاشة.png");
+        // An Arabic name of the app.
+        let items = catalog_items(&["Spotify"], "سبوتيفاي");
+        let files = vec![Row::file(r"C:\سبوتيفاي.txt", false)];
+        let rows = arrange(Parts { query: "سبوتيفاي".into(), pins: vec![], items, files, files_done: true });
+        assert_eq!(rows[0].title, "Spotify");
+    }
+
+    #[test]
+    fn a_sum_hides_files_that_only_share_digits() {
+        let items = catalog_items(&["Notepad"], "2+2");
+        assert_eq!(items.first().map(|i| i.kind), Some(Kind::Answer));
+        let files = vec![Row::file(r"C:\x\report 2022.docx", false), Row::file(r"C:\2 2.txt", false), Row::file(r"C:\a\2+2 notes.txt", false)];
+        let rows = arrange(Parts { query: "2+2".into(), pins: vec![], items, files, files_done: true });
+        assert_eq!(rows[0].target, Target::Launcher(Action::CopyText("4".into())));
+        let files: Vec<&str> = rows.iter().filter(|r| r.group == Group::Files).map(|r| r.title.as_str()).collect();
+        assert_eq!(files, ["2+2 notes.txt"]);
+        // Without an answer the files stay.
+        let rows = arrange(Parts { query: "2".into(), pins: vec![], items: vec![], files: vec![Row::file(r"C:\2 2.txt", false)], files_done: true });
+        assert_eq!(rows[0].title, "2 2.txt");
+        assert!(names_query("Report 2024.PDF", "report ext:pdf !old") && !names_query("notepad.ini", "notepda"));
     }
 
     #[test]

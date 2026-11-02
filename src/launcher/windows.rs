@@ -348,7 +348,7 @@ mod tests {
     fn run(q: &str, english: bool) -> Vec<Item> {
         static NO_LAUNCHES: fn(&str) -> u32 = |_| 0;
         let wins = sample();
-        let ctx = Context { english, windows_build: 0, windows: &wins, launches: &NO_LAUNCHES, today: (2026, 11, 1) };
+        let ctx = Context { english, windows_build: 0, windows: &wins, launches: &NO_LAUNCHES, picked: &NO_LAUNCHES, today: (2026, 11, 1) };
         matches(q, &ctx)
     }
 
