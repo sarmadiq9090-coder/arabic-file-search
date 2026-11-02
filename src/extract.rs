@@ -80,6 +80,11 @@ pub fn is_plain_text(ext: &str) -> bool {
 
 pub use archive::split_members;
 
+/// True for the archive extensions (lowercase, no dot) searched inside.
+pub fn is_archive(ext: &str) -> bool {
+    archive::is_archive_ext(ext)
+}
+
 /// Extract plain text from the file at `path`. Returns None on any failure/unsupported.
 ///
 /// Never panics: the whole extraction runs inside `catch_unwind`, and files

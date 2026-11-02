@@ -78,10 +78,11 @@ impl App {
             let Some(cache) = shared() else { return };
             let started = Instant::now();
             let progress = WarmProgress::default();
-            content_cache::warm(&docs, cache, &progress, &cancel);
+            let threads = content_cache::warm_threads();
+            content_cache::warm(&docs, cache, &progress, &cancel, threads, &idle_priority);
             let s = cache.stats();
             log(&format!(
-                "content index warm: {} of {} new documents in {} ms{}; stored {} ({} with text), {} KB{}",
+                "content index warm: {} of {} new documents in {} ms on {threads} threads{}; stored {} ({} with text), {} KB{}",
                 progress.added.load(Ordering::Relaxed),
                 progress.total.load(Ordering::Relaxed),
                 started.elapsed().as_millis(),
