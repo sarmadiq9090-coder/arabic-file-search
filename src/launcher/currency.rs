@@ -34,6 +34,8 @@ const OLDEST_BELIEVABLE: i64 = 1_577_836_800;
 /// A downloaded rate more than this factor away from the bundled one is
 /// treated as broken data (and the bundled rate is kept for that currency).
 const SANE_FACTOR: f64 = 50.0;
+/// Band for the other currencies, wide enough for a redenomination (÷1000).
+const SANE_FACTOR_WIDE: f64 = 2000.0;
 /// Largest amount accepted in a query.
 const MAX_AMOUNT: f64 = 1e12;
 
@@ -155,9 +157,10 @@ impl Rates {
             } else {
                 map.get(cur.code).and_then(|v| v.as_f64())
             };
-            let ok = raw.filter(|&r| {
-                r.is_finite() && r > 0.0 && r >= cur.bundled / SANE_FACTOR && r <= cur.bundled * SANE_FACTOR
-            });
+            // Currencies can be redenominated (a zero or two removed), so
+            // the minor ones get a wide band; the dinar and euro a narrow one.
+            let factor = if cur.code == "IQD" || cur.code == "EUR" { SANE_FACTOR } else { SANE_FACTOR_WIDE };
+            let ok = raw.filter(|&r| r.is_finite() && r > 0.0 && r >= cur.bundled / factor && r <= cur.bundled * factor);
             sane.push(ok.is_some());
             per_usd.push(ok.unwrap_or(cur.bundled));
         }
