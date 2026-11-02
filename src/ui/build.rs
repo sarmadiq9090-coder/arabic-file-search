@@ -333,7 +333,17 @@ impl NativeUi<AppUi> for App {
                 // (the floating box and the shortcut keep working); only
                 // "Exit" really closes it.
                 E::OnWindowClose if handle == app.window => {
-                    if app.close_hides() {
+                    let hides = app.close_hides();
+                    {
+                        let s = &app.state.borrow().settings;
+                        super::startup::log(&format!(
+                            "window close: {} (tray icon {}, floating {:?})",
+                            if hides { "hide to tray" } else { "exit" },
+                            s.tray_icon,
+                            s.floating_mode
+                        ));
+                    }
+                    if hides {
                         if let nwg::EventData::OnWindowClose(d) = &data {
                             d.close(false);
                         }

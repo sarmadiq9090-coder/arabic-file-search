@@ -16,6 +16,13 @@ if ($Machine) {
         [Runtime.InteropServices.RuntimeInformation]::OSArchitecture, `
         [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)
     if ($code -ne $want) { throw ("{0} is machine {1:x4}, not {2}" -f $Exe, $code, $Machine) }
+    # The UI thread's stack: 8 MB since 0.8.2 (a 1 MB stack overflowed on
+    # some desktops). SizeOfStackReserve is at optional header + 72.
+    $opt = $pe + 24
+    $magic = [BitConverter]::ToUInt16($bytes, $opt)
+    $stack = if ($magic -eq 0x20b) { [BitConverter]::ToUInt64($bytes, $opt + 72) } else { [BitConverter]::ToUInt32($bytes, $opt + 72) }
+    Write-Host ("stack reserve {0:N0} bytes" -f $stack)
+    if ($stack -lt 8MB) { throw ("{0} reserves only {1} bytes of stack, not 8 MB" -f $Exe, $stack) }
 }
 $data = Join-Path $env:LOCALAPPDATA 'BahthSari'
 $crash = Join-Path $data 'crash.txt'

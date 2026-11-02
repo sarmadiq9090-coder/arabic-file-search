@@ -350,6 +350,28 @@ function Session([string]$lang, [bool]$light, [string]$tag, [object[]]$queries, 
                 Shot "box-click-$tag" ($sw - 760) $top 760 ($sh - $top) | Out-Null
                 Close-Popup "box click $tag"
             } else { Fail "a click on the floating box did not open the popup ($tag)" }
+            # Clicked again and again, as an impatient user does (0.8.1 bug
+            # report: "clicking the box several times closes the program"):
+            # fast, slow, on the grip, double clicks. The program must live
+            # and the box must still be there.
+            $cxm = [int](($r.L + $r.R) / 2); $cym = [int](($r.T + $r.B) / 2)
+            foreach ($gap in @(30, 80, 150, 300, 600)) {
+                for ($i = 0; $i -lt 8; $i++) { [Q]::Click($cxm, $cym); Start-Sleep -Milliseconds $gap }
+                if (-not (Check-Alive "box clicked 8 times $gap ms apart ($tag)")) { break }
+            }
+            for ($i = 0; $i -lt 6; $i++) { [Q]::Click($cxm, $r.T + 2); Start-Sleep -Milliseconds 60 }
+            Check-Alive "grip clicked ($tag)" | Out-Null
+            Start-Sleep -Milliseconds 800
+            if (Popup-Visible) { Close-Popup "after repeated clicks $tag" }
+            $again = [Q]::Find($p.Id, 'InstaFindFloatingBox')
+            if ($again -eq [IntPtr]::Zero) { Fail "the floating box is gone after repeated clicks ($tag)" }
+            elseif (-not [Q]::IsWindowVisible($again)) { Fail "the floating box is hidden after repeated clicks ($tag)" }
+            else {
+                [Q]::Click($cxm, $cym)
+                for ($t = 0; $t -lt 20 -and -not (Popup-Visible); $t++) { Start-Sleep -Milliseconds 100 }
+                if (Popup-Visible) { Note "[$tag] box still opens the popup after 46 rapid clicks"; Close-Popup "after stress $tag" }
+                else { Fail "the floating box no longer opens the popup after repeated clicks ($tag)" }
+            }
         }
         Far-Cursor
     }

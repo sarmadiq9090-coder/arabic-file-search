@@ -1,0 +1,8 @@
+# InstaFind — بحث سريع 0.8.2: إصلاح التوقف المفاجئ
+
+- **إصلاح توقف البرنامج فجأة على بعض الأجهزة** عند الضغط المتكرر على خانة البحث العائمة أو عند ضغط زر الإغلاق، فتختفي الخانة والأيقونة بجانب الساعة.
+- **كل توقف مفاجئ يُسجَّل الآن** في تقرير الخطأ، فإذا حدث يسألك البرنامج عند الفتح التالي إن كنت تريد إرساله.
+- البحث من الهاتف لا يتوقف عند ضغط زر الإغلاق.
+- Enter في نافذة البحث الصغيرة يفتح أفضل نتيجة دائماً، حتى لو كان المؤشر واقفاً فوق نتيجة أخرى.
+
+**English:** Fixes the program suddenly quitting on some PCs when the floating search box was clicked repeatedly or the window was closed (8 MB UI stack instead of 1 MB, and the quick search no longer opens or closes inside its own opening or closing). Crashes that are not Rust panics, such as a stack overflow, are now written to the crash report, so the next start offers to send it. The phone search server keeps running when the window is closed to the tray. Enter in the quick search opens the best match even when the pointer rests over another row (a popup growing under a still pointer no longer selects the row under it).

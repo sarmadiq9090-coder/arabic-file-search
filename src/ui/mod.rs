@@ -498,6 +498,7 @@ impl App {
 
     /// Really closes the program (the tray menu's and Options menu's "Exit").
     fn quit(&self) {
+        startup::log("exit chosen from the menu");
         self.quitting.set(true);
         self.window.close();
     }

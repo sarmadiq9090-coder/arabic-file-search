@@ -15,6 +15,15 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+/// Clears a flag when dropped, also when a panic unwinds past it.
+struct Reset<'a>(&'a Cell<bool>);
+
+impl Drop for Reset<'_> {
+    fn drop(&mut self) {
+        self.0.set(false);
+    }
+}
+
 /// How long a list of installed apps is used before it is made again.
 const CATALOG_FRESH: Duration = Duration::from_secs(120);
 
@@ -85,6 +94,9 @@ pub struct Popup {
     /// A menu or message box of the popup is open: losing the focus to it
     /// must not close the popup.
     busy: Cell<u32>,
+    /// Inside `show_quick` or `hide_quick`: a nested call (Windows sends
+    /// activation messages while the popup is shown or hidden) does nothing.
+    toggling: Cell<bool>,
     hidden_at: Cell<Option<Instant>>,
 }
 
@@ -336,13 +348,21 @@ impl App {
     /// Opens the quick search at `anchor`, or closes it if it is open and
     /// in front (the hotkey and the box toggle it).
     pub(super) fn show_quick(&self, anchor: Anchor) {
+        if self.popup.toggling.replace(true) {
+            return;
+        }
+        let _reset = Reset(&self.popup.toggling);
+        self.show_quick_inner(anchor);
+    }
+
+    fn show_quick_inner(&self, anchor: Anchor) {
         if !self.ensure_popup() {
             return;
         }
         let hwnd = self.popup_hwnd();
         if self.quick_visible() {
             if unsafe { GetForegroundWindow() } == hwnd {
-                self.hide_quick();
+                self.hide_quick_inner();
                 return;
             }
         } else if matches!(anchor, Anchor::Tray { .. }) && self.popup.hidden_at.get().is_some_and(|t| t.elapsed() < REOPEN_GAP) {
@@ -374,6 +394,10 @@ impl App {
         self.popup.rect.set(rect);
         self.popup.selected.set(None);
         self.popup.enter_pending.set(false);
+        // Where the cursor is now: only a real move selects a row.
+        let mut cur = winapi::shared::windef::POINT { x: 0, y: 0 };
+        unsafe { GetCursorPos(&mut cur) };
+        self.popup.mouse.set((cur.x, cur.y));
         // Clearing the box runs the (empty) search, which sizes the window.
         let empty = shell::wide("");
         unsafe { SetWindowTextW(self.popup_edit(), empty.as_ptr()) };
@@ -388,6 +412,14 @@ impl App {
     }
 
     pub(super) fn hide_quick(&self) {
+        if self.popup.toggling.replace(true) {
+            return;
+        }
+        let _reset = Reset(&self.popup.toggling);
+        self.hide_quick_inner();
+    }
+
+    fn hide_quick_inner(&self) {
         let hwnd = self.popup_hwnd();
         if hwnd.is_null() || unsafe { IsWindowVisible(hwnd) } == 0 {
             return;
@@ -704,7 +736,13 @@ impl App {
             }
             WM_MOUSEMOVE => {
                 let p = point_of(l);
-                if self.popup.mouse.replace(p) != p {
+                // Compared on the screen: Windows also sends WM_MOUSEMOVE
+                // when the popup grows or moves under a cursor that stays
+                // put, and the row under it must not take the selection
+                // from the best match then (Enter would open that row).
+                let mut sp = winapi::shared::windef::POINT { x: 0, y: 0 };
+                unsafe { GetCursorPos(&mut sp) };
+                if self.popup.mouse.replace((sp.x, sp.y)) != (sp.x, sp.y) {
                     let row = quick::row_at(&self.popup.slots.borrow(), p.1);
                     if row.is_some() && row != self.popup.selected.get() {
                         self.popup.selected.set(row);
