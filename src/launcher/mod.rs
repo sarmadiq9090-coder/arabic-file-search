@@ -1,6 +1,6 @@
 //! What the quick search finds besides files: installed apps, Windows
 //! settings pages, open windows, instant answers (calculator, units, Hijri
-//! date), web shortcuts and system commands.
+//! date, currencies), web shortcuts and system commands.
 //!
 //! Everything here is platform independent and unit-tested on Linux, except
 //! the parts that ask Windows for data (`apps::scan`, `windows::list`), which
@@ -13,6 +13,7 @@ pub mod aliases;
 pub mod answers;
 pub mod apps;
 mod calc;
+pub mod currency;
 mod hijri;
 mod matching;
 mod phonetic;
