@@ -191,7 +191,7 @@ public static class U {
 }
 '@
 
-$VK = @{ CTRL = 0x11; ALT = 0x12; SHIFT = 0x10; ENTER = 0x0D; ESC = 0x1B; A = 0x41; F = 0x46; DOWN = 0x28; BACK = 0x08 }
+$VK = @{ CTRL = 0x11; ALT = 0x12; SHIFT = 0x10; ENTER = 0x0D; ESC = 0x1B; A = 0x41; F = 0x46; DOWN = 0x28; BACK = 0x08; F4 = 0x73 }
 $BM_CLICK = 0x00F5; $BM_GETCHECK = 0x00F0; $WM_CLOSE = 0x0010
 
 $data = Join-Path $env:LOCALAPPDATA 'BahthSari'
@@ -476,6 +476,7 @@ if ($main) {
     Start-Sleep -Seconds 3
     $p.Refresh()
     Record 'tray' 'core' 'close button hides to the tray (still running)' (-not $p.HasExited -and -not (Main-Window $p.Id))
+    Record 'tray' 'core' 'floating box stays after the close button' ($null -ne (Visible-Window $p.Id 'InstaFindFloatingBox'))
     [U]::Chord($VK.CTRL, $VK.ALT, $VK.F)
     $back = Wait-Until { Visible-Window $p.Id 'InstaFindQuickSearch' } 5
     Record 'tray' 'core' 'Ctrl+Alt+F still works while hidden' ($null -ne $back)
@@ -509,6 +510,37 @@ if ($main) {
 Quick-Search 'تقرير' 'تقرير مالي' 'core' 'Arabic UI quick search'
 Quick-Search 'notepad' 'Notepad' 'probe' 'Arabic UI app search'
 [U]::Chord($VK.ESC)
+Start-Sleep -Seconds 1
+
+# Alt+F4 on the main window: same as the close button.
+$main = Main-Window $p.Id
+if ($main) {
+    Focus-Window $main.Handle
+    [U]::Chord($VK.ALT, $VK.F4)
+    Start-Sleep -Seconds 3
+    $p.Refresh()
+    Record 'tray' 'core' 'Alt+F4 hides to the tray (still running)' (-not $p.HasExited -and -not (Main-Window $p.Id))
+    Record 'tray' 'core' 'floating box stays after Alt+F4' ($null -ne (Visible-Window $p.Id 'InstaFindFloatingBox'))
+    Shot 'after-alt-f4'
+    Check-Crash 'Alt+F4'
+}
+
+# Clicking the floating box over and over, as an impatient user does.
+$box = Visible-Window $p.Id 'InstaFindFloatingBox'
+if ($box) {
+    for ($i = 0; $i -lt 12; $i++) {
+        $b = Visible-Window $p.Id 'InstaFindFloatingBox'
+        if ($b) { Click-Center $b }
+        Start-Sleep -Milliseconds 250
+    }
+    Start-Sleep -Seconds 2
+    $p.Refresh()
+    Record 'floating box' 'core' 'still running after 12 quick clicks on the box' (-not $p.HasExited) $(if ($p.HasExited) { "exit code $($p.ExitCode)" } else { '' })
+    Record 'floating box' 'core' 'box still shown after 12 quick clicks' ($null -ne (Visible-Window $p.Id 'InstaFindFloatingBox'))
+    Shot 'after-box-clicks'
+    [U]::Chord($VK.ESC)
+    Check-Crash 'clicking the floating box'
+} else { Record 'floating box' 'core' 'box shown in the Arabic run' $false 'not visible' }
 Check-Crash 'Arabic interface'
 if (Test-Path (Join-Path $data 'log.txt')) { Copy-Item (Join-Path $data 'log.txt') (Join-Path $Out 'log-ar.txt') }
 Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force
