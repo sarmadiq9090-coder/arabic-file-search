@@ -528,7 +528,7 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
     let strong: Vec<Target> = parts
         .items
         .iter()
-        .filter(|i| i.kind == Kind::App && i.score >= crate::launcher::STRONG_SCORE)
+        .filter(|i| i.kind == Kind::App && i.strong)
         .map(|i| Target::Launcher(i.action.clone()))
         .collect();
     let answered = parts.items.iter().any(|i| i.kind == Kind::Answer);
@@ -550,7 +550,7 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
             best = Some(items.remove(i));
         } else if let Some(i) = items.iter().position(|r| r.group != Group::Web && starts(r)) {
             best = Some(items.remove(i));
-        } else if !files.is_empty() && (!has_app || names_query(&files[0].title, &nq)) {
+        } else if !files.is_empty() && (!has_app || names_query(&files[0].title, &query)) {
             best = Some(files.remove(0));
         } else if let Some(i) = items.iter().position(|r| r.group == Group::Apps) {
             // The files only resemble the query ("notepda"): an app found
@@ -600,12 +600,13 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
     rows
 }
 
-/// Whether a file name holds every word of the normalised query as typed,
-/// rather than only resembling it (a typo match). Words with search syntax
-/// ("ext:pdf", "!old", "a|b", wildcards) count as held.
-fn names_query(title: &str, nq: &str) -> bool {
+/// Whether a file name holds every word of the query the way a name search
+/// matches it (article-stripped, alternatives, ...), rather than only
+/// resembling it (a typo match). Search syntax ("ext:pdf", "!old") is not a
+/// word and counts as held.
+fn names_query(title: &str, query: &str) -> bool {
     let name = crate::normalize::normalize(title);
-    nq.split_whitespace().all(|w| w.starts_with(['!', '-']) || w.contains([':', '|', '*', '?', '"']) || name.contains(w))
+    crate::search::Query::parse(query).terms.iter().all(|t| t.matches(&name))
 }
 
 /// A feedback row; its texts are filled by the UI in the interface language.
@@ -1038,7 +1039,7 @@ mod tests {
     }
 
     fn item(kind: Kind, title: &str, action: Action) -> Item {
-        Item { kind, title: title.into(), subtitle: String::new(), action, score: 0, icon_path: None }
+        Item { kind, title: title.into(), subtitle: String::new(), action, score: 0, icon_path: None, strong: false }
     }
 
     fn launch(t: &str) -> Action {
@@ -1228,6 +1229,9 @@ mod tests {
         let rows = arrange(Parts { query: "2".into(), pins: vec![], items: vec![], files: vec![Row::file(r"C:\2 2.txt", false)], files_done: true });
         assert_eq!(rows[0].title, "2 2.txt");
         assert!(names_query("Report 2024.PDF", "report ext:pdf !old") && !names_query("notepad.ini", "notepda"));
+        // Matched like a name search: the article is stripped.
+        assert!(names_query("تقرير مالي.docx", "التقرير"));
+        assert!(names_query("Report 2024.PDF", "report|invoice"));
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! Apps in the main window (0.9): when what is typed in the search box names
 //! an installed program strongly (`launcher::STRONG_SCORE`), up to three
 //! buttons above the results start it. They use the quick search's catalog
-//! (`start_catalog`), and opening one counts like opening it from the popup.
+//! (built once by `start_catalog_once`, refreshed by the popup), and opening one counts like opening it from the popup.
 
 use super::App;
 use crate::launcher;
@@ -17,7 +17,7 @@ impl App {
         let items = if text.trim().is_empty() || self.content_mode() {
             Vec::new()
         } else {
-            self.start_catalog();
+            self.start_catalog_once();
             match self.catalog_now() {
                 Some(c) => {
                     let st = self.state.borrow();

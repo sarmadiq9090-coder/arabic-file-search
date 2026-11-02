@@ -86,6 +86,8 @@ pub struct Popup {
     catalog: Arc<Mutex<Option<Arc<Catalog>>>>,
     /// When the catalog was last (re)built, to list new apps now and then.
     catalog_started: Cell<Option<Instant>>,
+    /// When the exchange rates were last loaded or checked for an update.
+    rates_started: Cell<Option<Instant>>,
     /// The popup's HWND for background threads to post to (0 = none yet).
     post_to: Arc<AtomicUsize>,
     look: RefCell<Look>,
@@ -434,33 +436,44 @@ impl App {
     /// on a background thread. Built again when the popup opens and the list
     /// is over [`CATALOG_FRESH`] old, so programs installed since show up;
     /// the old list serves until the new one is ready.
+    ///
+    /// The exchange rates for the currency answers are loaded (and
+    /// downloaded when due) with it, at most every [`CATALOG_FRESH`].
     pub(super) fn start_catalog(&self) {
-        if self.popup.catalog_started.get().is_some_and(|t| t.elapsed() < CATALOG_FRESH) {
+        self.build_catalog(true);
+    }
+
+    /// Builds the catalog if it never was, for the main window's app
+    /// buttons: typing there neither rebuilds it nor touches the rates.
+    pub(super) fn start_catalog_once(&self) {
+        if self.popup.catalog_started.get().is_none() {
+            self.build_catalog(false);
+        }
+    }
+
+    fn build_catalog(&self, with_rates: bool) {
+        let due = |t: &Cell<Option<Instant>>| !t.get().is_some_and(|t| t.elapsed() < CATALOG_FRESH);
+        let rebuild = due(&self.popup.catalog_started);
+        let rates = with_rates && due(&self.popup.rates_started);
+        if !rebuild && !rates {
             return;
         }
-        self.popup.catalog_started.set(Some(Instant::now()));
+        if rebuild {
+            self.popup.catalog_started.set(Some(Instant::now()));
+        }
+        if rates {
+            self.popup.rates_started.set(Some(Instant::now()));
+        }
         let slot = self.popup.catalog.clone();
         let post_to = self.popup.post_to.clone();
         crate::crash_log::spawn_named("launcher-catalog", move || {
             background_priority();
-            let started = Instant::now();
-            let catalog = crate::crash_log::catch(shim::new_catalog).unwrap_or_default();
-            log(&format!(
-                "launcher catalog: {} apps, {} settings pages in {} ms",
-                catalog.apps.len(),
-                catalog.settings.len(),
-                started.elapsed().as_millis()
-            ));
-            if let Ok(mut s) = slot.lock() {
-                *s = Some(Arc::new(catalog));
-            }
-            let h = post_to.load(Ordering::Relaxed);
-            if h != 0 {
-                unsafe { PostMessageW(h as HWND, WM_APP_CATALOG, 0, 0) };
+            if rebuild {
+                build_catalog_into(&slot, &post_to);
             }
             // Exchange rates for the currency answers: the cached ones now, a
             // download at most every 12 hours (after the catalog, never in its way).
-            if let Some(line) = crate::launcher::currency::refresh_if_due() {
+            if rates && let Some(line) = crate::launcher::currency::refresh_if_due() {
                 log(&line);
             }
         });
@@ -1064,7 +1077,9 @@ impl App {
                     let mut st = self.state.borrow_mut();
                     let key = launcher::action_key(action);
                     st.history.record_launch(&key, now);
-                    st.history.record_pick(&query, &key, now);
+                    if launcher::learns_pick(action) {
+                        st.history.record_pick(&query, &key, now);
+                    }
                     st.history.add_recent(&query);
                     st.history.save();
                 }
@@ -1249,15 +1264,24 @@ pub(super) fn nwg_scale() -> f64 {
 
 impl App {
     /// The files opened lately that are still there, as rows. Looked up in
-    /// the index when it is loaded (no disk access); before that, only local
-    /// paths are checked on disk, and only the few needed.
+    /// the index when it is loaded (no disk access); before that, only paths
+    /// on local fixed drives are checked on disk (a network share, a mapped
+    /// drive or a CD could keep the popup waiting), and only the few needed.
     fn popup_recent_rows(&self) -> Vec<Row> {
+        use winapi::um::fileapi::GetDriveTypeW;
+        use winapi::um::winbase::DRIVE_FIXED;
         let st = self.state.borrow();
         let index = st.index.clone();
         let paths = st.history.recent_opens();
         let found = if index.entries.is_empty() {
+            let mut fixed: std::collections::HashMap<char, bool> = std::collections::HashMap::new();
             let probe = |p: &str| {
-                if p.starts_with(r"\\") || p.starts_with("//") {
+                let letter = crate::suggest::drive_letter(p)?;
+                let local = *fixed.entry(letter).or_insert_with(|| {
+                    let root = shell::wide(&format!("{letter}:\\"));
+                    unsafe { GetDriveTypeW(root.as_ptr()) == DRIVE_FIXED }
+                });
+                if !local {
                     return None;
                 }
                 std::fs::metadata(p).ok().map(|m| m.is_dir())
@@ -1303,6 +1327,26 @@ impl App {
 }
 
 /// A pinned favourite as a row.
+/// Lists the apps and settings pages (blocks: call it from a background
+/// thread), puts the catalog in `slot` and tells the popup.
+fn build_catalog_into(slot: &Mutex<Option<Arc<Catalog>>>, post_to: &AtomicUsize) {
+    let started = Instant::now();
+    let catalog = crate::crash_log::catch(shim::new_catalog).unwrap_or_default();
+    log(&format!(
+        "launcher catalog: {} apps, {} settings pages in {} ms",
+        catalog.apps.len(),
+        catalog.settings.len(),
+        started.elapsed().as_millis()
+    ));
+    if let Ok(mut s) = slot.lock() {
+        *s = Some(Arc::new(catalog));
+    }
+    let h = post_to.load(Ordering::Relaxed);
+    if h != 0 {
+        unsafe { PostMessageW(h as HWND, WM_APP_CATALOG, 0, 0) };
+    }
+}
+
 fn pin_row(p: &crate::history::Pin) -> Row {
     if p.app {
         let shell_app = p.target.to_ascii_lowercase().starts_with("shell:");

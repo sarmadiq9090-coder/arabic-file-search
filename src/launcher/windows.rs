@@ -127,7 +127,7 @@ pub fn matches(query: &str, ctx: &Context) -> Vec<Item> {
             _ => continue,
         };
         let title = if ctx.english { format!("Switch to: {}", w.title.trim()) } else { format!("التبديل إلى: {}", w.title.trim()) };
-        out.push(Item { kind: Kind::Window, title, subtitle: w.exe.clone(), action: Action::FocusWindow(w.hwnd), score, icon_path: None });
+        out.push(Item { kind: Kind::Window, title, subtitle: w.exe.clone(), action: Action::FocusWindow(w.hwnd), score, icon_path: None, strong: false });
     }
     out
 }

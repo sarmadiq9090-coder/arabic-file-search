@@ -83,6 +83,11 @@ pub struct Item {
     pub score: u32,
     /// File the icon is taken from (exe, lnk), if any.
     pub icon_path: Option<String>,
+    /// An app named strongly by the query: its match score plus the habit
+    /// for these very letters reaches [`STRONG_SCORE`]. How often it was
+    /// launched in general does not count, so a favourite does not turn a
+    /// weak match strong.
+    pub strong: bool,
 }
 
 /// The data the quick search looks through besides files, built once in the
@@ -163,6 +168,7 @@ impl Catalog {
                 title: app.name.clone(),
                 subtitle: if ctx.english { "App" } else { "تطبيق" }.to_string(),
                 score: s + boost(ctx, &action),
+                strong: s + picked_boost(ctx, &action) >= STRONG_SCORE,
                 action,
                 icon_path: app.icon_path.clone(),
             });
@@ -180,6 +186,7 @@ impl Catalog {
                 title: page.title(ctx.english).to_string(),
                 subtitle,
                 score: s + boost(ctx, &action),
+                strong: false,
                 action,
                 icon_path: None,
             });
@@ -212,10 +219,10 @@ impl Catalog {
 }
 
 impl Catalog {
-    /// The apps `query` names strongly (score at least [`STRONG_SCORE`]),
+    /// The apps `query` names strongly ([`Item::strong`]),
     /// best first, at most `n`: what the main window offers above the files.
     pub fn strong_apps(&self, query: &str, ctx: &Context, n: usize) -> Vec<Item> {
-        self.query(query, ctx, 40).into_iter().filter(|i| i.kind == Kind::App && i.score >= STRONG_SCORE).take(n).collect()
+        self.query(query, ctx, 40).into_iter().filter(|i| i.kind == Kind::App && i.strong).take(n).collect()
     }
 }
 
@@ -246,6 +253,23 @@ fn pick_boost(n: u32) -> u32 {
 fn boost(ctx: &Context, action: &Action) -> u32 {
     let key = action_key(action);
     if key.is_empty() { 0 } else { launch_boost((ctx.launches)(&key)) + pick_boost((ctx.picked)(&key)) }
+}
+
+/// The part of [`boost`] that belongs to this query: picks after the same letters.
+fn picked_boost(ctx: &Context, action: &Action) -> u32 {
+    let key = action_key(action);
+    if key.is_empty() { 0 } else { pick_boost((ctx.picked)(&key)) }
+}
+
+/// Whether opening `action` after typing a query is learnt as a pick for
+/// those letters: an app or a settings page. Web searches (whose key holds
+/// the typed text) and system commands would only fill the list.
+pub fn learns_pick(action: &Action) -> bool {
+    match action {
+        Action::Launch { .. } => true,
+        Action::OpenUri(u) => u.starts_with("ms-settings:"),
+        Action::CopyText(_) | Action::FocusWindow(_) | Action::System(_) => false,
+    }
 }
 
 /// A stable key for an action, used to count launches for the boost.
@@ -469,6 +493,16 @@ mod tests {
             assert!(names(q).is_empty(), "{q}: {:?}", names(q));
         }
         assert!(c.strong_apps("note", &cx, 1).len() == 1);
+        // Launched often in general: a piece of its name is still weak.
+        let notepad = action_key(&Action::Launch { target: "shell:AppsFolder\\Notepad".into(), args: String::new() });
+        let often = move |k: &str| if k == notepad { u32::MAX } else { 0 };
+        let cx = ctx(true, 0, &often);
+        assert!(c.strong_apps("otepa", &cx, 3).is_empty());
+        // Picked after these very letters: that habit makes it strong.
+        let notepad = action_key(&Action::Launch { target: "shell:AppsFolder\\Notepad".into(), args: String::new() });
+        let picked = move |k: &str| if k == notepad { 1 } else { 0 };
+        let cx = Context { picked: &picked, ..ctx(true, 0, &no_launches) };
+        assert_eq!(c.strong_apps("otepa", &cx, 3).into_iter().map(|i| i.title).collect::<Vec<_>>(), ["Notepad"]);
     }
 
     #[test]
@@ -479,6 +513,20 @@ mod tests {
         let cx = Context { picked: &picked, ..ctx(true, 0, &no_launches) };
         assert_eq!(first(&c, "notepad", &cx).title, "Notepad++");
         assert!(pick_boost(1) >= 500 && pick_boost(u32::MAX) <= 700 && pick_boost(0) == 0);
+    }
+
+    #[test]
+    fn picks_learnt_for_apps_and_settings_only() {
+        assert!(learns_pick(&Action::Launch { target: "C:\\x.exe".into(), args: String::new() }));
+        assert!(learns_pick(&Action::OpenUri("ms-settings:bluetooth".into())));
+        assert!(!learns_pick(&Action::OpenUri("https://www.google.com/search?q=x".into())));
+        assert!(!learns_pick(&Action::CopyText("4".into())));
+        assert!(!learns_pick(&Action::FocusWindow(1)));
+        let c = catalog();
+        let cx = ctx(true, 0, &no_launches);
+        for it in c.query("restart", &cx, 40).into_iter().filter(|i| matches!(i.kind, Kind::Command | Kind::Web)) {
+            assert!(!learns_pick(&it.action), "{:?}", it.action);
+        }
     }
 
     #[test]

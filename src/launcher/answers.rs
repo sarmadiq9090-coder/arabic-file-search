@@ -11,7 +11,7 @@ fn copy_hint(english: bool) -> &'static str {
 }
 
 fn item(title: String, subtitle: String, copy: String) -> Item {
-    Item { kind: Kind::Answer, title, subtitle, action: Action::CopyText(copy), score: ANSWER_SCORE, icon_path: None }
+    Item { kind: Kind::Answer, title, subtitle, action: Action::CopyText(copy), score: ANSWER_SCORE, icon_path: None, strong: false }
 }
 
 /// An instant answer for `query`, if it is a calculation, a conversion or a date question.

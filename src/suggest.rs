@@ -46,6 +46,14 @@ pub fn pick_recent<'a, T>(
         .collect()
 }
 
+/// The drive letter of a `C:\...` path, upper case; `None` for UNC paths,
+/// relative paths and anything else.
+pub fn drive_letter(path: &str) -> Option<char> {
+    let mut chars = path.chars();
+    let letter = chars.next().filter(char::is_ascii_alphabetic)?;
+    (chars.next() == Some(':') && matches!(chars.next(), Some('\\' | '/'))).then(|| letter.to_ascii_uppercase())
+}
+
 /// The list shown while the search box is empty: the favourites, then the
 /// recently opened files that are not favourites, each section capped.
 pub fn empty_rows(pins: Vec<Row>, recent: Vec<Row>) -> Vec<Row> {
@@ -115,7 +123,7 @@ fn shorten(text: &str, max: usize) -> String {
 
 /// A web search for `query`.
 pub fn web_url(query: &str) -> String {
-    format!("https://www.google.com/search?q={}", crate::launcher::web::percent_encode(query.trim()))
+    crate::launcher::web::google_url(query.trim())
 }
 
 /// What the search that found nothing was like.
@@ -221,14 +229,18 @@ pub fn did_you_mean(entries: &[Entry], text: &str, scope: &str, parse: &(impl Fn
         [i] => {
             let scope_lower = scope.to_lowercase();
             let word = closest_word(entries, tokens[*i], &|e: &Entry| q.entry_ok(e) && in_scope(&e.path, &scope_lower))?;
-            Some(replace_token(&tokens, *i, Some(&word)))
+            Some(replace_token(&tokens, *i, Some(&word))).filter(|t| finds(entries, &parse(t), scope))
         }
         _ => plain.iter().rev().find_map(|&i| {
             let rest = replace_token(&tokens, i, None);
-            let rq = parse(&rest);
-            (!rq.terms.is_empty() && !search::search_names(entries, &rq, scope).is_empty()).then_some(rest)
+            finds(entries, &parse(&rest), scope).then_some(rest)
         }),
     }
+}
+
+/// Whether a name search for `q` finds something.
+fn finds(entries: &[Entry], q: &Query, scope: &str) -> bool {
+    !q.terms.is_empty() && !search::search_names(entries, q, scope).is_empty()
 }
 
 /// `tokens` joined by spaces, with token `i` replaced by `with` (or left out).
@@ -430,6 +442,9 @@ mod tests {
         // Filters are kept as typed, and limit what is suggested.
         assert_eq!(dym(&es, "bdugte ext:xlsx", "").as_deref(), Some("budget ext:xlsx"));
         assert_eq!(dym(&es, "budgxx ext:png", "").as_deref(), Some("budgie ext:png"));
+        // The other terms must still match: no name has "qq" or "zz" too.
+        assert_eq!(dym(&es, "bdugte qq|zz", ""), None);
+        assert_eq!(dym(&es, "bdugte qq|final", "").as_deref(), Some("budget qq|final"));
         // Only words in the folder searched.
         assert_eq!(dym(&es, "invoise", r"D:\other").as_deref(), Some("invoice"));
         assert_eq!(dym(&es, "invoise", r"C:\docs"), None);
@@ -512,6 +527,15 @@ mod tests {
         // And never probes more than allowed.
         let got = pick_recent(["gone1", "gone2", "a"], 5, 2, |p| (!p.starts_with("gone")).then_some(()));
         assert!(got.is_empty());
+    }
+
+    #[test]
+    fn drive_letters() {
+        assert_eq!(drive_letter(r"c:\x\a.txt"), Some('C'));
+        assert_eq!(drive_letter("D:/a"), Some('D'));
+        for p in [r"\\server\share\a", "//server/a", "a.txt", "C:", "C:a", "1:\\a", ""] {
+            assert_eq!(drive_letter(p), None, "{p}");
+        }
     }
 
     #[test]

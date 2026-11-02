@@ -542,6 +542,23 @@ pub fn warm_threads() -> usize {
 /// several threads never hold several huge texts at once.
 const BIG_FILE: u64 = 8 * 1024 * 1024;
 
+/// Compressed documents (archives, zip-based office files) over this size
+/// count as big too: their text can be many times their size on disk.
+const BIG_COMPRESSED: u64 = 2 * 1024 * 1024;
+
+/// Zip-based office formats, whose text is compressed inside.
+const ZIPPED_DOCS: &[&str] = &["docx", "docm", "pptx", "odt", "odp", "ods", "xlsx", "xlsm", "xlsb", "epub"];
+
+/// Whether extracting `e` may need a lot of memory, so the warm-up does it
+/// on one thread at a time.
+fn is_heavy(e: &Entry) -> bool {
+    if e.size > BIG_FILE {
+        return true;
+    }
+    let ext = e.ext();
+    e.size > BIG_COMPRESSED && (extract::is_archive(&ext) || ZIPPED_DOCS.contains(&ext.as_str()))
+}
+
 /// Images, read only through OCR (Windows): by far the slowest documents.
 const IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif"];
 
@@ -622,7 +639,7 @@ pub fn warm(
                 break;
             }
             let Some(e) = todo.get(next.fetch_add(1, Ordering::Relaxed)) else { break };
-            let one_big = (e.size > BIG_FILE).then(|| big.lock().unwrap_or_else(|e| e.into_inner()));
+            let one_big = is_heavy(e).then(|| big.lock().unwrap_or_else(|e| e.into_inner()));
             // The file as it is now (the index may lag behind); a search may
             // also have stored it meanwhile.
             if let Some(st) = stamp(Path::new(&*e.path))
@@ -636,7 +653,9 @@ pub fn warm(
             // One thread saves (if anything changed); the others carry on.
             if let Ok(mut last) = last_save.try_lock() {
                 let added = progress.added.load(Ordering::Relaxed);
-                if time_to_save(last.0.elapsed(), added.saturating_sub(last.1), cache.documents()) {
+                // Only then counts the documents, which takes the store's lock.
+                let since = last.0.elapsed();
+                if since >= FLUSH_MIN && time_to_save(since, added.saturating_sub(last.1), cache.documents()) {
                     let _ = cache.flush();
                     *last = (Instant::now(), added);
                 }
@@ -1024,6 +1043,15 @@ mod tests {
         assert_eq!(warm_rank(&e("C:\\Users\\a\\Documents\\big.pdf", BIG_FILE + 1)), 3);
         assert_eq!(rank("C:\\Users\\a\\Documents\\صورة.JPG"), 4);
         assert!((1..=4).contains(&warm_threads()));
+    }
+
+    #[test]
+    fn compressed_documents_are_heavy_sooner() {
+        let e = |path: &str, size: u64| Entry { path: path.into(), size, mtime: 0, is_dir: false, norm_name: "".into() };
+        let mb = 1024 * 1024;
+        assert!(is_heavy(&e("C:\\a.pdf", BIG_FILE + 1)) && !is_heavy(&e("C:\\a.pdf", 3 * mb)));
+        assert!(is_heavy(&e("C:\\a.DOCX", 3 * mb)) && is_heavy(&e("C:\\a.zip", 3 * mb)) && is_heavy(&e("C:\\a.7z", 3 * mb)));
+        assert!(!is_heavy(&e("C:\\a.docx", mb)) && !is_heavy(&e("C:\\a.zip", mb)));
     }
 
     #[test]

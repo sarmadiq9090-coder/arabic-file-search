@@ -200,6 +200,10 @@ impl App {
         let sort = if st.settings.sort_col < 0 { SortKey::Relevance } else { sort };
         let boosted = if sort == SortKey::Relevance { st.history.boosted(&index, index::now_secs()) } else { Vec::new() };
         let show_system = system_files::show_system(st.settings.hide_system, &scope);
+        // A spelling suggestion is shown only for a search the user ran
+        // while the index is ready (see `on_names_found`): don't look for one
+        // otherwise.
+        let suggest = !st.live_search && st.scan.is_none() && st.loading.is_none();
         drop(st);
 
         let text = self.query.text();
@@ -235,7 +239,7 @@ impl App {
                     search::sort_hits(&index.entries, &mut hits, sort, desc);
                 }
                 // Nothing at all: a text that finds something, to suggest.
-                let did_you_mean = if hits.is_empty() && !q.is_empty() { crate::suggest::did_you_mean(&index.entries, &text, &scope, &parse) } else { None };
+                let did_you_mean = if suggest && hits.is_empty() && !q.is_empty() { crate::suggest::did_you_mean(&index.entries, &text, &scope, &parse) } else { None };
                 (hits, converted, did_you_mean, q.is_empty())
             };
             // After a panic (logged by the hook) the search still answers,

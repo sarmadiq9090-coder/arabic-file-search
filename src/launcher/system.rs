@@ -148,7 +148,7 @@ pub fn confirm_text(cmd: &SystemCommand, english: bool) -> String {
 }
 
 fn item(cmd: SystemCommand, subtitle: String, score: u32, english: bool) -> Item {
-    Item { kind: Kind::Command, title: title(&cmd, english), subtitle, action: Action::System(cmd), score, icon_path: None }
+    Item { kind: Kind::Command, title: title(&cmd, english), subtitle, action: Action::System(cmd), score, icon_path: None, strong: false }
 }
 
 /// "end chrome" → `chrome`, if the query starts with an end verb.
