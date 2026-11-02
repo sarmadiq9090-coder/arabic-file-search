@@ -329,8 +329,34 @@ Check-Crash 'first start'
 
 # ---------------------------------------------------------------- index
 $t1 = Get-Date
-[void](Wait-Until { (Test-Path $index) -or $p.HasExited } 1500)
+# Progress once a minute: how fast the index grows, what the program costs,
+# and whether the machine itself is slow (disk, antivirus).
+$next = (Get-Date).AddSeconds(60)
+while (-not (Test-Path $index) -and -not $p.HasExited -and ((Get-Date) - $t1).TotalSeconds -lt 1500) {
+    Start-Sleep -Seconds 2
+    if ((Get-Date) -ge $next) {
+        $next = (Get-Date).AddSeconds(60)
+        $m = Main-Window $p.Id
+        $bar = if ($m) { Get-Children $m.Handle | Where-Object Class -eq 'msctls_statusbar32' | Select-Object -First 1 }
+        $text = if ($bar) { [U]::StatusText($bar.Handle, 0) } else { '' }
+        $p.Refresh()
+        Write-Host ("index wait {0,5:N0} s: cpu {1:N0} s, threads {2}, memory {3:N0} MB, floating box {4}; {5}" -f `
+            ((Get-Date) - $t1).TotalSeconds, $p.TotalProcessorTime.TotalSeconds, $p.Threads.Count, ($p.WorkingSet64 / 1MB), `
+            [bool](Visible-Window $p.Id 'InstaFindFloatingBox'), $text)
+        try {
+            $io = Get-CimInstance Win32_Process -Filter "ProcessId=$($p.Id)" -ErrorAction Stop
+            $c = (Get-Counter '\PhysicalDisk(_Total)\Avg. Disk sec/Read', '\PhysicalDisk(_Total)\% Idle Time', '\Processor(_Total)\% Processor Time' -ErrorAction Stop).CounterSamples
+            $top = Get-Process | Sort-Object CPU -Descending | Select-Object -First 3 | ForEach-Object { '{0} {1:N0}s' -f $_.ProcessName, $_.CPU }
+            Write-Host ("    machine: read ops {0:N0}, disk read {1:N1} ms, disk idle {2:N0}%, total cpu {3:N0}%; busiest: {4}" -f `
+                $io.ReadOperationCount, ($c[0].CookedValue * 1000), $c[1].CookedValue, $c[2].CookedValue, ($top -join ', '))
+        } catch { Write-Host "    machine: counters unavailable ($($_.Exception.Message))" }
+    }
+}
 Record 'index' 'core' 'drives indexed and saved' ((Test-Path $index) -and -not $p.HasExited) ("{0:N0} s" -f ((Get-Date) - $t1).TotalSeconds)
+if (-not (Test-Path $index) -and (Test-Path (Join-Path $data 'log.txt'))) {
+    Write-Host '--- log.txt (index not saved) ---'
+    Get-Content (Join-Path $data 'log.txt') -Tail 60 -Encoding UTF8 | Write-Host
+}
 Start-Sleep -Seconds 10
 Check-Crash 'indexing'
 if ($p.HasExited) { Record 'stability' 'core' 'program still running' $false "exit code $($p.ExitCode)" }
@@ -404,9 +430,17 @@ if ($ui -and $ui.List) {
     Main-Search 'تقرير مالي' 'تقرير مالي' 'core' 'Arabic file name again before the menus'
     # The first row sits just under the column headers.
     $x = [int]($ui.List.X + $ui.List.W / 2); $y = $ui.List.Y + 36
-    [U]::Click($x, $y, $false); Start-Sleep -Milliseconds 300
-    [U]::Click($x, $y, $true)
-    $menu = Wait-Until { Open-Menu } 5
+    # Right after the heavy all-drives content search the window can be slow,
+    # so a second try is allowed; needing it is noted, not failed.
+    $menu = $null
+    for ($try = 1; $try -le 2 -and -not $menu; $try++) {
+        Focus-Window $ui.Main.Handle
+        [U]::Click($x, $y, $false); Start-Sleep -Milliseconds 300
+        [U]::Click($x, $y, $true)
+        $menu = Wait-Until { Open-Menu } 8
+        if (-not $menu) { Start-Sleep -Seconds 2 }   # not Esc: it hides the window
+        elseif ($try -gt 1) { Note 'menus' 'right-click menu' 'needed a second right-click (window busy after the content search)' }
+    }
     Record 'menus' 'core' 'right-click menu on a result' ($null -ne $menu)
     if ($menu) { Note 'menus' 'right-click items' ([U]::MenuItems($menu.Handle) -join ' / ') }
     Shot 'right-click-menu'
