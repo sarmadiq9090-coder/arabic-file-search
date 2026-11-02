@@ -285,6 +285,15 @@ impl History {
         v.sort_unstable_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
         v
     }
+
+    /// Every remembered opened file, the last opened first (then the most
+    /// opened). Whether they still exist is for the caller to check, for the
+    /// few it shows.
+    pub fn recent_opens(&self) -> Vec<&str> {
+        let mut v: Vec<(&str, u32, i64)> = self.opens.iter().map(|(p, &(c, t))| (p.as_str(), c, t)).collect();
+        v.sort_unstable_by(|a, b| b.2.cmp(&a.2).then(b.1.cmp(&a.1)).then_with(|| a.0.cmp(b.0)));
+        v.into_iter().map(|(p, ..)| p).collect()
+    }
 }
 
 #[cfg(test)]
@@ -366,6 +375,19 @@ mod tests {
         let b = h.boosted(&index, now);
         assert_eq!(b.iter().map(|x| x.0).collect::<Vec<_>>(), vec![0, 1]);
         assert!((score(2, now - 14 * DAY, now) - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn recent_opens_newest_first() {
+        let mut h = History::default();
+        assert!(h.recent_opens().is_empty());
+        h.record_open(r"C:\old.txt", 10);
+        h.record_open(r"C:\old.txt", 10);
+        h.record_open(r"C:\new.txt", 30);
+        h.record_open(r"C:\tie_once.txt", 20);
+        h.record_open(r"C:\tie_twice.txt", 20);
+        h.record_open(r"C:\tie_twice.txt", 20);
+        assert_eq!(h.recent_opens(), vec![r"C:\new.txt", r"C:\tie_twice.txt", r"C:\tie_once.txt", r"C:\old.txt"]);
     }
 
     #[test]

@@ -309,6 +309,7 @@ impl NativeUi<AppUi> for App {
         app.build_disk_usage()?;
         app.build_web_ui()?;
         app.build_thumbs()?;
+        app.build_suggest_bar()?;
         app.build_quick_menus(&settings)?;
         app.state.get_mut().settings = settings.clone();
         app.state.get_mut().history = History::load();
@@ -349,7 +350,8 @@ impl NativeUi<AppUi> for App {
                 E::OnNotice if handle == app.watch_notice => app.on_watch_notice(),
                 E::OnComboxBoxSelection if handle == app.kind_combo => app.on_kind_changed(),
                 E::OnButtonClick => {
-                    if handle == app.search_btn {
+                    if app.on_suggestion_click(handle) {
+                    } else if handle == app.search_btn {
                         app.on_search();
                     } else if handle == app.history_btn {
                         app.show_history_menu();

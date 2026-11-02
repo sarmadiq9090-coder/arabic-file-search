@@ -321,6 +321,10 @@ pub fn hides_for_notification_state(state: i32) -> bool {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Group {
     Pinned,
+    /// Recently opened files, shown while the box is empty.
+    Recent,
+    /// What to try when nothing was found ([`crate::suggest`]).
+    Suggest,
     Best,
     Windows,
     Apps,
@@ -350,6 +354,8 @@ pub enum Target {
     Feedback { kind: FeedbackKind, query: String },
     /// Continue the search in the full window.
     OpenInMain(String),
+    /// Try a suggestion for a search that found nothing.
+    Apply(crate::suggest::Suggestion),
 }
 
 impl Target {
@@ -451,6 +457,8 @@ impl Row {
 fn cap(group: Group) -> usize {
     match group {
         Group::Pinned => 3,
+        Group::Recent => crate::suggest::RECENT_ROWS,
+        Group::Suggest => 4,
         Group::Best => 1,
         Group::Windows => 3,
         Group::Apps => 4,
