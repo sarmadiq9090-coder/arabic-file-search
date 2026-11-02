@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://sarmadiq9090-coder.github.io/arabic-file-search/sitemap.xml
+Sitemap: https://fastkiwi.app/arabic-file-search/sitemap.xml
