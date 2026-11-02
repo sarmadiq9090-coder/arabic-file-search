@@ -11,6 +11,18 @@ fn main() {
         )
         .expect("unable to embed manifest");
 
+        // An 8 MB main-thread stack (Windows' default is 1 MB). The UI thread
+        // runs window procedures inside other window procedures (menus,
+        // message boxes, the quick search inside the floating box's click),
+        // and shell, IME and accessibility hooks on a real desktop add their
+        // own frames: a stack overflow there ends the program at once.
+        let msvc = std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc");
+        if msvc {
+            println!("cargo:rustc-link-arg-bins=/STACK:8388608");
+        } else {
+            println!("cargo:rustc-link-arg-bins=-Wl,--stack,8388608");
+        }
+
         // Application icon as resource id 1 (shown by Explorer, taskbar and shortcuts).
         embed_resource::compile("assets/bahth.rc", embed_resource::NONE)
             .manifest_required()
