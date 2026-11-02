@@ -95,6 +95,11 @@ fn has_arabic(s: &str) -> bool {
     s.chars().any(|c| matches!(c, '\u{0600}'..='\u{06FF}' | '\u{0750}'..='\u{077F}' | '\u{08A0}'..='\u{08FF}' | '\u{FB50}'..='\u{FDFF}' | '\u{FE70}'..='\u{FEFF}'))
 }
 
+/// A Google search for `terms`.
+pub fn google_url(terms: &str) -> String {
+    url(Site::Google, terms)
+}
+
 fn url(site: Site, terms: &str) -> String {
     let q = percent_encode(terms);
     match site {
@@ -141,7 +146,7 @@ fn shortcut(query: &str) -> Option<(Site, String)> {
 }
 
 fn web_item(title: String, url: String, score: u32) -> Item {
-    Item { kind: Kind::Web, title, subtitle: host(&url).to_string(), action: Action::OpenUri(url), score, icon_path: None }
+    Item { kind: Kind::Web, title, subtitle: host(&url).to_string(), action: Action::OpenUri(url), score, icon_path: None, strong: false }
 }
 
 /// Web-search results for `query` (a site shortcut, or the generic fallback when `fallback`).
@@ -180,7 +185,7 @@ mod tests {
 
     fn ctx(english: bool) -> Context<'static> {
         static NO_LAUNCHES: fn(&str) -> u32 = |_| 0;
-        Context { english, windows_build: 0, windows: &[], launches: &NO_LAUNCHES, today: (2026, 11, 1) }
+        Context { english, windows_build: 0, windows: &[], launches: &NO_LAUNCHES, picked: &NO_LAUNCHES, today: (2026, 11, 1) }
     }
 
     fn one(q: &str, fallback: bool) -> Option<Item> {

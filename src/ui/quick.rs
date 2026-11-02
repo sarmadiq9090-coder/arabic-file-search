@@ -86,6 +86,8 @@ pub struct Popup {
     catalog: Arc<Mutex<Option<Arc<Catalog>>>>,
     /// When the catalog was last (re)built, to list new apps now and then.
     catalog_started: Cell<Option<Instant>>,
+    /// When the exchange rates were last loaded or checked for an update.
+    rates_started: Cell<Option<Instant>>,
     /// The popup's HWND for background threads to post to (0 = none yet).
     post_to: Arc<AtomicUsize>,
     look: RefCell<Look>,
@@ -106,6 +108,8 @@ struct Files {
     query: String,
     rows: Vec<Row>,
     done: bool,
+    /// A text that finds something, when this query found nothing.
+    did_you_mean: Option<String>,
 }
 
 struct FileResult {
@@ -113,6 +117,7 @@ struct FileResult {
     rows: Vec<(String, bool)>,
     /// False while the index is still loading: "nothing found" isn't final.
     done: bool,
+    did_you_mean: Option<String>,
 }
 
 /// Fonts, colours and the backdrop choice for the current theme.
@@ -224,7 +229,7 @@ fn runs_as_admin(path: &str) -> bool {
 }
 
 /// Today's local date, for the Hijri answer.
-fn today() -> (i32, u32, u32) {
+pub(super) fn today() -> (i32, u32, u32) {
     let mut t: winapi::um::minwinbase::SYSTEMTIME = unsafe { std::mem::zeroed() };
     unsafe { winapi::um::sysinfoapi::GetLocalTime(&mut t) };
     (t.wYear as i32, t.wMonth as u32, t.wDay as u32)
@@ -431,31 +436,52 @@ impl App {
     /// on a background thread. Built again when the popup opens and the list
     /// is over [`CATALOG_FRESH`] old, so programs installed since show up;
     /// the old list serves until the new one is ready.
+    ///
+    /// The exchange rates for the currency answers are loaded (and
+    /// downloaded when due) with it, at most every [`CATALOG_FRESH`].
     pub(super) fn start_catalog(&self) {
-        if self.popup.catalog_started.get().is_some_and(|t| t.elapsed() < CATALOG_FRESH) {
+        self.build_catalog(true);
+    }
+
+    /// Builds the catalog if it never was, for the main window's app
+    /// buttons: typing there neither rebuilds it nor touches the rates.
+    pub(super) fn start_catalog_once(&self) {
+        if self.popup.catalog_started.get().is_none() {
+            self.build_catalog(false);
+        }
+    }
+
+    fn build_catalog(&self, with_rates: bool) {
+        let due = |t: &Cell<Option<Instant>>| !t.get().is_some_and(|t| t.elapsed() < CATALOG_FRESH);
+        let rebuild = due(&self.popup.catalog_started);
+        let rates = with_rates && due(&self.popup.rates_started);
+        if !rebuild && !rates {
             return;
         }
-        self.popup.catalog_started.set(Some(Instant::now()));
+        if rebuild {
+            self.popup.catalog_started.set(Some(Instant::now()));
+        }
+        if rates {
+            self.popup.rates_started.set(Some(Instant::now()));
+        }
         let slot = self.popup.catalog.clone();
         let post_to = self.popup.post_to.clone();
         crate::crash_log::spawn_named("launcher-catalog", move || {
             background_priority();
-            let started = Instant::now();
-            let catalog = crate::crash_log::catch(shim::new_catalog).unwrap_or_default();
-            log(&format!(
-                "launcher catalog: {} apps, {} settings pages in {} ms",
-                catalog.apps.len(),
-                catalog.settings.len(),
-                started.elapsed().as_millis()
-            ));
-            if let Ok(mut s) = slot.lock() {
-                *s = Some(Arc::new(catalog));
+            if rebuild {
+                build_catalog_into(&slot, &post_to);
             }
-            let h = post_to.load(Ordering::Relaxed);
-            if h != 0 {
-                unsafe { PostMessageW(h as HWND, WM_APP_CATALOG, 0, 0) };
+            // Exchange rates for the currency answers: the cached ones now, a
+            // download at most every 12 hours (after the catalog, never in its way).
+            if rates && let Some(line) = crate::launcher::currency::refresh_if_due() {
+                log(&line);
             }
         });
+    }
+
+    /// The launcher catalog if it is built (the main window's app buttons).
+    pub(super) fn catalog_now(&self) -> Option<Arc<Catalog>> {
+        self.popup.catalog.lock().ok().and_then(|c| c.clone())
     }
 
     // ---------------------------------------------------------------- searching
@@ -527,11 +553,14 @@ impl App {
                     hits = alt;
                 }
                 crate::search::promote(&mut hits, &boosted);
-                hits.iter().take(FILE_ROWS).filter_map(|&i| index.entries.get(i as usize)).map(|e| (e.path.to_string(), e.is_dir)).collect()
+                // Nothing at all: what to try instead (only once the index is in).
+                let did_you_mean = if hits.is_empty() && done { crate::suggest::did_you_mean(&index.entries, &text, "", &parse) } else { None };
+                let rows = hits.iter().take(FILE_ROWS).filter_map(|&i| index.entries.get(i as usize)).map(|e| (e.path.to_string(), e.is_dir)).collect();
+                (rows, did_you_mean)
             };
-            let rows = crate::crash_log::catch(run).unwrap_or_default();
+            let (rows, did_you_mean) = crate::crash_log::catch(run).unwrap_or_default();
             if let Ok(mut s) = slot.lock() {
-                *s = Some(FileResult { query: text, rows, done });
+                *s = Some(FileResult { query: text, rows, done, did_you_mean });
             }
             let h = post_to.load(Ordering::Relaxed);
             if h != 0 {
@@ -559,6 +588,7 @@ impl App {
             done: res.done && res.query == current,
             query: res.query,
             rows: res.rows.iter().map(|(p, d)| Row::file(p, *d)).collect(),
+            did_you_mean: res.did_you_mean,
         };
         self.popup_refresh();
         // The results of what is typed now (final or, while the index still
@@ -583,11 +613,14 @@ impl App {
                     let now = crate::index::now_secs();
                     let history = &st.history;
                     let launches = move |key: &str| history.launch_count(key, now);
+                    let picks = history.picks_for(&query, now);
+                    let picked = move |key: &str| picks.iter().find(|p| p.0 == key).map_or(0, |p| p.1);
                     let ctx = launcher::Context {
                         english: crate::i18n::is_en(),
                         windows_build: surface::windows_build(),
                         windows: &windows,
                         launches: &launches,
+                        picked: &picked,
                         today: today(),
                     };
                     c.query(&query, &ctx, 40)
@@ -597,11 +630,30 @@ impl App {
             (pins, items)
         };
         drop(windows);
-        let (files, files_done) = {
+        let (files, files_done, did_you_mean) = {
             let f = self.popup.files.borrow();
-            (f.rows.clone(), f.done && f.query == query)
+            let done = f.done && f.query == query;
+            (f.rows.clone(), done, if done { f.did_you_mean.clone() } else { None })
         };
-        let mut rows = quick::arrange(Parts { query: query.clone(), pins, items, files, files_done });
+        let mut rows = if query.trim().is_empty() {
+            // The empty box: favourites, then the files opened lately.
+            crate::suggest::empty_rows(pins, self.popup_recent_rows())
+        } else {
+            let mut rows = quick::arrange(Parts { query: query.clone(), pins, items, files, files_done });
+            if files_done && crate::suggest::nothing_found(&rows) {
+                // The launcher's "search the web" fallback is the web
+                // suggestion; only offered here while it is missing (the
+                // app list is still being made).
+                let situation = crate::suggest::Situation {
+                    did_you_mean,
+                    contents: crate::search::Query::parse(&query).has_text_criteria(),
+                    web: !rows.iter().any(|r| r.group == Group::Web),
+                    ..Default::default()
+                };
+                crate::suggest::insert_rows(&mut rows, &crate::suggest::suggestions(&query, &situation));
+            }
+            rows
+        };
         for r in rows.iter_mut() {
             label_more_row(r);
         }
@@ -620,6 +672,7 @@ impl App {
         drop(look);
         let previous = self.popup.selected.get().and_then(|i| self.popup.rows.borrow().get(i).map(|r| r.target.clone()));
         let selected = quick::reselect(&rows, previous.as_ref());
+        ui_test_dump(&query, &rows);
         *self.popup.rows.borrow_mut() = rows;
         *self.popup.slots.borrow_mut() = slots;
         self.popup.selected.set(selected);
@@ -739,6 +792,7 @@ impl App {
                 if self.quick_visible() {
                     self.popup_refresh();
                 }
+                self.show_app_matches();
                 Some(0)
             }
             WM_SETTINGCHANGE if surface::is_theme_change(l) => {
@@ -972,7 +1026,7 @@ impl App {
         if how == How::Enter && self.popup.file_running.get() {
             let first = self.popup.selected.get() == Some(0);
             let may_change = match row.group {
-                Group::Pinned => false,
+                Group::Pinned | Group::Recent | Group::Suggest => false,
                 Group::More | Group::Web => true,
                 _ if matches!(row.target, Target::Launcher(Action::CopyText(_))) => false,
                 _ => matches!(row.target, Target::File { .. }) || self.popup.files.borrow().rows.is_empty(),
@@ -1022,7 +1076,11 @@ impl App {
                 let Some(ok) = self.run_action(action, how == How::Admin) else { return };
                 if ok {
                     let mut st = self.state.borrow_mut();
-                    st.history.record_launch(&launcher::action_key(action), now);
+                    let key = launcher::action_key(action);
+                    st.history.record_launch(&key, now);
+                    if launcher::learns_pick(action) {
+                        st.history.record_pick(&query, &key, now);
+                    }
                     st.history.add_recent(&query);
                     st.history.save();
                 }
@@ -1046,6 +1104,10 @@ impl App {
                 self.on_query_changed();
                 return;
             }
+            (Target::Apply(s), _) => {
+                self.popup_apply_suggestion(s, &query);
+                return;
+            }
         };
         if ok {
             self.hide_quick();
@@ -1065,7 +1127,7 @@ impl App {
     /// Runs a launcher action: whether it worked, or `None` when the user
     /// declined. System commands are confirmed first, with "No" as the
     /// default button.
-    fn run_action(&self, action: &Action, admin: bool) -> Option<bool> {
+    pub(super) fn run_action(&self, action: &Action, admin: bool) -> Option<bool> {
         Some(match action {
             Action::Launch { target, args } => shell_execute(admin.then_some("runas"), &system_tool(target), args),
             Action::OpenUri(uri) => shell::open(uri),
@@ -1201,7 +1263,91 @@ pub(super) fn nwg_scale() -> f64 {
     nwg::scale_factor()
 }
 
+impl App {
+    /// The files opened lately that are still there, as rows. Looked up in
+    /// the index when it is loaded (no disk access); before that, only paths
+    /// on local fixed drives are checked on disk (a network share, a mapped
+    /// drive or a CD could keep the popup waiting), and only the few needed.
+    fn popup_recent_rows(&self) -> Vec<Row> {
+        use winapi::um::fileapi::GetDriveTypeW;
+        use winapi::um::winbase::DRIVE_FIXED;
+        let st = self.state.borrow();
+        let index = st.index.clone();
+        let paths = st.history.recent_opens();
+        let found = if index.entries.is_empty() {
+            let mut fixed: std::collections::HashMap<char, bool> = std::collections::HashMap::new();
+            let probe = |p: &str| {
+                let letter = crate::suggest::drive_letter(p)?;
+                let local = *fixed.entry(letter).or_insert_with(|| {
+                    let root = shell::wide(&format!("{letter}:\\"));
+                    unsafe { GetDriveTypeW(root.as_ptr()) == DRIVE_FIXED }
+                });
+                if !local {
+                    return None;
+                }
+                std::fs::metadata(p).ok().map(|m| m.is_dir())
+            };
+            crate::suggest::pick_recent(paths, crate::suggest::RECENT_ROWS, crate::suggest::MAX_PROBES, probe)
+        } else {
+            let probe = |p: &str| index.find(p).and_then(|i| index.entries.get(i)).map(|e| e.is_dir);
+            crate::suggest::pick_recent(paths, crate::suggest::RECENT_ROWS + crate::suggest::FAVOURITE_ROWS, usize::MAX, probe)
+        };
+        found.iter().map(|(p, d)| Row::file(p, *d)).collect()
+    }
+
+    /// Applies a suggestion for a search that found nothing: a new text is
+    /// typed in the box; the others continue in the full window.
+    fn popup_apply_suggestion(&self, s: &crate::suggest::Suggestion, query: &str) {
+        use crate::suggest::Suggestion;
+        match s {
+            Suggestion::Query(text) => {
+                let w = shell::wide(text);
+                let edit = self.popup_edit();
+                unsafe {
+                    SetWindowTextW(edit, w.as_ptr());
+                    let end = text.encode_utf16().count();
+                    SendMessageW(edit, EM_SETSEL as UINT, end, end as LPARAM);
+                }
+            }
+            Suggestion::Web => {
+                if shell::open(&crate::suggest::web_url(query)) {
+                    self.hide_quick();
+                }
+            }
+            Suggestion::Contents | Suggestion::AllDrives | Suggestion::AllKinds => {
+                self.query.set_text(query.trim());
+                if *s == Suggestion::Contents {
+                    self.content_chk.set_check_state(nwg::CheckBoxState::Checked);
+                }
+                self.show_window();
+                self.hide_quick();
+                self.on_search();
+            }
+        }
+    }
+}
+
 /// A pinned favourite as a row.
+/// Lists the apps and settings pages (blocks: call it from a background
+/// thread), puts the catalog in `slot` and tells the popup.
+fn build_catalog_into(slot: &Mutex<Option<Arc<Catalog>>>, post_to: &AtomicUsize) {
+    let started = Instant::now();
+    let catalog = crate::crash_log::catch(shim::new_catalog).unwrap_or_default();
+    log(&format!(
+        "launcher catalog: {} apps, {} settings pages in {} ms",
+        catalog.apps.len(),
+        catalog.settings.len(),
+        started.elapsed().as_millis()
+    ));
+    if let Ok(mut s) = slot.lock() {
+        *s = Some(Arc::new(catalog));
+    }
+    let h = post_to.load(Ordering::Relaxed);
+    if h != 0 {
+        unsafe { PostMessageW(h as HWND, WM_APP_CATALOG, 0, 0) };
+    }
+}
+
 fn pin_row(p: &crate::history::Pin) -> Row {
     if p.app {
         let shell_app = p.target.to_ascii_lowercase().starts_with("shell:");
@@ -1235,7 +1381,9 @@ fn label_more_row(r: &mut Row) {
 /// The name shown above a section.
 fn group_label(g: Group) -> &'static str {
     match g {
-        Group::Pinned => tr!("المثبّتة", "Pinned"),
+        Group::Pinned => tr!("المفضلة", "Favourites"),
+        Group::Recent => tr!("الأخيرة", "Recent"),
+        Group::Suggest => tr!("لا نتائج — جرّب", "No results — try"),
         Group::Best => tr!("أفضل نتيجة", "Best match"),
         Group::Windows => tr!("النوافذ المفتوحة", "Open windows"),
         Group::Apps => tr!("التطبيقات", "Apps"),
@@ -1245,6 +1393,25 @@ fn group_label(g: Group) -> &'static str {
         Group::Commands => tr!("أوامر", "Commands"),
         Group::Web => tr!("الويب", "Web"),
         Group::More => "",
+    }
+}
+
+/// For the automated UI test (`ci/ui-test.ps1`) only: the popup draws its rows
+/// itself, so UI Automation cannot read them. With `BAHTH_UI_TEST` set, each
+/// refresh writes the query and the rows to `quick-rows.txt` next to the log.
+fn ui_test_dump(query: &str, rows: &[Row]) {
+    use std::io::Write;
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if !*ON.get_or_init(|| std::env::var_os("BAHTH_UI_TEST").is_some()) {
+        return;
+    }
+    let mut text = format!("query\t{query}\n");
+    for r in rows {
+        text.push_str(&format!("{:?}\t{}\t{}\n", r.group, r.title, r.subtitle));
+    }
+    let path = crate::index::cache_path().with_file_name("quick-rows.txt");
+    if let Ok(mut f) = std::fs::File::create(path) {
+        let _ = f.write_all(text.as_bytes());
     }
 }
 
@@ -1272,3 +1439,4 @@ mod dpi_leak_tests {
         assert!(after <= before + 16, "GDI objects grew from {before} to {after}");
     }
 }
+

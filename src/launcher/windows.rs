@@ -127,7 +127,7 @@ pub fn matches(query: &str, ctx: &Context) -> Vec<Item> {
             _ => continue,
         };
         let title = if ctx.english { format!("Switch to: {}", w.title.trim()) } else { format!("التبديل إلى: {}", w.title.trim()) };
-        out.push(Item { kind: Kind::Window, title, subtitle: w.exe.clone(), action: Action::FocusWindow(w.hwnd), score, icon_path: None });
+        out.push(Item { kind: Kind::Window, title, subtitle: w.exe.clone(), action: Action::FocusWindow(w.hwnd), score, icon_path: None, strong: false });
     }
     out
 }
@@ -348,7 +348,7 @@ mod tests {
     fn run(q: &str, english: bool) -> Vec<Item> {
         static NO_LAUNCHES: fn(&str) -> u32 = |_| 0;
         let wins = sample();
-        let ctx = Context { english, windows_build: 0, windows: &wins, launches: &NO_LAUNCHES, today: (2026, 11, 1) };
+        let ctx = Context { english, windows_build: 0, windows: &wins, launches: &NO_LAUNCHES, picked: &NO_LAUNCHES, today: (2026, 11, 1) };
         matches(q, &ctx)
     }
 

@@ -171,6 +171,10 @@ impl NativeUi<AppUi> for App {
         }
         app.list.set_headers_enabled(true);
 
+        // Apps the query names (hidden until one does).
+        for b in app.app_btns.iter_mut() {
+            nwg::Button::builder().parent(w).font(f).text("").flags(nwg::ButtonFlags::TAB_STOP).build(b)?;
+        }
         nwg::Button::builder().parent(w).font(f).text(tr!("فتح الملف", "Open file")).build(&mut app.open_btn)?;
         nwg::Button::builder().parent(w).font(f).text(tr!("فتح المجلد", "Open folder")).build(&mut app.folder_btn)?;
         nwg::Button::builder().parent(w).font(f).text(tr!("نسخ المسار", "Copy path")).build(&mut app.copy_btn)?;
@@ -309,6 +313,7 @@ impl NativeUi<AppUi> for App {
         app.build_disk_usage()?;
         app.build_web_ui()?;
         app.build_thumbs()?;
+        app.build_suggest_bar()?;
         app.build_quick_menus(&settings)?;
         app.state.get_mut().settings = settings.clone();
         app.state.get_mut().history = History::load();
@@ -359,7 +364,8 @@ impl NativeUi<AppUi> for App {
                 E::OnNotice if handle == app.watch_notice => app.on_watch_notice(),
                 E::OnComboxBoxSelection if handle == app.kind_combo => app.on_kind_changed(),
                 E::OnButtonClick => {
-                    if handle == app.search_btn {
+                    if app.on_suggestion_click(handle) {
+                    } else if handle == app.search_btn {
                         app.on_search();
                     } else if handle == app.history_btn {
                         app.show_history_menu();
@@ -383,6 +389,8 @@ impl NativeUi<AppUi> for App {
                         app.on_stop();
                     } else if handle == app.options_btn {
                         app.show_menu(&app.options_menu);
+                    } else {
+                        app.on_app_button(&handle);
                     }
                 }
                 E::OnListViewItemActivated if handle == app.list => app.open_selected(),

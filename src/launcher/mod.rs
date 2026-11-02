@@ -1,6 +1,6 @@
 //! What the quick search finds besides files: installed apps, Windows
 //! settings pages, open windows, instant answers (calculator, units, Hijri
-//! date), web shortcuts and system commands.
+//! date, currencies), web shortcuts and system commands.
 //!
 //! Everything here is platform independent and unit-tested on Linux, except
 //! the parts that ask Windows for data (`apps::scan`, `windows::list`), which
@@ -13,6 +13,7 @@ pub mod aliases;
 pub mod answers;
 pub mod apps;
 mod calc;
+pub mod currency;
 mod hijri;
 mod matching;
 mod phonetic;
@@ -82,6 +83,11 @@ pub struct Item {
     pub score: u32,
     /// File the icon is taken from (exe, lnk), if any.
     pub icon_path: Option<String>,
+    /// An app named strongly by the query: its match score plus the habit
+    /// for these very letters reaches [`STRONG_SCORE`]. How often it was
+    /// launched in general does not count, so a favourite does not turn a
+    /// weak match strong.
+    pub strong: bool,
 }
 
 /// The data the quick search looks through besides files, built once in the
@@ -94,6 +100,13 @@ pub struct Catalog {
     index: matching::Index,
 }
 
+/// A score at least this high is a strong match: the whole name or an
+/// alias, the start of one ("سبوت" for سبوتيفاي), the name said in Arabic,
+/// or a habit. Such an app leads the quick-search list over files and is
+/// offered in the main window too; a word somewhere in an alias ("شاشة" in
+/// "لقطة شاشة") is not enough.
+pub const STRONG_SCORE: u32 = 850;
+
 /// What the caller knows about the moment of the query.
 pub struct Context<'a> {
     /// The interface language is English (titles and answers follow it).
@@ -104,6 +117,10 @@ pub struct Context<'a> {
     pub windows: &'a [windows::OpenWindow],
     /// How often the user opened a target before (`Action` key → count), for the boost.
     pub launches: &'a dyn Fn(&str) -> u32,
+    /// How often the user opened a target (`Action` key) after typing this
+    /// very query, or a longer one that starts with it (0 = never); see
+    /// `History::picks_for`. A strong boost: the habit for these letters.
+    pub picked: &'a dyn Fn(&str) -> u32,
     /// Today's date (year, month, day), for the Hijri answer.
     pub today: (i32, u32, u32),
 }
@@ -151,6 +168,7 @@ impl Catalog {
                 title: app.name.clone(),
                 subtitle: if ctx.english { "App" } else { "تطبيق" }.to_string(),
                 score: s + boost(ctx, &action),
+                strong: s + picked_boost(ctx, &action) >= STRONG_SCORE,
                 action,
                 icon_path: app.icon_path.clone(),
             });
@@ -168,6 +186,7 @@ impl Catalog {
                 title: page.title(ctx.english).to_string(),
                 subtitle,
                 score: s + boost(ctx, &action),
+                strong: false,
                 action,
                 icon_path: None,
             });
@@ -199,6 +218,14 @@ impl Catalog {
     }
 }
 
+impl Catalog {
+    /// The apps `query` names strongly ([`Item::strong`]),
+    /// best first, at most `n`: what the main window offers above the files.
+    pub fn strong_apps(&self, query: &str, ctx: &Context, n: usize) -> Vec<Item> {
+        self.query(query, ctx, 40).into_iter().filter(|i| i.kind == Kind::App && i.strong).take(n).collect()
+    }
+}
+
 /// What opening a settings page does: `ms-settings:` URIs go to the shell,
 /// classic tools ("control printers") are started with their arguments.
 pub fn page_action(page: &settings_pages::Page) -> Action {
@@ -217,9 +244,32 @@ fn launch_boost(n: u32) -> u32 {
     if n == 0 { 0 } else { (60 * (32 - n.leading_zeros())).min(400) }
 }
 
+/// Score added for an item picked `n` times after the same letters were
+/// typed: more than any tier gap, so the habit leads.
+fn pick_boost(n: u32) -> u32 {
+    if n == 0 { 0 } else { (500 + 50 * (32 - n.leading_zeros())).min(700) }
+}
+
 fn boost(ctx: &Context, action: &Action) -> u32 {
     let key = action_key(action);
-    if key.is_empty() { 0 } else { launch_boost((ctx.launches)(&key)) }
+    if key.is_empty() { 0 } else { launch_boost((ctx.launches)(&key)) + pick_boost((ctx.picked)(&key)) }
+}
+
+/// The part of [`boost`] that belongs to this query: picks after the same letters.
+fn picked_boost(ctx: &Context, action: &Action) -> u32 {
+    let key = action_key(action);
+    if key.is_empty() { 0 } else { pick_boost((ctx.picked)(&key)) }
+}
+
+/// Whether opening `action` after typing a query is learnt as a pick for
+/// those letters: an app or a settings page. Web searches (whose key holds
+/// the typed text) and system commands would only fill the list.
+pub fn learns_pick(action: &Action) -> bool {
+    match action {
+        Action::Launch { .. } => true,
+        Action::OpenUri(u) => u.starts_with("ms-settings:"),
+        Action::CopyText(_) | Action::FocusWindow(_) | Action::System(_) => false,
+    }
 }
 
 /// A stable key for an action, used to count launches for the boost.
@@ -242,7 +292,7 @@ mod tests {
     }
 
     fn ctx<'a>(english: bool, build: u32, launches: &'a dyn Fn(&str) -> u32) -> Context<'a> {
-        Context { english, windows_build: build, windows: &[], launches, today: (2026, 11, 1) }
+        Context { english, windows_build: build, windows: &[], launches, picked: &no_launches, today: (2026, 11, 1) }
     }
 
     fn app(name: &str) -> apps::App {
@@ -266,6 +316,10 @@ mod tests {
             "Snipping Tool",
             "Paint",
             "Google Play Games",
+            "Discord",
+            "Netflix",
+            "Adobe Photoshop 2024",
+            "Steam",
         ];
         Catalog::new(names.iter().map(|n| app(n)).collect(), settings_pages::PAGES.to_vec())
     }
@@ -375,6 +429,106 @@ mod tests {
         assert_eq!(page_action(page), Action::OpenUri("ms-settings:about".into()));
     }
 
+    fn score_of(c: &Catalog, q: &str, cx: &Context, title: &str) -> u32 {
+        c.query(q, cx, 40).into_iter().find(|i| i.title == title).map_or(0, |i| i.score)
+    }
+
+    #[test]
+    fn arabic_starts_and_slips() {
+        let c = catalog();
+        let cx = ctx(false, 0, &no_launches);
+        // The start of an Arabic spelling.
+        for (q, t) in [("سبوت", "Spotify"), ("فوتو", "Adobe Photoshop 2024"), ("تيليج", "Telegram"), ("ديسك", "Discord")] {
+            assert_eq!(first(&c, q, &cx).title, t, "{q}");
+        }
+        // Several words, the last one still being typed.
+        assert_eq!(first(&c, "مايكروسوفت ور", &cx).title, "Word");
+        // Common spellings, Iraqi ones too.
+        for (q, t) in [("كوكل كروم", "Google Chrome"), ("تلكرام", "Telegram"), ("وتساب", "WhatsApp"), ("ستيم", "Steam")] {
+            assert_eq!(first(&c, q, &cx).title, t, "{q}");
+        }
+        // One sound off, not in the table.
+        for (q, t) in [("ديسكود", "Discord"), ("نتفليس", "Netflix"), ("فوتشب", "Adobe Photoshop 2024")] {
+            assert_eq!(first(&c, q, &cx).title, t, "{q}");
+        }
+        // A slip ranks below the exact sound, which is a strong match.
+        let exact = score_of(&c, "سبوتفاي", &cx, "Spotify");
+        assert!(exact >= STRONG_SCORE, "{exact}");
+        assert!(score_of(&c, "ديسكود", &cx, "Discord") < exact);
+        assert!(score_of(&c, "ديسكود", &cx, "Discord") > 0);
+    }
+
+    #[test]
+    fn typos_find_apps() {
+        let c = catalog();
+        let cx = ctx(true, 0, &no_launches);
+        assert_eq!(first(&c, "notepda", &cx).title, "Notepad");
+        assert_eq!(first(&c, "discrod", &cx).title, "Discord");
+    }
+
+    #[test]
+    fn whole_name_then_start_then_typo() {
+        let c = catalog();
+        let cx = ctx(true, 0, &no_launches);
+        let whole = score_of(&c, "notepad", &cx, "Notepad");
+        let start = score_of(&c, "notep", &cx, "Notepad");
+        let typo = score_of(&c, "notepda", &cx, "Notepad");
+        assert!(whole > start && start > typo && typo > 0, "{whole} {start} {typo}");
+        // Same tier: the shorter name first.
+        let t = titles(&c, "notep", &cx);
+        assert_eq!(&t[..2], ["Notepad", "Notepad++"]);
+    }
+
+    #[test]
+    fn strong_apps_for_the_main_window() {
+        let c = catalog();
+        let cx = ctx(false, 0, &no_launches);
+        let names = |q: &str| c.strong_apps(q, &cx, 3).into_iter().map(|i| i.title).collect::<Vec<_>>();
+        assert_eq!(names("كروم"), ["Google Chrome"]);
+        assert_eq!(names("سبوت"), ["Spotify"]);
+        assert_eq!(names("نتفلكس"), ["Netflix"]);
+        assert_eq!(names("notepad"), ["Notepad", "Notepad++"]);
+        // Weak matches stay in the quick search: a typo, a slip, a piece of a word, a setting.
+        for q in ["notepda", "ديسكود", "otepa", "واي فاي", "تقرير", "2+2", "كل"] {
+            assert!(names(q).is_empty(), "{q}: {:?}", names(q));
+        }
+        assert!(c.strong_apps("note", &cx, 1).len() == 1);
+        // Launched often in general: a piece of its name is still weak.
+        let notepad = action_key(&Action::Launch { target: "shell:AppsFolder\\Notepad".into(), args: String::new() });
+        let often = move |k: &str| if k == notepad { u32::MAX } else { 0 };
+        let cx = ctx(true, 0, &often);
+        assert!(c.strong_apps("otepa", &cx, 3).is_empty());
+        // Picked after these very letters: that habit makes it strong.
+        let notepad = action_key(&Action::Launch { target: "shell:AppsFolder\\Notepad".into(), args: String::new() });
+        let picked = move |k: &str| if k == notepad { 1 } else { 0 };
+        let cx = Context { picked: &picked, ..ctx(true, 0, &no_launches) };
+        assert_eq!(c.strong_apps("otepa", &cx, 3).into_iter().map(|i| i.title).collect::<Vec<_>>(), ["Notepad"]);
+    }
+
+    #[test]
+    fn picks_lead_for_their_letters() {
+        let c = catalog();
+        let pp = action_key(&Action::Launch { target: "shell:AppsFolder\\Notepad++".into(), args: String::new() });
+        let picked = move |k: &str| if k == pp { 1 } else { 0 };
+        let cx = Context { picked: &picked, ..ctx(true, 0, &no_launches) };
+        assert_eq!(first(&c, "notepad", &cx).title, "Notepad++");
+        assert!(pick_boost(1) >= 500 && pick_boost(u32::MAX) <= 700 && pick_boost(0) == 0);
+    }
+
+    #[test]
+    fn picks_learnt_for_apps_and_settings_only() {
+        assert!(learns_pick(&Action::Launch { target: "C:\\x.exe".into(), args: String::new() }));
+        assert!(learns_pick(&Action::OpenUri("ms-settings:bluetooth".into())));
+        assert!(!learns_pick(&Action::OpenUri("https://www.google.com/search?q=x".into())));
+        assert!(!learns_pick(&Action::CopyText("4".into())));
+        assert!(!learns_pick(&Action::FocusWindow(1)));
+        let c = catalog();
+        let cx = ctx(true, 0, &no_launches);
+        for it in c.query("restart", &cx, 40).into_iter().filter(|i| matches!(i.kind, Kind::Command | Kind::Web)) {
+            assert!(!learns_pick(&it.action), "{:?}", it.action);
+        }
+    }
+
     #[test]
     fn launches_boost_reorders() {
         let c = catalog();
@@ -444,7 +598,7 @@ mod tests {
         apps.extend(catalog().apps);
         let c = Catalog::new(apps, settings_pages::PAGES.to_vec());
         let cx = ctx(false, 0, &no_launches);
-        let queries = ["ك", "كر", "كروم", "chrome", "واي فاي", "اعدادات الشاشه", "ؤاقخةث", "kroom", "spotfy", "zzzz"];
+        let queries = ["ك", "كر", "كروم", "chrome", "واي فاي", "اعدادات الشاشه", "ؤاقخةث", "kroom", "spotfy", "zzzz", "ديسكود", "مايكروسوفت ور"];
         let start = std::time::Instant::now();
         let mut n = 0;
         for i in 0..1000 {

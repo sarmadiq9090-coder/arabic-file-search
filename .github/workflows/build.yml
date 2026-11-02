@@ -141,8 +141,32 @@ jobs:
         shell: pwsh
         run: ./ci/smoke.ps1 -Exe ./${{ matrix.file }} -Machine ${{ matrix.machine }}
 
+  # A "real user" on a real Windows desktop (ci/ui-test.ps1): types Arabic and
+  # English searches, opens the menus, the quick search popup and the
+  # Arabic interface, closes to the tray, and screenshots every step. Core
+  # checks fail the job; "probe" checks (typos, Arabizi, Arabic app names...)
+  # only report what is missing. `release` waits for it: nothing is
+  # published unless the real-user test passes on the same commit.
+  ui:
+    needs: exe
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bahth-exe
+      - name: Real-user UI test
+        shell: powershell
+        run: ./ci/ui-test.ps1 -Exe ./bahth.exe -Out "$env:RUNNER_TEMP/ui-test"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test
+          path: ${{ runner.temp }}/ui-test
+
   release:
-    needs: [linux-test, windows, smoke]
+    needs: [linux-test, windows, smoke, ui]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

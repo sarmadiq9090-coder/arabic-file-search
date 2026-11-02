@@ -5,7 +5,9 @@
 //! The quick search (0.8) keeps two more lists here: how often launcher
 //! results were opened (`launches`, keyed by `crate::launcher::action_key`),
 //! which `Catalog::query` uses as a boost, and the pinned favourites
-//! (`pinned`), shown first in the quick search when they match.
+//! (`pinned`), shown first in the quick search when they match. Since 0.9
+//! it also remembers which result was opened after typing which query
+//! (`picks`), so the same letters lead to it next time.
 
 // Only the Windows UI and the tests use this module.
 
@@ -78,6 +80,32 @@ pub struct History {
     launches: HashMap<String, (u32, i64)>,
     /// Pinned favourites, oldest first.
     pub pinned: Vec<Pin>,
+    /// Which quick-search result was opened after typing which query, so the
+    /// same letters lead to it next time (0.9; missing in older files).
+    picks: Vec<QueryPick>,
+}
+
+/// A result opened after typing a query.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(default)]
+struct QueryPick {
+    /// The query, normalised (`crate::normalize::normalize`, single spaces).
+    query: String,
+    /// `crate::launcher::action_key` of what was opened.
+    key: String,
+    count: u32,
+    /// Last time, Unix seconds.
+    last: i64,
+}
+
+/// How many (query, result) picks are remembered.
+const MAX_PICKS: usize = 300;
+/// Longest query remembered for a pick.
+const MAX_PICK_QUERY: usize = 64;
+
+/// A query as picks store it: normalised, single spaces.
+fn pick_query(query: &str) -> String {
+    crate::normalize::normalize(query).split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// Frecency: the open count, halved for every [`HALF_LIFE_SECS`] since the last open.
@@ -131,6 +159,11 @@ impl History {
         }
         h.pinned.retain(|p| !p.target.is_empty());
         h.pinned.truncate(MAX_PINS);
+        h.picks.retain(|p| !p.key.is_empty() && !p.query.is_empty() && p.query.len() <= 4 * MAX_PICK_QUERY);
+        if h.picks.len() > MAX_PICKS {
+            h.picks.sort_by_key(|p| std::cmp::Reverse(p.last));
+            h.picks.truncate(MAX_PICKS);
+        }
         h
     }
 
@@ -226,6 +259,60 @@ impl History {
         }
     }
 
+    /// Remembers that the result with action key `key` was opened after
+    /// typing `query`. When more than [`MAX_PICKS`] are remembered the
+    /// weakest one is forgotten.
+    pub fn record_pick(&mut self, query: &str, key: &str, now: i64) {
+        let q = pick_query(query);
+        if key.is_empty() || q.is_empty() || q.chars().count() > MAX_PICK_QUERY {
+            return;
+        }
+        match self.picks.iter_mut().find(|p| p.query == q && p.key == key) {
+            Some(p) => {
+                p.count = p.count.saturating_add(1);
+                p.last = now;
+            }
+            None => self.picks.push(QueryPick { query: q.clone(), key: key.to_string(), count: 1, last: now }),
+        }
+        if self.picks.len() > MAX_PICKS {
+            let worst = self
+                .picks
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| !(p.query == q && p.key == key))
+                .min_by(|a, b| score(a.1.count, a.1.last, now).total_cmp(&score(b.1.count, b.1.last, now)))
+                .map(|(i, _)| i);
+            if let Some(i) = worst {
+                self.picks.remove(i);
+            }
+        }
+    }
+
+    /// What was opened after typing `query`, or a longer query that starts
+    /// with it (two letters at least), as (action key, strength): the count
+    /// fading with time like launches, doubled for the very same query.
+    pub fn picks_for(&self, query: &str, now: i64) -> Vec<(String, u32)> {
+        let q = pick_query(query);
+        let mut out: Vec<(String, u32)> = Vec::new();
+        if q.is_empty() {
+            return out;
+        }
+        let short = q.chars().count() < 2;
+        for p in &self.picks {
+            let same = p.query == q;
+            if !same && (short || !p.query.starts_with(&q)) {
+                continue;
+            }
+            let n = (score(p.count, p.last, now).round() as u32).clamp(1, p.count.max(1));
+            let n = if same { n.saturating_mul(2) } else { n };
+            match out.iter_mut().find(|(k, _)| *k == p.key) {
+                Some(e) => e.1 = e.1.saturating_add(n),
+                None => out.push((p.key.clone(), n)),
+            }
+        }
+        out
+    }
+
     pub fn is_pinned(&self, target: &str) -> bool {
         self.pinned.iter().any(|p| p.target.eq_ignore_ascii_case(target))
     }
@@ -284,6 +371,15 @@ impl History {
             self.opens.iter().filter_map(|(p, &(c, t))| index.find(p).map(|i| (i as u32, score(c, t, now)))).collect();
         v.sort_unstable_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
         v
+    }
+
+    /// Every remembered opened file, the last opened first (then the most
+    /// opened). Whether they still exist is for the caller to check, for the
+    /// few it shows.
+    pub fn recent_opens(&self) -> Vec<&str> {
+        let mut v: Vec<(&str, u32, i64)> = self.opens.iter().map(|(p, &(c, t))| (p.as_str(), c, t)).collect();
+        v.sort_unstable_by(|a, b| b.2.cmp(&a.2).then(b.1.cmp(&a.1)).then_with(|| a.0.cmp(b.0)));
+        v.into_iter().map(|(p, ..)| p).collect()
     }
 }
 
@@ -369,6 +465,19 @@ mod tests {
     }
 
     #[test]
+    fn recent_opens_newest_first() {
+        let mut h = History::default();
+        assert!(h.recent_opens().is_empty());
+        h.record_open(r"C:\old.txt", 10);
+        h.record_open(r"C:\old.txt", 10);
+        h.record_open(r"C:\new.txt", 30);
+        h.record_open(r"C:\tie_once.txt", 20);
+        h.record_open(r"C:\tie_twice.txt", 20);
+        h.record_open(r"C:\tie_twice.txt", 20);
+        assert_eq!(h.recent_opens(), vec![r"C:\new.txt", r"C:\tie_twice.txt", r"C:\tie_once.txt", r"C:\old.txt"]);
+    }
+
+    #[test]
     fn launches_and_pins() {
         let now = 1_700_000_000;
         let mut h = History::default();
@@ -408,6 +517,36 @@ mod tests {
     }
 
     #[test]
+    fn picks_by_query() {
+        let now = 1_700_000_000;
+        let mut h = History::default();
+        let sp = "launch:shell:appsfolder\\spotify";
+        h.record_pick("سبوتفاي", sp, now);
+        h.record_pick("  سبوتفاى ", sp, now);
+        h.record_pick("سبوتفاي", "", now);
+        h.record_pick("   ", sp, now);
+        assert_eq!(h.picks.len(), 1);
+        // The same query (letter forms ignored): doubled.
+        assert_eq!(h.picks_for("سبوتفاي", now), vec![(sp.to_string(), 4)]);
+        // The start of it.
+        assert_eq!(h.picks_for("سبو", now), vec![(sp.to_string(), 2)]);
+        // One letter only counts for the very same query; other queries nothing.
+        assert!(h.picks_for("س", now).is_empty());
+        assert!(h.picks_for("سبوتفاي2", now).is_empty());
+        assert!(h.picks_for("", now).is_empty());
+        h.record_pick("ك", "launch:chrome", now);
+        assert_eq!(h.picks_for("ك", now), vec![("launch:chrome".to_string(), 2)]);
+        // Old picks fade, never to zero.
+        assert_eq!(h.picks_for("سبو", now + 400 * DAY), vec![(sp.to_string(), 1)]);
+        // Bounded.
+        for i in 0..MAX_PICKS + 20 {
+            h.record_pick(&format!("q{i}"), "uri:x", now + i as i64);
+        }
+        assert_eq!(h.picks.len(), MAX_PICKS);
+        assert!(!h.picks_for(&format!("q{}", MAX_PICKS + 19), now).is_empty());
+    }
+
+    #[test]
     fn save_and_load() {
         let dir = std::env::temp_dir().join(format!("bahth_hist_{}", std::process::id()));
         let file = dir.join("history.json");
@@ -425,8 +564,10 @@ mod tests {
         h.record_open(r"C:\x.txt", 5);
         h.record_launch("uri:ms-settings:display", 7);
         h.toggle_pin(Pin { title: "x".into(), target: r"C:\x.txt".into(), app: false, dir: false });
+        h.record_pick("كروم", "launch:chrome.lnk", 9);
         h.save_to(&file).unwrap();
         let l = History::load_from(&file);
+        assert_eq!(l.picks, h.picks);
         assert_eq!(l.launches, h.launches);
         assert_eq!(l.pinned, h.pinned);
         assert_eq!(l.recent, h.recent);

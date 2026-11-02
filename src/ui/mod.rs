@@ -8,6 +8,7 @@
 //! - `results`: the result list, selection, copying, sorting and export
 //! - `files`: renaming and deleting files, and saving the edited index
 //! - `history_menu`: the menu of recent and saved searches
+//! - `empty_state`: the files opened lately (empty box) and what to try when nothing is found
 //! - `updates`: checking for, downloading and installing new versions
 //! - `feedback`: the "Send feedback" menu and the offer to report a crash
 //! - `content_index`: the stored document text and its background warm-up
@@ -25,11 +26,13 @@
 //! - `surface`: drawing, theme and DWM helpers of those custom-drawn windows
 //! - `format`, `shell`: text formatting and Windows shell helpers
 
+mod app_matches;
 mod autostart;
 mod build;
 mod content_index;
 mod dupes_window;
 mod disk_usage;
+mod empty_state;
 mod feedback;
 mod files;
 mod floating;
@@ -192,6 +195,10 @@ pub struct App {
     all_btn: nwg::Button,
     reindex_btn: nwg::Button,
     list: nwg::ListView,
+    /// Apps the search box names strongly, above the results (hidden when none).
+    app_btns: [nwg::Button; app_matches::APP_BUTTONS],
+    /// The launcher results behind `app_btns`, in order.
+    app_items: RefCell<Vec<crate::launcher::Item>>,
     open_btn: nwg::Button,
     folder_btn: nwg::Button,
     copy_btn: nwg::Button,
@@ -267,6 +274,8 @@ pub struct App {
     quick_menu: tray::QuickMenu,
     /// The quick search popup (built when it first opens).
     popup: quick::Popup,
+    /// What to try when a search finds nothing, above the result list.
+    suggest: empty_state::SuggestBar,
     /// The search box above the clock.
     floating: floating::Floating,
     /// The recent/saved searches menu, rebuilt each time it opens.
@@ -429,7 +438,19 @@ impl App {
         style::place(&self.options_btn.handle, right - wd.options, y_btn, wd.options, CTRL_H);
 
         // The result list fills the rest.
-        let y3 = y_scope + CTRL_H + GAP + 2;
+        let mut y3 = y_scope + CTRL_H + GAP + 2;
+        // Apps the query names, in a row of their own above the results.
+        let apps = self.app_buttons_shown();
+        if apps > 0 {
+            let mut x = M;
+            for b in &self.app_btns[..apps] {
+                let bw = style::button_width(&self.font, b).min(((w - 2 * M) / apps as i32 - GAP).max(40));
+                style::place(&b.handle, x, y3, bw, CTRL_H);
+                x += bw + GAP;
+            }
+            y3 += CTRL_H + GAP;
+        }
+        let y3 = self.place_suggestions(M, y3, w - 2 * M);
         style::place(&self.list.handle, M, y3, (w - 2 * M).max(100), (y_btn - GAP - y3).max(50));
 
         // Status bar: messages on one side, the selected file's path on the other.

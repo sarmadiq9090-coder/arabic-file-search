@@ -27,7 +27,7 @@ use std::io::{self, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, RwLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::extract;
 use crate::index::Entry;
@@ -42,8 +42,6 @@ const HEADER_LEN: u64 = 20;
 pub const MAX_TEXT: usize = 80 * 1024 * 1024;
 /// Default cap on the size of `content.dat`.
 pub const DEFAULT_MAX_BYTES: u64 = 4 * 1024 * 1024 * 1024;
-/// The background warm-up saves its progress after this many documents.
-const FLUSH_EVERY: usize = 200;
 
 const DAT: &str = "content.dat";
 const IDX: &str = "content.idx";
@@ -492,6 +490,11 @@ impl ContentCache {
         }
     }
 
+    /// Documents with a cached result; cheaper than [`stats`](Self::stats).
+    pub fn documents(&self) -> usize {
+        self.lock().map.len()
+    }
+
     pub fn is_full(&self) -> bool {
         self.lock().full
     }
@@ -528,38 +531,147 @@ pub struct WarmProgress {
     pub added: AtomicUsize,
 }
 
+/// How many threads [`warm`] should use on this machine: half the logical
+/// processors, between 1 and 4, so the PC stays responsive (in the app the
+/// threads also run at background priority).
+pub fn warm_threads() -> usize {
+    std::thread::available_parallelism().map_or(1, |n| n.get() / 2).clamp(1, 4)
+}
+
+/// Files over this size are extracted by one warm-up thread at a time, so
+/// several threads never hold several huge texts at once.
+const BIG_FILE: u64 = 8 * 1024 * 1024;
+
+/// Compressed documents (archives, zip-based office files) over this size
+/// count as big too: their text can be many times their size on disk.
+const BIG_COMPRESSED: u64 = 2 * 1024 * 1024;
+
+/// Zip-based office formats, whose text is compressed inside.
+const ZIPPED_DOCS: &[&str] = &["docx", "docm", "pptx", "odt", "odp", "ods", "xlsx", "xlsm", "xlsb", "epub"];
+
+/// Whether extracting `e` may need a lot of memory, so the warm-up does it
+/// on one thread at a time.
+fn is_heavy(e: &Entry) -> bool {
+    if e.size > BIG_FILE {
+        return true;
+    }
+    let ext = e.ext();
+    e.size > BIG_COMPRESSED && (extract::is_archive(&ext) || ZIPPED_DOCS.contains(&ext.as_str()))
+}
+
+/// Images, read only through OCR (Windows): by far the slowest documents.
+const IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif"];
+
+/// Where `e` goes in the warm-up order (lower first), so the documents a
+/// first content search most likely wants are cached first: the user's own
+/// folders, then everything else, then program and system folders, then big
+/// files and archives, then images (OCR).
+fn warm_rank(e: &Entry) -> u8 {
+    let ext = e.ext();
+    if IMAGE_EXTS.contains(&ext.as_str()) {
+        return 4;
+    }
+    if e.size > BIG_FILE || extract::is_archive(&ext) {
+        return 3;
+    }
+    let p = e.path.to_lowercase().replace('/', "\\");
+    let has = |parts: &[&str]| parts.iter().any(|x| p.contains(x));
+    if has(&[
+        "\\appdata\\",
+        "\\program files",
+        "\\programdata\\",
+        "\\windows\\",
+        "\\$recycle.bin\\",
+        "\\node_modules\\",
+        "\\.git\\",
+    ]) {
+        2
+    } else if has(&["\\desktop\\", "\\documents\\", "\\downloads\\", "\\onedrive"]) {
+        0
+    } else {
+        1
+    }
+}
+
+/// When the warm-up saves the index. Each save rewrites the whole map (about
+/// 10 MB for 100k documents), so saving after every few hundred documents
+/// wrote gigabytes on a big first warm-up. Now: at most every
+/// [`FLUSH_MIN`], and only once the documents added since the last save are
+/// an eighth of the store (so the total written stays a small multiple of
+/// the final index), or [`FLUSH_MAX`] has passed: a crash or a logoff loses
+/// at most a few minutes of work.
+const FLUSH_MIN: Duration = Duration::from_secs(20);
+const FLUSH_MAX: Duration = Duration::from_secs(300);
+
+fn time_to_save(since: Duration, added_since: usize, documents: usize) -> bool {
+    since >= FLUSH_MAX || (since >= FLUSH_MIN && added_since > 0 && added_since >= documents / 8)
+}
+
 /// Fills `cache` with the text of every document in `entries` that is not
-/// cached yet, most recently modified first. Meant for one low-priority
-/// background thread: it pauses while a content search runs, saves every
-/// [`FLUSH_EVERY`] documents, and stops at `cancel` or when the store is full.
-pub fn warm(entries: &[Entry], cache: &ContentCache, progress: &WarmProgress, cancel: &AtomicBool) {
+/// cached yet, the likely most useful first (see `warm_rank`; within a rank,
+/// most recently modified first). Runs on the calling thread plus
+/// `threads - 1` more, each of which calls `thread_init` first (to lower its
+/// priority). It pauses while a content search runs, saves now and then
+/// (see `time_to_save`), and stops at `cancel` or when the store is full; all
+/// its threads have ended when it returns.
+pub fn warm(
+    entries: &[Entry],
+    cache: &ContentCache,
+    progress: &WarmProgress,
+    cancel: &AtomicBool,
+    threads: usize,
+    thread_init: &(dyn Fn() + Sync),
+) {
     let mut todo: Vec<&Entry> =
         entries.iter().filter(|e| is_document(e) && !cache.is_fresh(&e.path, e.size, e.mtime)).collect();
-    todo.sort_by_key(|e| Reverse(e.mtime));
+    todo.sort_by_cached_key(|e| (warm_rank(e), Reverse(e.mtime)));
     progress.total.store(todo.len(), Ordering::Relaxed);
-    let mut unsaved = 0;
-    for e in todo {
-        while cache.searching() && !cancel.load(Ordering::Relaxed) {
-            std::thread::sleep(Duration::from_millis(100));
-        }
-        if cancel.load(Ordering::Relaxed) || cache.is_full() {
-            break;
-        }
-        // The file as it is now (the index may lag behind); a search may
-        // also have stored it meanwhile.
-        if let Some(st) = stamp(Path::new(&*e.path))
-            && !cache.is_fresh(&e.path, st.0, st.1)
-            && extract_and_store(cache, &e.path, st).1
-        {
-            progress.added.fetch_add(1, Ordering::Relaxed);
-            unsaved += 1;
-            if unsaved >= FLUSH_EVERY {
-                let _ = cache.flush();
-                unsaved = 0;
+    let next = AtomicUsize::new(0);
+    // When the warm-up last saved, and how many documents it had added.
+    let last_save = Mutex::new((Instant::now(), 0));
+    let big = Mutex::new(());
+    let work = || {
+        loop {
+            while cache.searching() && !cancel.load(Ordering::Relaxed) {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            if cancel.load(Ordering::Relaxed) || cache.is_full() {
+                break;
+            }
+            let Some(e) = todo.get(next.fetch_add(1, Ordering::Relaxed)) else { break };
+            let one_big = is_heavy(e).then(|| big.lock().unwrap_or_else(|e| e.into_inner()));
+            // The file as it is now (the index may lag behind); a search may
+            // also have stored it meanwhile.
+            if let Some(st) = stamp(Path::new(&*e.path))
+                && !cache.is_fresh(&e.path, st.0, st.1)
+                && extract_and_store(cache, &e.path, st).1
+            {
+                progress.added.fetch_add(1, Ordering::Relaxed);
+            }
+            drop(one_big);
+            progress.checked.fetch_add(1, Ordering::Relaxed);
+            // One thread saves (if anything changed); the others carry on.
+            if let Ok(mut last) = last_save.try_lock() {
+                let added = progress.added.load(Ordering::Relaxed);
+                // Only then counts the documents, which takes the store's lock.
+                let since = last.0.elapsed();
+                if since >= FLUSH_MIN && time_to_save(since, added.saturating_sub(last.1), cache.documents()) {
+                    let _ = cache.flush();
+                    *last = (Instant::now(), added);
+                }
             }
         }
-        progress.checked.fetch_add(1, Ordering::Relaxed);
-    }
+    };
+    std::thread::scope(|s| {
+        for i in 1..threads.max(1) {
+            // A thread that can't be started: the others do its share.
+            let _ = std::thread::Builder::new().name(format!("content-warm-{i}")).spawn_scoped(s, || {
+                thread_init();
+                work();
+            });
+        }
+        work();
+    });
     let _ = cache.flush();
     let _ = cache.compact();
 }
@@ -871,11 +983,11 @@ mod tests {
 
         // Cancelled at once: nothing stored.
         let p = WarmProgress::default();
-        warm(&entries, &cache, &p, &AtomicBool::new(true));
+        warm(&entries, &cache, &p, &AtomicBool::new(true), 3, &|| {});
         assert_eq!((p.total.load(Ordering::Relaxed), p.added.load(Ordering::Relaxed)), (6, 0));
 
         let p = WarmProgress::default();
-        warm(&entries, &cache, &p, &AtomicBool::new(false));
+        warm(&entries, &cache, &p, &AtomicBool::new(false), 3, &|| {});
         assert_eq!((p.total.load(Ordering::Relaxed), p.added.load(Ordering::Relaxed)), (6, 6));
         let e = &entries[3];
         assert_eq!(cache.get(&e.path, e.size, e.mtime).unwrap().unwrap(), "المبيعات 3");
@@ -885,7 +997,7 @@ mod tests {
         // Saved on disk, and a second warm-up has nothing to do.
         assert_eq!(ContentCache::open(&dir.join("store")).unwrap().stats().documents, 6);
         let p = WarmProgress::default();
-        warm(&entries, &cache, &p, &AtomicBool::new(false));
+        warm(&entries, &cache, &p, &AtomicBool::new(false), 3, &|| {});
         assert_eq!(p.total.load(Ordering::Relaxed), 0);
 
         // It waits while a search runs.
@@ -906,13 +1018,105 @@ mod tests {
         while !cache.searching() {
             std::thread::sleep(Duration::from_millis(5));
         }
-        let warmer = std::thread::spawn(move || warm(&entries2, &c2, &p2, &AtomicBool::new(false)));
+        let warmer = std::thread::spawn(move || warm(&entries2, &c2, &p2, &AtomicBool::new(false), 3, &|| {}));
         std::thread::sleep(Duration::from_millis(300));
         assert_eq!(p.added.load(Ordering::Relaxed), 0);
         release.store(true, Ordering::Relaxed);
         searcher.join().unwrap();
         warmer.join().unwrap();
         assert_eq!(p.added.load(Ordering::Relaxed), 1);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn warm_order_puts_likely_documents_first() {
+        let e = |path: &str, size: u64| Entry { path: path.into(), size, mtime: 0, is_dir: false, norm_name: "".into() };
+        let rank = |path: &str| warm_rank(&e(path, 1000));
+        assert_eq!(rank("C:\\Users\\a\\Documents\\تقرير.docx"), 0);
+        assert_eq!(rank("C:\\Users\\a\\DESKTOP\\x.pdf"), 0);
+        assert_eq!(rank("C:\\Users\\a\\OneDrive - Org\\x.xlsx"), 0);
+        assert_eq!(rank("D:\\عمل\\x.docx"), 1);
+        assert_eq!(rank("C:\\Users\\a\\AppData\\Local\\x\\Documents\\log.txt"), 2);
+        assert_eq!(rank("C:\\Program Files (x86)\\x\\readme.txt"), 2);
+        assert_eq!(rank("/home/a/Documents/x.txt"), 0);
+        assert_eq!(rank("C:\\Users\\a\\Documents\\x.zip"), 3);
+        assert_eq!(warm_rank(&e("C:\\Users\\a\\Documents\\big.pdf", BIG_FILE + 1)), 3);
+        assert_eq!(rank("C:\\Users\\a\\Documents\\صورة.JPG"), 4);
+        assert!((1..=4).contains(&warm_threads()));
+    }
+
+    #[test]
+    fn compressed_documents_are_heavy_sooner() {
+        let e = |path: &str, size: u64| Entry { path: path.into(), size, mtime: 0, is_dir: false, norm_name: "".into() };
+        let mb = 1024 * 1024;
+        assert!(is_heavy(&e("C:\\a.pdf", BIG_FILE + 1)) && !is_heavy(&e("C:\\a.pdf", 3 * mb)));
+        assert!(is_heavy(&e("C:\\a.DOCX", 3 * mb)) && is_heavy(&e("C:\\a.zip", 3 * mb)) && is_heavy(&e("C:\\a.7z", 3 * mb)));
+        assert!(!is_heavy(&e("C:\\a.docx", mb)) && !is_heavy(&e("C:\\a.zip", mb)));
+    }
+
+    #[test]
+    fn saves_are_spaced_out_on_big_stores() {
+        let s = Duration::from_secs;
+        // Not before FLUSH_MIN, and not with nothing new.
+        assert!(!time_to_save(s(5), 1000, 10));
+        assert!(!time_to_save(s(30), 0, 0));
+        assert!(time_to_save(s(30), 1, 0));
+        // A big store waits for an eighth more documents, or FLUSH_MAX.
+        assert!(!time_to_save(s(60), 1000, 100_000));
+        assert!(time_to_save(s(60), 12_500, 100_000));
+        assert!(time_to_save(FLUSH_MAX, 1, 100_000));
+    }
+
+    /// Several warm-up threads, stopped part way: what they stored is right,
+    /// and they have all ended when `warm` returns.
+    #[test]
+    fn parallel_warm_stops_cleanly() {
+        let dir = temp_dir("warm_par");
+        let docs = dir.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        let entries: Vec<Entry> = (0..400)
+            .map(|i| {
+                let p = docs.join(format!("ملف{i}.txt"));
+                fs::write(&p, format!("نص رقم {i}")).unwrap();
+                file_entry(&p, 1000 + i)
+            })
+            .collect();
+        let cache = Arc::new(ContentCache::open(&dir.join("store")).unwrap());
+        let cancel = Arc::new(AtomicBool::new(false));
+        let p = Arc::new(WarmProgress::default());
+        let started = Arc::new(AtomicUsize::new(0));
+        let warmer = {
+            let (cache, cancel, p, started, entries) = (cache.clone(), cancel.clone(), p.clone(), started.clone(), entries.clone());
+            std::thread::spawn(move || {
+                warm(&entries, &cache, &p, &cancel, 4, &|| {
+                    started.fetch_add(1, Ordering::Relaxed);
+                })
+            })
+        };
+        while p.added.load(Ordering::Relaxed) < 20 && !warmer.is_finished() {
+            std::thread::yield_now();
+        }
+        cancel.store(true, Ordering::Relaxed);
+        warmer.join().unwrap();
+        let added = p.added.load(Ordering::Relaxed);
+        assert_eq!(started.load(Ordering::Relaxed), 3);
+        // Nothing more is added once it has returned.
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(cache.stats().documents, added);
+        assert_eq!(p.checked.load(Ordering::Relaxed), added);
+        for (i, e) in entries.iter().enumerate() {
+            if let Some(t) = cache.get(&e.path, e.size, e.mtime) {
+                assert_eq!(t.unwrap(), format!("نص رقم {i}"));
+            }
+        }
+        // Saved on return; a second run finishes the rest.
+        assert_eq!(ContentCache::open(&dir.join("store")).unwrap().stats().documents, added);
+        cancel.store(false, Ordering::Relaxed);
+        let p = WarmProgress::default();
+        warm(&entries, &cache, &p, &cancel, 4, &|| {});
+        assert_eq!(p.total.load(Ordering::Relaxed), 400 - added);
+        assert_eq!(cache.stats().documents, 400);
+        drop(cache);
         fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -1074,6 +1278,129 @@ mod tests {
         assert_eq!(c.stats().documents, 1);
         assert_eq!(c.get("y", 1, 1), None);
         drop(c);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A one-page PDF with `lines` of text, with correct xref offsets.
+    fn bench_pdf(lines: &[String]) -> Vec<u8> {
+        let body: String = lines.iter().map(|l| format!("({l}) Tj T* ")).collect();
+        let stream = format!("BT /F1 12 Tf 14 TL 72 720 Td {body}ET");
+        let objs = [
+            "<< /Type /Catalog /Pages 2 0 R >>".to_owned(),
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_owned(),
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>".to_owned(),
+            format!("<< /Length {} >>\nstream\n{stream}\nendstream", stream.len()),
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>".to_owned(),
+        ];
+        let mut pdf = b"%PDF-1.4\n".to_vec();
+        let mut offsets = Vec::new();
+        for (i, o) in objs.iter().enumerate() {
+            offsets.push(pdf.len());
+            pdf.extend(format!("{} 0 obj\n{o}\nendobj\n", i + 1).bytes());
+        }
+        let xref = pdf.len();
+        pdf.extend(format!("xref\n0 {}\n0000000000 65535 f \n", objs.len() + 1).bytes());
+        for off in offsets {
+            pdf.extend(format!("{off:010} 00000 n \n").bytes());
+        }
+        pdf.extend(format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n", objs.len() + 1).bytes());
+        pdf
+    }
+
+    /// Writes a synthetic corpus of `n` documents (docx, txt, pdf, md) under
+    /// `dir` and returns their entries.
+    fn bench_corpus(dir: &Path, n: usize) -> Vec<Entry> {
+        let mut rng = Rng(0xBE7C_0001);
+        let words = ["تقرير", "المبيعات", "السنوي", "الإيرادات", "ميزانية", "report", "budget", "invoice", "عقد", "موظف"];
+        let mut sentence = |k: usize| -> String {
+            (0..k).map(|_| words[rng.below(words.len())]).collect::<Vec<_>>().join(" ")
+        };
+        let mut out = Vec::new();
+        for i in 0..n {
+            let sub = dir.join(format!("d{}", i % 50));
+            fs::create_dir_all(&sub).unwrap();
+            let (p, bytes): (PathBuf, Vec<u8>) = match i % 4 {
+                0 => {
+                    let p = sub.join(format!("doc{i}.docx"));
+                    let paras: String = (0..60)
+                        .map(|_| format!("<w:p><w:r><w:t>{}</w:t></w:r></w:p>", sentence(25)))
+                        .collect();
+                    let xml = format!(
+                        r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{paras}</w:body></w:document>"#
+                    );
+                    let mut zw = zip::ZipWriter::new(io::Cursor::new(Vec::new()));
+                    zw.start_file("word/document.xml", zip::write::SimpleFileOptions::default()).unwrap();
+                    zw.write_all(xml.as_bytes()).unwrap();
+                    (p, zw.finish().unwrap().into_inner())
+                }
+                1 => (sub.join(format!("t{i}.txt")), (0..80).map(|_| sentence(20) + "\n").collect::<String>().into_bytes()),
+                2 => {
+                    let lines: Vec<String> = (0..40).map(|j| format!("Annual report line {j} budget invoice {i}")).collect();
+                    (sub.join(format!("p{i}.pdf")), bench_pdf(&lines))
+                }
+                _ => (sub.join(format!("n{i}.md")), (0..40).map(|_| sentence(15) + "\n").collect::<String>().into_bytes()),
+            };
+            fs::write(&p, bytes).unwrap();
+            out.push(file_entry(&p, 1_600_000_000 + i as i64));
+        }
+        out
+    }
+
+    /// `cargo test --release bench_warm -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn bench_warm() {
+        let n: usize = std::env::var("BENCH_DOCS").ok().and_then(|s| s.parse().ok()).unwrap_or(4000);
+        let dir = temp_dir("bench");
+        let entries = bench_corpus(&dir.join("docs"), n);
+        let cache = ContentCache::open(&dir.join("store")).unwrap();
+        if let Ok(cmd) = std::env::var("BENCH_BEFORE") {
+            // e.g. dropping the OS file cache, to read from the disk.
+            std::process::Command::new("sh").args(["-c", &cmd]).status().unwrap();
+        }
+        let threads: usize = std::env::var("BENCH_THREADS").ok().and_then(|s| s.parse().ok()).unwrap_or_else(warm_threads);
+        let p = WarmProgress::default();
+        let t = std::time::Instant::now();
+        warm(&entries, &cache, &p, &AtomicBool::new(false), threads, &|| {});
+        let s = cache.stats();
+        eprintln!(
+            "warm {n} docs on {threads} threads: {} ms, added {}, texts {}, {} KB",
+            t.elapsed().as_millis(),
+            p.added.load(Ordering::Relaxed),
+            s.texts,
+            s.bytes / 1024
+        );
+        drop(cache);
+        // Index writes while 100k documents are added, saving every 200 (the
+        // old policy) and once at the end.
+        let big = ContentCache::open(&dir.join("big")).unwrap();
+        let (mut ms, mut bytes) = (0, 0);
+        for i in 0..100_000 {
+            big.put(&format!("C:\\Users\\someone\\Documents\\folder {}\\a document {i}.docx", i % 300), 1, 1, None);
+            if i % 200 == 199 {
+                let t = std::time::Instant::now();
+                big.flush().unwrap();
+                ms += t.elapsed().as_millis();
+                bytes += fs::metadata(dir.join("big").join(IDX)).unwrap().len();
+            }
+        }
+        let last = fs::metadata(dir.join("big").join(IDX)).unwrap().len();
+        eprintln!("100k documents, saved every 200: {ms} ms, {} MB written; one save: {} KB", bytes >> 20, last >> 10);
+        // The same with `time_to_save`, at a few extraction speeds.
+        let per_doc = last as f64 / 100_000.0;
+        for rate in [10u64, 50, 200, 1000] {
+            let (mut saves, mut written, mut at, mut at_added) = (0, 0.0, 0u64, 0usize);
+            for i in 1..=100_000usize {
+                let now_ms = i as u64 * 1000 / rate;
+                if time_to_save(Duration::from_millis(now_ms - at), i - at_added, i) {
+                    saves += 1;
+                    written += per_doc * i as f64;
+                    (at, at_added) = (now_ms, i);
+                }
+            }
+            eprintln!("  new policy at {rate} docs/s: {saves} saves, {} MB written", written as u64 >> 20);
+        }
+        drop(big);
         fs::remove_dir_all(&dir).unwrap();
     }
 

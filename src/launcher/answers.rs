@@ -1,6 +1,7 @@
-//! Instant answers: calculator, unit conversion, Hijri and Gregorian dates.
+//! Instant answers: calculator, unit conversion, currency conversion, Hijri
+//! and Gregorian dates.
 
-use super::{Action, Context, Item, Kind, calc, hijri, units};
+use super::{Action, Context, Item, Kind, calc, currency, hijri, units};
 
 /// Score of an instant answer: it is exactly what was asked, so it leads.
 pub const ANSWER_SCORE: u32 = 1000;
@@ -10,7 +11,7 @@ fn copy_hint(english: bool) -> &'static str {
 }
 
 fn item(title: String, subtitle: String, copy: String) -> Item {
-    Item { kind: Kind::Answer, title, subtitle, action: Action::CopyText(copy), score: ANSWER_SCORE, icon_path: None }
+    Item { kind: Kind::Answer, title, subtitle, action: Action::CopyText(copy), score: ANSWER_SCORE, icon_path: None, strong: false }
 }
 
 /// An instant answer for `query`, if it is a calculation, a conversion or a date question.
@@ -33,6 +34,10 @@ pub fn answer(query: &str, ctx: &Context) -> Option<Item> {
         };
         return Some(item(title, subtitle, copy));
     }
+    // After the units: "100 pounds" is a weight; "100 gbp" is money.
+    if let Some((title, copy, note)) = currency::answer(q, ctx.english, &currency::current()) {
+        return Some(item(title, format!("{note} · {hint}"), copy));
+    }
     let v = calc::evaluate(q)?;
     let shown = calc::format_number(v, 12);
     let title = calc::localize(&format!("= {shown}"), digits);
@@ -46,7 +51,7 @@ mod tests {
 
     fn ctx(english: bool) -> Context<'static> {
         static NO_LAUNCHES: fn(&str) -> u32 = |_| 0;
-        Context { english, windows_build: 0, windows: &[], launches: &NO_LAUNCHES, today: (2026, 11, 1) }
+        Context { english, windows_build: 0, windows: &[], launches: &NO_LAUNCHES, picked: &NO_LAUNCHES, today: (2026, 11, 1) }
     }
 
     fn title(q: &str) -> Option<String> {
@@ -86,6 +91,28 @@ mod tests {
         assert_eq!(title("هجري").as_deref(), Some("21 جمادى الأولى 1448 هـ"));
         let g = answer("2 GB to MB", &ctx(true)).unwrap();
         assert!(g.subtitle.contains("1024"), "{}", g.subtitle);
+    }
+
+    #[test]
+    fn currency_answers() {
+        let i = answer("100 usd to iqd", &ctx(true)).unwrap();
+        assert_eq!(i.kind, Kind::Answer);
+        assert!(i.title.starts_with("100 USD = ") && i.title.ends_with(" IQD"), "{}", i.title);
+        assert!(i.subtitle.ends_with("Press Enter to copy"), "{}", i.subtitle);
+        assert!(matches!(&i.action, Action::CopyText(t) if !t.contains(',') && t.parse::<f64>().is_ok()));
+        let i = answer("١٠٠ دولار", &ctx(false)).unwrap();
+        assert!(i.title.starts_with("١٠٠ دولار = ") && i.title.ends_with(" دينار عراقي"), "{}", i.title);
+        assert!(i.subtitle.contains("يورو") && i.subtitle.contains("سعر"), "{}", i.subtitle);
+        for q in ["50 يورو بالدينار", "100$ to iqd", "1000 iqd usd", "100 ريال سعودي", "100 ليرة تركية"] {
+            assert!(answer(q, &ctx(false)).is_some(), "{q}");
+        }
+        // Not money: plain searches, and what the calculator and units answer.
+        for q in ["100 files", "usd", "report 2024", "دولار"] {
+            assert_eq!(title(q), None, "{q}");
+        }
+        assert_eq!(title("2+2").as_deref(), Some("= 4"));
+        assert_eq!(answer("5 km to miles", &ctx(true)).unwrap().title, "5 km = 3.10686 mi");
+        assert!(answer("100 pounds", &ctx(true)).unwrap().title.contains("kg"));
     }
 
     #[test]
