@@ -432,42 +432,15 @@ impl Index {
     }
 }
 
-/// Folder listings read at the same time during a full scan.
-///
-/// Listing a folder mostly waits for the disk, not the processor. With one
-/// listing per core (4 on many PCs), a disk that answers each read in tens of
-/// milliseconds (a busy hard disk, a virtual or network disk) left the scan
-/// idle most of the time: a first index of 1.2 million files took over 25
-/// minutes instead of 5. More listings in flight let the disk answer them
-/// together.
-const SCAN_THREADS: usize = 16;
-
 /// Walks `roots` in parallel; the result is sorted with names filled in.
 fn walk_all(roots: &[String], capacity: usize, progress: &ScanProgress) -> Vec<Entry> {
     let out: Mutex<Vec<Entry>> = Mutex::new(Vec::with_capacity(capacity));
-    let walk_roots = || {
-        rayon::scope(|s| {
-            for root in roots {
-                let out = &out;
-                s.spawn(move |s| walk(s, PathBuf::from(root), out, progress));
-            }
-        })
-    };
-    // A full scan gets its own wider pool; a small subtree uses the shared one.
-    let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
-    let pool = (capacity > 0)
-        .then(|| {
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(SCAN_THREADS.max(cores))
-                .thread_name(|i| format!("scan-{i}"))
-                .build()
-                .ok()
-        })
-        .flatten();
-    match &pool {
-        Some(pool) => pool.install(walk_roots),
-        None => walk_roots(),
-    }
+    rayon::scope(|s| {
+        for root in roots {
+            let out = &out;
+            s.spawn(move |s| walk(s, PathBuf::from(root), out, progress));
+        }
+    });
     let mut entries = out.into_inner().unwrap_or_default();
     sort_by_path(&mut entries);
     fill_norm_names(&mut entries);

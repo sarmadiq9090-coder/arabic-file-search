@@ -332,7 +332,11 @@ $t1 = Get-Date
 # Progress once a minute: how fast the index grows, what the program costs,
 # and whether the machine itself is slow (disk, antivirus).
 $next = (Get-Date).AddSeconds(60)
-while (-not (Test-Path $index) -and -not $p.HasExited -and ((Get-Date) - $t1).TotalSeconds -lt 1500) {
+# GitHub's runners sometimes throttle the disk (reads of 100-250 ms with the
+# processor idle); the same 1.2 million files then take 25-40 minutes instead
+# of 5. That is the machine, not the program, so the wait is long and a late
+# finish is only noted.
+while (-not (Test-Path $index) -and -not $p.HasExited -and ((Get-Date) - $t1).TotalSeconds -lt 2700) {
     Start-Sleep -Seconds 2
     if ((Get-Date) -ge $next) {
         $next = (Get-Date).AddSeconds(60)
@@ -352,7 +356,9 @@ while (-not (Test-Path $index) -and -not $p.HasExited -and ((Get-Date) - $t1).To
         } catch { Write-Host "    machine: counters unavailable ($($_.Exception.Message))" }
     }
 }
-Record 'index' 'core' 'drives indexed and saved' ((Test-Path $index) -and -not $p.HasExited) ("{0:N0} s" -f ((Get-Date) - $t1).TotalSeconds)
+$secs = ((Get-Date) - $t1).TotalSeconds
+Record 'index' 'core' 'drives indexed and saved' ((Test-Path $index) -and -not $p.HasExited) ("{0:N0} s" -f $secs)
+if ((Test-Path $index) -and $secs -gt 900) { Note 'index' 'slow runner disk' ("first index took {0:N0} s; see the per-minute disk lines in the log" -f $secs) }
 if (-not (Test-Path $index) -and (Test-Path (Join-Path $data 'log.txt'))) {
     Write-Host '--- log.txt (index not saved) ---'
     Get-Content (Join-Path $data 'log.txt') -Tail 60 -Encoding UTF8 | Write-Host
