@@ -212,7 +212,7 @@ fn runs_as_admin(path: &str) -> bool {
 }
 
 /// Today's local date, for the Hijri answer.
-fn today() -> (i32, u32, u32) {
+pub(super) fn today() -> (i32, u32, u32) {
     let mut t: winapi::um::minwinbase::SYSTEMTIME = unsafe { std::mem::zeroed() };
     unsafe { winapi::um::sysinfoapi::GetLocalTime(&mut t) };
     (t.wYear as i32, t.wMonth as u32, t.wDay as u32)
@@ -426,6 +426,11 @@ impl App {
         });
     }
 
+    /// The launcher catalog if it is built (the main window's app buttons).
+    pub(super) fn catalog_now(&self) -> Option<Arc<Catalog>> {
+        self.popup.catalog.lock().ok().and_then(|c| c.clone())
+    }
+
     // ---------------------------------------------------------------- searching
 
     fn popup_query(&self) -> String {
@@ -551,11 +556,14 @@ impl App {
                     let now = crate::index::now_secs();
                     let history = &st.history;
                     let launches = move |key: &str| history.launch_count(key, now);
+                    let picks = history.picks_for(&query, now);
+                    let picked = move |key: &str| picks.iter().find(|p| p.0 == key).map_or(0, |p| p.1);
                     let ctx = launcher::Context {
                         english: crate::i18n::is_en(),
                         windows_build: surface::windows_build(),
                         windows: &windows,
                         launches: &launches,
+                        picked: &picked,
                         today: today(),
                     };
                     c.query(&query, &ctx, 40)
@@ -701,6 +709,7 @@ impl App {
                 if self.quick_visible() {
                     self.popup_refresh();
                 }
+                self.show_app_matches();
                 Some(0)
             }
             WM_SETTINGCHANGE if surface::is_theme_change(l) => {
@@ -984,7 +993,9 @@ impl App {
                 let Some(ok) = self.run_action(action, how == How::Admin) else { return };
                 if ok {
                     let mut st = self.state.borrow_mut();
-                    st.history.record_launch(&launcher::action_key(action), now);
+                    let key = launcher::action_key(action);
+                    st.history.record_launch(&key, now);
+                    st.history.record_pick(&query, &key, now);
                     st.history.add_recent(&query);
                     st.history.save();
                 }
@@ -1027,7 +1038,7 @@ impl App {
     /// Runs a launcher action: whether it worked, or `None` when the user
     /// declined. System commands are confirmed first, with "No" as the
     /// default button.
-    fn run_action(&self, action: &Action, admin: bool) -> Option<bool> {
+    pub(super) fn run_action(&self, action: &Action, admin: bool) -> Option<bool> {
         Some(match action {
             Action::Launch { target, args } => shell_execute(admin.then_some("runas"), &system_tool(target), args),
             Action::OpenUri(uri) => shell::open(uri),

@@ -171,6 +171,10 @@ impl NativeUi<AppUi> for App {
         }
         app.list.set_headers_enabled(true);
 
+        // Apps the query names (hidden until one does).
+        for b in app.app_btns.iter_mut() {
+            nwg::Button::builder().parent(w).font(f).text("").flags(nwg::ButtonFlags::TAB_STOP).build(b)?;
+        }
         nwg::Button::builder().parent(w).font(f).text(tr!("فتح الملف", "Open file")).build(&mut app.open_btn)?;
         nwg::Button::builder().parent(w).font(f).text(tr!("فتح المجلد", "Open folder")).build(&mut app.folder_btn)?;
         nwg::Button::builder().parent(w).font(f).text(tr!("نسخ المسار", "Copy path")).build(&mut app.copy_btn)?;
@@ -373,6 +377,8 @@ impl NativeUi<AppUi> for App {
                         app.on_stop();
                     } else if handle == app.options_btn {
                         app.show_menu(&app.options_menu);
+                    } else {
+                        app.on_app_button(&handle);
                     }
                 }
                 E::OnListViewItemActivated if handle == app.list => app.open_selected(),

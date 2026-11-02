@@ -365,7 +365,7 @@ mod tests {
 
     fn ctx_with<'a>(english: bool, windows: &'a [OpenWindow]) -> Context<'a> {
         static NO_LAUNCHES: fn(&str) -> u32 = |_| 0;
-        Context { english, windows_build: 0, windows, launches: &NO_LAUNCHES, today: (2026, 11, 1) }
+        Context { english, windows_build: 0, windows, launches: &NO_LAUNCHES, picked: &NO_LAUNCHES, today: (2026, 11, 1) }
     }
 
     fn cmds(q: &str) -> Vec<SystemCommand> {
