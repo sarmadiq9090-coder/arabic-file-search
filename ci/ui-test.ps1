@@ -265,7 +265,8 @@ function Focus-Window($Hwnd) {
 function Click-Center($W, [bool]$Right = $false) { [U]::Click([int]($W.X + $W.W / 2), [int]($W.Y + $W.H / 2), $Right) }
 function List-Names {
     if (-not $ui.List) { return @() }
-    $n = [Math]::Min([U]::ListCount($ui.List.Handle), 8)
+    # Enough rows to find the expected file below other good matches.
+    $n = [Math]::Min([U]::ListCount($ui.List.Handle), 300)
     $names = @()
     for ($i = 0; $i -lt $n; $i++) { $names += [U]::ListText($ui.List.Handle, $i, 0) }
     return $names
@@ -351,9 +352,11 @@ function Main-Search([string]$Q, [string]$Expect, [string]$Kind, [string]$Check,
     Start-Sleep -Milliseconds 200
     [U]::Chord($VK.CTRL, $VK.A); [U]::Chord($VK.BACK)
     [U]::Type($Q)
-    Start-Sleep -Milliseconds 300
-    $typed = [U]::Text($ui.Query.Handle)
-    if ($typed -ne $Q) { Note 'search' "typing '$Q'" "the box shows '$typed'" }
+    # A person sees what they type at once; note when the box lags behind.
+    $tt = Get-Date
+    [void](Wait-Until { [U]::Text($ui.Query.Handle) -eq $Q } 10)
+    $lag = ((Get-Date) - $tt).TotalSeconds
+    if ($lag -gt 1) { Record 'typing' 'probe' "typed text shows within 1 s ('$Q')" $false ("{0:N1} s; the box shows '{1}'" -f $lag, [U]::Text($ui.Query.Handle)) }
     [U]::Chord($VK.ENTER)
     $t = Get-Date
     $hit = $null
@@ -361,6 +364,7 @@ function Main-Search([string]$Q, [string]$Expect, [string]$Kind, [string]$Check,
     else { Start-Sleep -Seconds 3 }
     $names = @(List-Names)
     $top = ($names | Select-Object -First 3) -join ' | '
+    if ($hit) { $top += " (expected file is row $([array]::IndexOf($names, $hit) + 1))" }
     $count = if ($ui.List) { [U]::ListCount($ui.List.Handle) } else { 0 }
     $detail = "'$Q' -> {0:N1} s, {1} rows; top: {2}; status: {3}" -f ((Get-Date) - $t).TotalSeconds, $count, $top, (Status-Text)
     if ($Expect) { Record 'search' $Kind $Check ($null -ne $hit) $detail } else { Note 'search' $Check $detail }
@@ -384,8 +388,11 @@ if ($ui -and $ui.Content) {
     Start-Sleep -Milliseconds 500
     $on = [U]::SendMessage($ui.Content.Handle, $BM_GETCHECK, [IntPtr]::Zero, [IntPtr]::Zero).ToInt32()
     Record 'search' 'core' 'the "inside documents" box can be ticked' ($on -eq 1)
-    Main-Search 'السنوية للشركة' 'تقرير مالي' 'core' 'search inside documents (Arabic text)' 90
-    Main-Search 'revenue forecast' 'Quarterly Budget' 'core' 'search inside documents (English text)' 90
+    # Files changed today: a quick, realistic scope on a fresh install,
+    # while the background content index is still being built.
+    Main-Search 'dm:today السنوية للشركة' 'تقرير مالي' 'core' 'search inside documents, Arabic text (dm:today)' 90
+    Main-Search 'dm:today revenue forecast' 'Quarterly Budget' 'core' 'search inside documents, English text (dm:today)' 90
+    Main-Search 'خبرة عشر سنوات' 'سيرة ذاتية' 'probe' 'search inside documents on all drives within 60 s (first day)' 60
     [void][U]::PostMessage($ui.Content.Handle, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
 } else { Record 'search' 'core' 'search inside documents' $false 'no "inside documents" checkbox' }
 
@@ -417,7 +424,9 @@ function Quick-Rows {
     if (-not (Test-Path $rowsFile)) { return @() }
     try { return [IO.File]::ReadAllLines($rowsFile, [Text.Encoding]::UTF8) } catch { return @() }
 }
-function Quick-Search([string]$Q, [string]$Expect, [string]$Kind, [string]$Check, [int]$Wait = 10) {
+# -Best: the expected row must be the top ("Best") result.
+function Quick-Search([string]$Q, [string]$Expect, [string]$Kind, [string]$Check, [int]$Wait = 10, [switch]$Best) {
+    $like = if ($Best) { "Best`t*$Expect*" } else { "*$Expect*" }
     $pop = Visible-Window $p.Id 'InstaFindQuickSearch'
     if (-not $pop) { [U]::Chord($VK.CTRL, $VK.ALT, $VK.F); $pop = Wait-Until { Visible-Window $p.Id 'InstaFindQuickSearch' } 5 }
     if (-not $pop) { Record 'quick search' $Kind $Check $false 'popup not open'; return }
@@ -426,7 +435,7 @@ function Quick-Search([string]$Q, [string]$Expect, [string]$Kind, [string]$Check
     $t = Get-Date
     $hit = Wait-Until {
         $rows = @(Quick-Rows)
-        if ($rows.Count -gt 0 -and $rows[0] -eq "query`t$Q") { $rows | Select-Object -Skip 1 | Where-Object { $_ -like "*$Expect*" } | Select-Object -First 1 } else { $null }
+        if ($rows.Count -gt 0 -and $rows[0] -eq "query`t$Q") { $rows | Select-Object -Skip 1 | Where-Object { $_ -like $like } | Select-Object -First 1 } else { $null }
     } $Wait
     $all = @(Quick-Rows)
     $shown = if ($all.Count -gt 0) { $all[0] -replace "`t", ': ' } else { 'no quick-rows.txt' }
@@ -443,13 +452,17 @@ Start-Sleep -Seconds 3   # the app catalog loads in the background
 Quick-Search 'notepad' 'Notepad' 'core' 'app by English name (notepad)'
 Quick-Search 'تقرير مالي' 'تقرير مالي' 'core' 'Arabic file'
 Quick-Search '2+2' '4' 'probe' 'calculator answer (2+2)'
-Quick-Search 'غوغل كروم' 'Chrome' 'probe' 'app by Arabic name (غوغل كروم)'
-Quick-Search 'كروم' 'Chrome' 'probe' 'app by short Arabic name (كروم)'
-Quick-Search 'المفكرة' 'Notepad' 'probe' 'Windows app by Arabic meaning (المفكرة = Notepad)'
-Quick-Search 'الة حاسبة' 'Calculator' 'probe' 'Windows app by Arabic meaning (الة حاسبة = Calculator)'
-Quick-Search 'display' 'isplay' 'probe' 'Settings page (display)'
-Quick-Search 'اعدادات الشاشة' 'isplay' 'probe' 'Settings page in Arabic (اعدادات الشاشة)'
-Quick-Search 'notepda' 'Notepad' 'probe' 'app with a typo (notepda)'
+Quick-Search 'غوغل كروم' 'Chrome' 'probe' 'app by Arabic name (غوغل كروم) is first' -Best
+Quick-Search 'كروم' 'Chrome' 'probe' 'app by short Arabic name (كروم) is first' -Best
+Quick-Search 'المفكرة' 'Notepad' 'probe' 'Windows app by Arabic meaning (المفكرة = Notepad) is first' -Best
+Quick-Search 'الة حاسبة' 'Calculator' 'probe' 'Windows app by Arabic meaning (الة حاسبة = Calculator) is first' -Best
+Quick-Search 'رسام' 'Paint' 'probe' 'Windows app by Arabic meaning (رسام = Paint)'
+Quick-Search 'display' 'isplay' 'probe' 'Settings page (display) is first' -Best
+Quick-Search 'اعدادات الشاشة' 'isplay' 'probe' 'Settings page in Arabic (اعدادات الشاشة) is first' -Best
+Quick-Search 'واي فاي' 'Wi-Fi' 'probe' 'Settings page in Arabic (واي فاي = Wi-Fi)'
+Quick-Search 'notepda' 'Notepad' 'probe' 'app with a typo (notepda) is first' -Best
+Quick-Search '100 usd to iqd' '= ' 'probe' 'currency answer (100 usd to iqd)' -Best
+Quick-Search '5 كم بالميل' '3.1' 'probe' 'unit answer in Arabic (5 كم بالميل)' -Best
 [U]::Chord($VK.ESC)
 $gone = Wait-Until { -not (Visible-Window $p.Id 'InstaFindQuickSearch') } 3
 Record 'quick search' 'core' 'Esc closes the popup' ([bool]$gone)
