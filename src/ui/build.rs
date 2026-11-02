@@ -258,6 +258,7 @@ impl NativeUi<AppUi> for App {
             .build(&mut app.menu_hide_system)?;
         nwg::MenuItem::builder().text(tr!("تصدير النتائج إلى Excel (CSV)", "Export results to Excel (CSV)")).parent(&app.options_menu).build(&mut app.menu_export)?;
         nwg::MenuItem::builder().text(tr!("إخفاء إلى شريط المهام\tEsc", "Hide to the taskbar tray\tEsc")).parent(&app.options_menu).build(&mut app.menu_hide)?;
+        nwg::MenuItem::builder().text(tr!("خروج من البرنامج", "Exit the program")).parent(&app.options_menu).build(&mut app.menu_exit)?;
         nwg::MenuItem::builder()
             .text(&trf!("إظهار البرنامج من أي مكان\t{HOTKEY_TEXT}", "Show the program from anywhere\t{HOTKEY_TEXT}"))
             .parent(&app.options_menu)
@@ -323,7 +324,19 @@ impl NativeUi<AppUi> for App {
                 // report OnResize too, and re-laying out on each of those
                 // nests layouts inside layouts.
                 E::OnResize | E::OnWindowMaximize if handle == app.window => app.layout(),
-                E::OnWindowClose if handle == app.window => app.on_close(),
+                // The X button keeps the program running next to the clock
+                // (the floating box and the shortcut keep working); only
+                // "Exit" really closes it.
+                E::OnWindowClose if handle == app.window => {
+                    if app.close_hides() {
+                        if let nwg::EventData::OnWindowClose(d) = &data {
+                            d.close(false);
+                        }
+                        app.hide_to_tray();
+                    } else {
+                        app.on_close();
+                    }
+                }
                 E::OnTextInput if handle == app.query => app.on_query_changed(),
                 // The dialog-style message loop turns Enter into IDOK and Esc
                 // into IDCANCEL, which nwg reports as OnKeyEnter / OnKeyEsc.
@@ -421,8 +434,8 @@ impl NativeUi<AppUi> for App {
                         app.hide_to_tray();
                     } else if handle == app.tray_show {
                         app.show_window();
-                    } else if handle == app.tray_exit {
-                        app.window.close();
+                    } else if handle == app.tray_exit || handle == app.menu_exit {
+                        app.quit();
                     }
                 }
                 _ => {}

@@ -81,6 +81,24 @@ if (Test-Path $index) {
     Write-Host '::warning::the index was not saved within the time limit; skipped the command-line searches'
 }
 if (Test-Path $crash) { Fail "crash report written:"; Get-Content $crash | Write-Host }
+
+# The close button hides the window to the tray; the program keeps running.
+if (-not $gui.HasExited) {
+    $gui.Refresh()
+    if ($gui.MainWindowHandle -ne [IntPtr]::Zero) {
+        [void]$gui.CloseMainWindow()
+        Start-Sleep -Seconds 4
+        $gui.Refresh()
+        if ($gui.HasExited) { Fail 'the close button quit the program instead of hiding it to the tray' }
+        else { Write-Host 'close button: still running in the tray' }
+    } else {
+        Write-Host '::warning::no main window handle; skipped the close-button check'
+    }
+}
+# Starting with Windows is on by default.
+$run = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name BahthSari -ErrorAction SilentlyContinue
+if (-not $run -or $run.BahthSari -notmatch '--startup') { Fail 'start with Windows was not turned on' }
+if (Test-Path $crash) { Fail "crash report written:"; Get-Content $crash | Write-Host }
 if (-not $gui.HasExited) { Stop-Process -Id $gui.Id -Force }
 if ($failed) { exit 1 }
 Write-Host 'Smoke test passed.'

@@ -251,6 +251,7 @@ pub struct App {
     crash_checked: Cell<bool>,
     menu_export: nwg::MenuItem,
     menu_hide: nwg::MenuItem,
+    menu_exit: nwg::MenuItem,
     tray_icon: nwg::Icon,
     tray: nwg::TrayNotification,
     tray_menu: nwg::Menu,
@@ -278,6 +279,8 @@ pub struct App {
     /// System image-list index of the icon for each extension.
     icons: RefCell<HashMap<String, i32>>,
     tray_hint_shown: Cell<bool>,
+    /// "Exit" was chosen: closing the window really quits.
+    quitting: Cell<bool>,
     startup_logged: Cell<bool>,
     state: RefCell<State>,
     /// Moving another program's Open / Save As dialog to a result's folder.
@@ -462,6 +465,22 @@ impl App {
         }
     }
 
+    /// Whether the window's close button only hides it: there is a way back
+    /// (the icon by the clock or the floating box), and "Exit" was not chosen.
+    fn close_hides(&self) -> bool {
+        if self.quitting.get() {
+            return false;
+        }
+        let s = &self.state.borrow().settings;
+        s.tray_icon || s.floating_mode != crate::settings::FloatingMode::Off
+    }
+
+    /// Really closes the program (the tray menu's and Options menu's "Exit").
+    fn quit(&self) {
+        self.quitting.set(true);
+        self.window.close();
+    }
+
     fn show_window(&self) {
         self.window.set_visible(true);
         if let Some(h) = self.window.handle.hwnd() {
@@ -518,6 +537,8 @@ impl App {
         }
         self.unregister_alt_space();
         self.hide_quick();
+        // Gone at once, not left on screen while the index is freed.
+        self.destroy_floating();
         nwg::stop_thread_dispatch();
     }
 }

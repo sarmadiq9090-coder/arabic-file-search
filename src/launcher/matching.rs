@@ -9,6 +9,7 @@
 
 use super::Context;
 use super::apps::App;
+use super::phonetic;
 use super::settings_pages::Page;
 use crate::normalize::normalize;
 use crate::{franco, fuzzy, layout};
@@ -20,6 +21,10 @@ const ALL_WORDS_EXACT: u32 = 700;
 const ALL_WORDS: u32 = 600;
 const SUBSTRING: u32 = 500;
 const WORD_SUBSTRING: u32 = 350;
+const SOUNDS_LIKE: u32 = 450;
+/// Above a web shortcut ([`super::web::SHORTCUT_SCORE`]): "جوجل بلاي" is
+/// the app rather than a Google search for "بلاي".
+const SOUNDS_LIKE_WORDS: u32 = 920;
 const TYPO: u32 = 300;
 
 /// What a piece of text is, which sets how much a match in it counts.
@@ -179,12 +184,14 @@ struct Entry {
     percent: u32,
     /// All the texts' characters, to skip the entry at once.
     mask: u128,
+    /// Sound skeletons of the Latin name's words, for Arabic spellings.
+    sounds: Vec<String>,
 }
 
 impl Entry {
-    fn new(texts: Vec<Text>, percent: u32) -> Entry {
+    fn new(texts: Vec<Text>, percent: u32, latin_name: &str) -> Entry {
         let mask = texts.iter().fold(0, |m, t| m | t.mask);
-        Entry { texts, percent, mask }
+        Entry { texts, percent, mask, sounds: phonetic::name_sounds(latin_name) }
     }
 }
 
@@ -378,7 +385,7 @@ impl Index {
             .map(|a| {
                 let mut texts = vec![Text::new(Field::Name, &a.name)];
                 texts.extend(a.aliases.iter().map(|al| Text::new(Field::Alias, al)));
-                Entry::new(texts, 100)
+                Entry::new(texts, 100, &a.name)
             })
             .collect();
         let settings_idx = settings
@@ -391,7 +398,7 @@ impl Index {
                     Text::new(Field::Section, p.section_en),
                 ];
                 texts.extend(p.keywords.iter().map(|k| Text::new(Field::Keyword, k)));
-                Entry::new(texts, if p.is_settings_uri() { 100 } else { 98 })
+                Entry::new(texts, if p.is_settings_uri() { 100 } else { 98 }, "")
             })
             .collect();
         Index {
@@ -442,6 +449,16 @@ impl Index {
         // before normalising, which would merge the letters the keys stand for.
         if let Some(conv) = layout::convert_layout(raw) {
             pass(&Query::new(&conv), 75, &mut app_scores, &mut set_scores);
+        }
+        // Arabic letters for a Latin app name: "كوكل بلي" is "Google Play".
+        // Not for settings pages, which have Arabic titles of their own.
+        if let Some(qs) = phonetic::query_sounds(&q.full) {
+            for (e, s) in self.apps.iter().zip(app_scores.iter_mut()) {
+                if phonetic::matches(&qs, &e.sounds) {
+                    let base = if phonetic::is_whole_words(&qs, &e.sounds) { SOUNDS_LIKE_WORDS } else { SOUNDS_LIKE };
+                    *s = (*s).max(base * e.percent / 100);
+                }
+            }
         }
         let none = |a: &[u32], s: &[u32]| a.iter().chain(s).all(|&x| x == 0);
         // Arabizi ("kroom" → كروم), only for one Latin word and when nothing matched.

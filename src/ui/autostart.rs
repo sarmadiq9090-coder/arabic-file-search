@@ -17,6 +17,11 @@ const VALUE: &str = "BahthSari";
 /// off is respected.
 pub(super) const OWN_KEY: &str = "Software\\BahthSari";
 const CHOSEN: &str = "AutostartChosen";
+/// Set once 0.8.1 has turned starting with Windows back on (the user asked
+/// for it to be on); after that the user's choice counts again.
+const RESET_081: &str = "Autostart081";
+/// Where Task Manager's "Startup apps" page keeps apps it turned off.
+const APPROVED_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
 
 /// Command-line flag of a launch at sign-in: start hidden in the tray.
 pub const STARTUP_ARG: &str = "--startup";
@@ -80,9 +85,39 @@ fn set_string(key: &Key, name: &str, value: &str) -> bool {
     }
 }
 
-/// Whether the program starts with Windows.
+/// The first byte of Task Manager's record for our entry, if it has one:
+/// even (2, 6) means allowed, odd (3, 7) means turned off there.
+fn approved_flag() -> Option<u8> {
+    let key = open(APPROVED_KEY, false)?;
+    let name = wide(VALUE);
+    let mut buf = [0u8; 12];
+    let mut size = buf.len() as DWORD;
+    let ok = unsafe {
+        RegQueryValueExW(key.0, name.as_ptr(), std::ptr::null_mut(), std::ptr::null_mut(), buf.as_mut_ptr(), &mut size)
+    };
+    (ok == ERROR_SUCCESS as i32 && size > 0).then_some(buf[0])
+}
+
+/// Whether Task Manager's "Startup apps" turned our entry off.
+fn blocked_by_task_manager() -> bool {
+    approved_flag().is_some_and(|b| b & 1 == 1)
+}
+
+/// Clears a "turned off" mark Task Manager left on our entry.
+fn unblock() {
+    if !blocked_by_task_manager() {
+        return;
+    }
+    if let Some(key) = open(APPROVED_KEY, true) {
+        let name = wide(VALUE);
+        unsafe { RegDeleteValueW(key.0, name.as_ptr()) };
+    }
+}
+
+/// Whether the program starts with Windows: our `Run` entry is there and
+/// Task Manager has not turned it off.
 pub fn is_enabled() -> bool {
-    open(RUN_KEY, false).is_some_and(|k| has_value(&k, VALUE))
+    open(RUN_KEY, false).is_some_and(|k| has_value(&k, VALUE)) && !blocked_by_task_manager()
 }
 
 /// Turns starting with Windows on or off for the current user. The entry
@@ -94,6 +129,7 @@ pub fn set_enabled(on: bool) -> bool {
     }
     if on {
         let Ok(exe) = std::env::current_exe() else { return false };
+        unblock();
         set_string(&key, VALUE, &format!("\"{}\" {STARTUP_ARG}", exe.display()))
     } else {
         let name = wide(VALUE);
@@ -105,8 +141,15 @@ pub fn set_enabled(on: bool) -> bool {
 /// On by default: the first run turns it on once; after that only the user's
 /// choice counts. A stale path (the exe moved) is refreshed.
 pub fn apply_default() {
-    let chosen = open(OWN_KEY, false).is_some_and(|k| has_value(&k, CHOSEN));
-    if !chosen || is_enabled() {
+    let own = open(OWN_KEY, false);
+    let chosen = own.as_ref().is_some_and(|k| has_value(k, CHOSEN));
+    // 0.8.1 turns it on once more, for those who had it off without meaning to.
+    let reset_done = own.as_ref().is_some_and(|k| has_value(k, RESET_081));
+    drop(own);
+    if !chosen || !reset_done || is_enabled() {
         set_enabled(true);
+    }
+    if !reset_done && let Some(own) = open(OWN_KEY, true) {
+        set_string(&own, RESET_081, "1");
     }
 }
