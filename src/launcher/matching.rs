@@ -5,7 +5,8 @@
 //! strings. Tiers, best first: the whole name, the start of the name, the
 //! start of a word, every query word starting a word somewhere, anywhere in
 //! the name. Then, for what that missed: the query in the other keyboard
-//! layout, Arabizi spellings, and finally one or two typos.
+//! layout, Arabic spellings of Latin names by sound (exact, then with one
+//! sound off), Arabizi spellings, and finally one or two typos.
 
 use super::Context;
 use super::apps::App;
@@ -22,9 +23,15 @@ const ALL_WORDS: u32 = 600;
 const SUBSTRING: u32 = 500;
 const WORD_SUBSTRING: u32 = 350;
 const SOUNDS_LIKE: u32 = 450;
+/// The name's own words said in Arabic, four sound classes at least
+/// ("نتفلكس"): as good as the start of the name, so it counts as a strong
+/// match ([`super::STRONG_SCORE`]).
+const SOUNDS_LIKE_EXACT: u32 = 860;
 /// Above a web shortcut ([`super::web::SHORTCUT_SCORE`]): "جوجل بلاي" is
 /// the app rather than a Google search for "بلاي".
 const SOUNDS_LIKE_WORDS: u32 = 920;
+/// One sound class off ("ديسكود" for Discord): below every exact sound match.
+const SOUNDS_LIKE_SLIP: u32 = 400;
 const TYPO: u32 = 300;
 
 /// What a piece of text is, which sets how much a match in it counts.
@@ -454,10 +461,20 @@ impl Index {
         // Not for settings pages, which have Arabic titles of their own.
         if let Some(qs) = phonetic::query_sounds(&q.full) {
             for (e, s) in self.apps.iter().zip(app_scores.iter_mut()) {
-                if phonetic::matches(&qs, &e.sounds) {
-                    let base = if phonetic::is_whole_words(&qs, &e.sounds) { SOUNDS_LIKE_WORDS } else { SOUNDS_LIKE };
-                    *s = (*s).max(base * e.percent / 100);
-                }
+                let base = if phonetic::matches(&qs, &e.sounds) {
+                    if phonetic::is_whole_words(&qs, &e.sounds) {
+                        SOUNDS_LIKE_WORDS
+                    } else if phonetic::is_exact_words(&qs, &e.sounds) {
+                        SOUNDS_LIKE_EXACT
+                    } else {
+                        SOUNDS_LIKE
+                    }
+                } else if *s < SOUNDS_LIKE_SLIP && phonetic::matches_tolerant(&qs, &e.sounds) {
+                    SOUNDS_LIKE_SLIP
+                } else {
+                    0
+                };
+                *s = (*s).max(base * e.percent / 100);
             }
         }
         let none = |a: &[u32], s: &[u32]| a.iter().chain(s).all(|&x| x == 0);
