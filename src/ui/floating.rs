@@ -102,7 +102,7 @@ impl App {
         self.floating_timer(FRAME_MS);
     }
 
-    fn destroy_floating(&self) {
+    pub(super) fn destroy_floating(&self) {
         let h = self.floating_hwnd();
         if !h.is_null() {
             unsafe { DestroyWindow(h) };

@@ -15,6 +15,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+/// How long a list of installed apps is used before it is made again.
+const CATALOG_FRESH: Duration = Duration::from_secs(120);
+
 use winapi::shared::basetsd::{DWORD_PTR, UINT_PTR};
 use winapi::shared::minwindef::{LPARAM, LRESULT, UINT, WPARAM};
 use winapi::shared::windef::{HBRUSH, HDC, HGDIOBJ, HICON, HWND, RECT};
@@ -72,7 +75,8 @@ pub struct Popup {
     /// Enter was pressed before the file results came; open when they do.
     enter_pending: Cell<bool>,
     catalog: Arc<Mutex<Option<Arc<Catalog>>>>,
-    catalog_started: Cell<bool>,
+    /// When the catalog was last (re)built, to list new apps now and then.
+    catalog_started: Cell<Option<Instant>>,
     /// The popup's HWND for background threads to post to (0 = none yet).
     post_to: Arc<AtomicUsize>,
     look: RefCell<Look>,
@@ -392,11 +396,14 @@ impl App {
     }
 
     /// Builds the launcher catalog (installed apps take a moment to list)
-    /// on a background thread, once.
+    /// on a background thread. Built again when the popup opens and the list
+    /// is over [`CATALOG_FRESH`] old, so programs installed since show up;
+    /// the old list serves until the new one is ready.
     pub(super) fn start_catalog(&self) {
-        if self.popup.catalog_started.replace(true) {
+        if self.popup.catalog_started.get().is_some_and(|t| t.elapsed() < CATALOG_FRESH) {
             return;
         }
+        self.popup.catalog_started.set(Some(Instant::now()));
         let slot = self.popup.catalog.clone();
         let post_to = self.popup.post_to.clone();
         crate::crash_log::spawn_named("launcher-catalog", move || {

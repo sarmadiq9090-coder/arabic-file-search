@@ -15,6 +15,7 @@ pub mod apps;
 mod calc;
 mod hijri;
 mod matching;
+mod phonetic;
 pub mod settings_pages;
 pub mod system;
 mod units;
@@ -264,6 +265,7 @@ mod tests {
             "Visual Studio Code",
             "Snipping Tool",
             "Paint",
+            "Google Play Games",
         ];
         Catalog::new(names.iter().map(|n| app(n)).collect(), settings_pages::PAGES.to_vec())
     }
@@ -292,6 +294,18 @@ mod tests {
             assert_eq!(first(&c, q, &cx).title, "Google Chrome", "{q}");
         }
         assert_eq!(first(&c, "chrome", &cx).kind, Kind::App);
+    }
+
+    #[test]
+    fn arabic_spelling_of_any_latin_name() {
+        let c = catalog();
+        let cx = ctx(false, 0, &no_launches);
+        for q in ["كوكل بلي", "جوجل بلاي", "قوقل بلاي قيمز"] {
+            assert_eq!(first(&c, q, &cx).title, "Google Play Games", "{q}");
+        }
+        // A name in the Arabic table still comes first.
+        assert_eq!(first(&c, "جوجل كروم", &cx).title, "Google Chrome");
+        assert!(titles(&c, "سبوتيفاي", &cx).contains(&"Spotify".to_string()));
     }
 
     #[test]

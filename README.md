@@ -67,7 +67,7 @@ scoop install instafind
 
 ### البحث من أي مكان (جديد في 0.8)
 - **خانة بحث صغيرة فوق الساعة**: شفافة وتكاد لا تُرى حتى تقرّب المؤشر، فتظهر بنعومة. تختفي وحدها مع الألعاب والفيديو بملء الشاشة، وتُسحب لأي مكان. تُطفأ أو تُخفى من «خيارات ← البحث من أي مكان».
-- **نافذة بحث صغيرة بـ Ctrl+Alt+F** أو من أيقونة الساعة، تفتح النتائج للأعلى: الملفات، و**البرامج المثبتة** (`كروم` تفتح Google Chrome، `وورد`، `الحاسبة`)، و**صفحات إعدادات ويندوز** (`واي فاي`، `بلوتوث`، `الشاشة`)، و**التبديل إلى نافذة مفتوحة**.
+- **نافذة بحث صغيرة بـ Ctrl+Alt+F** أو من أيقونة الساعة، تفتح النتائج للأعلى: الملفات، و**البرامج المثبتة** (`كروم` تفتح Google Chrome، `وورد`، `الحاسبة`، وأي برنامج بنطقه العربي مثل `كوكل بلي`)، و**صفحات إعدادات ويندوز** (`واي فاي`، `بلوتوث`، `الشاشة`)، و**التبديل إلى نافذة مفتوحة**.
 - **إجابات فورية**: حاسبة (`250*12`)، تحويل وحدات (`5 كيلو بالباوند`، `30 مئوي`)، و**التاريخ الهجري** (`هجري`، وتحويل التواريخ بتقويم أم القرى).
 - **اختصارات المواقع**: `يوتيوب قرآن` يبحث في يوتيوب مباشرة، ومثلها جوجل وويكيبيديا والخرائط والترجمة.
 - **أوامر النظام** (إيقاف التشغيل، إعادة التشغيل، السكون، القفل، إفراغ السلة، إنهاء برنامج معلّق) وكلها **تطلب تأكيداً قبل التنفيذ**.
@@ -105,7 +105,7 @@ scoop install instafind
 
 ### الراحة
 - **واجهة عربية أو إنكليزية**: تتبع لغة ويندوز، وتُغيَّر من «خيارات ← Language / اللغة».
-- **يعمل مع ويندوز** في الخلفية، وEsc يخفيه إلى شريط المهام، ونسخة واحدة فقط منه.
+- **يعمل مع ويندوز** في الخلفية، وEsc أو زر الإغلاق يخفيانه إلى الأيقونة بجانب الساعة (للخروج: «خروج» من قائمة الأيقونة)، ونسخة واحدة فقط منه.
 - تواريخ نسبية («أمس»، «قبل 5 دقائق»)، وخيار الأرقام العربية، وأيقونات أنواع الملفات.
 - أي خطأ داخلي يُسجَّل في `log.txt` و`crash.txt` ولا يُغلق البرنامج.
 
@@ -229,7 +229,7 @@ InstaFind's second includes starting the command-line tool and loading the index
 
 #### Search from anywhere (new in 0.8)
 - **A small search box above the clock**: nearly invisible until the pointer comes close, then it fades in. It hides during full-screen games and video and can be dragged anywhere. Turn it off or hide it in **Options → Search from anywhere**.
-- **A quick-search popup on Ctrl+Alt+F** or from the tray icon, opening upward: files, **installed apps** (`chrome`, or `كروم` in Arabic), **Windows settings pages** (`wifi`, `bluetooth`, `display`) and **switching to an open window**.
+- **A quick-search popup on Ctrl+Alt+F** or from the tray icon, opening upward: files, **installed apps** (`chrome`, or `كروم` in Arabic, and any app by its Arabic spelling such as `كوكل بلي` for Google Play Games), **Windows settings pages** (`wifi`, `bluetooth`, `display`) and **switching to an open window**.
 - **Instant answers**: calculator (`250*12`), unit conversion (`5 kg to lb`, `100 F to C`) and the **Hijri date** (`hijri`, plus Umm al-Qura date conversion).
 - **Web shortcuts**: `youtube quran` searches YouTube directly; also Google, Wikipedia, Maps and Translate.
 - **System commands** (shut down, restart, sleep, lock, empty the Recycle Bin, end a frozen program), each **confirmed before it runs**.
@@ -266,7 +266,7 @@ InstaFind's second includes starting the command-line tool and loading the index
 
 #### Comfort
 - **English or Arabic interface**: follows the Windows display language; switch in **Options → Language / اللغة**.
-- **Starts with Windows** in the background, Esc hides it to the tray, single instance.
+- **Starts with Windows** in the background; Esc or the close button hides it to the tray (quit with *Exit* in the tray menu), single instance.
 - Relative dates, optional Arabic digits, file-type icons.
 - Internal errors are written to `log.txt` and `crash.txt` instead of closing the app.
 
