@@ -94,6 +94,8 @@ struct Files {
     query: String,
     rows: Vec<Row>,
     done: bool,
+    /// A text that finds something, when this query found nothing.
+    did_you_mean: Option<String>,
 }
 
 struct FileResult {
@@ -101,6 +103,7 @@ struct FileResult {
     rows: Vec<(String, bool)>,
     /// False while the index is still loading: "nothing found" isn't final.
     done: bool,
+    did_you_mean: Option<String>,
 }
 
 /// Fonts, colours and the backdrop choice for the current theme.
@@ -495,11 +498,14 @@ impl App {
                     hits = alt;
                 }
                 crate::search::promote(&mut hits, &boosted);
-                hits.iter().take(FILE_ROWS).filter_map(|&i| index.entries.get(i as usize)).map(|e| (e.path.to_string(), e.is_dir)).collect()
+                // Nothing at all: what to try instead (only once the index is in).
+                let did_you_mean = if hits.is_empty() && done { crate::suggest::did_you_mean(&index.entries, &text, "", &parse) } else { None };
+                let rows = hits.iter().take(FILE_ROWS).filter_map(|&i| index.entries.get(i as usize)).map(|e| (e.path.to_string(), e.is_dir)).collect();
+                (rows, did_you_mean)
             };
-            let rows = crate::crash_log::catch(run).unwrap_or_default();
+            let (rows, did_you_mean) = crate::crash_log::catch(run).unwrap_or_default();
             if let Ok(mut s) = slot.lock() {
-                *s = Some(FileResult { query: text, rows, done });
+                *s = Some(FileResult { query: text, rows, done, did_you_mean });
             }
             let h = post_to.load(Ordering::Relaxed);
             if h != 0 {
@@ -527,6 +533,7 @@ impl App {
             done: res.done && res.query == current,
             query: res.query,
             rows: res.rows.iter().map(|(p, d)| Row::file(p, *d)).collect(),
+            did_you_mean: res.did_you_mean,
         };
         self.popup_refresh();
         // The results of what is typed now (final or, while the index still
@@ -565,11 +572,30 @@ impl App {
             (pins, items)
         };
         drop(windows);
-        let (files, files_done) = {
+        let (files, files_done, did_you_mean) = {
             let f = self.popup.files.borrow();
-            (f.rows.clone(), f.done && f.query == query)
+            let done = f.done && f.query == query;
+            (f.rows.clone(), done, if done { f.did_you_mean.clone() } else { None })
         };
-        let mut rows = quick::arrange(Parts { query: query.clone(), pins, items, files, files_done });
+        let mut rows = if query.trim().is_empty() {
+            // The empty box: favourites, then the files opened lately.
+            crate::suggest::empty_rows(pins, self.popup_recent_rows())
+        } else {
+            let mut rows = quick::arrange(Parts { query: query.clone(), pins, items, files, files_done });
+            if files_done && crate::suggest::nothing_found(&rows) {
+                // The launcher's "search the web" fallback is the web
+                // suggestion; only offered here while it is missing (the
+                // app list is still being made).
+                let situation = crate::suggest::Situation {
+                    did_you_mean,
+                    contents: crate::search::Query::parse(&query).has_text_criteria(),
+                    web: !rows.iter().any(|r| r.group == Group::Web),
+                    ..Default::default()
+                };
+                crate::suggest::insert_rows(&mut rows, &crate::suggest::suggestions(&query, &situation));
+            }
+            rows
+        };
         for r in rows.iter_mut() {
             label_more_row(r);
         }
@@ -934,7 +960,7 @@ impl App {
         if how == How::Enter && self.popup.file_running.get() {
             let first = self.popup.selected.get() == Some(0);
             let may_change = match row.group {
-                Group::Pinned => false,
+                Group::Pinned | Group::Recent | Group::Suggest => false,
                 Group::More | Group::Web => true,
                 _ if matches!(row.target, Target::Launcher(Action::CopyText(_))) => false,
                 _ => matches!(row.target, Target::File { .. }) || self.popup.files.borrow().rows.is_empty(),
@@ -1006,6 +1032,10 @@ impl App {
                 self.show_window();
                 self.hide_quick();
                 self.on_query_changed();
+                return;
+            }
+            (Target::Apply(s), _) => {
+                self.popup_apply_suggestion(s, &query);
                 return;
             }
         };
@@ -1163,6 +1193,61 @@ pub(super) fn nwg_scale() -> f64 {
     nwg::scale_factor()
 }
 
+impl App {
+    /// The files opened lately that are still there, as rows. Looked up in
+    /// the index when it is loaded (no disk access); before that, only local
+    /// paths are checked on disk, and only the few needed.
+    fn popup_recent_rows(&self) -> Vec<Row> {
+        let st = self.state.borrow();
+        let index = st.index.clone();
+        let paths = st.history.recent_opens();
+        let found = if index.entries.is_empty() {
+            let probe = |p: &str| {
+                if p.starts_with(r"\\") || p.starts_with("//") {
+                    return None;
+                }
+                std::fs::metadata(p).ok().map(|m| m.is_dir())
+            };
+            crate::suggest::pick_recent(paths, crate::suggest::RECENT_ROWS, crate::suggest::MAX_PROBES, probe)
+        } else {
+            let probe = |p: &str| index.find(p).and_then(|i| index.entries.get(i)).map(|e| e.is_dir);
+            crate::suggest::pick_recent(paths, crate::suggest::RECENT_ROWS + crate::suggest::FAVOURITE_ROWS, usize::MAX, probe)
+        };
+        found.iter().map(|(p, d)| Row::file(p, *d)).collect()
+    }
+
+    /// Applies a suggestion for a search that found nothing: a new text is
+    /// typed in the box; the others continue in the full window.
+    fn popup_apply_suggestion(&self, s: &crate::suggest::Suggestion, query: &str) {
+        use crate::suggest::Suggestion;
+        match s {
+            Suggestion::Query(text) => {
+                let w = shell::wide(text);
+                let edit = self.popup_edit();
+                unsafe {
+                    SetWindowTextW(edit, w.as_ptr());
+                    let end = text.encode_utf16().count();
+                    SendMessageW(edit, EM_SETSEL as UINT, end, end as LPARAM);
+                }
+            }
+            Suggestion::Web => {
+                if shell::open(&crate::suggest::web_url(query)) {
+                    self.hide_quick();
+                }
+            }
+            Suggestion::Contents | Suggestion::AllDrives | Suggestion::AllKinds => {
+                self.query.set_text(query.trim());
+                if *s == Suggestion::Contents {
+                    self.content_chk.set_check_state(nwg::CheckBoxState::Checked);
+                }
+                self.show_window();
+                self.hide_quick();
+                self.on_search();
+            }
+        }
+    }
+}
+
 /// A pinned favourite as a row.
 fn pin_row(p: &crate::history::Pin) -> Row {
     if p.app {
@@ -1197,7 +1282,9 @@ fn label_more_row(r: &mut Row) {
 /// The name shown above a section.
 fn group_label(g: Group) -> &'static str {
     match g {
-        Group::Pinned => tr!("المثبّتة", "Pinned"),
+        Group::Pinned => tr!("المفضلة", "Favourites"),
+        Group::Recent => tr!("الأخيرة", "Recent"),
+        Group::Suggest => tr!("لا نتائج — جرّب", "No results — try"),
         Group::Best => tr!("أفضل نتيجة", "Best match"),
         Group::Windows => tr!("النوافذ المفتوحة", "Open windows"),
         Group::Apps => tr!("التطبيقات", "Apps"),

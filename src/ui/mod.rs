@@ -8,6 +8,7 @@
 //! - `results`: the result list, selection, copying, sorting and export
 //! - `files`: renaming and deleting files, and saving the edited index
 //! - `history_menu`: the menu of recent and saved searches
+//! - `empty_state`: the files opened lately (empty box) and what to try when nothing is found
 //! - `updates`: checking for, downloading and installing new versions
 //! - `feedback`: the "Send feedback" menu and the offer to report a crash
 //! - `content_index`: the stored document text and its background warm-up
@@ -30,6 +31,7 @@ mod build;
 mod content_index;
 mod dupes_window;
 mod disk_usage;
+mod empty_state;
 mod feedback;
 mod files;
 mod floating;
@@ -267,6 +269,8 @@ pub struct App {
     quick_menu: tray::QuickMenu,
     /// The quick search popup (built when it first opens).
     popup: quick::Popup,
+    /// What to try when a search finds nothing, above the result list.
+    suggest: empty_state::SuggestBar,
     /// The search box above the clock.
     floating: floating::Floating,
     /// The recent/saved searches menu, rebuilt each time it opens.
@@ -430,6 +434,7 @@ impl App {
 
         // The result list fills the rest.
         let y3 = y_scope + CTRL_H + GAP + 2;
+        let y3 = self.place_suggestions(M, y3, w - 2 * M);
         style::place(&self.list.handle, M, y3, (w - 2 * M).max(100), (y_btn - GAP - y3).max(50));
 
         // Status bar: messages on one side, the selected file's path on the other.
