@@ -672,6 +672,7 @@ impl App {
         drop(look);
         let previous = self.popup.selected.get().and_then(|i| self.popup.rows.borrow().get(i).map(|r| r.target.clone()));
         let selected = quick::reselect(&rows, previous.as_ref());
+        ui_test_dump(&query, &rows);
         *self.popup.rows.borrow_mut() = rows;
         *self.popup.slots.borrow_mut() = slots;
         self.popup.selected.set(selected);
@@ -1395,6 +1396,25 @@ fn group_label(g: Group) -> &'static str {
     }
 }
 
+/// For the automated UI test (`ci/ui-test.ps1`) only: the popup draws its rows
+/// itself, so UI Automation cannot read them. With `BAHTH_UI_TEST` set, each
+/// refresh writes the query and the rows to `quick-rows.txt` next to the log.
+fn ui_test_dump(query: &str, rows: &[Row]) {
+    use std::io::Write;
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if !*ON.get_or_init(|| std::env::var_os("BAHTH_UI_TEST").is_some()) {
+        return;
+    }
+    let mut text = format!("query\t{query}\n");
+    for r in rows {
+        text.push_str(&format!("{:?}\t{}\t{}\n", r.group, r.title, r.subtitle));
+    }
+    let path = crate::index::cache_path().with_file_name("quick-rows.txt");
+    if let Ok(mut f) = std::fs::File::create(path) {
+        let _ = f.write_all(text.as_bytes());
+    }
+}
+
 #[cfg(test)]
 mod dpi_leak_tests {
     /// Issue #10: the scale used on every floating-box frame leaked a screen
@@ -1419,3 +1439,4 @@ mod dpi_leak_tests {
         assert!(after <= before + 16, "GDI objects grew from {before} to {after}");
     }
 }
+
