@@ -596,7 +596,12 @@ mod tests {
         assert!(text.contains("in thread 'probe-thread': index out of bounds"), "{text}");
         assert!(text.contains("crash_log.rs:"), "{text}");
         assert!(text.contains("backtrace:"), "{text}");
-        assert!(text.contains("contained a parser panic: bad pdf"), "{text}");
+        // Other tests running at the same time also log contained panics, and
+        // only the first QUIET_LINES of a run get a line: once the cap is
+        // passed, this one may have been the one counted instead.
+        if QUIET_COUNT.load(Ordering::Relaxed) <= QUIET_LINES {
+            assert!(text.contains("contained a parser panic: bad pdf"), "{text}");
+        }
         let crash = std::fs::read_to_string(dir.join("crash.txt")).unwrap();
         assert!(crash.contains("probe-thread") && !crash.contains("bad pdf"));
         let _ = std::fs::remove_dir_all(&dir);

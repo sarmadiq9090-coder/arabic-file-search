@@ -150,7 +150,8 @@ jobs:
   ui:
     needs: exe
     runs-on: windows-latest
-    timeout-minutes: 50
+    # The first index can take 40 minutes when the runner's disk is throttled.
+    timeout-minutes: 80
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
