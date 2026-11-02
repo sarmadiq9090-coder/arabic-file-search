@@ -519,6 +519,18 @@ pub struct Parts {
 /// apps, files, settings, answers, commands and web, each section capped,
 /// at most [`MAX_RESULTS`] in all, then the feedback rows and "open in
 /// InstaFind".
+/// Whether `name` holds `q` with no letter or digit glued to either side.
+fn holds_whole(name: &str, q: &str) -> bool {
+    if q.is_empty() {
+        return false;
+    }
+    name.match_indices(q).any(|(at, _)| {
+        let before = name[..at].chars().next_back();
+        let after = name[at + q.len()..].chars().next();
+        !before.is_some_and(char::is_alphanumeric) && !after.is_some_and(char::is_alphanumeric)
+    })
+}
+
 pub fn arrange(parts: Parts) -> Vec<Row> {
     let query = parts.query.trim().to_string();
     let mut pins: Vec<Row> = parts.pins.into_iter().map(|r| Row { group: Group::Pinned, ..r }).collect();
@@ -537,7 +549,8 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
     let nq = crate::normalize::normalize(&query);
     if answered {
         // "2+2" is a sum: only files named with the whole of it, not every name with a 2.
-        files.retain(|r| crate::normalize::normalize(&r.title).contains(nq.as_str()));
+        // ("d412+25" holds "2+2" but is not named with it: it must stand alone.)
+        files.retain(|r| holds_whole(&crate::normalize::normalize(&r.title), &nq));
     }
     let found = !pins.is_empty() || !files.is_empty() || items.iter().any(|r| r.group != Group::Web);
 
@@ -552,11 +565,10 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
             best = Some(items.remove(i));
         } else if !files.is_empty() && (!has_app || names_query(&files[0].title, &query)) {
             best = Some(files.remove(0));
-        } else if let Some(i) = items.iter().position(|r| r.group == Group::Apps) {
-            // The files only resemble the query ("notepda"): an app found
-            // despite the typo comes first.
-            best = Some(items.remove(i));
         } else if let Some(i) = items.iter().position(|r| r.group != Group::Web) {
+            // The files only resemble the query ("notepda"): the best app or
+            // page found despite the typo comes first (items are best first,
+            // so a weak app never jumps a better settings page).
             best = Some(items.remove(i));
         }
     }
@@ -1220,7 +1232,7 @@ mod tests {
     fn a_sum_hides_files_that_only_share_digits() {
         let items = catalog_items(&["Notepad"], "2+2");
         assert_eq!(items.first().map(|i| i.kind), Some(Kind::Answer));
-        let files = vec![Row::file(r"C:\x\report 2022.docx", false), Row::file(r"C:\2 2.txt", false), Row::file(r"C:\a\2+2 notes.txt", false)];
+        let files = vec![Row::file(r"C:\x\report 2022.docx", false), Row::file(r"C:\2 2.txt", false), Row::file(r"C:\a\2+2 notes.txt", false), Row::file(r"C:\terminfo\d412+25", false)];
         let rows = arrange(Parts { query: "2+2".into(), pins: vec![], items, files, files_done: true });
         assert_eq!(rows[0].target, Target::Launcher(Action::CopyText("4".into())));
         let files: Vec<&str> = rows.iter().filter(|r| r.group == Group::Files).map(|r| r.title.as_str()).collect();
@@ -1232,6 +1244,21 @@ mod tests {
         // Matched like a name search: the article is stripped.
         assert!(names_query("تقرير مالي.docx", "التقرير"));
         assert!(names_query("Report 2024.PDF", "report|invoice"));
+    }
+
+    #[test]
+    fn weak_app_does_not_jump_a_better_settings_page() {
+        // "اعدادات الشاشة" on a real PC: Display (settings) scored best, a
+        // weak "Windows Tools" app match came after it and must stay there.
+        let items = vec![
+            item(Kind::Setting, "Display", Action::OpenUri("ms-settings:display".into())),
+            item(Kind::App, "Windows Tools", launch("shell:AppsFolder\\tools")),
+        ];
+        let files = vec![Row::file(r"C:\x\unrelated.txt", false)];
+        let rows = arrange(Parts { query: "اعدادات الشاشة".into(), pins: vec![], items, files, files_done: true });
+        assert_eq!(rows[0].title, "Display");
+        assert_eq!(rows[0].group, Group::Best);
+        assert!(holds_whole("2+2 notes.txt", "2+2") && !holds_whole("d412+25", "2+2") && !holds_whole("x", ""));
     }
 
     #[test]

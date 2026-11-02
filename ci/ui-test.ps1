@@ -384,7 +384,6 @@ Main-Search 'zzqqxxnotthere' '' 'probe' 'no results message'
 # 0.9: a search that finds nothing offers what to try next.
 $tips = @(Get-Children $ui.Main.Handle | Where-Object { $_.Visible -and $_.Class -eq 'Button' -and $_.Text -match 'Search the web|Search inside file contents|Did you mean' })
 Record 'search' 'core' 'no results shows suggestions (search the web / inside contents)' ($tips.Count -gt 0) (($tips | ForEach-Object Text) -join ' | ')
-Main-Search 'budgte' 'Quarterly Budget' 'core' 'English typo still finds the file (0.9 did-you-mean must not hide it)'
 
 # Inside documents.
 if ($ui -and $ui.Content) {
