@@ -145,8 +145,8 @@ jobs:
   # English searches, opens the menus, the quick search popup and the
   # Arabic interface, closes to the tray, and screenshots every step. Core
   # checks fail the job; "probe" checks (typos, Arabizi, Arabic app names...)
-  # only report what is missing. Not yet required by `release` while it
-  # proves itself stable on the runners.
+  # only report what is missing. `release` waits for it: nothing is
+  # published unless the real-user test passes on the same commit.
   ui:
     needs: exe
     runs-on: windows-latest
@@ -166,7 +166,7 @@ jobs:
           path: ${{ runner.temp }}/ui-test
 
   release:
-    needs: [linux-test, windows, smoke]
+    needs: [linux-test, windows, smoke, ui]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

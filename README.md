@@ -65,6 +65,16 @@ scoop install instafind
 
 ## المميزات
 
+### جديد في 0.9
+- **البرامج بأسمائها العربية كما تكتبها**: أكثر من 45 برنامجاً ولعبة جديدة بتهجئاتها الشائعة (`كوكل كروم`، `تلكرام`، `وتساب`، `فوتشوب`، `بوبجي`)، ويُقبل حرف غلط واحد (`ديسكود` تجد Discord)، وبداية الاسم تكفي (`سبوت`).
+- **البرنامج يتعلّم من اختيارك**: إذا كتبت حروفاً وفتحت برنامجاً، يظهر أولاً في المرة الجاية لنفس الحروف.
+- **البرامج في النافذة الرئيسية أيضاً**: أزرار «تطبيق: …» فوق النتائج عندما يطابق البحث اسم برنامج.
+- **تحويل العملات**: `100 دولار`، `100 usd to iqd`، `50 يورو بالدينار`، `١٠٠ ريال سعودي` لـ 24 عملة، بأسعار تتحدث كل 12 ساعة.
+- **الملفات الأخيرة والمفضلة** تظهر عند فتح البحث فارغاً.
+- **عندما لا توجد نتائج** يقترح البرنامج: «هل تقصد…؟»، البحث داخل المحتوى، كل الأقراص، كل الأنواع، أو الويب.
+- **ترتيب أذكى**: `notepda` تظهر Notepad قبل الملفات، و`2+2` تعطي الجواب بدون ملفات لا علاقة لها.
+- **فهرسة محتوى الملفات في اليوم الأول أسرع** بمرة ونصف إلى 3 مرات، وتبدأ بمجلداتك (سطح المكتب، المستندات، التنزيلات).
+
 ### البحث من أي مكان (جديد في 0.8)
 - **خانة بحث صغيرة فوق الساعة**: شفافة وتكاد لا تُرى حتى تقرّب المؤشر، فتظهر بنعومة. تختفي وحدها مع الألعاب والفيديو بملء الشاشة، وتُسحب لأي مكان. تُطفأ أو تُخفى من «خيارات ← البحث من أي مكان».
 - **نافذة بحث صغيرة بـ Ctrl+Alt+F** أو من أيقونة الساعة، تفتح النتائج للأعلى: الملفات، و**البرامج المثبتة** (`كروم` تفتح Google Chrome، `وورد`، `الحاسبة`، وأي برنامج بنطقه العربي مثل `كوكل بلي`)، و**صفحات إعدادات ويندوز** (`واي فاي`، `بلوتوث`، `الشاشة`)، و**التبديل إلى نافذة مفتوحة**.
@@ -226,6 +236,16 @@ Measured on a real Windows machine on GitHub Actions (Windows Server 2025, an in
 InstaFind's second includes starting the command-line tool and loading the index from disk. In the open window results appear as you type, in milliseconds (the status bar in the demo above shows 15 to 34 ms). The Windows Search indexer is not installed on that machine; by default it covers only user folders and does not treat `احمد` and `أحمد` as the same. [`ci/bench.ps1`](ci/bench.ps1) reproduces the run; raw results are in [`docs/media/bench.md`](docs/media/bench.md).
 
 ### Features
+
+#### New in 0.9
+- **Apps by the Arabic spelling you type**: 45+ more apps and games with their common spellings, one wrong letter forgiven (`ديسكود` finds Discord), and the start of a name is enough.
+- **Learns from your picks**: the app you open after typing some letters comes first next time.
+- **Apps in the main window too**: "App: …" buttons above the results when the search names an app.
+- **Currency conversion**: `100 usd to iqd`, `100 دولار`, `50 eur in gbp` for 24 currencies, rates refreshed every 12 hours.
+- **Recent and favourite files** when the search box opens empty.
+- **When nothing is found**: "Did you mean…?", search inside contents, all drives, all file types, or the web.
+- **Smarter ranking**: `notepda` shows Notepad before files, and `2+2` gives the answer without unrelated files.
+- **First-day content indexing 1.5–3× faster**, starting with your Desktop, Documents and Downloads.
 
 #### Search from anywhere (new in 0.8)
 - **A small search box above the clock**: nearly invisible until the pointer comes close, then it fades in. It hides during full-screen games and video and can be dragged anywhere. Turn it off or hide it in **Options → Search from anywhere**.

@@ -381,6 +381,10 @@ Main-Search 'ta2rer' 'تقرير' 'probe' 'Arabizi (ta2rer)'
 Main-Search 'budgte' 'Quarterly Budget' 'probe' 'English typo (budgte)'
 Main-Search 'الفيزيا' 'محاضرة الفيزياء' 'probe' 'common misspelling (الفيزيا)'
 Main-Search 'zzqqxxnotthere' '' 'probe' 'no results message'
+# 0.9: a search that finds nothing offers what to try next.
+$tips = @(Get-Children $ui.Main.Handle | Where-Object { $_.Visible -and $_.Class -eq 'Button' -and $_.Text -match 'Search the web|Search inside file contents|Did you mean' })
+Record 'search' 'core' 'no results shows suggestions (search the web / inside contents)' ($tips.Count -gt 0) (($tips | ForEach-Object Text) -join ' | ')
+Main-Search 'budgte' 'Quarterly Budget' 'core' 'English typo still finds the file (0.9 did-you-mean must not hide it)'
 
 # Inside documents.
 if ($ui -and $ui.Content) {
@@ -460,8 +464,21 @@ Quick-Search 'رسام' 'Paint' 'probe' 'Windows app by Arabic meaning (رسام
 Quick-Search 'display' 'isplay' 'probe' 'Settings page (display) is first' -Best
 Quick-Search 'اعدادات الشاشة' 'isplay' 'probe' 'Settings page in Arabic (اعدادات الشاشة) is first' -Best
 Quick-Search 'واي فاي' 'Wi-Fi' 'probe' 'Settings page in Arabic (واي فاي = Wi-Fi)'
-Quick-Search 'notepda' 'Notepad' 'probe' 'app with a typo (notepda) is first' -Best
-Quick-Search '100 usd to iqd' '= ' 'probe' 'currency answer (100 usd to iqd)' -Best
+Quick-Search 'notepda' 'Notepad' 'core' 'app with a typo (notepda) is first' -Best
+Quick-Search '100 usd to iqd' 'IQD' 'core' 'currency answer (100 usd to iqd)' -Best
+Quick-Search '100 دولار' 'IQD' 'core' 'currency answer in Arabic (100 دولار)' -Best
+Quick-Search '50 يورو بالدينار' 'IQD' 'probe' 'currency answer in Arabic (50 يورو بالدينار)' -Best
+Quick-Search 'كوكل كروم' 'Chrome' 'probe' 'Iraqi spelling of an app (كوكل كروم) is first' -Best
+Quick-Search 'zzqqxxnotthere' 'Suggest' 'core' 'no results shows a "try" group'
+# A sum shows its answer and no files that merely contain the digits.
+Quick-Search '2+2' '4' 'core' 'calculator answer (2+2) is first' -Best
+$files = @(Quick-Rows | Select-Object -Skip 1 | Where-Object { $_ -like "Files`t*" })
+Record 'quick search' 'core' '2+2 shows no unrelated files' ($files.Count -eq 0) (($files -replace "`t", ': ') -join ' | ')
+# The empty box lists favourites / recent files (none yet on a fresh runner: it must just not crash).
+[U]::Chord($VK.CTRL, $VK.A); [U]::Chord($VK.BACK)
+Start-Sleep -Seconds 1
+Record 'quick search' 'core' 'empty box after a search does not crash' (-not $p.HasExited)
+Shot 'quick-empty'
 Quick-Search '5 كم بالميل' '3.1' 'probe' 'unit answer in Arabic (5 كم بالميل)' -Best
 [U]::Chord($VK.ESC)
 $gone = Wait-Until { -not (Visible-Window $p.Id 'InstaFindQuickSearch') } 3
