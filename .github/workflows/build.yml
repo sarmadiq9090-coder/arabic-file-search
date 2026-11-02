@@ -149,6 +149,13 @@ jobs:
   # published unless the real-user test passes on the same commit.
   ui:
     needs: exe
+    # TEMPORARY (remove before merge): three samples of the first index with
+    # the per-minute disk and load lines.
+    strategy:
+      fail-fast: false
+      matrix:
+        sample: [1, 2, 3]
+    name: ui (sample ${{ matrix.sample }})
     runs-on: windows-latest
     timeout-minutes: 50
     steps:
@@ -162,7 +169,7 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ui-test
+          name: ui-test-${{ matrix.sample }}
           path: ${{ runner.temp }}/ui-test
 
   release:
