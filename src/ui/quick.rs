@@ -391,6 +391,10 @@ impl App {
         self.popup.rect.set(rect);
         self.popup.selected.set(None);
         self.popup.enter_pending.set(false);
+        // Where the cursor is now: only a real move selects a row.
+        let mut cur = winapi::shared::windef::POINT { x: 0, y: 0 };
+        unsafe { GetCursorPos(&mut cur) };
+        self.popup.mouse.set((cur.x, cur.y));
         // Clearing the box runs the (empty) search, which sizes the window.
         let empty = shell::wide("");
         unsafe { SetWindowTextW(self.popup_edit(), empty.as_ptr()) };
@@ -693,7 +697,13 @@ impl App {
             }
             WM_MOUSEMOVE => {
                 let p = point_of(l);
-                if self.popup.mouse.replace(p) != p {
+                // Compared on the screen: Windows also sends WM_MOUSEMOVE
+                // when the popup grows or moves under a cursor that stays
+                // put, and the row under it must not take the selection
+                // from the best match then (Enter would open that row).
+                let mut sp = winapi::shared::windef::POINT { x: 0, y: 0 };
+                unsafe { GetCursorPos(&mut sp) };
+                if self.popup.mouse.replace((sp.x, sp.y)) != (sp.x, sp.y) {
                     let row = quick::row_at(&self.popup.slots.borrow(), p.1);
                     if row.is_some() && row != self.popup.selected.get() {
                         self.popup.selected.set(row);
