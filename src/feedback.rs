@@ -374,4 +374,13 @@ mod tests {
         assert_eq!(format_windows(Some(""), None, None), "Windows");
         assert!(discussions_url().ends_with("/discussions"));
     }
+
+    #[test]
+    fn native_crash_lines_are_reports() {
+        let file = "1700000000 PANIC (v9.9.9) native crash: exception 0xC00000FD at bahth.exe+0x1A2B\r\nEND PANIC\r\n\r\n";
+        let r = crash_reports(file, "9.9.9");
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].time, 1_700_000_000);
+        assert!(r[0].text.contains("0xC00000FD"));
+    }
 }

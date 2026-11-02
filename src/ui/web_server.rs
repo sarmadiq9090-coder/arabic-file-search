@@ -232,7 +232,9 @@ impl App {
             match evt {
                 nwg::Event::OnMenuItemSelected if handle == app.web.menu_item && app.ensure_web_window() => app.show_web_window(),
                 nwg::Event::OnTimerTick if handle == app.timer => app.sync_web_index(),
-                nwg::Event::OnWindowClose if handle == app.window => app.stop_web(),
+                // Only a real exit stops it; the close button keeps the
+                // program running in the tray.
+                nwg::Event::OnWindowClose if handle == app.window && !app.close_hides() => app.stop_web(),
                 _ => {}
             }
         });
