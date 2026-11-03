@@ -8,11 +8,13 @@ use crate::index::Entry;
 pub(super) static ARABIC_DIGITS: AtomicBool = AtomicBool::new(false);
 
 /// Keeps a path reading left-to-right even when folder names are Arabic: the
-/// whole path is a left-to-right isolate (LRI … PDI), so the right-to-left
+/// whole path is a left-to-right embedding (LRE … PDF), so the right-to-left
 /// text around it (the Arabic window, a label) cannot move its ends, such as
 /// a trailing `\`, to the other side; and left-to-right marks around every
-/// separator keep Arabic folder names in path order. Display only: never
-/// pass the result to the shell or the clipboard.
+/// separator keep Arabic folder names in path order. Not the newer isolates
+/// (LRI … PDI): the list view and GDI text draw those as boxes (seen in
+/// store.yml's screenshots). Display only: never pass the result to the
+/// shell or the clipboard.
 pub(super) fn ltr_path(path: &str) -> String {
     // In the left-to-right (English) window a path with no right-to-left
     // letters already reads correctly.
@@ -20,7 +22,7 @@ pub(super) fn ltr_path(path: &str) -> String {
         return path.to_owned();
     }
     let mut s = String::with_capacity(path.len() + 16);
-    s.push('\u{2066}');
+    s.push('\u{202A}');
     for c in path.chars() {
         if c == '\\' {
             s.push_str("\u{200E}\\\u{200E}");
@@ -28,7 +30,7 @@ pub(super) fn ltr_path(path: &str) -> String {
             s.push(c);
         }
     }
-    s.push('\u{2069}');
+    s.push('\u{202C}');
     s
 }
 
@@ -168,17 +170,17 @@ mod tests {
     fn display_paths_keep_their_text() {
         for s in random_strings(0x1234_5678_9ABC_DEF1, 3000) {
             let shown = ltr_path(&s);
-            // Only the isolate and left-to-right marks are added.
-            let plain = |t: &str| t.replace(['\u{200E}', '\u{2066}', '\u{2069}'], "");
+            // Only the embedding and left-to-right marks are added.
+            let plain = |t: &str| t.replace(['\u{200E}', '\u{202A}', '\u{202C}'], "");
             assert_eq!(plain(&shown), plain(&s), "{s:?}");
-            assert!(shown.starts_with('\u{2066}') && shown.ends_with('\u{2069}'), "{s:?}");
+            assert!(shown.starts_with('\u{202A}') && shown.ends_with('\u{202C}'), "{s:?}");
         }
     }
 
     #[test]
-    fn display_paths_are_one_left_to_right_isolate() {
+    fn display_paths_are_one_left_to_right_embedding() {
         // Tests run in Arabic (i18n::detect).
-        assert_eq!(ltr_path("C:\\العمل\\"), "\u{2066}C:\u{200E}\\\u{200E}العمل\u{200E}\\\u{200E}\u{2069}");
+        assert_eq!(ltr_path("C:\\العمل\\"), "\u{202A}C:\u{200E}\\\u{200E}العمل\u{200E}\\\u{200E}\u{202C}");
     }
 
     #[test]
