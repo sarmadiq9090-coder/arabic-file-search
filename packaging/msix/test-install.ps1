@@ -1,5 +1,5 @@
 # Checks the Store package on a real Windows machine (store.yml): signs a COPY
-# of the bundle with a throwaway self-signed certificate (the Store signs the
+# of the bundle (or of one CPU's .msix) with a throwaway self-signed certificate (the Store signs the
 # real one), installs it, runs the `instafind.exe` alias and starts the app
 # like the Start menu does, then checks the log the packaged program writes:
 # package identity found, data under the package's
@@ -16,14 +16,16 @@ $failed = $false
 function Fail($msg) { Write-Host "::error::$msg"; $script:failed = $true }
 
 $root = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+# The native signtool on Windows on ARM, else the x64 one (emulated there).
+$hostArch = if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') { 'arm64' } else { 'x64' }
 $signtool = Get-ChildItem $root -Directory -Filter '10.*' |
     Sort-Object { [version]$_.Name } -Descending |
-    ForEach-Object { Join-Path $_.FullName 'x64\signtool.exe' } |
+    ForEach-Object { Join-Path $_.FullName "$hostArch\signtool.exe"; Join-Path $_.FullName 'x64\signtool.exe' } |
     Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $signtool) { throw "signtool.exe not found under $root" }
 
 $tmp = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
-$signed = Join-Path $tmp 'instafind-test-signed.msixbundle'
+$signed = Join-Path $tmp ('instafind-test-signed' + [IO.Path]::GetExtension($Bundle))
 Copy-Item $Bundle $signed -Force
 
 # The certificate subject must equal the manifest's Publisher.

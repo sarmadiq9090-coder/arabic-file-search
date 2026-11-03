@@ -103,6 +103,10 @@ def main(argv=None):
         shutil.rmtree(dest, ignore_errors=True)
         shutil.copytree(os.path.join(HERE, "Assets"), os.path.join(dest, "Assets"))
         shutil.copyfile(src, os.path.join(dest, "bahth.exe"))
+        # Licences: InstaFind's own and every crate's (packaging/make_notices.py);
+        # About opens THIRD-PARTY-NOTICES.txt from the package folder.
+        for doc in ("LICENSE", "THIRD-PARTY-NOTICES.txt"):
+            shutil.copyfile(os.path.join(ROOT, doc), os.path.join(dest, doc + (".txt" if doc == "LICENSE" else "")))
         manifest = fill(template, {
             "IDENTITY_NAME": ident["name"],
             "PUBLISHER": ident["publisher"],

@@ -36,6 +36,9 @@ on:
       - ".github/workflows/store.yml"
       - "src/store.rs"
       - "ci/store-shots.ps1"
+      - "packaging/make_notices.py"
+      - "THIRD-PARTY-NOTICES.txt"
+      - "Cargo.lock"
 
 permissions:
   contents: read
@@ -62,6 +65,23 @@ jobs:
           fi
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir exes \
             --pattern bahth.exe --pattern bahth-x86.exe --pattern bahth-arm64.exe
+          # Fail closed: every exe must match the SHA-256 digest GitHub
+          # recorded when the release job uploaded it. (build.yml makes no
+          # build attestations, so `gh attestation verify` has nothing to check.)
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" \
+            --jq '.assets[] | "\(.name) \(.digest // "none")"' > digests.txt
+          for f in bahth.exe bahth-x86.exe bahth-arm64.exe; do
+            want=$(awk -v n="$f" '$1 == n { print $2 }' digests.txt)
+            case "$want" in
+              sha256:*) ;;
+              *) echo "::error::$f has no SHA-256 digest on release $TAG; not packaging it"; exit 1 ;;
+            esac
+            got="sha256:$(sha256sum "exes/$f" | cut -d' ' -f1)"
+            if [ "$got" != "$want" ]; then
+              echo "::error::$f is $got, but release $TAG records $want"; exit 1
+            fi
+            echo "$f $got matches the release"
+          done
           ls -l exes
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -148,11 +168,17 @@ jobs:
       - name: makepri, makeappx pack and bundle
         shell: pwsh
         run: ./packaging/msix/pack.ps1 -Layouts msix -Out store-package
-      - name: Install a test-signed copy and check Store mode
+      - name: Install a test-signed copy and check Store mode (x64, from the bundle)
         shell: powershell
         run: |
           $bundle = Get-ChildItem store-package -Filter *.msixbundle | Select-Object -First 1
           ./packaging/msix/test-install.ps1 -Bundle $bundle.FullName -Name $env:STORE_name -Publisher $env:STORE_publisher
+      # The single-CPU packages inside the bundle, for install-test below.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: store-parts
+          path: ${{ runner.temp }}/msix-parts/
+          retention-days: 3
       - name: Summary
         shell: pwsh
         run: |
@@ -178,6 +204,44 @@ jobs:
           name: store-package
           path: store-package/
           if-no-files-found: error
+
+  # The same install check for the x86 package (on x64 Windows, where 32-bit
+  # Windows users' package also runs) and the arm64 package (on Windows 11
+  # on ARM); the package job covers x64.
+  install-test:
+    needs: package
+    if: ${{ !cancelled() && needs.package.result == 'success' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: store-parts
+          path: parts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: store-package
+          path: store-package
+      - name: Install a test-signed ${{ matrix.arch }} package and check Store mode
+        shell: powershell
+        run: |
+          $info = @{}
+          Get-Content store-package/identity.txt | ForEach-Object { $k, $v = $_ -split '=', 2; $info[$k] = $v }
+          $msix = Get-ChildItem parts -Filter "*_${{ matrix.arch }}.msix" | Select-Object -First 1
+          if (-not $msix) { throw "no ${{ matrix.arch }} package in store-parts" }
+          Write-Host "OS $([Runtime.InteropServices.RuntimeInformation]::OSArchitecture), package $($msix.Name)"
+          ./packaging/msix/test-install.ps1 -Bundle $msix.FullName -Name $info['name'] -Publisher $info['publisher']
 
   # Store listing screenshots (1920x1080 when the runner allows it), in
   # Arabic and English, from the same x64 exe that was packaged.
@@ -205,3 +269,13 @@ jobs:
           name: store-screenshots
           path: ${{ runner.temp }}/store-screenshots
           if-no-files-found: warn
+
+  # THIRD-PARTY-NOTICES.txt (shipped in every package) matches Cargo.lock.
+  notices:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Check the third-party notices
+        run: python3 packaging/make_notices.py --check

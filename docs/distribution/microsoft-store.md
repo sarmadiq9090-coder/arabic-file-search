@@ -24,7 +24,8 @@ packaged (`src/store.rs`) and behaves as a Store app.
 | `packaging/msix/AppxManifest.xml` | Manifest template: Windows.Desktop, `runFullTrust`, the `instafind.exe` alias, the `InstaFindStartup` startup task |
 | `packaging/msix/identity.json` | Partner Center identity. A value with `TODO` makes the build use the `test` block and say so |
 | `packaging/msix/Assets/` | Logos at scales 100–400 and target sizes 16–256, made by `make_assets.py` from the app icon (`assets/make_icon.py`, the source of `assets/bahth-256.png`) |
-| `packaging/msix/make_layout.py` | One package folder per CPU, with the filled manifest |
+| `packaging/msix/make_layout.py` | One package folder per CPU, with the filled manifest, `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt` |
+| `packaging/make_notices.py` | Writes `THIRD-PARTY-NOTICES.txt` from `Cargo.lock` (`--check` in CI); rerun after a dependency change |
 | `packaging/msix/pack.ps1` | `makepri` + `makeappx pack` per CPU, then `makeappx bundle` |
 | `packaging/msix/test-install.ps1` | CI check: installs a test-signed copy and checks Store mode |
 | `.github/workflows/store.yml` | Runs all of it on `windows-latest` and uploads the `store-package` artifact |
@@ -37,6 +38,8 @@ When `GetCurrentPackageFullName` succeeds the program is the Store version:
 - **Updates.** No GitHub check and no self-update (`update.rs` refuses too). Options ▸ "Updates from Microsoft Store (version …)" says that updates come from the Store. Downloading code would break Store policy 10.2.2, and the program's folder (`WindowsApps`) is read-only anyway.
 - **Start with Windows** uses the package's StartupTask (`Windows.ApplicationModel.StartupTask`, TaskId `InstaFindStartup`) instead of the `Run` key, which a packaged app cannot write for real. It is **off until the user turns it on** (Options ▸ Start with Windows, or Settings ▸ Apps ▸ Startup ▸ InstaFind): `store::ENABLE_STARTUP_ON_FIRST_RUN` is `false` because Store policy 10.2.8 wants the user's consent, unlike the portable program, which turns it on once. If the user turns it off in Settings ▸ Apps ▸ Startup or in Task Manager, Windows reports `DisabledByUser`, the program never turns it back on, and the Options item explains where to change it. A sign-in launch is recognised by the activation kind (`StartupTask`), since the task passes no `--startup`, and the program starts hidden in the tray as before.
 - **Data.** The program still writes to `%LOCALAPPDATA%\BahthSari` (index, content cache, rates, log, settings) and `HKCU\Software\BahthSari`. Windows redirects these writes to the package's private folder `%LOCALAPPDATA%\Packages\FastKiwi.InstaFind_sm1xjmj6v76yc\LocalCache\Local\BahthSari` and its private registry hive. The program sees one consistent view, and Windows removes the data on uninstall. The `instafind.exe` alias runs inside the package, so `instafind.exe -s "query"` reads the same index. A portable `bahth.exe` on the same PC keeps its own, separate index. The first log line of a Store run names the package and the real data folder.
+- **No phone search.** Options has no "Search from phone" item and the LAN server never starts (it serves file names over plain HTTP; Store policy 10.5.4).
+- **Licences.** The package carries `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt` next to `bahth.exe`; About offers to open the notices (the portable program opens the copy on GitHub).
 - **Unchanged:** global hotkeys (`RegisterHotKey`: Ctrl+Alt+F, Ctrl+Alt+G, optional Alt+Space), the tray icon, the floating box, the folder watchers and the indexer. A full-trust package runs as a normal desktop process of the user, and no low-level keyboard hooks are used. The single-instance mutex is shared with a portable copy, so only one of them runs at a time.
 
 ## 1. Fill the identity
@@ -62,7 +65,7 @@ The version is the app version plus `.0`, because the Store keeps the fourth num
 
 1. Partner Center ▸ Apps and games ▸ InstaFind ▸ **Start submission** (later: **Update**).
 2. **Pricing and availability:** Free; markets: all; visibility: public.
-3. **Properties:** category *Productivity* (subcategory none), or *Utilities & tools*. Privacy policy URL `https://fastkiwi.app/privacy/`. Website `https://fastkiwi.app/arabic-file-search/`. Support contact: the GitHub issues URL. Product declarations: leave "accessibility" unticked unless tested. Tick nothing about pen/Xbox. System requirements: keyboard required; 4 GB RAM recommended.
+3. **Properties:** category **Utilities & tools** (subcategory *File managers*). Privacy policy URL `https://fastkiwi.app/privacy/`. Website `https://fastkiwi.app/arabic-file-search/`. Support contact: the GitHub issues URL. Product declarations: leave "accessibility" unticked unless tested. Tick nothing about pen/Xbox. System requirements: keyboard required; 4 GB RAM recommended.
 4. **Age ratings:** the questionnaire, answers below.
 5. **Packages:** drag in the `.msixbundle`. Partner Center validates it (identity, version, `runFullTrust`). Device families: Windows 10/11 Desktop.
 6. **Store listings:** add **English (United States)** and **Arabic**, and paste the texts below. Upload screenshots and the 1:1 logo.
@@ -112,12 +115,12 @@ The version is the app version plus `.0`, because the Store keeps the fourth num
 **اسم المنتج:** InstaFind (الاسم المحجوز نفسه، بلا إضافة)
 
 **وصف قصير**
-> اعثر على أي ملف في حاسوبك أثناء الكتابة، بالعربية أو الإنكليزية، وحتى داخل المستندات. سريع وخاص ومجاني.
+> اعثر على أي ملف في حاسوبك أثناء الكتابة، بالعربية أو الإنجليزية، وحتى داخل المستندات. سريع وخاص ومجاني.
 
 **الوصف**
 > InstaFind يجد ملفاتك على ويندوز لحظة الكتابة، حتى بين أكثر من مليون ملف، ويفهم العربية كما نكتبها فعلاً.
 >
-> اكتب «احمد» فيجد «أحمد»، واكتب «التقرير» فيجد «تقرير»، ولو كتبت بلوحة المفاتيح الخطأ «hgjrvdv» يجد «التقرير». ويتعامل مع العربيزي والأخطاء الإملائية والهمزات الناقصة، والإنكليزية كذلك.
+> اكتب «احمد» فيجد «أحمد»، واكتب «التقرير» فيجد «تقرير»، ولو كتبت بلوحة المفاتيح الخطأ «hgjrvdv» يجد «التقرير». ويتعامل مع العربيزي والأخطاء الإملائية والهمزات الناقصة، والإنجليزية كذلك.
 >
 > ويبحث داخل المستندات: PDF وWord وExcel وPowerPoint وOpenDocument وRTF والبريد والكتب الإلكترونية والملفات المضغوطة، ويقرأ النص في الصور وملفات PDF الممسوحة بالتعرف الضوئي المدمج في ويندوز.
 >
@@ -145,9 +148,9 @@ The version is the app version plus `.0`, because the Store keeps the fourth num
 
 ## Age rating (IARC questionnaire)
 
-- Category: **Productivity / utility app** (not a game, not a browser, not social, not a store).
+- Category: **Utilities & tools** (a utility app: not a game, not a browser, not social, not a store).
 - Violence, fear, sexuality, nudity, profanity, drugs, alcohol, tobacco, gambling, crude humour, discrimination: **No** to all.
-- Does the app let users interact or exchange content with other users? **No.** (Search from phone is a read-only page for the user's own devices on their home network, off by default. Feedback opens a GitHub page in the user's browser.)
+- Does the app let users interact or exchange content with other users? **No.** (The Store version has no phone search. Feedback opens a GitHub page in the user's browser.)
 - Does it share the user's location with other users? **No.**
 - Digital purchases? **No.** Ads? **No.**
 - Unrestricted internet access (a browser or search engine)? **No.** Web shortcuts only open the user's default browser.
@@ -161,7 +164,7 @@ The version is the app version plus `.0`, because the Store keeps the fourth num
 > - shows a notification-area (tray) icon and a small floating search box near the taskbar clock, both of which can be turned off in Options;
 > - starts with Windows through its declared StartupTask (InstaFindStartup), minimised to the tray. It is **off by default**: the app never enables it by itself, only when the user turns it on in its Options menu ("Start with Windows") or in Settings > Apps > Startup > InstaFind. It can be turned off there or in Task Manager, and the app respects that choice (DisabledByUser).
 >
-> Network: the only automatic connection is a download of public currency exchange rates from https://open.er-api.com/v6/latest/USD (no key, no user data), at most every 12 hours, for the calculator's currency answers. The Store build never updates itself (updates come from the Store). "Send feedback" and the optional crash report only open a prefilled GitHub issue page in the user's browser; nothing is sent unless the user submits it there. "Search from phone" (a PIN-protected, read-only page on the home network) is off by default and only starts when the user turns it on, which may show a Windows Firewall prompt.
+> Network: the only automatic connection is a download of public currency exchange rates from https://open.er-api.com/v6/latest/USD (no key, no user data), at most every 12 hours, for the calculator's currency answers. The Store build never updates itself (updates come from the Store). "Send feedback" and the optional crash report only open a prefilled GitHub issue page in the user's browser; nothing is sent unless the user submits it there. The Store build has no "Search from phone" feature (the portable build's read-only home-network page uses plain HTTP, so it is removed from the Store build: no menu item, and the server never starts). The app opens no listening ports.
 >
 > To test: launch InstaFind and wait a minute for the first index (progress shows at the bottom). Type part of any file name, e.g. "windows" or "notepad", and the results appear as you type. Press Ctrl+Alt+F from any app for the quick search, and type "100 usd to eur" or "calc". Options > Language switches between Arabic and English. No account or sign-in is needed.
 
@@ -175,6 +178,17 @@ best), between 1 and 10 per language. The current ones in `docs/screenshots/`
 2. **By hand:** full-screen captures at 1920×1080 (Win+Shift+S).
 3. **Stop-gap:** `python3 packaging/msix/make_assets.py --screenshots out/` puts each `docs/media/*.png` centred on a 1366×768 canvas. Certification accepts that, but it looks small in the Store.
 
+### Captions (Partner Center ▸ Store listings ▸ Screenshots ▸ caption)
+
+| Shot | English | العربية |
+|---|---|---|
+| `1-search-*.png` | Results as you type: Arabic names found however they are written | النتائج أثناء الكتابة، والأسماء العربية تُوجد كيفما كُتبت |
+| `2-inside-*.png` | Search inside PDF, Word, Excel and text files, with the matching line | البحث داخل ملفات PDF وWord وExcel والنصوص، مع السطر المطابق |
+| `3-quick-*.png` | Ctrl+Alt+F from anywhere: files, apps, settings and answers | Ctrl+Alt+F من أي مكان: ملفات وبرامج وإعدادات وإجابات |
+| `4-duplicates-*.png` | Find duplicate files and free up space | اعثر على الملفات المكررة ووفّر المساحة |
+
+Upload the `-en` shots to the English listing and the `-ar` shots to the Arabic one, in the order 1–4.
+
 Logos for the listing: the Store builds the tile from the package. If Partner Center asks for a 1:1 "Store logo", upload `packaging/msix/Assets/Square150x150Logo.scale-400.png` (600×600) or render a 1080×1080 one with `assets/make_icon.py`.
 
 ## Store policy risks
@@ -187,7 +201,9 @@ Logos for the listing: the Store builds the tile from the package. If Partner Ce
 | **Self-update** | 10.2.2 (no dynamic code) | Off in the Store build (`store::is_packaged`: the menu shows the Store note, and `update::check_latest` never offers a release). |
 | **Start with Windows** | 10.2.8 (user consent) | Opt-in: `ENABLE_STARTUP_ON_FIRST_RUN = false`, so the first run leaves the declared StartupTask off and `store.yml`'s install test fails if it is on. The user turns it on in Options or Settings ▸ Apps ▸ Startup, and Windows' `DisabledByUser` is respected. |
 | **runFullTrust** (restricted capability) | Restricted capabilities review | Justified in the notes. Expected for a packaged Win32 app. |
-| **Phone search** opens a LAN server | 10.5 / security | Off by default, PIN-protected, read-only, user-initiated. |
+| **Phone search** serves file names over plain HTTP on the LAN | 10.5.4 (secure transmission) | Not in the Store build: `web_server.rs` builds no menu item and never starts the server when `store::is_packaged()`. The portable build keeps it (off by default, PIN-protected, read-only). |
+| **Third-party licences** | 10.1.x / open-source licence terms | Every package ships `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt` (all 148 crates in the exe and their licence texts, from `packaging/make_notices.py`; `store.yml` checks it matches `Cargo.lock`). About ▸ Yes opens it. |
+| **Packaging unverified exes** | Supply chain | `store.yml` packs a release's exes only if each matches the SHA-256 digest GitHub recorded at upload, and fails closed otherwise. |
 | **System commands** in the quick search (shut down, restart, lock) | 10.1 | Only when the user picks them. Mentioned implicitly via "answers"; fine. |
 | **Screenshots** below 1366×768 | Listing requirements | Captured at 1920×1080 by `store.yml` (`store-screenshots`, above). |
 
@@ -207,7 +223,7 @@ Logos for the listing: the Store builds the tile from the package. If Partner Ce
    - يفهرس أسماء الملفات ونصوص المستندات على جهاز المستخدم فقط، ولا يرسلها إلى أي مكان؛
    - يجلب أسعار صرف العملات من open.er-api.com كل 12 ساعة على الأكثر، بلا أي بيانات من المستخدم؛
    - يفتح صفحة GitHub في المتصفح للملاحظات وتقارير الأعطال، ولا يرسل شيئاً إلا إذا ضغط المستخدم «Submit».
-3. **الصور:** كل تشغيل لـ **store** يلتقط صور الشاشة بالعربية والإنكليزية ويضعها في **store-screenshots** أسفل صفحة التشغيل (بجانب store-package). نزّلها وارفعها في **Store listings**.
+3. **الصور:** كل تشغيل لـ **store** يلتقط صور الشاشة بالعربية والإنجليزية ويضعها في **store-screenshots** أسفل صفحة التشغيل (بجانب store-package). نزّلها وارفعها في **Store listings**.
 4. **الحصول على الحزمة:** بعد إصدار v0.9.2 (13 نوفمبر) تُبنى الحزمة تلقائياً، واسم التشغيل في Actions هو `store v0.9.2`. أو يدوياً:
    1. افتح صفحة المستودع على GitHub ← تبويب **Actions** ← اختر **store** من القائمة اليسرى.
    2. اضغط **Run workflow** ← اكتب رقم الإصدار في خانة tag: **`v0.9.2`** (أول إصدار فيه وضع المتجر، يصدر مع دفعة 13 نوفمبر) أو أحدث ← **Run workflow**. لا ترفع v0.9.1 أو أقدم إلى المتجر.
@@ -215,7 +231,7 @@ Logos for the listing: the Store builds the tile from the package. If Partner Ce
 5. **الرفع إلى المتجر:**
    1. ادخل https://partner.microsoft.com ← **Apps and games** ← **InstaFind** ← **Start submission**.
    2. **Pricing and availability:** اختر **Free**.
-   3. **Properties:** الفئة **Productivity**، ورابط الخصوصية `https://fastkiwi.app/privacy/`.
+   3. **Properties:** الفئة **Utilities & tools** (الفرعية **File managers**)، ورابط الخصوصية `https://fastkiwi.app/privacy/`.
    4. **Age ratings:** أجب «No» على كل الأسئلة (التفاصيل في قسم Age rating أعلاه). النتيجة المتوقعة 3+.
    5. **Packages:** اسحب ملف `.msixbundle` إلى الصفحة.
    6. **Store listings:** أضف **English** و**Arabic** وانسخ النصوص من القسمين أعلاه، وارفع الصور.

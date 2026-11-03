@@ -136,7 +136,14 @@ Windows Firewall may ask the first time: allow private networks only, not public
 impl App {
     /// Builds the Options menu item. Called once from `build_ui`; the
     /// window is created when it first opens.
+    ///
+    /// Not in the Microsoft Store version: the page serves file names over
+    /// plain HTTP on the home network, which Store policy 10.5.4 does not
+    /// allow. The item is then never built, so it never matches an event.
     pub(super) fn build_web_ui(&mut self) -> Result<(), nwg::NwgError> {
+        if crate::store::is_packaged() {
+            return Ok(());
+        }
         nwg::MenuItem::builder()
             .text(tr!("البحث من الهاتف (الشبكة المنزلية)…", "Search from phone (home network)…"))
             .parent(&self.options_menu)
@@ -238,7 +245,7 @@ impl App {
                 _ => {}
             }
         });
-        if get_dword(REG_ON) == Some(1) {
+        if get_dword(REG_ON) == Some(1) && !crate::store::is_packaged() {
             self.start_web();
         }
         main
@@ -289,6 +296,9 @@ impl App {
 
     fn start_web(&self) -> bool {
         self.stop_web();
+        if crate::store::is_packaged() {
+            return false; // see build_web_ui
+        }
         let port = if self.web.ui.is_built() {
             self.web.port_input.text().trim().parse::<u16>().ok().filter(|p| *p >= 1024)
         } else {
