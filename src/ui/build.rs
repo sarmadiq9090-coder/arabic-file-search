@@ -74,7 +74,7 @@ impl NativeUi<AppUi> for App {
             .ex_flags(crate::i18n::rtl_only(WS_EX_LAYOUTRTL))
             .flags({
                 // Started with Windows: wait in the tray until called.
-                let visible = if std::env::args().any(|a| a == autostart::STARTUP_ARG) {
+                let visible = if autostart::launched_at_sign_in() {
                     nwg::WindowFlags::empty()
                 } else {
                     nwg::WindowFlags::VISIBLE
@@ -268,7 +268,11 @@ impl NativeUi<AppUi> for App {
             .parent(&app.options_menu)
             .build(&mut app.menu_hotkey)?;
         nwg::MenuItem::builder()
-            .text(&trf!("التحقق من التحديثات (الإصدار {})", "Check for updates (version {})", env!("CARGO_PKG_VERSION")))
+            .text(&if crate::store::is_packaged() {
+                trf!("التحديثات من Microsoft Store (الإصدار {})", "Updates from Microsoft Store (version {})", env!("CARGO_PKG_VERSION"))
+            } else {
+                trf!("التحقق من التحديثات (الإصدار {})", "Check for updates (version {})", env!("CARGO_PKG_VERSION"))
+            })
             .parent(&app.options_menu)
             .build(&mut app.menu_update)?;
         nwg::MenuItem::builder()
@@ -433,11 +437,15 @@ impl NativeUi<AppUi> for App {
                                 tr!("لن يعمل البرنامج تلقائياً مع ويندوز.", "The program will not start with Windows.")
                             });
                         } else {
-                            app.set_status(tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting."));
+                            app.set_status(&autostart::change_failed_message());
                         }
                     } else if app.on_lang_item(handle) || app.on_feedback_item(handle) {
                     } else if handle == app.menu_update {
-                        app.check_for_update(true);
+                        if crate::store::is_packaged() {
+                            app.show_store_update_note();
+                        } else {
+                            app.check_for_update(true);
+                        }
                     } else if handle == app.menu_digits {
                         app.toggle_digits();
                     } else if handle == app.menu_content_index {

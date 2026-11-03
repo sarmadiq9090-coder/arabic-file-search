@@ -65,9 +65,14 @@ The in-app updater (`src/update.rs`) reads the latest release and downloads the 
 | `src/crash_log.rs` | Panic hook writing `log.txt` and `crash.txt` with a backtrace |
 | `src/feedback.rs` | Prefilled GitHub issue links (Options ▸ Send feedback) and the opt-in crash report offered at the next start; nothing is sent without the user (UI in `src/ui/feedback.rs`) |
 | `src/cli.rs` | `bahth.exe -s …` |
+| `src/store.rs` | Microsoft Store (MSIX) mode: package detection, StartupTask, no self-update ([docs/distribution/microsoft-store.md](distribution/microsoft-store.md)) |
 | `integrations/` | Flow Launcher plugin, PowerShell, AutoHotkey and Windows Terminal examples |
 | `assets/` | Icon (`python3 assets/make_icon.py` regenerates it) and the resource script |
 
 ## Testing on Wine
 
 The exe runs under Wine for quick checks (`LANG=C.UTF-8`, otherwise Arabic paths fail). Wine draws list items mirrored under right-to-left layout, so check list rendering on real Windows.
+
+## Microsoft Store
+
+[`store.yml`](../.github/workflows/store.yml) packs the three exes into an unsigned `.msixbundle` (artifact `store-package`) from `packaging/msix/` (manifest template, `identity.json`, logos); `build.yml`'s release job starts it with the new tag. The same exe detects that it runs packaged (`src/store.rs`): no self-update, start-with-Windows through the package's StartupTask, data redirected by Windows into the package's AppData. Submission steps, listing texts and certification notes: [docs/distribution/microsoft-store.md](distribution/microsoft-store.md).

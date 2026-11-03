@@ -35,8 +35,9 @@ winapi = { version = "0.3", features = ["winuser", "consoleapi", "wincon", "proc
     # Quick search: open windows (windows.rs) and system commands (system.rs).
     "dwmapi", "powerbase", "powrprof", "reason", "securitybaseapi"] }
 
-# Windows.Media.Ocr for text in images and scanned PDFs (src/ocr.rs).
-windows = { version = "0.62", features = ["Foundation", "Foundation_Collections", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage", "Storage_Streams", "Win32_System_WinRT"] }
+# Windows.Media.Ocr for text in images and scanned PDFs (src/ocr.rs);
+# ApplicationModel(_Activation): the Store version's StartupTask (src/store.rs).
+windows = { version = "0.62", features = ["ApplicationModel", "ApplicationModel_Activation", "Foundation", "Foundation_Collections", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage", "Storage_Streams", "Win32_System_WinRT"] }
 
 [build-dependencies]
 embed-manifest = "1.5.1"

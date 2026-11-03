@@ -1,0 +1,177 @@
+name: store
+
+# Builds the Microsoft Store package: one MSIX per CPU (x64, x86, arm64)
+# bundled into InstaFind_<version>.msixbundle, unsigned (the Store signs
+# it), uploaded as the `store-package` artifact for Partner Center.
+# docs/distribution/microsoft-store.md explains the whole submission.
+#
+# - With a tag (Run workflow -> tag, or a published release), it packages
+#   that release's exact bahth.exe / bahth-x86.exe / bahth-arm64.exe.
+# - Without one (Run workflow with no tag, or a pull request touching the
+#   packaging), it builds the exes from this commit as build.yml does.
+# The identity comes from packaging/msix/identity.json. While it still has a
+# TODO, the TEST identity is used and the run says so: the Store would
+# refuse that package.
+# Every run also installs a copy signed with a throwaway certificate on the
+# runner and checks the packaged program starts in Store mode
+# (packaging/msix/test-install.ps1).
+#
+# build.yml's release job starts this workflow with the new tag: a release
+# made with GITHUB_TOKEN does not fire the `release` event below.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to package, e.g. v0.9.1 (empty: build from the chosen branch)"
+        required: false
+        default: ""
+  release:
+    types: [published]
+  pull_request:
+    paths:
+      - "packaging/msix/**"
+      - ".github/workflows/store.yml"
+      - "src/store.rs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: store-${{ github.ref }}-${{ inputs.tag || github.event.release.tag_name || '' }}
+  cancel-in-progress: true
+
+env:
+  TAG: ${{ inputs.tag || github.event.release.tag_name || '' }}
+
+jobs:
+  # The release's own exes, when packaging a tag.
+  release-exes:
+    if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::tag '$TAG' is not vX.Y.Z"; exit 1
+          fi
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir exes \
+            --pattern bahth.exe --pattern bahth-x86.exe --pattern bahth-arm64.exe
+          ls -l exes
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: store-exes
+          path: exes/
+          retention-days: 3
+
+  # Otherwise the x64 and x86 exes cross-built with mingw, as build.yml does.
+  build-gnu:
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.tag == '') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-gnu, i686-pc-windows-gnu
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Build bahth.exe and bahth-x86.exe
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q mingw-w64
+          cargo build --release --target x86_64-pc-windows-gnu
+          cargo build --release --target i686-pc-windows-gnu
+          mkdir -p exes
+          cp target/x86_64-pc-windows-gnu/release/bahth.exe exes/bahth.exe
+          cp target/i686-pc-windows-gnu/release/bahth.exe exes/bahth-x86.exe
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: store-exes-gnu
+          path: exes/
+          retention-days: 3
+
+  # ... and the ARM64 exe built natively, as build.yml does.
+  build-arm64:
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.tag == '') }}
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          targets: aarch64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Build bahth-arm64.exe
+        shell: pwsh
+        run: |
+          cargo build --release --target aarch64-pc-windows-msvc
+          New-Item -ItemType Directory -Force exes | Out-Null
+          Copy-Item target/aarch64-pc-windows-msvc/release/bahth.exe exes/bahth-arm64.exe
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: store-exes-arm64
+          path: exes/
+          retention-days: 3
+
+  package:
+    needs: [release-exes, build-gnu, build-arm64]
+    # Runs after whichever exes job ran (the others are skipped).
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: store-exes*
+          path: exes
+          merge-multiple: true
+      - name: Lay out the packages (identity.json -> AppxManifest.xml)
+        shell: pwsh
+        run: |
+          $version = if ($env:TAG) { $env:TAG.TrimStart('v') } else { $null }
+          $layoutArgs = @('packaging/msix/make_layout.py', '--exes', 'exes', '--out', 'msix', '--require-all')
+          if ($version) { $layoutArgs += @('--version', $version) }
+          python @layoutArgs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Content msix/identity.txt | ForEach-Object { "STORE_$_" } | Add-Content $env:GITHUB_ENV -Encoding utf8
+      - name: makepri, makeappx pack and bundle
+        shell: pwsh
+        run: ./packaging/msix/pack.ps1 -Layouts msix -Out store-package
+      - name: Install a test-signed copy and check Store mode
+        shell: powershell
+        run: |
+          $bundle = Get-ChildItem store-package -Filter *.msixbundle | Select-Object -First 1
+          ./packaging/msix/test-install.ps1 -Bundle $bundle.FullName -Name $env:STORE_name -Publisher $env:STORE_publisher
+      - name: Summary
+        shell: pwsh
+        run: |
+          $bundle = Get-ChildItem store-package -Filter *.msixbundle | Select-Object -First 1
+          $hash = (Get-FileHash $bundle.FullName -Algorithm SHA256).Hash.ToLower()
+          $source = if ($env:TAG) { "release $env:TAG" } else { "built from $env:GITHUB_SHA" }
+          $lines = @(
+            "## Microsoft Store package",
+            "",
+            "- File: ``$($bundle.Name)`` ($([math]::Round($bundle.Length / 1MB, 1)) MB, SHA-256 ``$hash``)",
+            "- Version: $env:STORE_version, CPUs: $env:STORE_archs, exes: $source",
+            "- Identity: ``$env:STORE_name`` / ``$env:STORE_publisher``"
+          )
+          if ($env:STORE_test -eq 'true') {
+            $lines += "", "> [!WARNING]", "> TEST identity: packaging/msix/identity.json still has a TODO. The Store will refuse this package; it is for testing only."
+            Write-Host "::warning::TEST identity used (identity.json has a TODO); not for upload."
+          } else {
+            $lines += "", "Download the ``store-package`` artifact, unzip it and upload the .msixbundle in Partner Center (docs/distribution/microsoft-store.md)."
+          }
+          $lines | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: store-package
+          path: store-package/
+          if-no-files-found: error

@@ -99,7 +99,7 @@ pub struct QuickMenu {
 
 /// Whether this run started with Windows (hidden, in the background).
 fn started_hidden() -> bool {
-    std::env::args().any(|a| a == autostart::STARTUP_ARG)
+    autostart::launched_at_sign_in()
 }
 
 impl App {
