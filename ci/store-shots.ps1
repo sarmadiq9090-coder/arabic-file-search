@@ -370,6 +370,13 @@ Write-Host ("index saved after {0:N0} s" -f ((Get-Date) - $started).TotalSeconds
 Start-Sleep -Seconds 45   # the text of the sample files
 Stop-Process -Id $p.Id -Force
 Start-Sleep -Seconds 2
+# No background indexing of the runner's own documents in the shots'
+# status bar: the inside-documents scene reads the demo folder directly.
+$settingsFile = Join-Path $data 'settings.txt'
+if (Test-Path $settingsFile) {
+    $lines = Get-Content $settingsFile -Encoding utf8 | ForEach-Object { if ($_ -match '^content_index=') { 'content_index=0' } else { $_ } }
+    Set-Content $settingsFile -Value $lines -Encoding utf8
+}
 
 $scenes = @(
     @{ Lang = 'ar'; Folder = @('اختيار مجلد…'); Inside = @('البحث داخل المستندات أيضاً'); Name = 'تقرير'; Content = 'الميزانية'
@@ -436,9 +443,17 @@ foreach ($s in $scenes) {
     Set-Inside $false $s.Inside
     [S]::SetText((Query-Box), '')
 
-    # 3. Quick search over the desktop: the main window out of the way.
+    # 3. Quick search over File Explorer showing the demo folder, as a user
+    # would call it (and not over the runner's bare desktop).
     Clear-Desktop   # the main window too
     [void][S]::ShowWindow($script:hwnd, 6)   # SW_MINIMIZE
+    Start-Process explorer.exe -ArgumentList "`"$(Join-Path $demo $(if ($lang -eq 'ar') { 'العمل' } else { 'Work' }))`""
+    $explorer = $null
+    for ($i = 0; $i -lt 20 -and -not $explorer; $i++) {
+        Start-Sleep -Milliseconds 500
+        $explorer = [S]::TopWindows(0) | Where-Object { [S]::Class($_) -eq 'CabinetWClass' } | Select-Object -First 1
+    }
+    if ($explorer) { [void][S]::ShowWindow($explorer, 3); Focus $explorer; Start-Sleep -Seconds 2 } else { Warn "no File Explorer window ($lang)" }
     [S]::Chord($VK.CTRL, $VK.ALT, $VK.F)
     Start-Sleep -Seconds 2
     [S]::Type($s.Quick)
@@ -446,6 +461,7 @@ foreach ($s in $scenes) {
     Shot "3-quick-$lang.png"
     [S]::Chord($VK.ESC)
     Start-Sleep -Seconds 1
+    if ($explorer) { [void][S]::PostMessage($explorer, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) }   # WM_CLOSE
 
     Check-Crash "scenes $lang"
     Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
