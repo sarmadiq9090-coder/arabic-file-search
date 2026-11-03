@@ -790,6 +790,9 @@ pub fn run() {
         startup::log(&format!("start: removed {stale} unfinished index save file(s)"));
     }
     autostart::apply_default();
+    if let Some(line) = crate::store::startup_log_line() {
+        startup::log(&line);
+    }
     phase("single-instance");
     unsafe {
         winapi::um::objbase::CoInitialize(std::ptr::null_mut());

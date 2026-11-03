@@ -1,5 +1,7 @@
 //! Starting with Windows: a value under the current user's `Run` key (no
 //! admin rights needed) that launches the program hidden in the tray.
+//! The Microsoft Store version uses its package's StartupTask instead
+//! (`crate::store`): a packaged program's `Run` value is never read.
 
 use winapi::shared::minwindef::{DWORD, HKEY};
 use winapi::shared::winerror::ERROR_SUCCESS;
@@ -156,9 +158,26 @@ fn unblock() {
     }
 }
 
+/// Whether this run started with Windows (hidden, in the background): the
+/// `Run` entry passes `--startup`; the Store's startup task passes nothing.
+pub fn launched_at_sign_in() -> bool {
+    std::env::args().any(|a| a == STARTUP_ARG) || crate::store::launched_by_startup_task()
+}
+
+/// What to tell the user when `set_enabled` fails.
+pub fn change_failed_message() -> String {
+    match crate::store::startup_state() {
+        Some(state) => crate::store::startup_refused_message(state),
+        None => tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting.").to_string(),
+    }
+}
+
 /// Whether the program starts with Windows: our `Run` entry is there and
 /// Task Manager has not turned it off.
 pub fn is_enabled() -> bool {
+    if crate::store::is_packaged() {
+        return crate::store::startup_state().is_some_and(|s| s.is_on());
+    }
     open(RUN_KEY, false).is_some_and(|k| has_value(&k, VALUE)) && !blocked_by_task_manager()
 }
 
@@ -168,6 +187,12 @@ pub fn is_enabled() -> bool {
 /// another copy which still exists (the one it was moved to:
 /// `crate::run_entry::target`).
 pub fn set_enabled(on: bool) -> bool {
+    if crate::store::is_packaged() {
+        if let Some(own) = open(OWN_KEY, true) {
+            set_string(&own, CHOSEN, "1");
+        }
+        return crate::store::set_startup(on).is_ok();
+    }
     let Some(key) = open(RUN_KEY, true) else { return false };
     if let Some(own) = open(OWN_KEY, true) {
         set_string(&own, CHOSEN, "1");
@@ -203,6 +228,15 @@ pub fn point_to(exe: &std::path::Path) -> bool {
 /// On by default: the first run turns it on once; after that only the user's
 /// choice counts. A stale path (the exe moved) is refreshed.
 pub fn apply_default() {
+    if crate::store::is_packaged() {
+        // Store: turned on once, through the startup task, unless the user
+        // already chose or turned it off in Settings / Task Manager.
+        let chosen = open(OWN_KEY, false).is_some_and(|k| has_value(&k, CHOSEN));
+        if crate::store::startup_state().is_some_and(|s| crate::store::enable_on_first_run(chosen, s)) {
+            set_enabled(true);
+        }
+        return;
+    }
     let own = open(OWN_KEY, false);
     let chosen = own.as_ref().is_some_and(|k| has_value(k, CHOSEN));
     // 0.8.1 turns it on once more, for those who had it off without meaning to.

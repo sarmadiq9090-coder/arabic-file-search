@@ -62,6 +62,10 @@ impl App {
     }
 
     pub(super) fn maybe_check_for_update(&self) {
+        // The Store updates its own copy; no check against GitHub.
+        if crate::store::is_packaged() {
+            return;
+        }
         let last = self.state.borrow().settings.update_check;
         if crate::update::should_check_now(last, index::now_secs().max(0) as u64) {
             self.check_for_update(false);
@@ -201,5 +205,12 @@ impl App {
             let done = self.update_progress.0.load(Ordering::Relaxed);
             self.set_status(&trf!("جارٍ تنزيل التحديث… {}٪", "Downloading the update… {}%", (done * 100 / total).min(100)));
         }
+    }
+
+    /// Options ▸ Updates in the Microsoft Store version: the Store, not the
+    /// program, installs new versions.
+    pub(super) fn show_store_update_note(&self) {
+        self.set_status(tr!("التحديثات تأتي من Microsoft Store.", "Updates come from Microsoft Store."));
+        nwg::modal_info_message(&self.window, title(), &crate::store::update_message());
     }
 }
