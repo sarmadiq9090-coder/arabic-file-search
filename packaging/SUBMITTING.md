@@ -99,7 +99,10 @@ Automatic option: store that PAT as the repository secret `WINGET_PAT`. Then
 - winget checks that a portable file is unchanged before it uninstalls it.
   After an in-app self-update the exe's hash differs, so
   `winget uninstall Sarmad.InstaFind` may refuse and ask for `--force`.
-  `winget upgrade` to the next manifest fixes this.
+  `winget upgrade` to the next manifest fixes this. Newer versions do not
+  self-update when they run from winget's `Packages\` or `Links\` folder (or
+  Scoop's `apps\`/`shims\`); they tell the user to run `winget upgrade` /
+  `scoop update` instead (`update::package_manager_for` in `src/update.rs`).
 
 Later versions: either let `packaging.yml` (with `WINGET_PAT`) submit, or run
 `wingetcreate update Sarmad.InstaFind --version X.Y.Z --urls

@@ -35,6 +35,8 @@ The `ui` job ([`ci/ui-test.ps1`](../ci/ui-test.ps1)) then uses the x64 exe like 
 
 The in-app updater (`src/update.rs`) reads the latest release and downloads the asset for its own CPU: exactly **`bahth.exe`** on x64 (every installed copy since 0.3.0 looks for that name, so never rename it), `bahth-x86.exe` on 32-bit and `bahth-arm64.exe` on ARM64 (`ASSET_NAME`). Keep those names, keep releases out of draft/prerelease, and keep the repository URL. Editing a `releases/*-notes.md` file later re-syncs that release's title and body ([`release-notes.yml`](../.github/workflows/release-notes.yml)); assets are never touched.
 
+The updater fails closed: it installs a release only when GitHub publishes a SHA-256 `digest` for the asset (it does for every upload), and refuses it otherwise, pointing to the manual download. A copy installed with Scoop (under `%SCOOP%`/`%USERPROFILE%\scoop` `apps\` or `shims\`) or winget (under `...\WinGet\Packages\` or `Links\`) never updates itself: the manual check says to run `scoop update instafind` / `winget upgrade Sarmad.InstaFind` (`update::package_manager_for`).
+
 ## Code map
 
 | Path | What it does |
@@ -61,7 +63,7 @@ The in-app updater (`src/update.rs`) reads the latest release and downloads the 
 | `src/web.rs`, `src/ui/web_server.rs` | Read-only LAN search page for a phone, PIN-protected, off by default |
 | `src/thumb_cache.rs`, `src/draw.rs`, `src/dragdrop.rs`, `src/icon.rs` | Thumbnail LRU, match underline, drag & drop and clipboard, icons |
 | `src/history.rs`, `src/settings.rs` | Search history, saved searches, often-opened files, quick-search launch counts and pinned favourites (all in `history.json`); window, column and quick-search settings (`settings.txt`) |
-| `src/update.rs` | Auto-update from GitHub Releases (WinHTTP, SHA-256 check, fallback when the API is rate-limited) |
+| `src/update.rs` | Auto-update from GitHub Releases (WinHTTP, required SHA-256 check, fallback when the API is rate-limited, defers to winget/Scoop installs) |
 | `src/crash_log.rs` | Panic hook writing `log.txt` and `crash.txt` with a backtrace |
 | `src/feedback.rs` | Prefilled GitHub issue links (Options ▸ Send feedback) and the opt-in crash report offered at the next start; nothing is sent without the user (UI in `src/ui/feedback.rs`) |
 | `src/cli.rs` | `bahth.exe -s …` |
