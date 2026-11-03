@@ -2,8 +2,9 @@
 # of the bundle with a throwaway self-signed certificate (the Store signs the
 # real one), installs it, runs the `instafind.exe` alias and starts the app
 # like the Start menu does, then checks the log the packaged program writes:
-# package identity found, startup task present, data under the package's
-# private AppData folder. Removes the package and the certificate afterwards.
+# package identity found, data under the package's
+# private AppData folder, startup task present but off (the user has not
+# turned it on). Removes the package and the certificate afterwards.
 # Run with Windows PowerShell 5.1 (the Appx module is unreliable in pwsh 7).
 param(
     [Parameter(Mandatory)][string]$Bundle,
@@ -118,7 +119,9 @@ try {
         if ($where -ne $log) { Fail "data was not written under the package's private folder ($private)" }
         if ($line -notmatch [regex]::Escape($pkg.PackageFullName)) { Fail "the logged package name is not $($pkg.PackageFullName)" }
         if ($line -match 'startup task None') { Fail "the startup task (InstaFindStartup) was not found" }
-        if ($line -notmatch 'startup task Some\(Enabled\)') { Write-Host "::warning::startup task not enabled after the first run: $line" }
+        # Off until the user turns it on (store::ENABLE_STARTUP_ON_FIRST_RUN,
+        # Store policy 10.2.8): the first run must not enable it.
+        if ($line -notmatch 'startup task Some\(Disabled\)') { Fail "the startup task is not plainly off after the first run (the user did not consent): $line" }
     }
     Start-Sleep -Seconds 5
     $proc = Get-Process bahth -ErrorAction SilentlyContinue

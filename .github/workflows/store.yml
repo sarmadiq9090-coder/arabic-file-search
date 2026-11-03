@@ -1,4 +1,5 @@
 name: store
+run-name: store ${{ inputs.tag || github.event.release.tag_name || github.head_ref || github.ref_name }}
 
 # Builds the Microsoft Store package: one MSIX per CPU (x64, x86, arm64)
 # bundled into InstaFind_<version>.msixbundle, unsigned (the Store signs
@@ -14,7 +15,8 @@ name: store
 # refuse that package.
 # Every run also installs a copy signed with a throwaway certificate on the
 # runner and checks the packaged program starts in Store mode
-# (packaging/msix/test-install.ps1).
+# (packaging/msix/test-install.ps1), and captures the listing screenshots
+# (ci/store-shots.ps1, artifact `store-screenshots`).
 #
 # build.yml's release job starts this workflow with the new tag: a release
 # made with GITHUB_TOKEN does not fire the `release` event below.
@@ -23,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to package, e.g. v0.9.1 (empty: build from the chosen branch)"
+        description: "Release tag to package, v0.9.2 or later (empty: test build from the chosen branch)"
         required: false
         default: ""
   release:
@@ -33,6 +35,7 @@ on:
       - "packaging/msix/**"
       - ".github/workflows/store.yml"
       - "src/store.rs"
+      - "ci/store-shots.ps1"
 
 permissions:
   contents: read
@@ -175,3 +178,30 @@ jobs:
           name: store-package
           path: store-package/
           if-no-files-found: error
+
+  # Store listing screenshots (1920x1080 when the runner allows it), in
+  # Arabic and English, from the same x64 exe that was packaged.
+  screenshots:
+    needs: [release-exes, build-gnu]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: windows-latest
+    # The first index of the runner's drive can take a long while.
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: store-exes*
+          path: exes
+          merge-multiple: true
+      - name: Capture the screenshots
+        shell: powershell
+        run: ./ci/store-shots.ps1 -Exe exes/bahth.exe -Out "$env:RUNNER_TEMP/store-screenshots"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: store-screenshots
+          path: ${{ runner.temp }}/store-screenshots
+          if-no-files-found: warn
