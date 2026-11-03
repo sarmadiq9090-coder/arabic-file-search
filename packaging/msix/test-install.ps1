@@ -108,7 +108,10 @@ try {
         foreach ($logName in @('Application', 'Microsoft-Windows-AppModel-Runtime/Admin', 'Microsoft-Windows-AppXDeploymentServer/Operational', 'Microsoft-Windows-TWinUI/Operational')) {
             $events = Get-WinEvent -FilterHashtable @{ LogName = $logName; StartTime = $started.AddSeconds(-10) } -ErrorAction SilentlyContinue |
                 Where-Object { $_.Level -le 3 -or $_.Message -match 'bahth|InstaFind' } | Select-Object -First 15
-            foreach ($e in $events) { Write-Host ("[{0}] {1} {2} {3}: {4}" -f $logName, $e.TimeCreated.ToString('HH:mm:ss'), $e.ProviderName, $e.Id, (($e.Message -replace '\s+', ' ').Substring(0, [Math]::Min(400, $e.Message.Length)))) }
+            foreach ($e in $events) {
+                $msg = "$($e.Message)" -replace '\s+', ' '
+                Write-Host ("[{0}] {1} {2} {3}: {4}" -f $logName, $e.TimeCreated.ToString('HH:mm:ss'), $e.ProviderName, $e.Id, $msg.Substring(0, [Math]::Min(400, $msg.Length)))
+            }
         }
     } else {
         Write-Host "log ($where): $line"
