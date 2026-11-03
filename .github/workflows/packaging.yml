@@ -39,7 +39,7 @@ jobs:
       version: ${{ steps.up.outputs.version }}
       sha: ${{ steps.up.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: main
       - name: Update manifests
@@ -85,7 +85,7 @@ jobs:
     if: needs.manifests.outputs.version != ''
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.manifests.outputs.sha }}
       - name: Pack and push
@@ -103,7 +103,7 @@ jobs:
     if: needs.manifests.outputs.version != ''
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.manifests.outputs.sha }}
       - name: Submit to winget-pkgs
