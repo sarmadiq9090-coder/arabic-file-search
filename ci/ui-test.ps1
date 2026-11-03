@@ -5,7 +5,8 @@
 # first-run question, the floating box, Arabic and English search in the main
 # window, search inside documents, the right-click and Options menus, the
 # quick search popup (apps, answers, files), the Arabic interface and
-# close-to-tray. Every step saves a screenshot.
+# close-to-tray, the indexing progress, and moving a copy out of Downloads.
+# Every step saves a screenshot.
 #
 # Results are read back with plain Win32 messages (WM_GETTEXT, LVM_GETITEMTEXT,
 # SB_GETTEXT, MN_GETHMENU), which work on every Windows without UI Automation.
@@ -198,6 +199,8 @@ $data = Join-Path $env:LOCALAPPDATA 'BahthSari'
 $crash = Join-Path $data 'crash.txt'
 $index = Join-Path $data 'index.bin'
 $rowsFile = Join-Path $data 'quick-rows.txt'
+# The popup's indexing progress line, empty when there is none.
+$noteFile = Join-Path $data 'quick-note.txt'
 $results = New-Object System.Collections.Generic.List[object]
 $shot = 0
 
@@ -273,7 +276,8 @@ function List-Names {
 }
 function Status-Text {
     if (-not $ui.Status) { return '' }
-    return ([U]::StatusText($ui.Status.Handle, 0) + ' ' + [U]::StatusText($ui.Status.Handle, 1)).Trim()
+    # Part 2: the indexing progress, while indexing runs.
+    return ([U]::StatusText($ui.Status.Handle, 0) + ' ' + [U]::StatusText($ui.Status.Handle, 1) + ' ' + [U]::StatusText($ui.Status.Handle, 2)).Trim()
 }
 # The main window's controls, found by class (and the checkbox by its style).
 function Find-Controls($Main) {
@@ -332,17 +336,26 @@ $t1 = Get-Date
 # Progress once a minute: how fast the index grows, what the program costs,
 # and whether the machine itself is slow (disk, antivirus).
 $next = (Get-Date).AddSeconds(60)
+# While the drives are scanned, the status bar's last part shows the
+# progress ("Indexing… 36,000 files so far").
+$progressSeen = ''
 # GitHub's runners sometimes throttle the disk (reads of 100-250 ms with the
 # processor idle); the same 1.2 million files then take 25-40 minutes instead
 # of 5. That is the machine, not the program, so the wait is long and a late
 # finish is only noted.
 while (-not (Test-Path $index) -and -not $p.HasExited -and ((Get-Date) - $t1).TotalSeconds -lt 2700) {
     Start-Sleep -Seconds 2
+    if (-not $progressSeen) {
+        $m = Main-Window $p.Id
+        $bar = if ($m) { Get-Children $m.Handle | Where-Object Class -eq 'msctls_statusbar32' | Select-Object -First 1 }
+        $part = if ($bar) { [U]::StatusText($bar.Handle, 2) } else { '' }
+        if ($part -match 'Indexing…|جارِ الفهرسة') { $progressSeen = $part }
+    }
     if ((Get-Date) -ge $next) {
         $next = (Get-Date).AddSeconds(60)
         $m = Main-Window $p.Id
         $bar = if ($m) { Get-Children $m.Handle | Where-Object Class -eq 'msctls_statusbar32' | Select-Object -First 1 }
-        $text = if ($bar) { [U]::StatusText($bar.Handle, 0) } else { '' }
+        $text = if ($bar) { ([U]::StatusText($bar.Handle, 0) + ' | ' + [U]::StatusText($bar.Handle, 2)) } else { '' }
         $p.Refresh()
         Write-Host ("index wait {0,5:N0} s: cpu {1:N0} s, threads {2}, memory {3:N0} MB, floating box {4}; {5}" -f `
             ((Get-Date) - $t1).TotalSeconds, $p.TotalProcessorTime.TotalSeconds, $p.Threads.Count, ($p.WorkingSet64 / 1MB), `
@@ -358,6 +371,7 @@ while (-not (Test-Path $index) -and -not $p.HasExited -and ((Get-Date) - $t1).To
 }
 $secs = ((Get-Date) - $t1).TotalSeconds
 Record 'index' 'core' 'drives indexed and saved' ((Test-Path $index) -and -not $p.HasExited) ("{0:N0} s" -f $secs)
+Record 'index' 'probe' 'indexing progress shown in the status bar while indexing' ([bool]$progressSeen) $progressSeen
 if ((Test-Path $index) -and $secs -gt 900) { Note 'index' 'slow runner disk' ("first index took {0:N0} s; see the per-minute disk lines in the log" -f $secs) }
 if (-not (Test-Path $index) -and (Test-Path (Join-Path $data 'log.txt'))) {
     Write-Host '--- log.txt (index not saved) ---'
@@ -428,6 +442,12 @@ if ($ui -and $ui.Content) {
     Main-Search 'dm:today السنوية للشركة' 'تقرير مالي' 'core' 'search inside documents, Arabic text (dm:today)' 90
     Main-Search 'dm:today revenue forecast' 'Quarterly Budget' 'core' 'search inside documents, English text (dm:today)' 90
     Main-Search 'خبرة عشر سنوات' 'سيرة ذاتية' 'probe' 'search inside documents on all drives within 60 s (first day)' 60
+    # Nothing found yet while the content index fills reads as "may be
+    # incomplete", not as a bare "found 0".
+    $status = Status-Text
+    if ([U]::ListCount($ui.List.Handle) -eq 0) {
+        Record 'search' 'probe' 'no results yet while indexing says results may be incomplete' ($status -match 'incomplete while indexing|ناقصة أثناء الفهرسة') $status
+    } else { Note 'search' 'no results yet while indexing' "skipped: the first-day search found results; status: $status" }
     [void][U]::PostMessage($ui.Content.Handle, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
 } else { Record 'search' 'core' 'search inside documents' $false 'no "inside documents" checkbox' }
 
@@ -494,6 +514,10 @@ Record 'quick search' 'core' 'Ctrl+Alt+F opens the popup' ($null -ne $pop)
 Start-Sleep -Seconds 3   # the app catalog loads in the background
 Quick-Search 'notepad' 'Notepad' 'core' 'app by English name (notepad)'
 Quick-Search 'تقرير مالي' 'تقرير مالي' 'core' 'Arabic file'
+if (Test-Path $noteFile) {
+    $line = [IO.File]::ReadAllText($noteFile, [Text.Encoding]::UTF8)
+    Note 'quick search' 'indexing line under the results' $(if ($line) { $line } else { '(none: indexing has finished)' })
+}
 Quick-Search '2+2' '4' 'probe' 'calculator answer (2+2)'
 Quick-Search 'غوغل كروم' 'Chrome' 'probe' 'app by Arabic name (غوغل كروم) is first' -Best
 Quick-Search 'كروم' 'Chrome' 'probe' 'app by short Arabic name (كروم) is first' -Best
@@ -600,6 +624,43 @@ if ($box) {
 Check-Crash 'Arabic interface'
 if (Test-Path (Join-Path $data 'log.txt')) { Copy-Item (Join-Path $data 'log.txt') (Join-Path $Out 'log-ar.txt') }
 Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force
+
+# ---------------------------------------------------------------- moving out of Downloads
+# Most people run the downloaded exe straight from Downloads. Once, such a
+# copy offers to move itself to %LOCALAPPDATA%\Programs\InstaFind (with a
+# Start-menu shortcut) and restart from there. The interface is still Arabic.
+Start-Sleep -Seconds 2
+$dlDir = Join-Path $env:USERPROFILE 'Downloads'
+New-Item -ItemType Directory -Force $dlDir | Out-Null
+$dlExe = Join-Path $dlDir 'bahth (1).exe'
+Copy-Item -LiteralPath $Exe -Destination $dlExe -Force
+$moved = Join-Path $env:LOCALAPPDATA 'Programs\InstaFind\bahth.exe'
+Remove-Item (Split-Path $moved) -Recurse -Force -ErrorAction SilentlyContinue
+$p = Start-Process -FilePath $dlExe -PassThru
+$offer = Wait-Until { Get-Windows $p.Id | Where-Object { $_.Visible -and $_.Class -eq '#32770' -and $_.Text -match 'مكان دائم|permanent place' } | Select-Object -First 1 } 40
+$offerText = if ($offer) { (Get-Children $offer.Handle | Where-Object { $_.Class -eq 'Static' -and $_.Text } | ForEach-Object Text) -join ' ' } else { '' }
+Record 'first run' 'probe' 'a copy run from Downloads offers to move to a permanent place' ($null -ne $offer) $offerText
+if ($offer) {
+    Shot 'move-offer'
+    $yes = [U]::GetDlgItem($offer.Handle, 6)
+    if ($yes -ne [IntPtr]::Zero) { [void][U]::PostMessage($yes, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero) } else { Focus-Window $offer.Handle; [U]::Chord($VK.ENTER) }
+    $np = Wait-Until { Get-Process bahth* -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $moved } | Select-Object -First 1 } 60
+    Record 'first run' 'probe' 'the moved copy runs from %LOCALAPPDATA%\Programs\InstaFind' ($null -ne $np) $moved
+    $lnk = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\بحث سريع.lnk'
+    Record 'first run' 'probe' 'Start-menu shortcut created' (Test-Path -LiteralPath $lnk) $lnk
+    if ($np) {
+        $main = Wait-Until { Main-Window $np.Id } 20
+        Record 'first run' 'probe' 'the moved copy opens its window' ($null -ne $main)
+        Shot 'moved-copy'
+        # Settings stay in %LOCALAPPDATA%\BahthSari: the offer is not made again.
+        Start-Sleep -Seconds 5
+        Record 'first run' 'probe' 'the moved copy does not offer the move again' (-not (Get-Windows $np.Id | Where-Object { $_.Visible -and $_.Class -eq '#32770' -and $_.Text -match 'مكان دائم|permanent place' }))
+    }
+    Check-Crash 'moving the program'
+}
+Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Sleep -Seconds 1
+Remove-Item -LiteralPath $dlExe -Force -ErrorAction SilentlyContinue
 
 # ---------------------------------------------------------------- report
 $fail = @($results | Where-Object Result -eq 'FAIL').Count

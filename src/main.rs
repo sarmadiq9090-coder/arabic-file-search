@@ -53,6 +53,8 @@ mod history;
 #[cfg(any(windows, test))]
 mod index;
 #[cfg(any(windows, test))]
+mod indexing_status;
+#[cfg(any(windows, test))]
 mod launcher;
 #[cfg(any(windows, test))]
 mod layout;
@@ -60,6 +62,8 @@ mod layout;
 mod normalize;
 #[cfg(any(windows, test))]
 mod quick;
+#[cfg(any(windows, test))]
+mod relocate;
 #[cfg(any(windows, test))]
 mod replace;
 #[cfg(any(windows, test))]

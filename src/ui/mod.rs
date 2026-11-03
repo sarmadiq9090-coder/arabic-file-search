@@ -38,12 +38,14 @@ mod files;
 mod floating;
 mod format;
 mod history_menu;
+mod indexing;
 mod lang_menu;
 mod keys;
 mod launcher_shim; // thin glue to crate::launcher, see the file
 mod lazy;
 mod quick;
 mod quickswitch;
+mod relocate;
 mod replace_window;
 mod results;
 mod search_jobs;
@@ -61,7 +63,7 @@ use native_windows_gui as nwg;
 use nwg::NativeUi;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use winapi::shared::minwindef::LPARAM;
@@ -147,8 +149,8 @@ struct State {
     loading: Option<LoadJob>,
     scan: Option<ScanJob>,
     content: Option<ContentJob>,
-    /// Cancels the background content-index warm-up.
-    warm: Option<Arc<AtomicBool>>,
+    /// The background content-index warm-up: cancels it, and its progress.
+    warm: Option<Arc<content_index::Warm>>,
     /// A filename search is running on a background thread.
     name_running: bool,
     /// The query changed while a search was running; search again when it ends.
@@ -291,6 +293,11 @@ pub struct App {
     /// "Exit" was chosen: closing the window really quits.
     quitting: Cell<bool>,
     startup_logged: Cell<bool>,
+    /// The indexing progress shown in the status bar's last part, if any.
+    indexing_shown: RefCell<Option<String>>,
+    /// The offer to move a copy out of Downloads or a temp folder was
+    /// already considered this run (see `relocate`).
+    move_checked: Cell<bool>,
     state: RefCell<State>,
     /// Moving another program's Open / Save As dialog to a result's folder.
     quick: quickswitch::QuickSwitch,
@@ -453,11 +460,17 @@ impl App {
         let y3 = self.place_suggestions(M, y3, w - 2 * M);
         style::place(&self.list.handle, M, y3, (w - 2 * M).max(100), (y_btn - GAP - y3).max(50));
 
-        // Status bar: messages on one side, the selected file's path on the other.
+        // Status bar: messages on one side, the selected file's path on the
+        // other, and while indexing runs its progress at the far end.
         if let Some(sb) = self.status.handle.hwnd() {
             let px = (w as f64 * nwg::scale_factor()) as i32;
-            let parts: [i32; 2] = [px / 2, -1];
-            unsafe { SendMessageW(sb, SB_SETPARTS, 2, parts.as_ptr() as LPARAM) };
+            if self.indexing_part_shown() {
+                let parts: [i32; 3] = [px * 9 / 20, px * 3 / 4, -1];
+                unsafe { SendMessageW(sb, SB_SETPARTS, 3, parts.as_ptr() as LPARAM) };
+            } else {
+                let parts: [i32; 2] = [px / 2, -1];
+                unsafe { SendMessageW(sb, SB_SETPARTS, 2, parts.as_ptr() as LPARAM) };
+            }
         }
     }
 
@@ -568,6 +581,14 @@ impl App {
 pub fn run() {
     crate::search::init_local_utc_offset();
     let updated = std::env::args().any(|a| a == "--updated");
+    let moved = std::env::args().any(|a| a == crate::relocate::MOVED_ARG);
+    if moved {
+        // Started from the new place by the copy that is now exiting.
+        for _ in 0..6 {
+            crate::update::wait_for_previous_instance_exit();
+        }
+        startup::log("start: relaunched from the permanent place");
+    }
     if updated {
         // The previous version is still closing; let it go first. A big
         // index can take a while to free, so wait up to a minute.
@@ -576,7 +597,7 @@ pub fn run() {
         }
         startup::log(&format!("start: relaunched after updating to {}", env!("CARGO_PKG_VERSION")));
     }
-    if activate_running_copy(updated) {
+    if activate_running_copy(updated || moved) {
         return;
     }
     // Only the copy that keeps running tidies up after an update.

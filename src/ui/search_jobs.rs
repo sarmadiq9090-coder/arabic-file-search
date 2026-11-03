@@ -12,6 +12,7 @@ use super::startup::{LOOP_STARTED, background_priority, log, log_phases, phase};
 use super::{App, ContentJob, LoadJob, Matches, Row, ScanJob};
 use crate::index::{self, Index, ScanProgress};
 use crate::fuzzy;
+use crate::indexing_status;
 use crate::search::{self, ContentHit, ContentProgress, Query, SortKey};
 use crate::system_files;
 
@@ -320,6 +321,16 @@ impl App {
             }
             return;
         }
+        // Nothing yet while the drives are still being scanned: not "no
+        // results", the index is not complete.
+        if n == 0
+            && busy
+            && !loading
+            && let Some(text) = self.no_results_while_indexing()
+        {
+            self.set_status(&format!("{text}{warn}"));
+            return;
+        }
         let tail = match (loading, busy) {
             (true, _) => tr!(" (جاري تحميل الفهرس…)", " (loading the index…)"),
             (false, true) => tr!(" (الفهرسة ما زالت جارية)", " (indexing is still running)"),
@@ -411,6 +422,7 @@ impl App {
         // startup) and then every hour, for copies that live in the tray.
         let t = self.ticks.get().wrapping_add(1);
         self.ticks.set(t);
+        self.poll_indexing(t);
         if t % 18_000 == 50 {
             self.maybe_check_for_update();
         }
@@ -420,6 +432,14 @@ impl App {
             self.crash_checked.set(true);
             self.offer_crash_report();
         }
+        // Then, once, the offer to move a copy out of Downloads. It comes
+        // before the first-run question about the floating box (tick 14 in
+        // `quick_tick`, and not while this offer's message box is open), so
+        // a copy that moves asks that question from its new place.
+        if t >= 12 && self.crash_checked.get() && !self.move_checked.get() && self.window.visible() && self.window.enabled() {
+            self.move_checked.set(true);
+            self.offer_move();
+        }
         self.quick_tick(t);
     }
 
@@ -428,11 +448,9 @@ impl App {
         let Some(job) = &st.scan else { return };
         let finished = job.result.lock().ok().and_then(|mut r| r.take());
         match finished {
-            None => {
-                let n = job.progress.files.load(Ordering::Relaxed);
-                drop(st);
-                self.set_status(&trf!("جاري فهرسة الملفات… {} عنصر حتى الآن", "Indexing files… {} items so far", fmt_num(n)));
-            }
+            // The count shows in the status bar's progress part
+            // (`poll_indexing`), so a search's own message stays readable.
+            None => {}
             Some(None) => {
                 st.scan = None;
                 drop(st);
@@ -486,10 +504,24 @@ impl App {
         if done {
             self.stop_btn.set_enabled(false);
             let cached = if cached > 0 { trf!(" (من الفهرس: {})", " ({} from the index)", fmt_num(cached)) } else { String::new() };
-            self.set_status(&trf!("انتهى البحث داخل {} مستند: وجدت {} ملف.{}", "Searched {} documents: found {} files.{}", fmt_num(total), fmt_num(n), cached));
+            let mut status = trf!("انتهى البحث داخل {} مستند: وجدت {} ملف.{}", "Searched {} documents: found {} files.{}", fmt_num(total), fmt_num(n), cached);
+            // The drives are still being scanned: documents not in the index
+            // yet were not searched. (A finished search did read every
+            // document the content index lacked, so its warm-up doesn't count.)
+            if n == 0 && self.state.borrow().scan.is_some() {
+                status = format!("{status} {}.", indexing_status::incomplete_text(crate::i18n::current()));
+            }
+            self.set_status(&status);
             if n == 0 {
                 self.suggest_for_content(&self.query.text());
             }
+        } else if n == 0
+            && let Some(text) = self.content_search_while_indexing(checked, total)
+        {
+            // The first day: a search over every drive reads most documents
+            // itself while the content index fills, and finds nothing for a
+            // while. Say why, rather than a bare "found 0".
+            self.set_status(&text);
         } else {
             self.set_status(&trf!(
                 "جاري البحث داخل المستندات… تم فحص {} من {} — وجدت {}",
