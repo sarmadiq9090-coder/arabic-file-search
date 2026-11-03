@@ -35,12 +35,13 @@ pub const STARTUP_TASK_ID: &str = "InstaFindStartup";
 /// The command the package adds to `PATH` (`windows.appExecutionAlias`).
 pub const EXECUTION_ALIAS: &str = "instafind.exe";
 /// Whether the first run in the Store turns starting with Windows on once,
-/// like the portable program does (`autostart::apply_default`). The user can
-/// turn it off in Options, in Settings ▸ Apps ▸ Startup or in Task Manager,
-/// and Windows then keeps it off (`DisabledByUser`); it is never turned back
-/// on behind the user's back. Set to `false` if Store certification asks
-/// for an explicit opt-in.
-pub const ENABLE_STARTUP_ON_FIRST_RUN: bool = true;
+/// like the portable program does (`autostart::apply_default`). Off: Store
+/// policy 10.2.8 wants the user's consent, so the Store version starts with
+/// Windows only once the user turns it on (Options, or Settings ▸ Apps ▸
+/// Startup ▸ InstaFind). Once the user turns it off there or in Task
+/// Manager, Windows keeps it off (`DisabledByUser`) and the program never
+/// turns it back on.
+pub const ENABLE_STARTUP_ON_FIRST_RUN: bool = false;
 
 /// `ERROR_SUCCESS` / `ERROR_INSUFFICIENT_BUFFER` / `APPMODEL_ERROR_NO_PACKAGE`.
 const ERROR_SUCCESS: i32 = 0;
@@ -139,7 +140,7 @@ pub const ACTIVATION_KIND_STARTUP_TASK: i32 = 1020;
 #[cfg(any(windows, test))]
 pub fn update_message() -> String {
     trf!(
-        "التحديثات تأتي من Microsoft Store.\nيحدّث المتجر «بحث سريع» تلقائياً، أو افتح Microsoft Store ▸ المكتبة ▸ «الحصول على التحديثات».\n\nالإصدار الحالي: {}",
+        "التحديثات تأتي من Microsoft Store.\nيحدّث المتجر InstaFind تلقائياً، أو افتح Microsoft Store ▸ المكتبة ▸ «الحصول على التحديثات».\n\nالإصدار الحالي: {}",
         "Updates come from Microsoft Store.\nThe Store updates InstaFind automatically, or open Microsoft Store ▸ Library ▸ “Get updates”.\n\nCurrent version: {}",
         env!("CARGO_PKG_VERSION")
     )
@@ -156,7 +157,7 @@ pub fn startup_refused_message(state: StartupState) -> String {
         )
         .to_string(),
         _ => tr!(
-            "أوقفتَ تشغيل البرنامج مع ويندوز من الإعدادات. لتشغيله: الإعدادات ▸ التطبيقات ▸ بدء التشغيل ▸ بحث سريع.",
+            "أوقفتَ تشغيل البرنامج مع ويندوز من الإعدادات. لتشغيله: الإعدادات ▸ التطبيقات ▸ بدء التشغيل ▸ InstaFind.",
             "You turned starting with Windows off in Settings. To turn it on: Settings ▸ Apps ▸ Startup ▸ InstaFind."
         )
         .to_string(),
@@ -373,7 +374,10 @@ mod tests {
         // Tests run in Arabic (i18n::detect).
         let m = update_message();
         assert!(m.contains("Microsoft Store") && m.contains("التحديثات") && m.contains(env!("CARGO_PKG_VERSION")), "{m}");
-        assert!(startup_refused_message(StartupState::DisabledByUser).contains("الإعدادات"));
+        let m = startup_refused_message(StartupState::DisabledByUser);
+        // Named as Settings ▸ Apps ▸ Startup lists it: the manifest's
+        // StartupTask DisplayName, from identity.json's displayName.
+        assert!(m.contains("الإعدادات") && m.contains("بدء التشغيل ▸ InstaFind"), "{m}");
         assert!(startup_refused_message(StartupState::DisabledByPolicy).contains("سياسة"));
     }
 
