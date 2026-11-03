@@ -34,8 +34,8 @@
 pub const STARTUP_TASK_ID: &str = "InstaFindStartup";
 /// The command the package adds to `PATH` (`windows.appExecutionAlias`).
 pub const EXECUTION_ALIAS: &str = "instafind.exe";
-/// Whether the first run in the Store turns starting with Windows on once,
-/// like the portable program does (`autostart::apply_default`). Off: Store
+/// Whether the first run in the Store turns starting with Windows on once
+/// (`autostart::apply_store_default`). Off: Store
 /// policy 10.2.8 wants the user's consent, so the Store version starts with
 /// Windows only once the user turns it on (Options, or Settings ▸ Apps ▸
 /// Startup ▸ InstaFind). Once the user turns it off there or in Task
@@ -140,7 +140,7 @@ pub const ACTIVATION_KIND_STARTUP_TASK: i32 = 1020;
 #[cfg(any(windows, test))]
 pub fn update_message() -> String {
     trf!(
-        "التحديثات تأتي من Microsoft Store.\nيحدّث المتجر InstaFind تلقائياً، أو افتح Microsoft Store ▸ المكتبة ▸ «الحصول على التحديثات».\n\nالإصدار الحالي: {}",
+        "التحديثات تأتي من Microsoft Store.\nيحدّث المتجر InstaFind تلقائياً، أو افتح Microsoft Store ◂ المكتبة ◂ «الحصول على التحديثات».\n\nالإصدار الحالي: {}",
         "Updates come from Microsoft Store.\nThe Store updates InstaFind automatically, or open Microsoft Store ▸ Library ▸ “Get updates”.\n\nCurrent version: {}",
         env!("CARGO_PKG_VERSION")
     )
@@ -157,7 +157,7 @@ pub fn startup_refused_message(state: StartupState) -> String {
         )
         .to_string(),
         _ => tr!(
-            "أوقفتَ تشغيل البرنامج مع ويندوز من الإعدادات. لتشغيله: الإعدادات ▸ التطبيقات ▸ بدء التشغيل ▸ InstaFind.",
+            "أوقفتَ تشغيل البرنامج مع ويندوز من الإعدادات. لتشغيله: الإعدادات ◂ التطبيقات ◂ بدء التشغيل ◂ InstaFind.",
             "You turned starting with Windows off in Settings. To turn it on: Settings ▸ Apps ▸ Startup ▸ InstaFind."
         )
         .to_string(),
@@ -377,7 +377,7 @@ mod tests {
         let m = startup_refused_message(StartupState::DisabledByUser);
         // Named as Settings ▸ Apps ▸ Startup lists it: the manifest's
         // StartupTask DisplayName, from identity.json's displayName.
-        assert!(m.contains("الإعدادات") && m.contains("بدء التشغيل ▸ InstaFind"), "{m}");
+        assert!(m.contains("الإعدادات") && m.contains("بدء التشغيل ◂ InstaFind"), "{m}");
         assert!(startup_refused_message(StartupState::DisabledByPolicy).contains("سياسة"));
     }
 

@@ -179,15 +179,6 @@ pub fn point_to(exe: &std::path::Path) -> bool {
 /// On by default: the first run turns it on once; after that only the user's
 /// choice counts. A stale path (the exe moved) is refreshed.
 pub fn apply_default() {
-    if crate::store::is_packaged() {
-        // Store: turned on once, through the startup task, unless the user
-        // already chose or turned it off in Settings / Task Manager.
-        let chosen = open(OWN_KEY, false).is_some_and(|k| has_value(&k, CHOSEN));
-        if crate::store::startup_state().is_some_and(|s| crate::store::enable_on_first_run(chosen, s)) {
-            set_enabled(true);
-        }
-        return;
-    }
     let own = open(OWN_KEY, false);
     let chosen = own.as_ref().is_some_and(|k| has_value(k, CHOSEN));
     // 0.8.1 turns it on once more, for those who had it off without meaning to.
@@ -198,5 +189,17 @@ pub fn apply_default() {
     }
     if !reset_done && let Some(own) = open(OWN_KEY, true) {
         set_string(&own, RESET_081, "1");
+    }
+}
+
+/// The Microsoft Store version's counterpart of `apply_default`, through
+/// the package's startup task: off until the user turns it on
+/// (`store::ENABLE_STARTUP_ON_FIRST_RUN`), and never against a choice made
+/// in Settings or Task Manager. Kept apart from `apply_default`, which is
+/// about the `Run` key only.
+pub fn apply_store_default() {
+    let chosen = open(OWN_KEY, false).is_some_and(|k| has_value(&k, CHOSEN));
+    if crate::store::startup_state().is_some_and(|s| crate::store::enable_on_first_run(chosen, s)) {
+        set_enabled(true);
     }
 }
