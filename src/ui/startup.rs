@@ -139,10 +139,11 @@ pub(super) fn activate_running_copy(updated: bool) -> bool {
         return false;
     }
     // The first copy may still be creating its window; give it a few seconds.
-    let (class, title) = (shell::wide("NativeWindowsGuiWindow"), shell::wide(title()));
+    let class = shell::wide("NativeWindowsGuiWindow");
+    let titles = [shell::wide(title()), shell::wide(super::LEGACY_TITLE)];
     let mut hwnd = std::ptr::null_mut();
     for _ in 0..50 {
-        hwnd = unsafe { FindWindowW(class.as_ptr(), title.as_ptr()) };
+        hwnd = titles.iter().map(|t| unsafe { FindWindowW(class.as_ptr(), t.as_ptr()) }).find(|h| !h.is_null()).unwrap_or(std::ptr::null_mut());
         if !hwnd.is_null() {
             break;
         }

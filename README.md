@@ -4,7 +4,7 @@
 
 <h1 align="center">InstaFind — بحث سريع</h1>
 
-<p align="center"><b>أسرع طريقة لإيجاد أي ملف على ويندوز، بالعربية والإنكليزية، وحتى داخل المستندات.</b><br><b dir="ltr">Find any file on Windows as you type, in Arabic or English, even inside documents.</b></p>
+<p align="center"><b>أسرع طريقة لإيجاد أي ملف على ويندوز، بالعربية والإنجليزية، وحتى داخل المستندات.</b><br><b dir="ltr">Find any file on Windows as you type, in Arabic or English, even inside documents.</b></p>
 
 <p align="center">
 <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest"><img src="https://img.shields.io/github/v/release/sarmadiq9090-coder/arabic-file-search?label=%D8%A7%D9%84%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1&color=2f81f7" alt="الإصدار / Release"></a>
@@ -114,8 +114,8 @@ scoop install instafind
 - **سطر الأوامر** و**إضافة Flow Launcher** وأمثلة PowerShell وAutoHotkey.
 
 ### الراحة
-- **واجهة عربية أو إنكليزية**: تتبع لغة ويندوز، وتُغيَّر من «خيارات ← Language / اللغة».
-- **يعمل مع ويندوز** في الخلفية، وEsc أو زر الإغلاق يخفيانه إلى الأيقونة بجانب الساعة (للخروج: «خروج» من قائمة الأيقونة)، ونسخة واحدة فقط منه.
+- **واجهة عربية أو إنجليزية**: تتبع لغة ويندوز، وتُغيَّر من «خيارات ← Language / اللغة».
+- **يعمل مع ويندوز** في الخلفية إن اخترت ذلك (في سؤال أول تشغيل أو من «خيارات…»؛ مطفأ ما لم تشغّله)، وEsc أو زر الإغلاق يخفيانه إلى الأيقونة بجانب الساعة (للخروج: «خروج» من قائمة الأيقونة)، ونسخة واحدة فقط منه.
 - تواريخ نسبية («أمس»، «قبل 5 دقائق»)، وخيار الأرقام العربية، وأيقونات أنواع الملفات.
 - أي خطأ داخلي يُسجَّل في `log.txt` و`crash.txt` ولا يُغلق البرنامج.
 
@@ -286,7 +286,7 @@ InstaFind's second includes starting the command-line tool and loading the index
 
 #### Comfort
 - **English or Arabic interface**: follows the Windows display language; switch in **Options → Language / اللغة**.
-- **Starts with Windows** in the background; Esc or the close button hides it to the tray (quit with *Exit* in the tray menu), single instance.
+- **Starts with Windows** in the background if you choose so (in the first-run question or in **Options…**; off unless you turn it on); Esc or the close button hides it to the tray (quit with *Exit* in the tray menu), single instance.
 - Relative dates, optional Arabic digits, file-type icons.
 - Internal errors are written to `log.txt` and `crash.txt` instead of closing the app.
 

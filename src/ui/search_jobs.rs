@@ -339,13 +339,13 @@ impl App {
         let tail = format!("{tail}{warn}");
         match res.converted {
             Some(fb) => self.set_status(&trf!(
-                "{}: {} نتيجة في {} ملي ثانية{tail}",
+                "{}: عدد النتائج: {} (خلال {} ملّي ثانية){tail}",
                 "{}: {} results in {} ms{tail}",
                 fb.status(&res.text),
                 fmt_num(n),
                 fmt_num(res.ms)
             )),
-            None => self.set_status(&trf!("وجدت {} نتيجة في {} ملي ثانية{tail}", "Found {} results in {} ms{tail}", fmt_num(n), fmt_num(res.ms))),
+            None => self.set_status(&trf!("عدد النتائج: {} (خلال {} ملّي ثانية){tail}", "Found {} results in {} ms{tail}", fmt_num(n), fmt_num(res.ms))),
         }
     }
 
@@ -403,7 +403,7 @@ impl App {
     pub(super) fn on_stop(&self) {
         let n = self.state.borrow().rows.len();
         self.cancel_content();
-        self.set_status(&trf!("تم إيقاف البحث. وجدت {} ملف.", "Search stopped. Found {} files.", fmt_num(n)));
+        self.set_status(&trf!("تم إيقاف البحث. عدد الملفات: {}.", "Search stopped. Found {} files.", fmt_num(n)));
     }
 
     /// Polls background jobs a few times per second.
@@ -504,7 +504,7 @@ impl App {
         if done {
             self.stop_btn.set_enabled(false);
             let cached = if cached > 0 { trf!(" (من الفهرس: {})", " ({} from the index)", fmt_num(cached)) } else { String::new() };
-            let mut status = trf!("انتهى البحث داخل {} مستند: وجدت {} ملف.{}", "Searched {} documents: found {} files.{}", fmt_num(total), fmt_num(n), cached);
+            let mut status = trf!("انتهى البحث داخل المستندات (فُحص منها: {}). عدد الملفات: {}.{}", "Searched {} documents: found {} files.{}", fmt_num(total), fmt_num(n), cached);
             // The drives are still being scanned: documents not in the index
             // yet were not searched. (A finished search did read every
             // document the content index lacked, so its warm-up doesn't count.)
@@ -524,7 +524,7 @@ impl App {
             self.set_status(&text);
         } else {
             self.set_status(&trf!(
-                "جاري البحث داخل المستندات… تم فحص {} من {} — وجدت {}",
+                "جاري البحث داخل المستندات… فُحص {} من {} — عدد الملفات: {}",
                 "Searching inside documents… checked {} of {} — found {}",
                 fmt_num(checked),
                 fmt_num(total),

@@ -91,7 +91,10 @@ use watching::SubtreeScan;
 const WS_EX_LAYOUTRTL: u32 = 0x0040_0000;
 
 /// The window title; also how a second copy of the program finds the first.
-const TITLE: &str = "بحث سريع";
+/// The product name first, as in InstaWords («InstaWords — تفقيط»).
+const TITLE: &str = "InstaFind — بحث سريع";
+/// The Arabic title up to 0.9.1, so a new copy still finds an older one.
+const LEGACY_TITLE: &str = "بحث سريع";
 const TITLE_EN: &str = "InstaFind";
 
 /// The window title in the interface language.

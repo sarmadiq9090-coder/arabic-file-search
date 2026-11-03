@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        يمكنك الكتابة بالعربية أو بالإنكليزية. / You can write in Arabic or English.
+        يمكنك الكتابة بالعربية أو بالإنجليزية. / You can write in Arabic or English.
   - type: textarea
     id: idea
     attributes:

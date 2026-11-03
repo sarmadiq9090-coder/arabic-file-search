@@ -111,7 +111,16 @@ jobs:
         env:
           PAT: ${{ secrets.WINGET_PAT }}
           VERSION: ${{ needs.manifests.outputs.version }}
+          # To update: the new tag from github.com/microsoft/winget-create/releases
+          # and the SHA-256 of its wingetcreate.exe.
+          WINGETCREATE_VERSION: v1.12.13.0
+          WINGETCREATE_SHA256: 24042bd37915805615e6cf969ac57c6439124c3fe85823327f5f3fb24bd9ffea
         run: |
           if (-not $env:PAT) { Write-Host "WINGET_PAT not set: skipping the winget-pkgs PR."; exit 0 }
-          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          # A pinned release, checked against its SHA-256 before it runs with
+          # the token (aka.ms/wingetcreate/latest could change under us).
+          $url = "https://github.com/microsoft/winget-create/releases/download/$env:WINGETCREATE_VERSION/wingetcreate.exe"
+          Invoke-WebRequest $url -OutFile wingetcreate.exe
+          $hash = (Get-FileHash wingetcreate.exe -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne $env:WINGETCREATE_SHA256) { throw "wingetcreate.exe $env:WINGETCREATE_VERSION is $hash, expected $env:WINGETCREATE_SHA256" }
           ./wingetcreate.exe submit --token $env:PAT "packaging/winget/manifests/s/Sarmad/InstaFind/$env:VERSION"
