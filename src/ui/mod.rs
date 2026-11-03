@@ -789,6 +789,10 @@ pub fn run() {
     if stale > 0 {
         startup::log(&format!("start: removed {stale} unfinished index save file(s)"));
     }
+    if let Some(full) = crate::store::package_full_name() {
+        // Before the first WinRT call, so a failure there is placed.
+        startup::log(&format!("store: starting {full}"));
+    }
     autostart::apply_default();
     if let Some(line) = crate::store::startup_log_line() {
         startup::log(&line);
