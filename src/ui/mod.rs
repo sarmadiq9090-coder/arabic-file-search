@@ -793,7 +793,11 @@ pub fn run() {
         // Before the first WinRT call, so a failure there is placed.
         startup::log(&format!("store: starting {full}"));
     }
-    autostart::apply_default();
+    if crate::store::is_packaged() {
+        autostart::apply_store_default();
+    } else {
+        autostart::apply_default();
+    }
     if let Some(line) = crate::store::startup_log_line() {
         startup::log(&line);
     }

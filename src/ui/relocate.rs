@@ -51,7 +51,8 @@ impl App {
     /// Once (the first time it applies), offers to move a copy that runs
     /// from Downloads or a temp folder to a permanent place.
     pub(super) fn offer_move(&self) {
-        if self.state.borrow().settings.move_asked {
+        // The Store installs and updates its copy itself (WindowsApps).
+        if crate::store::is_packaged() || self.state.borrow().settings.move_asked {
             return;
         }
         let Ok(exe) = std::env::current_exe() else { return };
