@@ -1,4 +1,4 @@
-# Microsoft Store screenshots on a real Windows machine (store.yml): sets the
+﻿# Microsoft Store screenshots on a real Windows machine (store.yml): sets the
 # screen to 1920x1080 when the runner allows it, seeds sample files with
 # Arabic and English names in C:\Users\Public\Demo (so no runner user folder
 # shows in a path), lets the program index, and captures the full screen in
