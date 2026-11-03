@@ -381,7 +381,7 @@ foreach ($s in $scenes) {
                 Focus $dupes
                 Start-Sleep -Seconds 6   # compares the files' content
                 Shot "4-duplicates-$lang.png"
-                [void][S]::PostMessage($dupes, 0x0010 /* WM_CLOSE */, [IntPtr]::Zero, [IntPtr]::Zero)
+                [void][S]::PostMessage($dupes, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)   # WM_CLOSE
                 Start-Sleep -Seconds 1
             }
         }
