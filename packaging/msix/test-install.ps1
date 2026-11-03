@@ -56,21 +56,60 @@ try {
         if ($p.ExitCode -ne 0 -or $text -notmatch '\d+\.\d+\.\d+') { Fail "instafind.exe --version failed" }
     }
 
-    # Start it as the Start menu does and wait for its first log line.
-    Start-Process "shell:AppsFolder\$pfn!InstaFind"
+    # Start it as the Start menu does and wait for its first log line; if
+    # that shows no sign of life, start it through the alias (also inside
+    # the package) to tell a launch problem from a program problem.
     $log = Join-Path $private 'log.txt'
-    $line = $null
-    for ($i = 0; $i -lt 120 -and -not $line; $i++) {
-        Start-Sleep -Seconds 1
-        foreach ($f in @($log, (Join-Path $real 'log.txt'))) {
-            if (Test-Path $f) {
-                $line = Get-Content $f | Where-Object { $_ -match 'store: packaged as' } | Select-Object -Last 1
-                if ($line) { $where = $f; break }
+    function Wait-StoreLine([int]$Seconds) {
+        for ($i = 0; $i -lt $Seconds; $i++) {
+            Start-Sleep -Seconds 1
+            foreach ($f in @($log, (Join-Path $real 'log.txt'))) {
+                if (Test-Path $f) {
+                    $l = Get-Content $f | Where-Object { $_ -match 'store: packaged as' } | Select-Object -Last 1
+                    if ($l) { return @{ Line = $l; Where = $f } }
+                }
+            }
+        }
+        return $null
+    }
+    $started = Get-Date
+    $appId = 'InstaFind'
+    Write-Host "starting shell:AppsFolder\$pfn!$appId"
+    Start-Process "shell:AppsFolder\$pfn!$appId"
+    $hit = Wait-StoreLine 60
+    if (-not $hit) {
+        Write-Host "::warning::no log line 60 s after the Start-menu style launch; processes: $((Get-Process bahth -ErrorAction SilentlyContinue | ForEach-Object { $_.Id }) -join ', ')"
+        if (Test-Path $alias) {
+            Write-Host "starting $alias (no arguments)"
+            $viaAlias = Start-Process -FilePath $alias -PassThru
+            $hit = Wait-StoreLine 60
+            if (-not $hit) {
+                $viaAlias.Refresh()
+                $code = if ($viaAlias.HasExited) { '0x{0:x8}' -f $viaAlias.ExitCode } else { 'still running' }
+                Write-Host "alias launch: $code"
+            } else {
+                Write-Host "::warning::the program started through the alias but not through shell:AppsFolder"
             }
         }
     }
+    $line = if ($hit) { $hit.Line } else { $null }
+    $where = if ($hit) { $hit.Where } else { $null }
     if (-not $line) {
         Fail "the packaged program did not log 'store: packaged as' within 2 minutes"
+        Write-Host '--- diagnostics ---'
+        Get-Process | Where-Object { $_.Path -like '*WindowsApps*' -or $_.Name -eq 'bahth' } | Format-Table Id, Name, Path -AutoSize | Out-String | Write-Host
+        Write-Host "package folder $($pkg.InstallLocation):"
+        Get-ChildItem $pkg.InstallLocation -ErrorAction SilentlyContinue | Format-Table Name, Length | Out-String | Write-Host
+        $pkgData = Join-Path $env:LOCALAPPDATA "Packages\$pfn"
+        Write-Host "files under $pkgData`:"
+        Get-ChildItem $pkgData -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { "  $($_.FullName) ($($_.Length))" } | Write-Host
+        if (Test-Path $real) { Write-Host "files under $real`:"; Get-ChildItem $real -File | ForEach-Object { "  $($_.Name) ($($_.Length))" } | Write-Host }
+        foreach ($f in @((Join-Path $real 'log.txt'))) { if (Test-Path $f) { Write-Host "--- $f ---"; Get-Content $f -Tail 20 | Write-Host } }
+        foreach ($logName in @('Application', 'Microsoft-Windows-AppModel-Runtime/Admin', 'Microsoft-Windows-AppXDeploymentServer/Operational', 'Microsoft-Windows-TWinUI/Operational')) {
+            $events = Get-WinEvent -FilterHashtable @{ LogName = $logName; StartTime = $started.AddSeconds(-10) } -ErrorAction SilentlyContinue |
+                Where-Object { $_.Level -le 3 -or $_.Message -match 'bahth|InstaFind' } | Select-Object -First 15
+            foreach ($e in $events) { Write-Host ("[{0}] {1} {2} {3}: {4}" -f $logName, $e.TimeCreated.ToString('HH:mm:ss'), $e.ProviderName, $e.Id, (($e.Message -replace '\s+', ' ').Substring(0, [Math]::Min(400, $e.Message.Length)))) }
+        }
     } else {
         Write-Host "log ($where): $line"
         if ($where -ne $log) { Fail "data was not written under the package's private folder ($private)" }
