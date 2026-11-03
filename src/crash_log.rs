@@ -57,12 +57,20 @@ pub fn default_log_path() -> PathBuf {
     crate::index::cache_path().with_file_name("log.txt")
 }
 
+/// `crash.txt`, where the panic reports are kept (see `feedback`).
+#[cfg(windows)]
+pub fn crash_path() -> PathBuf {
+    default_log_path().with_file_name("crash.txt")
+}
+
 /// Installs the panic hook, writing to `log` (and `crash.txt` beside it).
 /// The previous hook still runs after it. Only the first call counts.
 pub fn install(log: PathBuf) {
     if LOG_PATH.set(log).is_err() {
         return;
     }
+    #[cfg(windows)]
+    native::install(&crash_path());
     let previous = panic::take_hook();
     panic::set_hook(Box::new(move |info| {
         // Never let reporting a panic cause another one.
@@ -241,8 +249,9 @@ fn image_base() -> Option<usize> {
     None
 }
 
+/// The release asset name, so offsets name the right build (x64, x86 or ARM64).
 fn exe_name() -> &'static str {
-    "bahth.exe"
+    crate::update::ASSET_NAME
 }
 
 /// Appends a timestamped entry to the log; never fails loudly. Moves a log
@@ -269,6 +278,182 @@ fn append_crash(path: &Path, text: &str) {
     }
 }
 
+/// Crashes that are not Rust panics (a stack overflow, an access violation
+/// in Windows or a driver hook): one line in `crash.txt`, written without
+/// allocating, so the next start offers the report like a panic's. Before
+/// 0.8.2 these left no trace at all.
+#[cfg(windows)]
+mod native {
+    use std::path::Path;
+    use std::sync::OnceLock;
+    use winapi::shared::minwindef::DWORD;
+    use winapi::um::errhandlingapi::{AddVectoredExceptionHandler, SetUnhandledExceptionFilter};
+    use winapi::um::fileapi::{CreateFileW, OPEN_ALWAYS, WriteFile};
+    use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
+    use winapi::um::processthreadsapi::SetThreadStackGuarantee;
+    use winapi::um::winnt::{EXCEPTION_POINTERS, FILE_APPEND_DATA, FILE_SHARE_READ, FILE_SHARE_WRITE, LONG};
+
+    const STACK_OVERFLOW: u32 = 0xC000_00FD;
+    const CONTINUE_SEARCH: LONG = 0;
+    static PATH: OnceLock<Vec<u16>> = OnceLock::new();
+
+    pub(super) fn install(crash: &Path) {
+        use std::os::windows::ffi::OsStrExt;
+        let wide: Vec<u16> = crash.as_os_str().encode_wide().chain(Some(0)).collect();
+        if PATH.set(wide).is_err() {
+            return;
+        }
+        unsafe {
+            // Room for the handler to run once the stack has overflowed.
+            let mut guarantee: u32 = 64 * 1024;
+            SetThreadStackGuarantee(&mut guarantee);
+            AddVectoredExceptionHandler(1, Some(vectored));
+            SetUnhandledExceptionFilter(Some(unhandled));
+        }
+    }
+
+    unsafe extern "system" fn vectored(info: *mut EXCEPTION_POINTERS) -> LONG {
+        if let Some((code, at)) = unsafe { code_and_address(info) }
+            && code == STACK_OVERFLOW
+        {
+            write_line(code, at);
+        }
+        CONTINUE_SEARCH
+    }
+
+    unsafe extern "system" fn unhandled(info: *mut EXCEPTION_POINTERS) -> LONG {
+        if let Some((code, at)) = unsafe { code_and_address(info) }
+            && code != STACK_OVERFLOW
+        {
+            write_line(code, at);
+        }
+        CONTINUE_SEARCH
+    }
+
+    unsafe fn code_and_address(info: *mut EXCEPTION_POINTERS) -> Option<(u32, usize)> {
+        let rec = unsafe { info.as_ref()?.ExceptionRecord.as_ref()? };
+        Some((rec.ExceptionCode, rec.ExceptionAddress as usize))
+    }
+
+    /// Appends "<secs> PANIC (v0.8.2) native crash: exception 0xC00000FD at
+    /// bahth.exe+0x1234" and "END PANIC", the shape `feedback::crash_reports`
+    /// reads, so the next start offers to report it.
+    fn write_line(code: u32, at: usize) {
+        let Some(path) = PATH.get() else { return };
+        let mut buf = [0u8; 200];
+        let mut n = 0;
+        let mut put = |bytes: &[u8], n: &mut usize| {
+            for &b in bytes {
+                if *n < buf.len() {
+                    buf[*n] = b;
+                    *n += 1;
+                }
+            }
+        };
+        put(&decimal(now_secs()), &mut n);
+        put(b" PANIC (v", &mut n);
+        put(env!("CARGO_PKG_VERSION").as_bytes(), &mut n);
+        put(b") native crash: exception 0x", &mut n);
+        put(&hex(code as u64, 8), &mut n);
+        put(b" at ", &mut n);
+        let base = super::image_base().unwrap_or(0);
+        if base != 0 && at >= base && at - base < 0x1000_0000 {
+            put(super::exe_name().as_bytes(), &mut n);
+            put(b"+0x", &mut n);
+            put(&hex((at - base) as u64, 1), &mut n);
+        } else {
+            put(b"0x", &mut n);
+            put(&hex(at as u64, 1), &mut n);
+        }
+        put(b"\r\nEND PANIC\r\n\r\n", &mut n);
+        unsafe {
+            let h = CreateFileW(
+                path.as_ptr(),
+                FILE_APPEND_DATA,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                std::ptr::null_mut(),
+                OPEN_ALWAYS,
+                0,
+                std::ptr::null_mut(),
+            );
+            if h != INVALID_HANDLE_VALUE {
+                let mut written: DWORD = 0;
+                WriteFile(h, buf.as_ptr().cast(), n as DWORD, &mut written, std::ptr::null_mut());
+                CloseHandle(h);
+            }
+        }
+    }
+
+    fn now_secs() -> u64 {
+        let mut ft = winapi::shared::minwindef::FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+        unsafe { winapi::um::sysinfoapi::GetSystemTimeAsFileTime(&mut ft) };
+        let t = ((ft.dwHighDateTime as u64) << 32) | ft.dwLowDateTime as u64;
+        (t / 10_000_000).saturating_sub(11_644_473_600)
+    }
+
+    /// `v` in hex, at least `min` digits, as ASCII in a fixed buffer.
+    pub(super) fn hex(v: u64, min: usize) -> Digits {
+        let mut d = Digits::default();
+        let mut tmp = [0u8; 16];
+        let mut len = 0;
+        let mut x = v;
+        loop {
+            tmp[len] = b"0123456789ABCDEF"[(x & 0xF) as usize];
+            len += 1;
+            x >>= 4;
+            if x == 0 && len >= min {
+                break;
+            }
+        }
+        for i in 0..len {
+            d.push(tmp[len - 1 - i]);
+        }
+        d
+    }
+
+    pub(super) fn decimal(v: u64) -> Digits {
+        let mut d = Digits::default();
+        let mut tmp = [0u8; 20];
+        let mut len = 0;
+        let mut x = v;
+        loop {
+            tmp[len] = b'0' + (x % 10) as u8;
+            len += 1;
+            x /= 10;
+            if x == 0 {
+                break;
+            }
+        }
+        for i in 0..len {
+            d.push(tmp[len - 1 - i]);
+        }
+        d
+    }
+
+    /// Up to 20 ASCII digits, on the stack.
+    #[derive(Default)]
+    pub(super) struct Digits {
+        buf: [u8; 20],
+        len: usize,
+    }
+
+    impl Digits {
+        fn push(&mut self, b: u8) {
+            if self.len < self.buf.len() {
+                self.buf[self.len] = b;
+                self.len += 1;
+            }
+        }
+    }
+
+    impl std::ops::Deref for Digits {
+        type Target = [u8];
+        fn deref(&self) -> &[u8] {
+            &self.buf[..self.len]
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -286,6 +471,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_pointer_width = "64")] // 64-bit addresses
     fn frames_get_offsets_into_the_program() {
         let bt = "   0:     0x140489519 - <unknown>\n   1:     0x7ffa00001000 - <unknown>\n  at src/x.rs:1\n";
         let out = annotate_frames(bt, Some(0x1_4000_0000), "bahth.exe");
@@ -331,10 +517,15 @@ mod tests {
             seed ^= seed << 17;
             (seed % n as u64) as usize
         };
+        // The usual image base of a 64-bit exe; 32-bit images load lower.
+        #[cfg(target_pointer_width = "64")]
+        const IMAGE_BASE: usize = 0x1_4000_0000;
+        #[cfg(not(target_pointer_width = "64"))]
+        const IMAGE_BASE: usize = 0x40_0000;
         for _ in 0..3000 {
             let s: String = (0..below(12)).map(|_| PIECES[below(PIECES.len())]).collect();
             let _ = frame_address(&s);
-            let base = [None, Some(0), Some(usize::MAX), Some(0x1_4000_0000)][below(4)];
+            let base = [None, Some(0), Some(usize::MAX), Some(IMAGE_BASE)][below(4)];
             let _ = annotate_frames(&s, base, "bahth.exe");
             let r = report(&s, Some((&s, u32::MAX, 0)), &s, &s);
             assert!(r.ends_with("END PANIC"));
@@ -405,7 +596,12 @@ mod tests {
         assert!(text.contains("in thread 'probe-thread': index out of bounds"), "{text}");
         assert!(text.contains("crash_log.rs:"), "{text}");
         assert!(text.contains("backtrace:"), "{text}");
-        assert!(text.contains("contained a parser panic: bad pdf"), "{text}");
+        // Other tests running at the same time also log contained panics, and
+        // only the first QUIET_LINES of a run get a line: once the cap is
+        // passed, this one may have been the one counted instead.
+        if QUIET_COUNT.load(Ordering::Relaxed) <= QUIET_LINES {
+            assert!(text.contains("contained a parser panic: bad pdf"), "{text}");
+        }
         let crash = std::fs::read_to_string(dir.join("crash.txt")).unwrap();
         assert!(crash.contains("probe-thread") && !crash.contains("bad pdf"));
         let _ = std::fs::remove_dir_all(&dir);

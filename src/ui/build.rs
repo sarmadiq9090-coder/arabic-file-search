@@ -171,6 +171,10 @@ impl NativeUi<AppUi> for App {
         }
         app.list.set_headers_enabled(true);
 
+        // Apps the query names (hidden until one does).
+        for b in app.app_btns.iter_mut() {
+            nwg::Button::builder().parent(w).font(f).text("").flags(nwg::ButtonFlags::TAB_STOP).build(b)?;
+        }
         nwg::Button::builder().parent(w).font(f).text(tr!("فتح الملف", "Open file")).build(&mut app.open_btn)?;
         nwg::Button::builder().parent(w).font(f).text(tr!("فتح المجلد", "Open folder")).build(&mut app.folder_btn)?;
         nwg::Button::builder().parent(w).font(f).text(tr!("نسخ المسار", "Copy path")).build(&mut app.copy_btn)?;
@@ -258,6 +262,7 @@ impl NativeUi<AppUi> for App {
             .build(&mut app.menu_hide_system)?;
         nwg::MenuItem::builder().text(tr!("تصدير النتائج إلى Excel (CSV)", "Export results to Excel (CSV)")).parent(&app.options_menu).build(&mut app.menu_export)?;
         nwg::MenuItem::builder().text(tr!("إخفاء إلى شريط المهام\tEsc", "Hide to the taskbar tray\tEsc")).parent(&app.options_menu).build(&mut app.menu_hide)?;
+        nwg::MenuItem::builder().text(tr!("خروج من البرنامج", "Exit the program")).parent(&app.options_menu).build(&mut app.menu_exit)?;
         nwg::MenuItem::builder()
             .text(&trf!("إظهار البرنامج من أي مكان\t{HOTKEY_TEXT}", "Show the program from anywhere\t{HOTKEY_TEXT}"))
             .parent(&app.options_menu)
@@ -272,9 +277,14 @@ impl NativeUi<AppUi> for App {
             .parent(&app.options_menu)
             .build(&mut app.menu_autostart)?;
         super::lang_menu::build(&app.options_menu, &mut app.lang_menu, &mut app.menu_lang_ar, &mut app.menu_lang_en)?;
+        super::feedback::build(&app.options_menu, &mut app.feedback_menu, [&mut app.menu_feedback_bug, &mut app.menu_feedback_idea, &mut app.menu_feedback_talk])?;
 
-        // Tray icon, so a hidden window comes back instantly.
-        app.tray_icon.handle = crate::icon::load_icon(true) as _;
+        // Tray icon, so a hidden window comes back instantly: a monochrome
+        // magnifier in the taskbar's colours (the app icon if that fails).
+        app.tray_icon.handle = app.mono_icons.get(super::surface::taskbar_dark()) as _;
+        if app.tray_icon.handle.is_null() {
+            app.tray_icon.handle = crate::icon::load_icon(true) as _;
+        }
         if app.tray_icon.handle.is_null() {
             nwg::Icon::builder().source_system(Some(nwg::OemIcon::Information)).build(&mut app.tray_icon)?;
         }
@@ -282,9 +292,18 @@ impl NativeUi<AppUi> for App {
             .parent(w)
             .icon(Some(&app.tray_icon))
             .tip(Some(&format!("{} ({HOTKEY_TEXT})", title())))
+            .visible(settings.tray_icon)
             .build(&mut app.tray)?;
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.tray_menu)?;
-        nwg::MenuItem::builder().text(tr!("إظهار بحث سريع", "Show InstaFind")).parent(&app.tray_menu).build(&mut app.tray_show)?;
+        nwg::MenuItem::builder().text(&trf!("فتح نافذة البحث\t{HOTKEY_TEXT}", "Open quick search\t{HOTKEY_TEXT}")).parent(&app.tray_menu).build(&mut app.tray_quick)?;
+        nwg::MenuItem::builder()
+            .text(tr!("إظهار المربع العائم", "Show the floating box"))
+            .check(settings.floating_mode != crate::settings::FloatingMode::Off)
+            .parent(&app.tray_menu)
+            .build(&mut app.tray_floating)?;
+        nwg::MenuItem::builder().text(tr!("النافذة الكاملة", "Full window")).parent(&app.tray_menu).build(&mut app.tray_show)?;
+        nwg::MenuItem::builder().text(tr!("الإعدادات…", "Settings…")).parent(&app.tray_menu).build(&mut app.tray_settings)?;
+        nwg::MenuItem::builder().text(tr!("حول InstaFind", "About InstaFind")).parent(&app.tray_menu).build(&mut app.tray_about)?;
         nwg::MenuItem::builder().text(tr!("خروج", "Exit")).parent(&app.tray_menu).build(&mut app.tray_exit)?;
 
         phase("tray");
@@ -294,6 +313,8 @@ impl NativeUi<AppUi> for App {
         app.build_disk_usage()?;
         app.build_web_ui()?;
         app.build_thumbs()?;
+        app.build_suggest_bar()?;
+        app.build_quick_menus(&settings)?;
         app.state.get_mut().settings = settings.clone();
         app.state.get_mut().history = History::load();
         let ui = AppUi { inner: Rc::new(app), handlers: Default::default(), raw_handlers: Default::default() };
@@ -308,7 +329,29 @@ impl NativeUi<AppUi> for App {
                 // report OnResize too, and re-laying out on each of those
                 // nests layouts inside layouts.
                 E::OnResize | E::OnWindowMaximize if handle == app.window => app.layout(),
-                E::OnWindowClose if handle == app.window => app.on_close(),
+                // The X button keeps the program running next to the clock
+                // (the floating box and the shortcut keep working); only
+                // "Exit" really closes it.
+                E::OnWindowClose if handle == app.window => {
+                    let hides = app.close_hides();
+                    {
+                        let s = &app.state.borrow().settings;
+                        super::startup::log(&format!(
+                            "window close: {} (tray icon {}, floating {:?})",
+                            if hides { "hide to tray" } else { "exit" },
+                            s.tray_icon,
+                            s.floating_mode
+                        ));
+                    }
+                    if hides {
+                        if let nwg::EventData::OnWindowClose(d) = &data {
+                            d.close(false);
+                        }
+                        app.hide_to_tray();
+                    } else {
+                        app.on_close();
+                    }
+                }
                 E::OnTextInput if handle == app.query => app.on_query_changed(),
                 // The dialog-style message loop turns Enter into IDOK and Esc
                 // into IDCANCEL, which nwg reports as OnKeyEnter / OnKeyEsc.
@@ -321,7 +364,8 @@ impl NativeUi<AppUi> for App {
                 E::OnNotice if handle == app.watch_notice => app.on_watch_notice(),
                 E::OnComboxBoxSelection if handle == app.kind_combo => app.on_kind_changed(),
                 E::OnButtonClick => {
-                    if handle == app.search_btn {
+                    if app.on_suggestion_click(handle) {
+                    } else if handle == app.search_btn {
                         app.on_search();
                     } else if handle == app.history_btn {
                         app.show_history_menu();
@@ -345,14 +389,16 @@ impl NativeUi<AppUi> for App {
                         app.on_stop();
                     } else if handle == app.options_btn {
                         app.show_menu(&app.options_menu);
+                    } else {
+                        app.on_app_button(&handle);
                     }
                 }
                 E::OnListViewItemActivated if handle == app.list => app.open_selected(),
                 E::OnListViewItemChanged if handle == app.list => app.show_selected_path(),
                 E::OnListViewRightClick if handle == app.list => app.show_menu(&app.menu),
                 E::OnListViewColumnClick if handle == app.list => app.on_column_click(data.on_list_view_item_index().1),
-                E::OnMousePress(nwg::MousePressEvent::MousePressLeftUp) if handle == app.tray => app.show_window(),
-                E::OnContextMenu if handle == app.tray => app.show_menu(&app.tray_menu),
+                E::OnMousePress(nwg::MousePressEvent::MousePressLeftUp) if handle == app.tray => app.on_tray_click(),
+                E::OnContextMenu if handle == app.tray => app.show_tray_menu(),
                 E::OnMenuItemSelected => {
                     if app.on_history_item(handle) {
                     } else if handle == app.menu_open {
@@ -372,7 +418,11 @@ impl NativeUi<AppUi> for App {
                     } else if handle == app.menu_delete {
                         app.delete_selected();
                     } else if handle == app.menu_hotkey {
-                        app.set_status(&trf!("اضغط {HOTKEY_TEXT} من أي برنامج لإظهار بحث سريع أو إخفائه.", "Press {HOTKEY_TEXT} in any program to show or hide InstaFind."));
+                        if app.state.borrow().settings.hotkey_opens == crate::settings::HotkeyOpens::Quick {
+                            app.set_status(&trf!("اضغط {HOTKEY_TEXT} من أي برنامج لفتح نافذة البحث الصغيرة.", "Press {HOTKEY_TEXT} in any program to open the quick search."));
+                        } else {
+                            app.set_status(&trf!("اضغط {HOTKEY_TEXT} من أي برنامج لإظهار بحث سريع أو إخفائه.", "Press {HOTKEY_TEXT} in any program to show or hide InstaFind."));
+                        }
                     } else if handle == app.menu_autostart {
                         let on = !app.menu_autostart.checked();
                         if autostart::set_enabled(on) {
@@ -385,7 +435,7 @@ impl NativeUi<AppUi> for App {
                         } else {
                             app.set_status(tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting."));
                         }
-                    } else if app.on_lang_item(handle) {
+                    } else if app.on_lang_item(handle) || app.on_feedback_item(handle) {
                     } else if handle == app.menu_update {
                         app.check_for_update(true);
                     } else if handle == app.menu_digits {
@@ -402,8 +452,8 @@ impl NativeUi<AppUi> for App {
                         app.hide_to_tray();
                     } else if handle == app.tray_show {
                         app.show_window();
-                    } else if handle == app.tray_exit {
-                        app.window.close();
+                    } else if handle == app.tray_exit || handle == app.menu_exit {
+                        app.quit();
                     }
                 }
                 _ => {}
@@ -499,6 +549,9 @@ impl NativeUi<AppUi> for App {
         ui.handlers.borrow_mut().push(ui.inner.setup_disk_usage());
         ui.handlers.borrow_mut().push(ui.inner.setup_web());
         let (handler, raw) = ui.inner.setup_thumbs()?;
+        ui.handlers.borrow_mut().push(handler);
+        ui.raw_handlers.borrow_mut().push(raw);
+        let (handler, raw) = ui.inner.setup_quick()?;
         ui.handlers.borrow_mut().push(handler);
         ui.raw_handlers.borrow_mut().push(raw);
 

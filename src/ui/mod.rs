@@ -8,7 +8,9 @@
 //! - `results`: the result list, selection, copying, sorting and export
 //! - `files`: renaming and deleting files, and saving the edited index
 //! - `history_menu`: the menu of recent and saved searches
+//! - `empty_state`: the files opened lately (empty box) and what to try when nothing is found
 //! - `updates`: checking for, downloading and installing new versions
+//! - `feedback`: the "Send feedback" menu and the offer to report a crash
 //! - `content_index`: the stored document text and its background warm-up
 //! - `watching`: applying changes from the drive watcher to the index
 //! - `keys`: keyboard handling and the global hotkey
@@ -18,19 +20,29 @@
 //! - `thumbs`: the thumbnail view of the results (Ctrl+T)
 //! - `startup`: start-up timing, logging, single instance, fonts
 //! - `lazy`: secondary windows created when they first open, for a quick start
+//! - `quick`: the quick search popup (Ctrl+Alt+F, the floating box, the tray icon)
+//! - `floating`: the small search box above the taskbar clock
+//! - `tray`: the monochrome tray icon and menu, the new options, first-run question
+//! - `surface`: drawing, theme and DWM helpers of those custom-drawn windows
 //! - `format`, `shell`: text formatting and Windows shell helpers
 
+mod app_matches;
 mod autostart;
 mod build;
 mod content_index;
 mod dupes_window;
 mod disk_usage;
+mod empty_state;
+mod feedback;
 mod files;
+mod floating;
 mod format;
 mod history_menu;
 mod lang_menu;
 mod keys;
+mod launcher_shim; // TEMPORARY, see the file
 mod lazy;
+mod quick;
 mod quickswitch;
 mod replace_window;
 mod results;
@@ -38,7 +50,9 @@ mod search_jobs;
 mod shell;
 mod startup;
 mod style;
+mod surface;
 mod thumbs;
+mod tray;
 mod updates;
 mod watching;
 mod web_server;
@@ -181,6 +195,10 @@ pub struct App {
     all_btn: nwg::Button,
     reindex_btn: nwg::Button,
     list: nwg::ListView,
+    /// Apps the search box names strongly, above the results (hidden when none).
+    app_btns: [nwg::Button; app_matches::APP_BUTTONS],
+    /// The launcher results behind `app_btns`, in order.
+    app_items: RefCell<Vec<crate::launcher::Item>>,
     open_btn: nwg::Button,
     folder_btn: nwg::Button,
     copy_btn: nwg::Button,
@@ -231,13 +249,35 @@ pub struct App {
     lang_menu: nwg::Menu,
     menu_lang_ar: nwg::MenuItem,
     menu_lang_en: nwg::MenuItem,
+    /// Options ▸ "Send feedback": report a problem, suggest an idea, discuss.
+    feedback_menu: nwg::Menu,
+    menu_feedback_bug: nwg::MenuItem,
+    menu_feedback_idea: nwg::MenuItem,
+    menu_feedback_talk: nwg::MenuItem,
+    /// The crash reports of the last run were already offered (or none).
+    crash_checked: Cell<bool>,
     menu_export: nwg::MenuItem,
     menu_hide: nwg::MenuItem,
+    menu_exit: nwg::MenuItem,
     tray_icon: nwg::Icon,
     tray: nwg::TrayNotification,
     tray_menu: nwg::Menu,
+    tray_quick: nwg::MenuItem,
+    tray_floating: nwg::MenuItem,
     tray_show: nwg::MenuItem,
+    tray_settings: nwg::MenuItem,
+    tray_about: nwg::MenuItem,
     tray_exit: nwg::MenuItem,
+    /// The tray icon in white and in black, for dark and light taskbars.
+    mono_icons: tray::MonoIcons,
+    /// Options ▸ "Search from anywhere".
+    quick_menu: tray::QuickMenu,
+    /// The quick search popup (built when it first opens).
+    popup: quick::Popup,
+    /// What to try when a search finds nothing, above the result list.
+    suggest: empty_state::SuggestBar,
+    /// The search box above the clock.
+    floating: floating::Floating,
     /// The recent/saved searches menu, rebuilt each time it opens.
     history_menu: RefCell<HistoryMenu>,
     /// True while the user edits a file name in the list (F2).
@@ -248,6 +288,8 @@ pub struct App {
     /// System image-list index of the icon for each extension.
     icons: RefCell<HashMap<String, i32>>,
     tray_hint_shown: Cell<bool>,
+    /// "Exit" was chosen: closing the window really quits.
+    quitting: Cell<bool>,
     startup_logged: Cell<bool>,
     state: RefCell<State>,
     /// Moving another program's Open / Save As dialog to a result's folder.
@@ -396,7 +438,19 @@ impl App {
         style::place(&self.options_btn.handle, right - wd.options, y_btn, wd.options, CTRL_H);
 
         // The result list fills the rest.
-        let y3 = y_scope + CTRL_H + GAP + 2;
+        let mut y3 = y_scope + CTRL_H + GAP + 2;
+        // Apps the query names, in a row of their own above the results.
+        let apps = self.app_buttons_shown();
+        if apps > 0 {
+            let mut x = M;
+            for b in &self.app_btns[..apps] {
+                let bw = style::button_width(&self.font, b).min(((w - 2 * M) / apps as i32 - GAP).max(40));
+                style::place(&b.handle, x, y3, bw, CTRL_H);
+                x += bw + GAP;
+            }
+            y3 += CTRL_H + GAP;
+        }
+        let y3 = self.place_suggestions(M, y3, w - 2 * M);
         style::place(&self.list.handle, M, y3, (w - 2 * M).max(100), (y_btn - GAP - y3).max(50));
 
         // Status bar: messages on one side, the selected file's path on the other.
@@ -422,7 +476,7 @@ impl App {
     fn hide_to_tray(&self) {
         self.remember_query();
         self.window.set_visible(false);
-        if !self.tray_hint_shown.replace(true) {
+        if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
             self.tray.show(
                 tr!("البرنامج ما زال يعمل هنا. انقر الأيقونة أو شغّل البرنامج مرة أخرى لإظهاره فوراً.", "The program is still running here. Click the icon or start the program again to show it at once."),
                 Some(title()),
@@ -430,6 +484,23 @@ impl App {
                 None,
             );
         }
+    }
+
+    /// Whether the window's close button only hides it: there is a way back
+    /// (the icon by the clock or the floating box), and "Exit" was not chosen.
+    fn close_hides(&self) -> bool {
+        if self.quitting.get() {
+            return false;
+        }
+        let s = &self.state.borrow().settings;
+        s.tray_icon || s.floating_mode != crate::settings::FloatingMode::Off
+    }
+
+    /// Really closes the program (the tray menu's and Options menu's "Exit").
+    fn quit(&self) {
+        startup::log("exit chosen from the menu");
+        self.quitting.set(true);
+        self.window.close();
     }
 
     fn show_window(&self) {
@@ -486,6 +557,10 @@ impl App {
         if let Some(h) = self.window.handle.hwnd() {
             unsafe { winapi::um::winuser::UnregisterHotKey(h, HOTKEY_ID) };
         }
+        self.unregister_alt_space();
+        self.hide_quick();
+        // Gone at once, not left on screen while the index is freed.
+        self.destroy_floating();
         nwg::stop_thread_dispatch();
     }
 }

@@ -65,7 +65,7 @@ pub(super) mod glyph {
 }
 
 /// The icon font installed on this system, if any. Looked up once.
-fn icon_font() -> Option<&'static str> {
+pub(super) fn icon_font() -> Option<&'static str> {
     static FONT: std::sync::OnceLock<Option<&'static str>> = std::sync::OnceLock::new();
     *FONT.get_or_init(|| ["Segoe Fluent Icons", "Segoe MDL2 Assets"].into_iter().find(|f| font_installed(f)))
 }

@@ -1,6 +1,6 @@
 [package]
 name = "bahth"
-version = "0.6.1"
+version = "0.9.0"
 edition = "2024"
 description = "بحث سريع - برنامج بحث سريع عن الملفات وداخل المستندات لويندوز"
 
@@ -31,7 +31,9 @@ sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["comp
 
 [target.'cfg(windows)'.dependencies]
 native-windows-gui = { version = "1.0.13", default-features = false, features = ["list-view", "animation-timer", "clipboard", "menu", "file-dialog", "status-bar", "high-dpi", "tray-notification", "combobox", "notice", "textbox"] }
-winapi = { version = "0.3", features = ["winuser", "consoleapi", "wincon", "processenv", "commctrl", "shellapi", "fileapi", "winbase", "combaseapi", "objbase", "timezoneapi", "minwinbase", "libloaderapi", "uxtheme", "synchapi", "errhandlingapi", "sysinfoapi", "winerror", "handleapi", "processthreadsapi", "wingdi", "oleidl", "ole2", "objidl", "unknwnbase", "guiddef", "windef", "minwindef", "usp10", "winhttp", "winnt", "winreg", "dbt", "ioapiset"] }
+winapi = { version = "0.3", features = ["winuser", "consoleapi", "wincon", "processenv", "commctrl", "shellapi", "fileapi", "winbase", "combaseapi", "objbase", "timezoneapi", "minwinbase", "libloaderapi", "uxtheme", "synchapi", "errhandlingapi", "sysinfoapi", "winerror", "handleapi", "processthreadsapi", "wingdi", "oleidl", "ole2", "objidl", "unknwnbase", "guiddef", "windef", "minwindef", "usp10", "winhttp", "winnt", "winreg", "dbt", "ioapiset", "shobjidl_core", "shlobj", "knownfolders", "shtypes",
+    # Quick search: open windows (windows.rs) and system commands (system.rs).
+    "dwmapi", "powerbase", "powrprof", "reason", "securitybaseapi"] }
 
 # Windows.Media.Ocr for text in images and scanned PDFs (src/ocr.rs).
 windows = { version = "0.62", features = ["Foundation", "Foundation_Collections", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage", "Storage_Streams", "Win32_System_WinRT"] }
@@ -45,3 +47,7 @@ opt-level = 3
 lto = "thin"
 codegen-units = 1
 strip = true
+
+# native-windows-gui 1.0.13 with a GDI handle leak fixed (vendor/README.md).
+[patch.crates-io]
+native-windows-gui = { path = "vendor/native-windows-gui" }

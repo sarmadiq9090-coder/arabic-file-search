@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: "أسئلة ونقاش / Questions & discussion"
+    url: https://github.com/sarmadiq9090-coder/arabic-file-search/discussions
+    about: "اسأل أو شارك تجربتك مع المستخدمين الآخرين. / Ask a question or talk with other users."
+  - name: "الموقع / Website"
+    url: https://fastkiwi.app/arabic-file-search/
+    about: "التنزيل والأسئلة الشائعة. / Download and FAQ."

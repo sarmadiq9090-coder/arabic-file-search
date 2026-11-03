@@ -22,6 +22,8 @@ pub(super) struct NameResult {
     text: String,
     /// How a fallback (keyboard layout, Arabizi, typos) found the hits, if one did.
     converted: Option<fuzzy::Fallback>,
+    /// A text that finds something, when this one found nothing at all.
+    did_you_mean: Option<String>,
     empty: bool,
     ms: usize,
 }
@@ -73,6 +75,7 @@ impl App {
                 self.start_watching();
                 if self.query.text().trim().is_empty() || self.content_mode() {
                     self.set_status(&trf!("تم تحميل الفهرس ({} عنصر). اكتب للبحث.", "Index loaded ({} items). Type to search.", fmt_num(n)));
+                    self.show_recent_files();
                 } else {
                     self.search_names();
                 }
@@ -148,6 +151,7 @@ impl App {
         if !self.content_mode() {
             self.search_names();
         }
+        self.show_app_matches();
     }
 
     pub(super) fn on_search(&self) {
@@ -196,6 +200,10 @@ impl App {
         let sort = if st.settings.sort_col < 0 { SortKey::Relevance } else { sort };
         let boosted = if sort == SortKey::Relevance { st.history.boosted(&index, index::now_secs()) } else { Vec::new() };
         let show_system = system_files::show_system(st.settings.hide_system, &scope);
+        // A spelling suggestion is shown only for a search the user ran
+        // while the index is ready (see `on_names_found`): don't look for one
+        // otherwise.
+        let suggest = !st.live_search && st.scan.is_none() && st.loading.is_none();
         drop(st);
 
         let text = self.query.text();
@@ -230,15 +238,17 @@ impl App {
                 } else {
                     search::sort_hits(&index.entries, &mut hits, sort, desc);
                 }
-                (hits, converted, q.is_empty())
+                // Nothing at all: a text that finds something, to suggest.
+                let did_you_mean = if suggest && hits.is_empty() && !q.is_empty() { crate::suggest::did_you_mean(&index.entries, &text, &scope, &parse) } else { None };
+                (hits, converted, did_you_mean, q.is_empty())
             };
             // After a panic (logged by the hook) the search still answers,
             // with no results: otherwise `name_running` would stay set and
             // no search would run again, nor any change from the watcher.
-            let (hits, converted, empty) = crate::crash_log::catch(run).unwrap_or_default();
+            let (hits, converted, did_you_mean, empty) = crate::crash_log::catch(run).unwrap_or_default();
             let ms = started.elapsed().as_millis() as usize;
             if let Ok(mut r) = slot.lock() {
-                *r = Some(NameResult { index, hits, text, converted, empty, ms });
+                *r = Some(NameResult { index, hits, text, converted, did_you_mean, empty, ms });
             }
             notice.notice();
         });
@@ -267,7 +277,12 @@ impl App {
             return;
         }
         let old_n = st.rows.len();
-        st.rows = res.hits.into_iter().map(|entry| Row { entry, snippet: None, matches: None }).collect();
+        st.rows = if res.empty {
+            // The empty box lists the files opened lately.
+            super::empty_state::recent_rows(&st.history, &res.index)
+        } else {
+            res.hits.into_iter().map(|entry| Row { entry, snippet: None, matches: None }).collect()
+        };
         st.rows_index = res.index;
         st.shown_query = Some(self.parse_query(res.converted.as_ref().map_or(&res.text, |f| &f.query)));
         let n = st.rows.len();
@@ -280,6 +295,9 @@ impl App {
             // the count changed.
             self.refresh_list();
             self.reselect(selected);
+            if n > 0 || res.empty {
+                self.show_suggestions(Vec::new());
+            }
             if n != old_n && !res.empty {
                 self.set_status(&trf!("وجدت {} نتيجة (حُدِّثت تلقائياً){warn}", "Found {} results (updated automatically){warn}", fmt_num(n)));
             }
@@ -287,9 +305,18 @@ impl App {
         }
         self.clear_selection();
         self.refresh_list();
+        if n == 0 && !res.empty && !busy {
+            self.suggest_for_names(&res.text, res.did_you_mean.clone());
+        } else {
+            self.show_suggestions(Vec::new());
+        }
         if res.empty {
             if !busy {
-                self.set_status(tr!("اكتب اسم الملف أو جزءاً منه للبحث.", "Type a file name or part of one to search."));
+                self.set_status(if n > 0 {
+                    tr!("اكتب اسم الملف أو جزءاً منه للبحث. في القائمة الملفات التي فتحتها مؤخراً.", "Type a file name or part of one to search. Listed: the files you opened lately.")
+                } else {
+                    tr!("اكتب اسم الملف أو جزءاً منه للبحث.", "Type a file name or part of one to search.")
+                });
             }
             return;
         }
@@ -347,6 +374,7 @@ impl App {
         st.rows.clear();
         st.rows_index = index;
         drop(st);
+        self.show_suggestions(Vec::new());
         self.clear_selection();
         self.refresh_list();
         self.stop_btn.set_enabled(true);
@@ -386,6 +414,13 @@ impl App {
         if t % 18_000 == 50 {
             self.maybe_check_for_update();
         }
+        // Offer to report a crash of the last run once the window is up
+        // (not while the program waits hidden in the tray).
+        if t >= 10 && !self.crash_checked.get() && self.window.visible() {
+            self.crash_checked.set(true);
+            self.offer_crash_report();
+        }
+        self.quick_tick(t);
     }
 
     pub(super) fn poll_scan(&self) {
@@ -415,6 +450,7 @@ impl App {
                 self.start_watching();
                 if self.query.text().trim().is_empty() || self.content_mode() {
                     self.set_status(&trf!("اكتملت الفهرسة: {} عنصر.", "Indexing complete: {} items.", fmt_num(n)));
+                    self.show_recent_files();
                 } else {
                     self.search_names();
                 }
@@ -451,6 +487,9 @@ impl App {
             self.stop_btn.set_enabled(false);
             let cached = if cached > 0 { trf!(" (من الفهرس: {})", " ({} from the index)", fmt_num(cached)) } else { String::new() };
             self.set_status(&trf!("انتهى البحث داخل {} مستند: وجدت {} ملف.{}", "Searched {} documents: found {} files.{}", fmt_num(total), fmt_num(n), cached));
+            if n == 0 {
+                self.suggest_for_content(&self.query.text());
+            }
         } else {
             self.set_status(&trf!(
                 "جاري البحث داخل المستندات… تم فحص {} من {} — وجدت {}",

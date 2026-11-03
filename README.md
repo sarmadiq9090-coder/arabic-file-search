@@ -15,7 +15,7 @@
 
 <p align="center">
 <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe"><b>⬇ تنزيل bahth.exe · Download</b></a><br>
-<a href="https://sarmadiq9090-coder.github.io/arabic-file-search/">الموقع · Website</a> · <a href="#العربية">العربية</a> · <a href="#english">English</a> · <a href="CHANGELOG.md">سجل التغييرات · Changelog</a>
+<a href="https://fastkiwi.app/arabic-file-search/">الموقع · Website</a> · <a href="#العربية">العربية</a> · <a href="#english">English</a> · <a href="CHANGELOG.md">سجل التغييرات · Changelog</a>
 </p>
 
 <table align="center"><tr>
@@ -34,6 +34,7 @@
 ## التنزيل والتشغيل
 
 1. نزّل [`bahth.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe) من [أحدث إصدار](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest). ملف واحد، لا يحتاج تثبيتاً.
+   - لأجهزة ARM64 (مثل Snapdragon) نزّل [`bahth-arm64.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-arm64.exe)، ولويندوز 32 بت نزّل [`bahth-x86.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-x86.exe). كل نسخة تحدّث نفسها بنسختها.
 2. ضعه في مجلد دائم، مثلاً `%LOCALAPPDATA%\Programs\Bahth\` (هذا المسار تستعمله إضافات `integrations/`)، ثم شغّله.
 3. إن ظهر تحذير SmartScreen لأن الملف غير موقّع رقمياً: «مزيد من المعلومات» ← «تشغيل على أي حال».
 
@@ -47,8 +48,8 @@ scoop install instafind
 أول تشغيل يفهرس الأقراص في الخلفية (دقيقة أو أكثر حسب عدد الملفات)، وبعدها يفتح البرنامج فوراً ويبقى الفهرس محدَّثاً وحده عند إضافة الملفات أو حذفها أو إعادة تسميتها.
 
 - **التحديث تلقائي**: يتحقق البرنامج مرة يومياً من GitHub ويعرض تثبيت الإصدار الجديد بنقرة ثم يعيد التشغيل، ويمكن التحقق يدوياً من «خيارات…». من لديه 0.3.1 أو أحدث يصله كل تحديث وحده.
-- **المتطلبات**: ويندوز 10 أو 11، 64 بت (Rust لم تعد تدعم الأقدم). البحث داخل الصور يحتاج حزمة اللغة العربية في ويندوز لقراءة النص العربي.
-- **الخصوصية**: كل شيء يبقى على جهازك. الاتصال الوحيد بالإنترنت هو التحقق من التحديثات على GitHub، والبحث من الهاتف مطفأ ما لم تشغّله.
+- **المتطلبات**: ويندوز 10 أو 11، بنسخ 64 بت وARM64 و32 بت (Rust لم تعد تدعم الأقدم). البحث داخل الصور يحتاج حزمة اللغة العربية في ويندوز لقراءة النص العربي.
+- **الخصوصية**: كل شيء يبقى على جهازك، ولا يجمع البرنامج أي بيانات استخدام. الاتصال الوحيد بالإنترنت هو التحقق من التحديثات على GitHub، والبحث من الهاتف مطفأ ما لم تشغّله، والملاحظات وتقارير الأخطاء لا تُرسل إلا حين تضغط أنت (انظر [الملاحظات والبلاغات](#الملاحظات-والبلاغات)).
 - **بيانات البرنامج** في `%LOCALAPPDATA%\BahthSari\` (الفهرس والسجل والإعدادات)، وتفضيلاته في `HKCU\Software\BahthSari`. لإزالته: أطفئ «التشغيل مع ويندوز» من «خيارات…»، ثم احذف `bahth.exe` وذلك المجلد.
 
 ## السرعة
@@ -63,6 +64,27 @@ scoop install instafind
 الثانية في عمود InstaFind تشمل تشغيل البرنامج من سطر الأوامر وقراءة الفهرس من القرص. داخل نافذة البرنامج المفتوحة يظهر الجواب أثناء الكتابة في أجزاء من الثانية (شريط الحالة في العرض أعلاه يقول 15 إلى 34 ملي ثانية). خدمة فهرسة ويندوز غير موجودة على ذلك الجهاز، وهي أصلاً لا تفهرس إلا مجلدات المستخدم ولا تساوي بين «احمد» و«أحمد». يعيد [`ci/bench.ps1`](ci/bench.ps1) القياس، والنتائج الخام في [`docs/media/bench.md`](docs/media/bench.md).
 
 ## المميزات
+
+### جديد في 0.9
+- **البرامج بأسمائها العربية كما تكتبها**: أكثر من 45 برنامجاً ولعبة جديدة بتهجئاتها الشائعة (`كوكل كروم`، `تلكرام`، `وتساب`، `فوتشوب`، `بوبجي`)، ويُقبل حرف غلط واحد (`ديسكود` تجد Discord)، وبداية الاسم تكفي (`سبوت`).
+- **البرنامج يتعلّم من اختيارك**: إذا كتبت حروفاً وفتحت برنامجاً، يظهر أولاً في المرة الجاية لنفس الحروف.
+- **البرامج في النافذة الرئيسية أيضاً**: أزرار «تطبيق: …» فوق النتائج عندما يطابق البحث اسم برنامج.
+- **تحويل العملات**: `100 دولار`، `100 usd to iqd`، `50 يورو بالدينار`، `١٠٠ ريال سعودي` لـ 24 عملة، بأسعار تتحدث كل 12 ساعة.
+- **الملفات الأخيرة والمفضلة** تظهر عند فتح البحث فارغاً.
+- **عندما لا توجد نتائج** يقترح البرنامج: «هل تقصد…؟»، البحث داخل المحتوى، كل الأقراص، كل الأنواع، أو الويب.
+- **ترتيب أذكى**: `notepda` تظهر Notepad قبل الملفات، و`2+2` تعطي الجواب بدون ملفات لا علاقة لها.
+- **فهرسة محتوى الملفات في اليوم الأول أسرع** بمرة ونصف إلى 3 مرات، وتبدأ بمجلداتك (سطح المكتب، المستندات، التنزيلات).
+
+### البحث من أي مكان (جديد في 0.8)
+- **خانة بحث صغيرة فوق الساعة**: شفافة وتكاد لا تُرى حتى تقرّب المؤشر، فتظهر بنعومة. تختفي وحدها مع الألعاب والفيديو بملء الشاشة، وتُسحب لأي مكان. تُطفأ أو تُخفى من «خيارات ← البحث من أي مكان».
+- **نافذة بحث صغيرة بـ Ctrl+Alt+F** أو من أيقونة الساعة، تفتح النتائج للأعلى: الملفات، و**البرامج المثبتة** (`كروم` تفتح Google Chrome، `وورد`، `الحاسبة`، وأي برنامج بنطقه العربي مثل `كوكل بلي`)، و**صفحات إعدادات ويندوز** (`واي فاي`، `بلوتوث`، `الشاشة`)، و**التبديل إلى نافذة مفتوحة**.
+- **إجابات فورية**: حاسبة (`250*12`)، تحويل وحدات (`5 كيلو بالباوند`، `30 مئوي`)، و**التاريخ الهجري** (`هجري`، وتحويل التواريخ بتقويم أم القرى).
+- **اختصارات المواقع**: `يوتيوب قرآن` يبحث في يوتيوب مباشرة، ومثلها جوجل وويكيبيديا والخرائط والترجمة.
+- **أوامر النظام** (إيقاف التشغيل، إعادة التشغيل، السكون، القفل، إفراغ السلة، إنهاء برنامج معلّق) وكلها **تطلب تأكيداً قبل التنفيذ**.
+- **Tab** يفتح إجراءات النتيجة: تشغيل كمسؤول، نسخ المسار، فتح المجلد، التثبيت في المفضلة. والبرنامج يتعلم ما تفتحه كثيراً فيقدّمه.
+- أيقونة بلون واحد بجانب الساعة تتبع الوضع الداكن والفاتح. وكل الجديد يُطفأ، فيرجع البرنامج كما كان تماماً.
+
+<p align="center"><img src="docs/quick-shots/q-chrome-ar.png" width="420" alt="نافذة البحث الصغيرة: «كروم» تجد Google Chrome"></p>
 
 ### البحث
 - **نتائج فورية بالاسم** أثناء الكتابة في كل الأقراص أو في مجلد تختاره، مع فلاتر جاهزة: مستندات، صور، صوت، فيديو، مضغوطات، برامج، مجلدات.
@@ -81,7 +103,7 @@ scoop install instafind
 - **كل التطابقات** داخل الملف مع أرقام الأسطر (F4)، وتصحيح العربية المعكوسة في ملفات PDF.
 
 ### أدوات
-- **Ctrl+Alt+F** يُظهر البرنامج من أي مكان، و**Ctrl+Alt+G** في نافذة «حفظ» أو «فتح» بأي برنامج ينقلها إلى مجلد النتيجة التي تختارها.
+- **Ctrl+Alt+F** يفتح نافذة البحث الصغيرة من أي مكان (أو النافذة الكاملة إن اخترت ذلك في الخيارات)، و**Ctrl+Alt+G** في نافذة «حفظ» أو «فتح» بأي برنامج ينقلها إلى مجلد النتيجة التي تختارها.
 - **الملفات المكررة**: يجدها بالحجم ثم بصمة المحتوى، ويعرض المساحة المهدرة، وينقل ما تختاره إلى سلة المحذوفات.
 - **أحجام المجلدات**: عمود الحجم يشمل المجلدات، ونافذة تبيّن ما يملأ القرص.
 - **عرض المصغرات** للصور والمستندات (Ctrl+T).
@@ -93,7 +115,7 @@ scoop install instafind
 
 ### الراحة
 - **واجهة عربية أو إنكليزية**: تتبع لغة ويندوز، وتُغيَّر من «خيارات ← Language / اللغة».
-- **يعمل مع ويندوز** في الخلفية، وEsc يخفيه إلى شريط المهام، ونسخة واحدة فقط منه.
+- **يعمل مع ويندوز** في الخلفية، وEsc أو زر الإغلاق يخفيانه إلى الأيقونة بجانب الساعة (للخروج: «خروج» من قائمة الأيقونة)، ونسخة واحدة فقط منه.
 - تواريخ نسبية («أمس»، «قبل 5 دقائق»)، وخيار الأرقام العربية، وأيقونات أنواع الملفات.
 - أي خطأ داخلي يُسجَّل في `log.txt` و`crash.txt` ولا يُغلق البرنامج.
 
@@ -125,7 +147,7 @@ scoop install instafind
 
 | المفتاح | العمل |
 |---|---|
-| Ctrl+Alt+F | إظهار البرنامج أو إخفاؤه من أي مكان |
+| Ctrl+Alt+F | نافذة البحث الصغيرة من أي مكان (Tab للإجراءات، Esc للإغلاق) |
 | Ctrl+Alt+G | في نافذة حفظ أو فتح: الانتقال إلى مجلد نتيجة |
 | Enter / Ctrl+Enter | فتح الملف / فتح مجلده مع تحديده |
 | السهم للأسفل | من مربع البحث إلى النتائج (وفي مربع فارغ: السجل) |
@@ -156,6 +178,13 @@ bahth.exe -s عقد --json
 - دعم ملفات doc القديمة تقريبي.
 - المشاكل والاقتراحات مرحّب بها في [Issues](https://github.com/sarmadiq9090-coder/arabic-file-search/issues)، ويفيد إرفاق `%LOCALAPPDATA%\BahthSari\log.txt`.
 
+## الملاحظات والبلاغات
+
+- **«خيارات ← أرسل ملاحظة»** يفتح في المتصفح صفحة GitHub جاهزة فيها رقم الإصدار ونظام ويندوز: «أبلغ عن مشكلة»، أو «اقترح ميزة جديدة»، أو «اسأل أو ناقش مع المستخدمين». تراجعها ثم تضغط «Submit» بنفسك، ويمكنك الكتابة بالعربية.
+- **تقارير الأخطاء**: إن حدث خطأ داخلي، يسألك البرنامج مرة واحدة عند التشغيل التالي إن كنت تريد فتح صفحة GitHub فيها التقرير. التقرير محفوظ على جهازك فقط في `%LOCALAPPDATA%\BahthSari\crash.txt`، واسم المستخدم في المسارات يُستبدل بـ`<user>`.
+- **لا يُرسَل شيء تلقائياً**: لا تتبّع ولا إحصاءات، ولا اتصال بالإنترنت لهذا الغرض دون نقرتك.
+- أو اكتب مباشرة في [Issues](https://github.com/sarmadiq9090-coder/arabic-file-search/issues) أو [Discussions](https://github.com/sarmadiq9090-coder/arabic-file-search/discussions).
+
 ## للمطوّرين
 
 البناء من المصدر وخريطة الكود وطريقة النشر في [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). باختصار: `cargo build --release` على ويندوز، و`cargo test` يعمل على لينكس أيضاً.
@@ -177,6 +206,7 @@ InstaFind is a free, open-source file search tool for Windows, written in Rust. 
 ### Download and run
 
 1. Download [`bahth.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe) from the [latest release](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest). It is a single file; nothing to install.
+   - On ARM64 PCs (e.g. Snapdragon) download [`bahth-arm64.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-arm64.exe); on 32-bit Windows, [`bahth-x86.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-x86.exe). Each one updates itself with its own build.
 2. Put it in a permanent folder, for example `%LOCALAPPDATA%\Programs\Bahth\` (the path the `integrations/` plugins expect), and run it.
 3. If SmartScreen warns because the file is not code-signed: **More info → Run anyway**.
 
@@ -190,8 +220,8 @@ scoop install instafind
 The first run indexes your drives in the background (a minute or more, depending on the number of files). After that the app opens instantly and keeps the index current by itself as files are added, deleted or renamed.
 
 - **Automatic updates**: once a day the app checks GitHub, offers the new version with one click and restarts. You can also check from **Options…**. Version 0.3.1 and later update themselves.
-- **Requirements**: Windows 10 or 11, 64-bit (Rust no longer supports older versions). Text recognition in images needs the Windows language pack for each OCR language.
-- **Privacy**: everything stays on your PC. The only internet connection is the update check against GitHub; phone search is off unless you turn it on.
+- **Requirements**: Windows 10 or 11: x64, ARM64 or 32-bit (Rust no longer supports older versions). Text recognition in images needs the Windows language pack for each OCR language.
+- **Privacy**: everything stays on your PC and the app collects no usage data. The only internet connection is the update check against GitHub; phone search is off unless you turn it on; feedback and crash reports are sent only when you click (see [Feedback](#feedback)).
 - **Data** lives in `%LOCALAPPDATA%\BahthSari\` (index, log, settings) and `HKCU\Software\BahthSari`. To remove the app, turn off *Start with Windows* in **Options…**, then delete `bahth.exe` and that folder.
 
 ### Speed
@@ -206,6 +236,27 @@ Measured on a real Windows machine on GitHub Actions (Windows Server 2025, an in
 InstaFind's second includes starting the command-line tool and loading the index from disk. In the open window results appear as you type, in milliseconds (the status bar in the demo above shows 15 to 34 ms). The Windows Search indexer is not installed on that machine; by default it covers only user folders and does not treat `احمد` and `أحمد` as the same. [`ci/bench.ps1`](ci/bench.ps1) reproduces the run; raw results are in [`docs/media/bench.md`](docs/media/bench.md).
 
 ### Features
+
+#### New in 0.9
+- **Apps by the Arabic spelling you type**: 45+ more apps and games with their common spellings, one wrong letter forgiven (`ديسكود` finds Discord), and the start of a name is enough.
+- **Learns from your picks**: the app you open after typing some letters comes first next time.
+- **Apps in the main window too**: "App: …" buttons above the results when the search names an app.
+- **Currency conversion**: `100 usd to iqd`, `100 دولار`, `50 eur in gbp` for 24 currencies, rates refreshed every 12 hours.
+- **Recent and favourite files** when the search box opens empty.
+- **When nothing is found**: "Did you mean…?", search inside contents, all drives, all file types, or the web.
+- **Smarter ranking**: `notepda` shows Notepad before files, and `2+2` gives the answer without unrelated files.
+- **First-day content indexing 1.5–3× faster**, starting with your Desktop, Documents and Downloads.
+
+#### Search from anywhere (new in 0.8)
+- **A small search box above the clock**: nearly invisible until the pointer comes close, then it fades in. It hides during full-screen games and video and can be dragged anywhere. Turn it off or hide it in **Options → Search from anywhere**.
+- **A quick-search popup on Ctrl+Alt+F** or from the tray icon, opening upward: files, **installed apps** (`chrome`, or `كروم` in Arabic, and any app by its Arabic spelling such as `كوكل بلي` for Google Play Games), **Windows settings pages** (`wifi`, `bluetooth`, `display`) and **switching to an open window**.
+- **Instant answers**: calculator (`250*12`), unit conversion (`5 kg to lb`, `100 F to C`) and the **Hijri date** (`hijri`, plus Umm al-Qura date conversion).
+- **Web shortcuts**: `youtube quran` searches YouTube directly; also Google, Wikipedia, Maps and Translate.
+- **System commands** (shut down, restart, sleep, lock, empty the Recycle Bin, end a frozen program), each **confirmed before it runs**.
+- **Tab** opens a row's actions: run as administrator, copy path, open folder, pin to favourites. Often-opened items rise to the top.
+- A monochrome tray icon that follows the dark or light taskbar. Everything new can be turned off, which brings back the old behaviour exactly.
+
+<p align="center"><img src="docs/quick-shots/q-app-en.png" width="420" alt="The quick-search popup finding Notepad"></p>
 
 #### Search
 - **Instant filename search** across all drives or one folder, with ready-made filters: documents, pictures, audio, video, archives, programs, folders.
@@ -223,7 +274,7 @@ InstaFind's second includes starting the command-line tool and loading the index
 - **All matches** in a file with line numbers (F4), and reversed Arabic text in PDFs is repaired.
 
 #### Tools
-- **Ctrl+Alt+F** shows the app from anywhere; **Ctrl+Alt+G** in any program's Save or Open dialog jumps the dialog to the folder of a result.
+- **Ctrl+Alt+F** opens the quick-search popup from anywhere (or the full window, if you choose so in Options); **Ctrl+Alt+G** in any program's Save or Open dialog jumps the dialog to the folder of a result.
 - **Duplicate finder** (size, then content hash), sorted by wasted space, moves your picks to the Recycle Bin.
 - **Folder sizes** in the Size column and a disk-usage window.
 - **Thumbnail view** (Ctrl+T).
@@ -235,7 +286,7 @@ InstaFind's second includes starting the command-line tool and loading the index
 
 #### Comfort
 - **English or Arabic interface**: follows the Windows display language; switch in **Options → Language / اللغة**.
-- **Starts with Windows** in the background, Esc hides it to the tray, single instance.
+- **Starts with Windows** in the background; Esc or the close button hides it to the tray (quit with *Exit* in the tray menu), single instance.
 - Relative dates, optional Arabic digits, file-type icons.
 - Internal errors are written to `log.txt` and `crash.txt` instead of closing the app.
 
@@ -267,7 +318,7 @@ Every filter also has an Arabic spelling (`حجم:`, `تاريخ:`, `كلمة:`,
 
 | Key | Action |
 |---|---|
-| Ctrl+Alt+F | show or hide the app from anywhere |
+| Ctrl+Alt+F | quick-search popup from anywhere (Tab for actions, Esc to close) |
 | Ctrl+Alt+G | in a Save/Open dialog: jump to a result's folder |
 | Enter / Ctrl+Enter | open the file / open its folder with the file selected |
 | Down arrow | from the search box to the results (in an empty box: history) |
@@ -297,6 +348,13 @@ A Flow Launcher plugin (keyword `bs`) and PowerShell, AutoHotkey and Windows Ter
 - OCR is slower than document extraction. Only the first 50 pages of a scanned PDF are read, and images over 30 MB are skipped.
 - Support for legacy `.doc` files is approximate.
 - Bugs and ideas are welcome in [Issues](https://github.com/sarmadiq9090-coder/arabic-file-search/issues); attaching `%LOCALAPPDATA%\BahthSari\log.txt` helps.
+
+### Feedback
+
+- **Options → Send feedback** opens a prefilled GitHub page in your browser, with the app version and Windows version filled in: **Report a problem**, **Suggest a feature**, or **Ask or discuss with other users**. You review it and press **Submit** yourself; Arabic or English are both fine.
+- **Crash reports**: if the app hit an internal error, at the next start it asks once whether to open a prefilled GitHub issue with the report. The report is kept only on your PC in `%LOCALAPPDATA%\BahthSari\crash.txt`, and user names in paths are replaced with `<user>`.
+- **Nothing is ever sent automatically**: no telemetry, and no network connection for this without your click.
+- Or go straight to [Issues](https://github.com/sarmadiq9090-coder/arabic-file-search/issues) or [Discussions](https://github.com/sarmadiq9090-coder/arabic-file-search/discussions).
 
 ### Developers
 

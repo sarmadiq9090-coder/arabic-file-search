@@ -1,9 +1,15 @@
 name: build
 
-# CI checks and builds every push. The exe is cross-built once (exactly as in
-# local QC, x86_64-pc-windows-gnu), smoke-tested on real Windows, and when main
-# gets a version (Cargo.toml) that has no tag yet, the `release` job tags it and
-# publishes that same exe as the asset `bahth.exe` the in-app updater downloads.
+# CI checks and builds every push. Three exes are built, each smoke-tested on
+# real Windows, and when main gets a version (Cargo.toml) that has no tag yet,
+# the `release` job tags it and publishes those same exes:
+#   bahth.exe        x64, cross-built with mingw (x86_64-pc-windows-gnu). This
+#                    name must never change: every installed copy's updater
+#                    looks for it.
+#   bahth-x86.exe    32-bit, cross-built with mingw (i686-pc-windows-gnu).
+#   bahth-arm64.exe  ARM64, built natively on a Windows ARM runner
+#                    (aarch64-pc-windows-msvc, static CRT).
+# The updater in each build fetches the asset for its own CPU (src/update.rs).
 
 on:
   push:
@@ -53,11 +59,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: i686-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
       - name: Test
         run: cargo test --release
+      # 32-bit (usize, the x86 updater asset) under WOW64.
+      - name: Test (32-bit)
+        run: cargo test --release --target i686-pc-windows-msvc
 
-  # The exe exactly as it is published: cross-built on Linux with mingw.
+  # The x64 and x86 exes exactly as they are published: cross-built on Linux
+  # with mingw.
   exe:
     needs: linux-test
     runs-on: ubuntu-latest
@@ -65,35 +77,97 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-gnu
+          targets: x86_64-pc-windows-gnu, i686-pc-windows-gnu
       - uses: Swatinem/rust-cache@v2
-      - name: Build bahth.exe
+      - name: Build bahth.exe and bahth-x86.exe
         run: |
           sudo apt-get update -q && sudo apt-get install -y -q mingw-w64
           cargo build --release --target x86_64-pc-windows-gnu
+          cargo build --release --target i686-pc-windows-gnu
           cp target/x86_64-pc-windows-gnu/release/bahth.exe bahth.exe
+          cp target/i686-pc-windows-gnu/release/bahth.exe bahth-x86.exe
       - uses: actions/upload-artifact@v4
         with:
           name: bahth-exe
           path: bahth.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bahth-x86-exe
+          path: bahth-x86.exe
 
-  # Runs that same exe on a real Windows machine: the GUI indexes the drive,
-  # then the command line searches the index. Any crash report fails it.
+  # The ARM64 exe, built and unit-tested natively on Windows on ARM.
+  exe-arm64:
+    needs: linux-test
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --release --target aarch64-pc-windows-msvc
+      - name: Build bahth-arm64.exe
+        shell: pwsh
+        run: |
+          cargo build --release --target aarch64-pc-windows-msvc
+          Copy-Item target/aarch64-pc-windows-msvc/release/bahth.exe bahth-arm64.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bahth-arm64-exe
+          path: bahth-arm64.exe
+
+  # Runs each exe on a real Windows machine of its CPU (x86 under WOW64): the
+  # GUI indexes the drive, then the command line searches the index. Any
+  # crash report fails it.
   smoke:
-    needs: exe
-    runs-on: windows-latest
+    needs: [exe, exe-arm64]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { machine: x64, os: windows-latest, artifact: bahth-exe, file: bahth.exe }
+          - { machine: x86, os: windows-latest, artifact: bahth-x86-exe, file: bahth-x86.exe }
+          - { machine: arm64, os: windows-11-arm, artifact: bahth-arm64-exe, file: bahth-arm64.exe }
+    name: smoke (${{ matrix.machine }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: bahth-exe
+          name: ${{ matrix.artifact }}
       - name: Smoke test
         shell: pwsh
-        run: ./ci/smoke.ps1 -Exe ./bahth.exe
+        run: ./ci/smoke.ps1 -Exe ./${{ matrix.file }} -Machine ${{ matrix.machine }}
+
+  # A "real user" on a real Windows desktop (ci/ui-test.ps1): types Arabic and
+  # English searches, opens the menus, the quick search popup and the
+  # Arabic interface, closes to the tray, and screenshots every step. Core
+  # checks fail the job; "probe" checks (typos, Arabizi, Arabic app names...)
+  # only report what is missing. `release` waits for it: nothing is
+  # published unless the real-user test passes on the same commit.
+  ui:
+    needs: exe
+    runs-on: windows-latest
+    # The first index can take 40 minutes when the runner's disk is throttled.
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bahth-exe
+      - name: Real-user UI test
+        shell: powershell
+        run: ./ci/ui-test.ps1 -Exe ./bahth.exe -Out "$env:RUNNER_TEMP/ui-test"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test
+          path: ${{ runner.temp }}/ui-test
 
   release:
-    needs: [linux-test, windows, smoke]
+    needs: [linux-test, windows, smoke, ui]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -111,23 +185,24 @@ jobs:
           else
             echo "new=true" >> "$GITHUB_OUTPUT"
           fi
-      # Publishes the very exe the smoke test ran.
+      # Publishes the very exes the smoke tests ran.
       - if: steps.v.outputs.new == 'true'
         uses: actions/download-artifact@v4
         with:
-          name: bahth-exe
+          pattern: bahth-*exe
+          merge-multiple: true
       - if: steps.v.outputs.new == 'true'
         name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.v.outputs.tag }}
         run: |
-          test -s bahth.exe
+          for f in bahth.exe bahth-x86.exe bahth-arm64.exe; do test -s "$f"; done
           notes="releases/$TAG-notes.md"
           [ -f "$notes" ] || notes=/dev/null
           title=$(head -1 "$notes" | sed 's/^# *//')
           [ -n "$title" ] || title="$TAG"
-          gh release create "$TAG" bahth.exe --target "$GITHUB_SHA" --title "$title" --notes-file "$notes" --latest
+          gh release create "$TAG" bahth.exe bahth-x86.exe bahth-arm64.exe --target "$GITHUB_SHA" --title "$title" --notes-file "$notes" --latest
       # Package managers: packaging.yml rewrites the Scoop, winget and
       # Chocolatey manifests and commits them to main (and pushes to
       # Chocolatey/winget when their secrets exist). A release made with
