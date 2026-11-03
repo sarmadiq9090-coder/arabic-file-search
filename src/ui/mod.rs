@@ -40,7 +40,7 @@ mod format;
 mod history_menu;
 mod lang_menu;
 mod keys;
-mod launcher_shim; // TEMPORARY, see the file
+mod launcher_shim; // thin glue to crate::launcher, see the file
 mod lazy;
 mod quick;
 mod quickswitch;
