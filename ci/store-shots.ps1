@@ -150,24 +150,31 @@ public static class S {
         for (int i = vks.Length - 1; i >= 0; i--) list.Add(Key(vks[i], 0, 2));
         SendInput((uint)list.Count, list.ToArray(), Marshal.SizeOf(typeof(INPUT)));
     }
-    // Clicks the item of an open popup menu (#32768) whose text starts with
-    // one of the given strings; false when there is none.
-    public static bool ClickMenuItem(IntPtr menuWindow, string[] starts) {
+    // The item of an open popup menu (#32768) whose text starts with one of
+    // the given strings: { HMENU, position }, or null. nwg menus notify by
+    // position (MNS_NOTIFYBYPOS), so WM_MENUCOMMAND(position, HMENU) posted
+    // to the owner window selects it.
+    public static long[] FindMenuItem(IntPtr menuWindow, string[] starts) {
         IntPtr m = SendMessage(menuWindow, 0x01E1 /* MN_GETHMENU */, IntPtr.Zero, IntPtr.Zero);
         int n = GetMenuItemCount(m);
         for (int i = 0; i < n; i++) {
             var sb = new StringBuilder(512);
             GetMenuString(m, (uint)i, sb, 512, 0x400 /* MF_BYPOSITION */);
             foreach (var s in starts) {
-                if (s.Length > 0 && sb.ToString().StartsWith(s)) {
-                    RECT r;
-                    if (!GetMenuItemRect(IntPtr.Zero, m, (uint)i, out r)) return false;
-                    ClickAt((r.L + r.R) / 2, (r.T + r.B) / 2);
-                    return true;
-                }
+                if (s.Length > 0 && sb.ToString().StartsWith(s)) return new long[] { m.ToInt64(), i };
             }
         }
-        return false;
+        return null;
+    }
+    public static string[] MenuTexts(IntPtr menuWindow) {
+        IntPtr m = SendMessage(menuWindow, 0x01E1, IntPtr.Zero, IntPtr.Zero);
+        var list = new List<string>();
+        for (int i = 0; i < GetMenuItemCount(m); i++) {
+            var sb = new StringBuilder(512);
+            GetMenuString(m, (uint)i, sb, 512, 0x400);
+            list.Add(sb.ToString());
+        }
+        return list.ToArray();
     }
     public static void Screen(string path, int w, int h) {
         using (var bmp = new Bitmap(w, h))
@@ -391,8 +398,17 @@ foreach ($s in $scenes) {
         [void][S]::PostMessage($opt.H, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)
         $menu = $null
         for ($i = 0; $i -lt 10 -and -not $menu; $i++) { Start-Sleep -Milliseconds 300; $menu = [S]::TopWindows(0) | Where-Object { [S]::Class($_) -eq '#32768' } | Select-Object -First 1 }
-        if (-not $menu -or -not [S]::ClickMenuItem($menu, $s.Dupes)) { Warn "duplicate finder menu item not found ($lang)"; [S]::Chord($VK.ESC) }
+        $item = $null
+        if (-not $menu) { Warn "the Options menu did not open ($lang)" }
         else {
+            $item = [S]::FindMenuItem($menu, $s.Dupes)
+            if (-not $item) { Warn "no duplicate finder item ($lang) among: $([S]::MenuTexts($menu) -join ' / ')" }
+        }
+        if ($menu) { [S]::Chord($VK.ESC); Start-Sleep -Milliseconds 400 }
+        if ($item) {
+            [void][S]::PostMessage($script:hwnd, 0x0126, [IntPtr]$item[1], [IntPtr]$item[0])   # WM_MENUCOMMAND
+        }
+        if ($item) {
             $dupes = $null
             for ($i = 0; $i -lt 20 -and -not $dupes; $i++) {
                 Start-Sleep -Milliseconds 500
