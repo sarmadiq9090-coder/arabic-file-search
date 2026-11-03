@@ -196,6 +196,10 @@ Write-Host "screen is ${W}x${H}"
 if ($W -ne $Width -or $H -ne $Height) { Warn "the runner's screen is ${W}x${H}, not ${Width}x${Height}" }
 if ($W -lt 1366 -or $H -lt 768) { Warn "${W}x${H} is below the Store's 1366x768 minimum" }
 
+# The runner's own windows (its agent console) off the desktop.
+function Clear-Desktop { try { (New-Object -ComObject Shell.Application).MinimizeAll() } catch { Write-Host "MinimizeAll: $_" }; Start-Sleep -Seconds 1 }
+Clear-Desktop
+
 # ---------------------------------------------------------------- sample files
 # Realistic names in both languages; the .txt files carry the words the
 # inside-documents scene finds; the backup folder holds exact copies for the
@@ -298,29 +302,48 @@ function Set-Inside([bool]$On, [string[]]$Names) {
     if (-not $cb) { Warn "checkbox not found: $($Names -join ' / ')"; return }
     if ([S]::Checked($cb.H) -ne $On) { [S]::Click($cb.H); Start-Sleep -Milliseconds 500 }
 }
-# Limits the search to the demo folder through "Choose folder…" (as
-# ci/demo.ps1 does), so the shots show only the sample files.
+# Limits the search to the demo folder through "Choose folder…". The
+# dialog ignores WM_SETTEXT (ci/demo.ps1 only gets away with it because its
+# folder is the dialog's default), so the path is typed as a person would:
+# a click in the Folder box, Ctrl+A, the path, Enter. Throws unless the
+# scope then shows the demo folder, so no runner folder can end up in a shot.
+function Scope-Text {
+    (Controls | ForEach-Object { $_.Text -replace "[\u200E\u2066\u2069]", '' }) -join ' | '
+}
 function Set-Scope([string[]]$Names) {
     $b = Controls | Where-Object { $_.Class -eq 'Button' -and $Names -contains $_.Text } | Select-Object -First 1
     if (-not $b) { throw 'folder button not found' }
-    Focus $script:hwnd
-    [S]::Click($b.H)
-    $dlg = $null
-    for ($i = 0; $i -lt 20 -and -not $dlg; $i++) {
-        Start-Sleep -Milliseconds 500
-        $dlg = [S]::TopWindows($script:appPid) | Where-Object { [S]::Class($_) -eq '#32770' } | Select-Object -First 1
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        Focus $script:hwnd
+        [void][S]::PostMessage($b.H, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)   # BM_CLICK
+        $dlg = $null
+        for ($i = 0; $i -lt 20 -and -not $dlg; $i++) {
+            Start-Sleep -Milliseconds 500
+            $dlg = [S]::TopWindows($script:appPid) | Where-Object { [S]::Class($_) -eq '#32770' } | Select-Object -First 1
+        }
+        if (-not $dlg) { throw 'folder dialog did not open' }
+        Start-Sleep -Seconds 2   # it builds its controls after it appears
+        $edit = [S]::Children($dlg) | Where-Object { [S]::Class($_) -eq 'Edit' -and [S]::ParentClass($_) -eq 'ComboBox' } | Select-Object -First 1
+        Focus $dlg
+        if ($edit) { [S]::Click($edit) }
+        [S]::Chord($VK.CTRL, 0x41)   # Ctrl+A
+        [S]::Type($demo)
+        Start-Sleep -Milliseconds 300
+        [S]::Chord($VK.ENTER)
+        for ($i = 0; $i -lt 10 -and ([S]::TopWindows($script:appPid) -contains $dlg); $i++) { Start-Sleep -Milliseconds 500 }
+        if ([S]::TopWindows($script:appPid) -contains $dlg) {
+            # Enter navigated into the folder: "Select Folder" now picks it.
+            $ok = [S]::Children($dlg) | Where-Object { [S]::Class($_) -eq 'Button' -and [S]::Text($_) -eq 'Select Folder' } | Select-Object -First 1
+            if ($ok) { [void][S]::PostMessage($ok, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) }
+            for ($i = 0; $i -lt 10 -and ([S]::TopWindows($script:appPid) -contains $dlg); $i++) { Start-Sleep -Milliseconds 500 }
+        }
+        if ([S]::TopWindows($script:appPid) -contains $dlg) { [void][S]::PostMessage($dlg, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero); Start-Sleep -Seconds 1 }
+        Start-Sleep -Seconds 1
+        $text = Scope-Text
+        if ($text -match [regex]::Escape($demo)) { Write-Host "scope set to $demo"; return }
+        Write-Host "attempt ${attempt}: scope not set; controls: $text"
     }
-    if (-not $dlg) { throw 'folder dialog did not open' }
-    for ($try = 0; $try -lt 20; $try++) {
-        Start-Sleep -Milliseconds 500
-        if (-not ([S]::TopWindows($script:appPid) -contains $dlg)) { break }
-        $kids = [S]::Children($dlg)
-        $edit = $kids | Where-Object { [S]::Class($_) -eq 'Edit' -and [S]::ParentClass($_) -eq 'ComboBox' } | Select-Object -First 1
-        $ok = $kids | Where-Object { [S]::Class($_) -eq 'Button' -and [S]::Text($_) -eq 'Select Folder' } | Select-Object -First 1
-        if ($edit -and $ok) { [S]::SetText($edit, $demo); Start-Sleep -Milliseconds 300; [S]::Press($ok) }
-    }
-    if ([S]::TopWindows($script:appPid) -contains $dlg) { throw 'the folder dialog did not close' }
-    Start-Sleep -Seconds 1
+    throw "the search scope could not be set to $demo"
 }
 function Shot([string]$Name) {
     [S]::Park($W, $H)
@@ -364,7 +387,8 @@ foreach ($s in $scenes) {
     if (-not $opt) { Warn "Options button not found ($lang)"; Controls | ForEach-Object { Write-Host "  $($_.Class) | $($_.Text)" } }
     else {
         Focus $script:hwnd
-        [S]::Press($opt.H)
+        # Posted: the button's handler shows the menu and waits in it.
+        [void][S]::PostMessage($opt.H, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)
         $menu = $null
         for ($i = 0; $i -lt 10 -and -not $menu; $i++) { Start-Sleep -Milliseconds 300; $menu = [S]::TopWindows(0) | Where-Object { [S]::Class($_) -eq '#32768' } | Select-Object -First 1 }
         if (-not $menu -or -not [S]::ClickMenuItem($menu, $s.Dupes)) { Warn "duplicate finder menu item not found ($lang)"; [S]::Chord($VK.ESC) }
@@ -397,8 +421,8 @@ foreach ($s in $scenes) {
     [S]::SetText((Query-Box), '')
 
     # 3. Quick search over the desktop: the main window out of the way.
+    Clear-Desktop   # the main window too
     [void][S]::ShowWindow($script:hwnd, 6)   # SW_MINIMIZE
-    Start-Sleep -Seconds 1
     [S]::Chord($VK.CTRL, $VK.ALT, $VK.F)
     Start-Sleep -Seconds 2
     [S]::Type($s.Quick)
