@@ -400,11 +400,14 @@ foreach ($s in $scenes) {
     $opt = Controls | Where-Object { $_.Class -eq 'Button' -and $s.Options -contains $_.Text } | Select-Object -First 1
     if (-not $opt) { Warn "Options button not found ($lang)"; Controls | ForEach-Object { Write-Host "  $($_.Class) | $($_.Text)" } }
     else {
-        Focus $script:hwnd
-        # Posted: the button's handler shows the menu and waits in it.
-        [void][S]::PostMessage($opt.H, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)
+        # A real click, as a person: a posted BM_CLICK did not open the menu
+        # on the maximized window. A second try with BM_CLICK if it fails.
         $menu = $null
-        for ($i = 0; $i -lt 10 -and -not $menu; $i++) { Start-Sleep -Milliseconds 300; $menu = [S]::TopWindows(0) | Where-Object { [S]::Class($_) -eq '#32768' } | Select-Object -First 1 }
+        for ($try = 0; $try -lt 2 -and -not $menu; $try++) {
+            Focus $script:hwnd
+            if ($try -eq 0) { [S]::Click($opt.H) } else { [void][S]::PostMessage($opt.H, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) }
+            for ($i = 0; $i -lt 17 -and -not $menu; $i++) { Start-Sleep -Milliseconds 300; $menu = [S]::TopWindows(0) | Where-Object { [S]::Class($_) -eq '#32768' } | Select-Object -First 1 }
+        }
         $item = $null
         if (-not $menu) { Warn "the Options menu did not open ($lang)" }
         else {
