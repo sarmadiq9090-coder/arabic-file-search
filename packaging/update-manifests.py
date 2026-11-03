@@ -62,8 +62,8 @@ DESC_AR = """\
 TAGS = ["search", "file-search", "find", "arabic", "full-text-search", "ocr", "indexer", "desktop-search", "portable", "rust"]
 
 SCOOP_NOTES = [
-    "InstaFind updates itself from GitHub (it offers new versions in the app). That is harmless,",
-    "but 'scoop update instafind' remains the way to keep Scoop's records in step.",
+    "Installed with Scoop, InstaFind does not update itself (versions up to 0.9.0 still offer to):",
+    "run 'scoop update instafind' to get new versions.",
     "Index, settings and log live in %LOCALAPPDATA%\\BahthSari (not in the Scoop folder);",
     "delete that folder and HKCU\\Software\\BahthSari yourself to remove all data.",
 ]
