@@ -221,7 +221,20 @@ mod win {
     /// Runs a WinRT call on a fresh multithreaded thread, so the caller's
     /// apartment (the UI thread is single-threaded) does not matter and a
     /// blocking `.join()` cannot deadlock it.
+    ///
+    /// The multithreaded apartment is kept alive for the whole process
+    /// (`CoIncrementMTAUsage`, once). Without that it is torn down each time
+    /// one of these short-lived threads exits, and the next call goes
+    /// through the `windows` crate's cached factory of the dead apartment:
+    /// an access violation in combase.dll (seen in store.yml's install test).
     fn on_mta<T: Send + 'static>(f: impl FnOnce() -> windows::core::Result<T> + Send + 'static) -> Result<T, String> {
+        static MTA: OnceLock<()> = OnceLock::new();
+        MTA.get_or_init(|| {
+            let mut cookie = std::ptr::null_mut();
+            // SAFETY: an out-parameter; the cookie is never released, so the
+            // apartment lives until the process exits.
+            let _ = unsafe { winapi::um::combaseapi::CoIncrementMTAUsage(&mut cookie) };
+        });
         std::thread::spawn(move || {
             let _ = unsafe { RoInitialize(RO_INIT_MULTITHREADED) };
             f().map_err(|e| e.message().to_string())

@@ -581,6 +581,10 @@ pub fn run() {
     }
     // Only the copy that keeps running tidies up after an update.
     crate::update::cleanup_old();
+    if let Some(full) = crate::store::package_full_name() {
+        // Before the first WinRT call, so a failure there is placed.
+        startup::log(&format!("store: starting {full}"));
+    }
     autostart::apply_default();
     if let Some(line) = crate::store::startup_log_line() {
         startup::log(&line);
