@@ -75,7 +75,7 @@ impl App {
                 self.start_warm();
                 self.start_watching();
                 if self.query.text().trim().is_empty() || self.content_mode() {
-                    self.set_status(&trf!("تم تحميل الفهرس ({} عنصر). اكتب للبحث.", "Index loaded ({} items). Type to search.", fmt_num(n)));
+                    self.set_status(&trf!("تم تحميل الفهرس (عدد العناصر: {}). اكتب للبحث.", "Index loaded ({} items). Type to search.", fmt_num(n)));
                     self.show_recent_files();
                 } else {
                     self.search_names();
@@ -300,7 +300,7 @@ impl App {
                 self.show_suggestions(Vec::new());
             }
             if n != old_n && !res.empty {
-                self.set_status(&trf!("وجدت {} نتيجة (حُدِّثت تلقائياً){warn}", "Found {} results (updated automatically){warn}", fmt_num(n)));
+                self.set_status(&trf!("عدد النتائج: {} (حُدِّثت تلقائياً){warn}", "Found {} results (updated automatically){warn}", fmt_num(n)));
             }
             return;
         }
@@ -467,7 +467,7 @@ impl App {
                 self.reindex_btn.set_enabled(true);
                 self.start_watching();
                 if self.query.text().trim().is_empty() || self.content_mode() {
-                    self.set_status(&trf!("اكتملت الفهرسة: {} عنصر.", "Indexing complete: {} items.", fmt_num(n)));
+                    self.set_status(&trf!("اكتملت الفهرسة. عدد العناصر: {}.", "Indexing complete: {} items.", fmt_num(n)));
                     self.show_recent_files();
                 } else {
                     self.search_names();

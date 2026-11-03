@@ -293,7 +293,7 @@ impl App {
         let result = write();
         drop(st);
         match result {
-            Ok(n) => self.set_status(&trf!("تم تصدير {} نتيجة.", "Exported {} results.", fmt_num(n))),
+            Ok(n) => self.set_status(&trf!("تم التصدير. عدد النتائج: {}.", "Exported {} results.", fmt_num(n))),
             Err(e) => {
                 nwg::modal_error_message(&self.window, tr!("خطأ", "Error"), &trf!("تعذر حفظ الملف:\n{e}", "Could not save the file:\n{e}"));
             }

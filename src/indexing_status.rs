@@ -48,7 +48,7 @@ pub fn group_digits(n: usize) -> String {
     out
 }
 
-/// "جارِ الفهرسة… 36,000 من 432,000 ملف" / "Indexing… 36,000 of 432,000
+/// "جارِ الفهرسة… الملفات: 36,000 من 432,000" / "Indexing… 36,000 of 432,000
 /// files", or `None` when nothing is being indexed. `num` writes a count
 /// (thousands separators, and the digits the user chose).
 pub fn progress_text(lang: Lang, state: Indexing, num: &dyn Fn(usize) -> String) -> Option<String> {
@@ -57,13 +57,13 @@ pub fn progress_text(lang: Lang, state: Indexing, num: &dyn Fn(usize) -> String)
     }
     Some(match state {
         Indexing::Names { found } => match lang {
-            Lang::Ar => format!("جارِ الفهرسة… {} ملف حتى الآن", num(found)),
+            Lang::Ar => format!("جارِ الفهرسة… عدد الملفات حتى الآن: {}", num(found)),
             Lang::En => format!("Indexing… {} files so far", num(found)),
         },
         Indexing::Contents { checked, total } => {
             let (checked, total) = (num(checked.min(total)), num(total));
             match lang {
-                Lang::Ar => format!("جارِ الفهرسة… {checked} من {total} ملف"),
+                Lang::Ar => format!("جارِ الفهرسة… الملفات: {checked} من {total}"),
                 Lang::En => format!("Indexing… {checked} of {total} files"),
             }
         }
@@ -95,7 +95,7 @@ pub fn content_search_text(lang: Lang, state: Indexing, checked: usize, total: u
     let lead = no_results_text(lang, state)?;
     let (checked, total) = (num(checked.min(total)), num(total));
     Some(match lang {
-        Lang::Ar => format!("{lead} تم فحص {checked} من {total} مستند…"),
+        Lang::Ar => format!("{lead} المستندات المفحوصة: {checked} من {total}…"),
         Lang::En => format!("{lead} Checked {checked} of {total} documents…"),
     })
 }
@@ -134,14 +134,14 @@ mod tests {
     #[test]
     fn content_progress_reads_as_in_the_user_study() {
         let s = Indexing::Contents { checked: 36_000, total: 432_000 };
-        assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("جارِ الفهرسة… 36,000 من 432,000 ملف"));
+        assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("جارِ الفهرسة… الملفات: 36,000 من 432,000"));
         assert_eq!(progress_text(Lang::En, s, &num).as_deref(), Some("Indexing… 36,000 of 432,000 files"));
     }
 
     #[test]
     fn name_scan_has_no_total_yet() {
         let s = Indexing::Names { found: 120_500 };
-        assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("جارِ الفهرسة… 120,500 ملف حتى الآن"));
+        assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("جارِ الفهرسة… عدد الملفات حتى الآن: 120,500"));
         assert_eq!(progress_text(Lang::En, s, &num).as_deref(), Some("Indexing… 120,500 files so far"));
         // A scan that has found nothing yet is still running.
         assert!(Indexing::Names { found: 0 }.running());
@@ -177,7 +177,7 @@ mod tests {
         );
         assert_eq!(
             content_search_text(Lang::Ar, s, 36_000, 432_000, &num).as_deref(),
-            Some("لا نتائج حتى الآن — قد تكون النتائج ناقصة أثناء الفهرسة. تم فحص 36,000 من 432,000 مستند…")
+            Some("لا نتائج حتى الآن — قد تكون النتائج ناقصة أثناء الفهرسة. المستندات المفحوصة: 36,000 من 432,000…")
         );
     }
 
@@ -201,7 +201,7 @@ mod tests {
         // The window can show Arabic-Indic digits (Options); the formatter is passed in.
         let indic = |n: usize| group_digits(n).chars().map(|c| if c.is_ascii_digit() { char::from_u32(c as u32 - 48 + 0x0660).unwrap() } else { c }).collect::<String>();
         let s = Indexing::Contents { checked: 36_000, total: 432_000 };
-        assert_eq!(progress_text(Lang::Ar, s, &indic).as_deref(), Some("جارِ الفهرسة… ٣٦,٠٠٠ من ٤٣٢,٠٠٠ ملف"));
+        assert_eq!(progress_text(Lang::Ar, s, &indic).as_deref(), Some("جارِ الفهرسة… الملفات: ٣٦,٠٠٠ من ٤٣٢,٠٠٠"));
     }
 
     #[test]
