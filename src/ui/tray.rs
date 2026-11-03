@@ -99,7 +99,19 @@ pub struct QuickMenu {
 
 /// Whether this run started with Windows (hidden, in the background).
 fn started_hidden() -> bool {
-    std::env::args().any(|a| a == autostart::STARTUP_ARG)
+    autostart::launched_at_sign_in()
+}
+
+/// THIRD-PARTY-NOTICES.txt beside the exe (the Store package ships it,
+/// packaging/msix/make_layout.py), else the copy on GitHub for the portable
+/// program, which is a single exe.
+fn notices_location() -> String {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.join("THIRD-PARTY-NOTICES.txt")))
+        .filter(|p| p.is_file())
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|| format!("{}/blob/main/THIRD-PARTY-NOTICES.txt", crate::feedback::REPO_URL))
 }
 
 impl App {
@@ -268,16 +280,21 @@ impl App {
     }
 
     fn show_about(&self) {
-        nwg::modal_info_message(
-            &self.window,
-            tr!("حول بحث سريع", "About InstaFind"),
-            &trf!(
-                "بحث سريع (InstaFind) — الإصدار {}\nبحث فوري عن الملفات وداخل المستندات، بالعربية والإنجليزية.\n\nاضغط {HOTKEY_TEXT} من أي مكان لتبحث.\n{}",
-                "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {HOTKEY_TEXT} anywhere to search.\n{}",
-                env!("CARGO_PKG_VERSION"),
-                crate::feedback::REPO_URL
-            ),
+        let text = trf!(
+            "بحث سريع (InstaFind) — الإصدار {}\nبحث فوري عن الملفات وداخل المستندات، بالعربية والإنجليزية.\n\nاضغط {HOTKEY_TEXT} من أي مكان لتبحث.\n{}\n\nتراخيص المكونات مفتوحة المصدر التي يستعملها البرنامج في THIRD-PARTY-NOTICES.txt. هل تريد فتحه؟",
+            "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {HOTKEY_TEXT} anywhere to search.\n{}\n\nThe licences of the open-source components it uses are in THIRD-PARTY-NOTICES.txt. Open it?",
+            env!("CARGO_PKG_VERSION"),
+            crate::feedback::REPO_URL
         );
+        let params = nwg::MessageParams {
+            title: tr!("حول بحث سريع", "About InstaFind"),
+            content: &text,
+            buttons: nwg::MessageButtons::YesNo,
+            icons: nwg::MessageIcons::Info,
+        };
+        if nwg::modal_message(&self.window, &params) == nwg::MessageChoice::Yes {
+            super::shell::open(&notices_location());
+        }
     }
 
     /// Timer work of the quick search, from the main window's tick: the

@@ -602,7 +602,18 @@ pub fn run() {
     }
     // Only the copy that keeps running tidies up after an update.
     crate::update::cleanup_old();
-    autostart::apply_default();
+    if let Some(full) = crate::store::package_full_name() {
+        // Before the first WinRT call, so a failure there is placed.
+        startup::log(&format!("store: starting {full}"));
+    }
+    if crate::store::is_packaged() {
+        autostart::apply_store_default();
+    } else {
+        autostart::apply_default();
+    }
+    if let Some(line) = crate::store::startup_log_line() {
+        startup::log(&line);
+    }
     phase("single-instance");
     unsafe {
         winapi::um::objbase::CoInitialize(std::ptr::null_mut());

@@ -1,5 +1,7 @@
 //! Starting with Windows: a value under the current user's `Run` key (no
 //! admin rights needed) that launches the program hidden in the tray.
+//! The Microsoft Store version uses its package's StartupTask instead
+//! (`crate::store`): a packaged program's `Run` value is never read.
 
 use winapi::shared::minwindef::{DWORD, HKEY};
 use winapi::shared::winerror::ERROR_SUCCESS;
@@ -114,15 +116,38 @@ fn unblock() {
     }
 }
 
+/// Whether this run started with Windows (hidden, in the background): the
+/// `Run` entry passes `--startup`; the Store's startup task passes nothing.
+pub fn launched_at_sign_in() -> bool {
+    std::env::args().any(|a| a == STARTUP_ARG) || crate::store::launched_by_startup_task()
+}
+
+/// What to tell the user when `set_enabled` fails.
+pub fn change_failed_message() -> String {
+    match crate::store::startup_state() {
+        Some(state) => crate::store::startup_refused_message(state),
+        None => tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting.").to_string(),
+    }
+}
+
 /// Whether the program starts with Windows: our `Run` entry is there and
 /// Task Manager has not turned it off.
 pub fn is_enabled() -> bool {
+    if crate::store::is_packaged() {
+        return crate::store::startup_state().is_some_and(|s| s.is_on());
+    }
     open(RUN_KEY, false).is_some_and(|k| has_value(&k, VALUE)) && !blocked_by_task_manager()
 }
 
 /// Turns starting with Windows on or off for the current user. The entry
 /// points at this exe, which the updater keeps at the same path.
 pub fn set_enabled(on: bool) -> bool {
+    if crate::store::is_packaged() {
+        if let Some(own) = open(OWN_KEY, true) {
+            set_string(&own, CHOSEN, "1");
+        }
+        return crate::store::set_startup(on).is_ok();
+    }
     let Some(key) = open(RUN_KEY, true) else { return false };
     if let Some(own) = open(OWN_KEY, true) {
         set_string(&own, CHOSEN, "1");
@@ -164,5 +189,17 @@ pub fn apply_default() {
     }
     if !reset_done && let Some(own) = open(OWN_KEY, true) {
         set_string(&own, RESET_081, "1");
+    }
+}
+
+/// The Microsoft Store version's counterpart of `apply_default`, through
+/// the package's startup task: off until the user turns it on
+/// (`store::ENABLE_STARTUP_ON_FIRST_RUN`), and never against a choice made
+/// in Settings or Task Manager. Kept apart from `apply_default`, which is
+/// about the `Run` key only.
+pub fn apply_store_default() {
+    let chosen = open(OWN_KEY, false).is_some_and(|k| has_value(&k, CHOSEN));
+    if crate::store::startup_state().is_some_and(|s| crate::store::enable_on_first_run(chosen, s)) {
+        set_enabled(true);
     }
 }
