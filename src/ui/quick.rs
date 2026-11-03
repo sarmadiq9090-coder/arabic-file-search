@@ -45,6 +45,8 @@ use crate::quick::{self, Anchor, FeedbackKind, Group, Icon, ListMetrics, Palette
 const WIDTH: i32 = 480;
 /// The search strip at the bottom.
 const STRIP_H: i32 = 52;
+/// The indexing progress line under the results, while indexing runs.
+const NOTE_H: i32 = 26;
 /// Opacity (of 255) of the list's tint over the acrylic backdrop.
 const LIST_TINT: u8 = 0xA8;
 /// At most this many file rows (the full window has the rest).
@@ -100,6 +102,15 @@ pub struct Popup {
     /// activation messages while the popup is shown or hidden) does nothing.
     toggling: Cell<bool>,
     hidden_at: Cell<Option<Instant>>,
+    /// The indexing progress line under the results while indexing runs
+    /// (`ui/indexing.rs`), and its height (physical px, 0 without one).
+    note: RefCell<Option<String>>,
+    note_h: Cell<i32>,
+    /// The typed text matched no file: while the names are still being
+    /// scanned the line leads with "results may be incomplete while indexing".
+    no_files: Cell<bool>,
+    /// The drive scan is not done, so name results may be incomplete.
+    names_incomplete: Cell<bool>,
 }
 
 /// File rows of the latest finished search.
@@ -635,6 +646,8 @@ impl App {
             let done = f.done && f.query == query;
             (f.rows.clone(), done, if done { f.did_you_mean.clone() } else { None })
         };
+        self.popup.no_files.set(!query.trim().is_empty() && files.is_empty());
+        let note = self.popup_note_text();
         let mut rows = if query.trim().is_empty() {
             // The empty box: favourites, then the files opened lately.
             crate::suggest::empty_rows(pins, self.popup_recent_rows())
@@ -660,7 +673,8 @@ impl App {
         let look = self.popup.look.borrow();
         let m = metrics(look.scale);
         let work = self.popup.work.get();
-        let max_list = (work.height() - px(STRIP_H, look.scale) - px(24, look.scale)).max(m.row * 3);
+        let note_h = if note.is_some() { px(NOTE_H, look.scale) } else { 0 };
+        let max_list = (work.height() - px(STRIP_H, look.scale) - px(24, look.scale) - note_h).max(m.row * 3);
         quick::fit_rows(&mut rows, &m, max_list);
         let groups: Vec<Group> = rows.iter().map(|r| r.group).collect();
         let (slots, mut list_h) = quick::layout_list(&groups, &m);
@@ -668,6 +682,11 @@ impl App {
             // The hint line.
             list_h = px(44, look.scale);
         }
+        // The indexing progress, under the results.
+        list_h += note_h;
+        ui_test_note(note.as_deref());
+        *self.popup.note.borrow_mut() = note;
+        self.popup.note_h.set(note_h);
         let scale = look.scale;
         drop(look);
         let previous = self.popup.selected.get().and_then(|i| self.popup.rows.borrow().get(i).map(|r| r.target.clone()));
@@ -678,6 +697,30 @@ impl App {
         self.popup.selected.set(selected);
         self.popup.list_h.set(list_h);
         self.popup_resize(list_h + px(STRIP_H, scale));
+    }
+
+    /// The progress line under the results while indexing runs (the
+    /// counters are read in `ui/indexing.rs`), or `None`.
+    fn popup_note_text(&self) -> Option<String> {
+        let state = self.indexing();
+        self.popup.names_incomplete.set(state.names_incomplete());
+        crate::indexing_status::popup_note(crate::i18n::current(), state, self.popup.no_files.get(), &super::format::fmt_num)
+    }
+
+    /// The indexing progress changed: redraws the open popup's line, or
+    /// lays the popup out again when the line appears or goes.
+    pub(super) fn popup_indexing_changed(&self) {
+        if !self.quick_visible() {
+            return;
+        }
+        let note = self.popup_note_text();
+        if note.is_some() != self.popup.note.borrow().is_some() {
+            self.popup_refresh();
+            return;
+        }
+        ui_test_note(note.as_deref());
+        *self.popup.note.borrow_mut() = note;
+        unsafe { InvalidateRect(self.popup_hwnd(), std::ptr::null(), 0) };
     }
 
     /// Gives the popup `height` (keeping its anchored edge) and lays out the
@@ -870,6 +913,9 @@ impl App {
         let p = &look.palette;
         let rtl = rtl();
         let list_h = self.popup.list_h.get().min(h);
+        let note = self.popup.note.borrow();
+        let note_h = self.popup.note_h.get().min(list_h);
+        let names_incomplete = note.is_some() && self.popup.names_incomplete.get();
         let opaque = !look.backdrop;
 
         // Backgrounds: the list (solid, or clear for the backdrop), the
@@ -881,7 +927,7 @@ impl App {
         let mut base = vec![list_bg; (w * h) as usize];
         let strip = quick::premul(p.background, 255);
         base[(list_h * w) as usize..].fill(strip);
-        if !rows.is_empty() && list_h > 0 && list_h < h {
+        if (!rows.is_empty() || note.is_some()) && list_h > 0 && list_h < h {
             let line = quick::premul(p.line, 255);
             base[((list_h - 1) * w) as usize..(list_h * w) as usize].fill(line);
         }
@@ -912,13 +958,22 @@ impl App {
         surface::compose(canvas, &base, opaque, &|dc| {
             if rows.is_empty() {
                 let hint = tr!("اكتب للبحث في الملفات والتطبيقات والإعدادات", "Type to search files, apps and settings");
-                surface::draw_text(dc, &look.small, p.muted, hint, &Rect::at(tx, 0, text_w, list_h), rtl, false);
+                surface::draw_text(dc, &look.small, p.muted, hint, &Rect::at(tx, 0, text_w, list_h - note_h), rtl, false);
+            }
+            if let Some(text) = note.as_deref() {
+                surface::draw_text(dc, &look.small, p.muted, text, &Rect::at(tx, list_h - note_h, text_w, note_h), rtl, false);
             }
             for slot in slots.iter() {
                 match slot.kind {
                     SlotKind::Header(g) => {
                         let r = Rect::at(quick::mirror_x(px(16, s), w - px(32, s), w, rtl), slot.y, w - px(32, s), slot.h);
-                        surface::draw_text(dc, &look.header, p.muted, group_label(g), &r, rtl, false);
+                        // Not a plain "No results" while the index is not complete.
+                        let label = if g == Group::Suggest && names_incomplete {
+                            crate::indexing_status::incomplete_try(crate::i18n::current())
+                        } else {
+                            group_label(g)
+                        };
+                        surface::draw_text(dc, &look.header, p.muted, label, &r, rtl, false);
                     }
                     SlotKind::Separator => {}
                     SlotKind::Row(i) => {
@@ -1413,6 +1468,17 @@ fn ui_test_dump(query: &str, rows: &[Row]) {
     if let Ok(mut f) = std::fs::File::create(path) {
         let _ = f.write_all(text.as_bytes());
     }
+}
+
+/// Like [`ui_test_dump`]: the indexing progress line, in `quick-note.txt`
+/// (empty without one). A file of its own, so the test's row matching
+/// (`*4*` for "2+2") can never match a count in it.
+fn ui_test_note(note: Option<&str>) {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if !*ON.get_or_init(|| std::env::var_os("BAHTH_UI_TEST").is_some()) {
+        return;
+    }
+    let _ = std::fs::write(crate::index::cache_path().with_file_name("quick-note.txt"), note.unwrap_or_default());
 }
 
 #[cfg(test)]

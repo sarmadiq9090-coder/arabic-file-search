@@ -32,6 +32,25 @@ pub(super) fn shared() -> Option<&'static ContentCache> {
         .as_ref()
 }
 
+/// A content-index warm-up: what stops it and how far it got, shared with
+/// its thread so the window can show the progress (`ui/indexing.rs`).
+#[derive(Default)]
+pub(super) struct Warm {
+    pub(super) cancel: AtomicBool,
+    pub(super) progress: WarmProgress,
+    /// Its thread has ended: all done, stopped, or no store to fill.
+    pub(super) finished: AtomicBool,
+}
+
+/// Marks a warm-up finished however its thread ends, a panic included.
+struct Finished(Arc<Warm>);
+
+impl Drop for Finished {
+    fn drop(&mut self) {
+        self.0.finished.store(true, Ordering::Relaxed);
+    }
+}
+
 /// Lowest CPU priority, and low disk priority where Windows supports it.
 fn idle_priority() {
     use winapi::um::processthreadsapi::{GetCurrentThread, SetThreadPriority};
@@ -45,18 +64,21 @@ fn idle_priority() {
 
 impl App {
     /// (Re)starts filling the content index from the current file index,
-    /// unless the user switched it off. Shows nothing while it runs.
+    /// unless the user switched it off. Its progress shows in the status bar
+    /// (`poll_indexing`).
     pub(super) fn start_warm(&self) {
         self.stop_warm();
         let mut st = self.state.borrow_mut();
         if !st.settings.content_index {
             return;
         }
-        let cancel = Arc::new(AtomicBool::new(false));
-        st.warm = Some(cancel.clone());
+        let job = Arc::new(Warm::default());
+        st.warm = Some(job.clone());
         let index = st.index.clone();
         drop(st);
         crate::crash_log::spawn_named("content-warm", move || {
+            let finished = Finished(job.clone());
+            let (cancel, progress) = (&job.cancel, &job.progress);
             idle_priority();
             // Only the documents are needed. Letting go of the index at once
             // matters: while another holder shares it, every change found by
@@ -77,9 +99,8 @@ impl App {
             }
             let Some(cache) = shared() else { return };
             let started = Instant::now();
-            let progress = WarmProgress::default();
             let threads = content_cache::warm_threads();
-            content_cache::warm(&docs, cache, &progress, &cancel, threads, &idle_priority);
+            content_cache::warm(&docs, cache, progress, cancel, threads, &idle_priority);
             let s = cache.stats();
             log(&format!(
                 "content index warm: {} of {} new documents in {} ms on {threads} threads{}; stored {} ({} with text), {} KB{}",
@@ -92,12 +113,13 @@ impl App {
                 s.bytes / 1024,
                 if s.full { ", full" } else { "" }
             ));
+            drop(finished);
         });
     }
 
     pub(super) fn stop_warm(&self) {
-        if let Some(cancel) = self.state.borrow_mut().warm.take() {
-            cancel.store(true, Ordering::Relaxed);
+        if let Some(job) = self.state.borrow_mut().warm.take() {
+            job.cancel.store(true, Ordering::Relaxed);
         }
     }
 
