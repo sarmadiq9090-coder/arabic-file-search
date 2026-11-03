@@ -76,15 +76,7 @@ pub(super) fn fmt_bytes(size: u64) -> String {
 }
 
 pub(super) fn fmt_num(n: usize) -> String {
-    let s = n.to_string();
-    let mut out = String::new();
-    for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(c);
-    }
-    digits(out)
+    digits(crate::indexing_status::group_digits(n))
 }
 
 /// Quotes a CSV cell, and stops Excel from reading a cell that starts with

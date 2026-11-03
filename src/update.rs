@@ -51,6 +51,7 @@ pub struct Release {
     pub exe_url: String,
     pub exe_size: u64,
     /// SHA-256 of the program as hex, when GitHub publishes one (`digest`).
+    /// Installing requires it (`required_sha256`).
     pub sha256: Option<String>,
 }
 
@@ -58,6 +59,107 @@ pub struct Release {
 /// (it allows only 60 calls an hour per address without a login).
 #[cfg(windows)]
 pub const LATEST_PAGE_URL: &str = "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest";
+/// GitHub API endpoint for one release, by tag (appended). Gives the SHA-256
+/// of a release that was found through the web page.
+#[cfg(windows)]
+pub const RELEASE_BY_TAG_URL: &str = "https://api.github.com/repos/sarmadiq9090-coder/arabic-file-search/releases/tags/";
+/// Where users download the program by hand when the updater refuses a release.
+pub const MANUAL_DOWNLOAD_URL: &str = "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest";
+
+/// The SHA-256 the downloaded program must match. Fails closed: a release
+/// without a checksum (GitHub's `digest`) is never installed, because nothing
+/// would show that the file is the one that was published.
+pub fn required_sha256(rel: &Release) -> Result<&str, String> {
+    rel.sha256.as_deref().ok_or_else(missing_digest_message)
+}
+
+/// Why a release without a checksum is refused, and where to get it by hand.
+pub fn missing_digest_message() -> String {
+    trf!(
+        "لا يمكن التحقق من هذا التحديث: لم ينشر GitHub بصمة SHA-256 لملف البرنامج، لذلك لم يُثبَّت.\nيمكنك تنزيل الإصدار الجديد يدوياً من:\n{}",
+        "This update cannot be verified: GitHub published no SHA-256 checksum for the program file, so it was not installed.\nYou can download the new version by hand from:\n{}",
+        MANUAL_DOWNLOAD_URL
+    )
+}
+
+/// A package manager that installed this copy and so owns its updates.
+/// Replacing the exe behind its back breaks its records (version, hash,
+/// winget's uninstall entry), so the self-updater stays out of the way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackageManager {
+    Scoop,
+    Winget,
+}
+
+impl PackageManager {
+    pub fn name(self) -> &'static str {
+        match self {
+            PackageManager::Scoop => "Scoop",
+            PackageManager::Winget => "winget",
+        }
+    }
+
+    /// The command that updates InstaFind (`bucket/instafind.json`, `Sarmad.InstaFind`).
+    pub fn update_command(self) -> &'static str {
+        match self {
+            PackageManager::Scoop => "scoop update instafind",
+            PackageManager::Winget => "winget upgrade Sarmad.InstaFind",
+        }
+    }
+}
+
+/// Which package manager installed the program at `exe`, judged by where it
+/// lives; `var` reads an environment variable. Case-insensitive.
+/// - Scoop: `apps\` or `shims\` under `%SCOOP%`, `%USERPROFILE%\scoop`, and
+///   the global `%SCOOP_GLOBAL%` / `%ProgramData%\scoop`.
+/// - winget: `Packages\` (portable installs) or `Links\` (their command
+///   shims) under `%LOCALAPPDATA%\Microsoft\WinGet`, and the machine-wide
+///   `%ProgramFiles%\WinGet` / `%ProgramFiles(x86)%\WinGet`.
+pub fn package_manager_for(exe: &str, var: impl Fn(&str) -> Option<String>) -> Option<PackageManager> {
+    fn norm(p: &str) -> String {
+        let p = p.replace('/', "\\");
+        let p = p.strip_prefix(r"\\?\").unwrap_or(&p);
+        p.trim_end_matches('\\').to_lowercase()
+    }
+    let exe = norm(exe);
+    // An unset or empty variable is no root (`\scoop` is not a Scoop folder).
+    let var = |k: &str| var(k).filter(|v| !norm(v).is_empty());
+    // True when `exe` is a file somewhere below `<root>\<sub>\`.
+    let below = |root: &Option<String>, sub: &str| {
+        let Some(root) = root.as_deref().map(norm).filter(|r| !r.is_empty()) else { return false };
+        let dir = format!("{root}\\{}\\", sub.to_lowercase());
+        exe.len() > dir.len() && exe.starts_with(&dir)
+    };
+    let scoop = [
+        var("SCOOP"),
+        var("USERPROFILE").map(|h| format!("{h}\\scoop")),
+        var("SCOOP_GLOBAL"),
+        var("ProgramData").map(|d| format!("{d}\\scoop")),
+    ];
+    if scoop.iter().any(|r| below(r, "apps") || below(r, "shims")) {
+        return Some(PackageManager::Scoop);
+    }
+    let winget = [
+        var("LOCALAPPDATA").map(|d| format!("{d}\\Microsoft\\WinGet")),
+        var("ProgramFiles").map(|d| format!("{d}\\WinGet")),
+        var("ProgramFiles(x86)").map(|d| format!("{d}\\WinGet")),
+    ];
+    if winget.iter().any(|r| below(r, "Packages") || below(r, "Links")) {
+        return Some(PackageManager::Winget);
+    }
+    None
+}
+
+/// What the user is told instead of a self-update when a package manager
+/// installed this copy.
+pub fn managed_message(pm: PackageManager) -> String {
+    trf!(
+        "هذه النسخة مثبّتة عبر {0}، لذلك يحدّثها {0} ولا يحدّث البرنامج نفسه بنفسه.\nللتحديث، شغّل هذا الأمر في الطرفية (Terminal):\n{1}",
+        "This copy was installed with {0}, so it is updated by {0}, not by the program itself.\nTo update, run this in a terminal:\n{1}",
+        pm.name(),
+        pm.update_command()
+    )
+}
 
 /// The tag in a ".../releases/tag/<tag>" address (where LATEST_PAGE_URL
 /// leads), if any.
@@ -570,6 +672,33 @@ mod win {
         parse_release(&text, env!("CARGO_PKG_VERSION"))
     }
 
+    /// The SHA-256 GitHub publishes for this CPU's program in release `tag`,
+    /// if the API answers (it may still be rate-limited).
+    fn fetch_sha256(tag: &str) -> Option<String> {
+        if tag.is_empty() || !tag.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-') {
+            return None;
+        }
+        let body = fetch_json(&format!("{RELEASE_BY_TAG_URL}{tag}"), MAX_JSON as u64).ok()?;
+        let rel = parse_release(std::str::from_utf8(&body).ok()?, env!("CARGO_PKG_VERSION")).ok()??;
+        (rel.tag == tag).then_some(rel.sha256).flatten()
+    }
+
+    /// The package manager that installed this copy, if any (then it, not
+    /// the self-updater, updates the program). Both the path the program was
+    /// started by (a winget `Links` shim) and the resolved one are checked.
+    pub fn managed_by() -> Option<PackageManager> {
+        static PM: OnceLock<Option<PackageManager>> = OnceLock::new();
+        *PM.get_or_init(|| {
+            let var = |k: &str| std::env::var(k).ok();
+            let started = std::env::current_exe().ok();
+            let resolved = original_exe().ok().map(Path::to_path_buf);
+            started
+                .into_iter()
+                .chain(resolved)
+                .find_map(|p| package_manager_for(&p.to_string_lossy(), var))
+        })
+    }
+
     /// GETs a small JSON document of at most `max` bytes (the exchange rates
     /// of the currency answers), with the same connection settings as the
     /// update check.
@@ -593,6 +722,17 @@ mod win {
     /// running exe (which is kept as `bahth.exe.old` until the next start).
     /// `progress(done, total)` is called as bytes arrive. Does not restart.
     pub fn download_and_install(rel: &Release, progress: impl Fn(u64, u64)) -> Result<(), String> {
+        if let Some(pm) = managed_by() {
+            return Err(managed_message(pm));
+        }
+        // Found through the web page (API rate-limited): ask the API once
+        // more, for this release only, for the checksum. Without it, refuse.
+        let mut rel = rel.clone();
+        if rel.sha256.is_none() {
+            rel.sha256 = fetch_sha256(&rel.tag);
+        }
+        required_sha256(&rel)?;
+        let rel = &rel;
         let exe = original_exe()?.to_path_buf();
         let new = sibling(&exe, ".new");
         let old = sibling(&exe, ".old");
@@ -642,11 +782,10 @@ mod win {
         file.sync_all().map_err(|e| format!("cannot write the update: {e}"))?;
         drop(file);
 
-        if let Some(want) = &rel.sha256 {
-            let got: String = sha2::Digest::finalize(hasher).iter().map(|b| format!("{b:02x}")).collect();
-            if &got != want {
-                return Err(tr!("الملف الذي نُزّل لا يطابق بصمة الإصدار (SHA-256)", "the downloaded file does not match the release checksum (SHA-256)").into());
-            }
+        let want = required_sha256(rel)?;
+        let got: String = sha2::Digest::finalize(hasher).iter().map(|b| format!("{b:02x}")).collect();
+        if got != want {
+            return Err(tr!("الملف الذي نُزّل لا يطابق بصمة الإصدار (SHA-256)", "the downloaded file does not match the release checksum (SHA-256)").into());
         }
         let size = fs::metadata(new).map_err(|e| e.to_string())?.len();
         if size != total.get() {
@@ -771,6 +910,101 @@ mod tests {
         let with = SAMPLE.replace("\"size\": 4321000,", &format!("\"size\": 4321000, \"digest\": \"sha256:{h}\","));
         let r = parse_release(&with, "0.2.2").unwrap().unwrap();
         assert_eq!(r.sha256.as_deref(), Some("ab".repeat(32).as_str()));
+    }
+
+    #[test]
+    fn no_checksum_means_no_install() {
+        // GitHub gave no `digest`: refused, with the manual download link.
+        let r = parse_release(SAMPLE, "0.2.2").unwrap().unwrap();
+        let e = required_sha256(&r).unwrap_err();
+        assert!(e.contains(MANUAL_DOWNLOAD_URL) && e.contains("SHA-256"), "{e}");
+        assert_eq!(e, missing_digest_message());
+        // Found through the web page: no checksum either until the API gives one.
+        let r = release_from_tag("v0.4.1", "0.4.0").unwrap();
+        assert!(required_sha256(&r).is_err());
+        // A malformed digest is no digest.
+        for bad in ["sha256:abc", "md5:", "sha256:", &format!("sha1:{}", "a".repeat(64)), &format!("sha256:{}", "g".repeat(64))] {
+            let json = SAMPLE.replace("\"size\": 4321000,", &format!("\"size\": 4321000, \"digest\": \"{bad}\","));
+            let r = parse_release(&json, "0.2.2").unwrap().unwrap();
+            assert!(required_sha256(&r).is_err(), "{bad}");
+        }
+        // With one, it is what the download must match.
+        let h = "CD".repeat(32);
+        let json = SAMPLE.replace("\"size\": 4321000,", &format!("\"size\": 4321000, \"digest\": \"sha256:{h}\","));
+        let r = parse_release(&json, "0.2.2").unwrap().unwrap();
+        assert_eq!(required_sha256(&r), Ok("cd".repeat(32).as_str()));
+    }
+
+    /// A typical Windows environment for `package_manager_for`.
+    fn win_env(k: &str) -> Option<String> {
+        Some(
+            match k {
+                "USERPROFILE" => r"C:\Users\سرمد",
+                "LOCALAPPDATA" => r"C:\Users\سرمد\AppData\Local",
+                "ProgramData" => r"C:\ProgramData",
+                "ProgramFiles" => r"C:\Program Files",
+                "ProgramFiles(x86)" => r"C:\Program Files (x86)",
+                _ => return None,
+            }
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn scoop_installs_are_left_to_scoop() {
+        use PackageManager::Scoop;
+        let pm = |p: &str| package_manager_for(p, win_env);
+        assert_eq!(pm(r"C:\Users\سرمد\scoop\apps\instafind\current\bahth.exe"), Some(Scoop));
+        assert_eq!(pm(r"C:\Users\سرمد\scoop\apps\instafind\0.9.0\bahth.exe"), Some(Scoop));
+        assert_eq!(pm(r"c:\users\سرمد\SCOOP\Apps\instafind\current\BAHTH.EXE"), Some(Scoop));
+        assert_eq!(pm(r"\\?\C:\Users\سرمد\scoop\apps\instafind\current\bahth.exe"), Some(Scoop));
+        assert_eq!(pm("C:/Users/سرمد/scoop/apps/instafind/current/bahth.exe"), Some(Scoop));
+        assert_eq!(pm(r"C:\Users\سرمد\scoop\shims\instafind.exe"), Some(Scoop));
+        assert_eq!(pm(r"C:\ProgramData\scoop\apps\instafind\current\bahth.exe"), Some(Scoop));
+        // A custom Scoop folder ($env:SCOOP, with a trailing backslash).
+        let custom = |k: &str| if k == "SCOOP" { Some(r"D:\Tools\Scoop\".to_string()) } else { win_env(k) };
+        assert_eq!(package_manager_for(r"D:\Tools\Scoop\apps\instafind\current\bahth.exe", custom), Some(Scoop));
+        let global = |k: &str| if k == "SCOOP_GLOBAL" { Some(r"E:\GlobalScoop".to_string()) } else { None };
+        assert_eq!(package_manager_for(r"E:\GlobalScoop\apps\instafind\current\bahth.exe", global), Some(Scoop));
+        // Look-alikes are not Scoop.
+        assert_eq!(pm(r"C:\Users\سرمد\scoop\apps2\bahth.exe"), None);
+        assert_eq!(pm(r"C:\Users\سرمد\scoop\bahth.exe"), None);
+        assert_eq!(pm(r"C:\Users\سرمد\scoop\apps"), None);
+        assert_eq!(pm(r"C:\Users\سرمد\Downloads\scoop\apps\bahth.exe"), None);
+        assert_eq!(pm(r"D:\Tools\Scoop\apps\instafind\current\bahth.exe"), None);
+    }
+
+    #[test]
+    fn winget_installs_are_left_to_winget() {
+        use PackageManager::Winget;
+        let pm = |p: &str| package_manager_for(p, win_env);
+        assert_eq!(
+            pm(r"C:\Users\سرمد\AppData\Local\Microsoft\WinGet\Packages\Sarmad.InstaFind_Microsoft.Winget.Source_8wekyb3d8bbwe\bahth.exe"),
+            Some(Winget)
+        );
+        assert_eq!(pm(r"C:\Users\سرمد\AppData\Local\Microsoft\WinGet\Links\instafind.exe"), Some(Winget));
+        assert_eq!(pm(r"c:\users\سرمد\appdata\local\microsoft\winget\links\bahth.exe"), Some(Winget));
+        assert_eq!(pm(r"C:\Program Files\WinGet\Packages\Sarmad.InstaFind_x\bahth.exe"), Some(Winget));
+        assert_eq!(pm(r"C:\Program Files (x86)\WinGet\Links\instafind.exe"), Some(Winget));
+        // The ordinary portable copy, and look-alikes, update themselves.
+        assert_eq!(pm(r"C:\Users\سرمد\Downloads\bahth.exe"), None);
+        assert_eq!(pm(r"C:\Users\سرمد\Desktop\WinGet\Packages\bahth.exe"), None);
+        assert_eq!(pm(r"C:\Users\سرمد\AppData\Local\Microsoft\WinGet\bahth.exe"), None);
+        assert_eq!(pm(r"C:\Users\سرمد\AppData\Local\Microsoft\WinGetX\Packages\bahth.exe"), None);
+        assert_eq!(pm(r"C:\Program Files\InstaFind\bahth.exe"), None);
+        assert_eq!(pm(""), None);
+        // No environment at all (empty or missing variables): nothing matches.
+        assert_eq!(package_manager_for(r"\scoop\apps\x\bahth.exe", |_| Some(String::new())), None);
+        assert_eq!(package_manager_for(r"C:\Users\x\scoop\apps\x\bahth.exe", |_| None), None);
+    }
+
+    #[test]
+    fn managed_message_names_the_update_command() {
+        for (pm, cmd) in [(PackageManager::Scoop, "scoop update instafind"), (PackageManager::Winget, "winget upgrade Sarmad.InstaFind")] {
+            let m = managed_message(pm);
+            assert!(m.contains(pm.name()) && m.contains(cmd), "{m}");
+            assert_eq!(pm.update_command(), cmd);
+        }
     }
 
     #[test]

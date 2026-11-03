@@ -20,6 +20,16 @@ impl App {
     /// Looks for a newer release on GitHub in the background. The automatic
     /// check runs at most once a day and stays silent unless it finds one.
     pub(super) fn check_for_update(&self, manual: bool) {
+        // Installed with winget or Scoop: they update it, never the program
+        // itself (that would break their records of the file).
+        if let Some(pm) = crate::update::managed_by() {
+            if manual {
+                log(&format!("update: skipped, installed with {}", pm.name()));
+                self.set_status(&trf!("يُحدَّث عبر {}.", "Updated by {}.", pm.name()));
+                nwg::modal_info_message(&self.window, title(), &crate::update::managed_message(pm));
+            }
+            return;
+        }
         if self.update_busy.replace(true) {
             if manual {
                 self.set_status(tr!("جاري التحقق من التحديثات…", "Checking for updates…"));

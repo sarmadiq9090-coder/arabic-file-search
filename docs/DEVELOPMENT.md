@@ -25,7 +25,7 @@ cargo build --release --target i686-pc-windows-gnu     # bahth-x86.exe (32-bit)
 
 Every push and pull request runs [`.github/workflows/build.yml`](../.github/workflows/build.yml): `cargo clippy --all-targets -D warnings` on Linux and Windows, `cargo test` (debug and release) on Linux and `cargo test --release` on Windows, then the gnu cross-builds of `bahth.exe` (x64) and `bahth-x86.exe` (32-bit), a native build and `cargo test --release` of `bahth-arm64.exe` on a `windows-11-arm` runner (MSVC, static CRT), and a smoke test of each exact exe on real Windows of its CPU (x86 under WOW64) ([`ci/smoke.ps1`](../ci/smoke.ps1)): the GUI indexes the runner's drives, the command line searches the index (Arabic, emoji, long names, filters), and any `crash.txt` or early exit fails the job.
 
-The `ui` job ([`ci/ui-test.ps1`](../ci/ui-test.ps1)) then uses the x64 exe like a person on a real Windows desktop. It types with real keystrokes and clicks with the mouse. It covers the first-run question, the floating box, Arabic and English searches (no hamza, wrong keyboard layout, Arabizi, typos), search inside documents, the right-click and Options menus, the Ctrl+Alt+F popup (apps by Arabic name, answers, Settings pages), the Arabic interface, the close button and Alt+F4 hiding to the tray, and repeated clicks on the floating box. **Core** checks fail the job. **Probe** checks report missing features (`MISS`) without failing it. The table goes to the job summary, and a screenshot of every step goes to the `ui-test` artifact. The popup draws its own rows, so when `BAHTH_UI_TEST` is set it writes them to `quick-rows.txt` for the test to read. The `release` job waits for `ui` as well as the build, test and smoke jobs.
+The `ui` job ([`ci/ui-test.ps1`](../ci/ui-test.ps1)) then uses the x64 exe like a person on a real Windows desktop. It types with real keystrokes and clicks with the mouse. It covers the first-run question, the floating box, Arabic and English searches (no hamza, wrong keyboard layout, Arabizi, typos), search inside documents, the right-click and Options menus, the Ctrl+Alt+F popup (apps by Arabic name, answers, Settings pages), the Arabic interface, the close button and Alt+F4 hiding to the tray, repeated clicks on the floating box, the indexing progress in the status bar, and a copy run from Downloads moving itself to `%LOCALAPPDATA%\Programs\InstaFind` (probes). **Core** checks fail the job. **Probe** checks report missing features (`MISS`) without failing it. The table goes to the job summary, and a screenshot of every step goes to the `ui-test` artifact. The popup draws its own rows, so when `BAHTH_UI_TEST` is set it writes them to `quick-rows.txt` (and its indexing progress line to `quick-note.txt`) for the test to read. The `release` job waits for `ui` as well as the build, test and smoke jobs.
 
 ## Releases
 
@@ -34,6 +34,8 @@ The `ui` job ([`ci/ui-test.ps1`](../ci/ui-test.ps1)) then uses the x64 exe like 
 3. Push to `main`. When the version has no tag yet and the smoke test passed, the `release` job publishes the very `bahth.exe`, `bahth-x86.exe` and `bahth-arm64.exe` the smoke tests ran, creates the tag and marks the GitHub Release as *latest*.
 
 The in-app updater (`src/update.rs`) reads the latest release and downloads the asset for its own CPU: exactly **`bahth.exe`** on x64 (every installed copy since 0.3.0 looks for that name, so never rename it), `bahth-x86.exe` on 32-bit and `bahth-arm64.exe` on ARM64 (`ASSET_NAME`). Keep those names, keep releases out of draft/prerelease, and keep the repository URL. Editing a `releases/*-notes.md` file later re-syncs that release's title and body ([`release-notes.yml`](../.github/workflows/release-notes.yml)); assets are never touched.
+
+The updater fails closed: it installs a release only when GitHub publishes a SHA-256 `digest` for the asset (it does for every upload), and refuses it otherwise, pointing to the manual download. A copy installed with Scoop (under `%SCOOP%`/`%USERPROFILE%\scoop` `apps\` or `shims\`) or winget (under `...\WinGet\Packages\` or `Links\`) never updates itself: the manual check says to run `scoop update instafind` / `winget upgrade Sarmad.InstaFind` (`update::package_manager_for`).
 
 ## Code map
 
@@ -48,6 +50,8 @@ The in-app updater (`src/update.rs`) reads the latest release and downloads the 
 | `src/launcher/` | What the quick search finds besides files: apps, settings pages, open windows, answers, system commands, web shortcuts (the UI reaches its Windows-side parts through the thin `ui/launcher_shim.rs`) |
 | `src/i18n.rs` | Arabic/English strings side by side (`tr!`, `trf!`), language from the registry or Windows |
 | `src/index.rs` | Parallel drive indexing and the saved index (`%LOCALAPPDATA%\BahthSari\index.bin`) |
+| `src/indexing_status.rs`, `src/ui/indexing.rs` | First day: the indexing progress («جارِ الفهرسة… 36,000 من 432,000 ملف») in the status bar's last part and under the quick popup's results, and "results may be incomplete while indexing" instead of "no results"; read from the scan's and the content warm-up's own counters |
+| `src/relocate.rs`, `src/ui/relocate.rs` | First run from Downloads or a temp folder: the one-time offer to copy the exe to `%LOCALAPPDATA%\Programs\InstaFind\bahth.exe`, add a Start-menu shortcut, point start-with-Windows there and restart (`--moved`); never for winget, Scoop, Chocolatey or Program Files copies |
 | `src/watch.rs`, `src/watch_pace.rs` | Live index updates (ReadDirectoryChangesW), with paced rescans after lost events |
 | `src/search.rs`, `src/search/` | Query parsing, name and content search; `members.rs` one result per archive; `robustness.rs` fuzz-style tests |
 | `src/normalize.rs` | Arabic normalisation for matching (hamza, ta marbuta, alef maqsura, diacritics, tatweel, Persian letters, presentation forms) |
@@ -61,7 +65,7 @@ The in-app updater (`src/update.rs`) reads the latest release and downloads the 
 | `src/web.rs`, `src/ui/web_server.rs` | Read-only LAN search page for a phone, PIN-protected, off by default |
 | `src/thumb_cache.rs`, `src/draw.rs`, `src/dragdrop.rs`, `src/icon.rs` | Thumbnail LRU, match underline, drag & drop and clipboard, icons |
 | `src/history.rs`, `src/settings.rs` | Search history, saved searches, often-opened files, quick-search launch counts and pinned favourites (all in `history.json`); window, column and quick-search settings (`settings.txt`) |
-| `src/update.rs` | Auto-update from GitHub Releases (WinHTTP, SHA-256 check, fallback when the API is rate-limited) |
+| `src/update.rs` | Auto-update from GitHub Releases (WinHTTP, required SHA-256 check, fallback when the API is rate-limited, defers to winget/Scoop installs) |
 | `src/crash_log.rs` | Panic hook writing `log.txt` and `crash.txt` with a backtrace |
 | `src/feedback.rs` | Prefilled GitHub issue links (Options ▸ Send feedback) and the opt-in crash report offered at the next start; nothing is sent without the user (UI in `src/ui/feedback.rs`) |
 | `src/cli.rs` | `bahth.exe -s …` |
