@@ -414,7 +414,7 @@ impl App {
             trf!("أحجام المجلدات — {}", "Folder sizes — {}", name_of(&path))
         });
         d.total_label.set_text(&trf!(
-            "الحجم الكلي: {} في {} ملف · العناصر: {} · Backspace للرجوع، نقرتان للدخول",
+            "الحجم الكلي: {} · عدد الملفات: {} · العناصر: {} · Backspace للرجوع، نقرتان للدخول",
             "Total: {} in {} files · items: {} · Backspace goes up, double-click opens",
             fmt_bytes(total),
             fmt_num(files as usize),

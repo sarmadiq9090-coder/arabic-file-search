@@ -95,9 +95,18 @@ impl NativeUi<AppUi> for App {
         nwg::TextInput::builder()
             .parent(w)
             .font(Some(&app.query_font))
-            .placeholder_text(Some(tr!("اكتب اسم الملف أو كلمة للبحث…   أمثلة:  تقرير ‎.pdf   ·   عقد !قديم   ·   صورة|فيديو", "Type a file name or a word…   e.g.  report .pdf   ·   contract !old   ·   photo|video")))
             .focus(true)
             .build(&mut app.query)?;
+        // The hint, shown even while the box has focus (nwg's placeholder
+        // hides it then, and the box has focus from the start, so it was
+        // never seen), as the quick search's box does.
+        if let Some(h) = app.query.handle.hwnd() {
+            let cue = shell::wide(tr!(
+                "اكتب اسم الملف أو كلمة للبحث…   أمثلة:  تقرير ‎.pdf   ·   عقد !قديم   ·   صورة|فيديو",
+                "Type a file name or a word…   e.g.  report .pdf   ·   contract !old   ·   photo|video"
+            ));
+            unsafe { SendMessageW(h, winapi::um::commctrl::EM_SETCUEBANNER, 1, cue.as_ptr() as LPARAM) };
+        }
         nwg::Button::builder().parent(w).font(f).text(tr!("بحث", "Search")).build(&mut app.search_btn)?;
         nwg::Button::builder().parent(w).font(f).text(tr!("السجل", "History")).build(&mut app.history_btn)?;
         let kinds: Vec<&'static str> = search::KINDS.iter().zip(crate::i18n::KIND_LABELS_EN).map(|((label, _), en)| tr!(*label, en)).collect();

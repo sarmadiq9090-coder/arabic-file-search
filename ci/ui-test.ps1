@@ -317,16 +317,26 @@ Record 'start' 'core' 'main window appears' ($null -ne $main) ("{0:N0} ms" -f $m
 Record 'start' 'probe' 'window within 3 seconds' ($ms -lt 3000) ("{0:N0} ms" -f $ms)
 Shot 'first-start'
 
-# The one-time question about the box above the clock.
+# The one first-run question: the box above the clock (Yes/No) and a check
+# box for starting with Windows, unticked. A task dialog: its buttons are
+# not child windows, so it is driven with its own messages.
+$runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+Record 'first run' 'core' 'start with Windows is off before the user chooses' ($null -eq (Get-ItemProperty $runKey -Name BahthSari -ErrorAction SilentlyContinue))
 $dlg = Wait-Until { Visible-Window $p.Id '#32770' } 40
 Record 'first run' 'probe' 'asks about the search box above the clock' ($null -ne $dlg)
 if ($dlg) {
-    Note 'first run' 'question text' ((Get-Children $dlg.Handle | Where-Object { $_.Class -eq 'Static' -and $_.Text } | ForEach-Object Text) -join ' ')
+    Note 'first run' 'question title' $dlg.Text
     Shot 'first-run-question'
-    $yes = [U]::GetDlgItem($dlg.Handle, 6)
-    if ($yes -ne [IntPtr]::Zero) { [void][U]::PostMessage($yes, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero) } else { Focus-Window $dlg.Handle; [U]::Chord($VK.ENTER) }
+    $TDM_CLICK_BUTTON = 0x0400 + 102; $TDM_CLICK_VERIFICATION = 0x0400 + 113
+    [void][U]::SendMessage($dlg.Handle, $TDM_CLICK_VERIFICATION, [IntPtr]1, [IntPtr]0)   # tick "Start with Windows"
+    Start-Sleep -Milliseconds 300
+    Shot 'first-run-question-ticked'
+    [void][U]::PostMessage($dlg.Handle, $TDM_CLICK_BUTTON, [IntPtr]6, [IntPtr]0)          # Yes (IDYES)
     $box = Wait-Until { Visible-Window $p.Id 'InstaFindFloatingBox' } 10
+    if (-not $box -and (Visible-Window $p.Id '#32770')) { Focus-Window $dlg.Handle; [U]::Chord($VK.ENTER); $box = Wait-Until { Visible-Window $p.Id 'InstaFindFloatingBox' } 10 }
     Record 'floating box' 'core' 'appears after answering Yes' ($null -ne $box)
+    $run = Get-ItemProperty $runKey -Name BahthSari -ErrorAction SilentlyContinue
+    Record 'first run' 'core' 'ticking "Start with Windows" turns it on' ($run -and $run.BahthSari -match '--startup') $(if ($run) { $run.BahthSari } else { 'no Run entry' })
     Shot 'floating-box'
 }
 Check-Crash 'first start'

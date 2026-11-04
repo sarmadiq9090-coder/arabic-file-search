@@ -4,7 +4,7 @@
 
 <h1 align="center">InstaFind — بحث سريع</h1>
 
-<p align="center"><b>أسرع طريقة لإيجاد أي ملف على ويندوز، بالعربية والإنكليزية، وحتى داخل المستندات.</b><br><b dir="ltr">Find any file on Windows as you type, in Arabic or English, even inside documents.</b></p>
+<p align="center"><b>أسرع طريقة لإيجاد أي ملف على ويندوز، بالعربية والإنجليزية، وحتى داخل المستندات.</b><br><b dir="ltr">Find any file on Windows as you type, in Arabic or English, even inside documents.</b></p>
 
 <p align="center">
 <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest"><img src="https://img.shields.io/github/v/release/sarmadiq9090-coder/arabic-file-search?label=%D8%A7%D9%84%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1&color=2f81f7" alt="الإصدار / Release"></a>
@@ -37,6 +37,14 @@
    - لأجهزة ARM64 (مثل Snapdragon) نزّل [`bahth-arm64.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-arm64.exe)، ولويندوز 32 بت نزّل [`bahth-x86.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-x86.exe). كل نسخة تحدّث نفسها بنسختها.
 2. ضعه في مجلد دائم، مثلاً `%LOCALAPPDATA%\Programs\Bahth\` (هذا المسار تستعمله إضافات `integrations/`)، ثم شغّله.
 3. إن ظهر تحذير SmartScreen لأن الملف غير موقّع رقمياً: «مزيد من المعلومات» ← «تشغيل على أي حال».
+
+**التحقق من الملف** (اختياري، من الإصدار 0.9.2): كل إصدار ينشر بجانب الملفات [`SHA256SUMS.txt`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/SHA256SUMS.txt) فيه بصمة SHA-256 لكل ملف. نزّله في مجلد الملف نفسه، ثم شغّل في PowerShell هناك:
+
+```powershell
+Get-Content SHA256SUMS.txt | ForEach-Object { $h, $f = $_ -split '\s+', 2; if (Test-Path $f) { "${f}: " + $(if ((Get-FileHash $f -Algorithm SHA256).Hash -eq $h) { 'OK' } else { 'MISMATCH' }) } }
+```
+
+يجب أن يظهر `OK` بجانب الملف. (في Git Bash أو لينكس: `sha256sum -c --ignore-missing SHA256SUMS.txt`.)
 
 أو ثبّته بأمر واحد عبر [Scoop](https://scoop.sh):
 
@@ -114,8 +122,8 @@ scoop install instafind
 - **سطر الأوامر** و**إضافة Flow Launcher** وأمثلة PowerShell وAutoHotkey.
 
 ### الراحة
-- **واجهة عربية أو إنكليزية**: تتبع لغة ويندوز، وتُغيَّر من «خيارات ← Language / اللغة».
-- **يعمل مع ويندوز** في الخلفية، وEsc أو زر الإغلاق يخفيانه إلى الأيقونة بجانب الساعة (للخروج: «خروج» من قائمة الأيقونة)، ونسخة واحدة فقط منه.
+- **واجهة عربية أو إنجليزية**: تتبع لغة ويندوز، وتُغيَّر من «خيارات ← Language / اللغة».
+- **يعمل مع ويندوز** في الخلفية إن اخترت ذلك (في سؤال أول تشغيل أو من «خيارات…»؛ مطفأ ما لم تشغّله)، وEsc أو زر الإغلاق يخفيانه إلى الأيقونة بجانب الساعة (للخروج: «خروج» من قائمة الأيقونة)، ونسخة واحدة فقط منه.
 - تواريخ نسبية («أمس»، «قبل 5 دقائق»)، وخيار الأرقام العربية، وأيقونات أنواع الملفات.
 - أي خطأ داخلي يُسجَّل في `log.txt` و`crash.txt` ولا يُغلق البرنامج.
 
@@ -210,6 +218,14 @@ InstaFind is a free, open-source file search tool for Windows, written in Rust. 
 2. Put it in a permanent folder, for example `%LOCALAPPDATA%\Programs\Bahth\` (the path the `integrations/` plugins expect), and run it.
 3. If SmartScreen warns because the file is not code-signed: **More info → Run anyway**.
 
+**Verify the download** (optional, from 0.9.2): every release also publishes [`SHA256SUMS.txt`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/SHA256SUMS.txt) with the SHA-256 of each file. Save it next to the exe and run in PowerShell in that folder:
+
+```powershell
+Get-Content SHA256SUMS.txt | ForEach-Object { $h, $f = $_ -split '\s+', 2; if (Test-Path $f) { "${f}: " + $(if ((Get-FileHash $f -Algorithm SHA256).Hash -eq $h) { 'OK' } else { 'MISMATCH' }) } }
+```
+
+It should print `OK` for the file. (In Git Bash or on Linux: `sha256sum -c --ignore-missing SHA256SUMS.txt`.)
+
 Or install it with [Scoop](https://scoop.sh):
 
 ```powershell
@@ -286,7 +302,7 @@ InstaFind's second includes starting the command-line tool and loading the index
 
 #### Comfort
 - **English or Arabic interface**: follows the Windows display language; switch in **Options → Language / اللغة**.
-- **Starts with Windows** in the background; Esc or the close button hides it to the tray (quit with *Exit* in the tray menu), single instance.
+- **Starts with Windows** in the background if you choose so (in the first-run question or in **Options…**; off unless you turn it on); Esc or the close button hides it to the tray (quit with *Exit* in the tray menu), single instance.
 - Relative dates, optional Arabic digits, file-type icons.
 - Internal errors are written to `log.txt` and `crash.txt` instead of closing the app.
 

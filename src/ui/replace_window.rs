@@ -295,7 +295,7 @@ impl App {
                 }
                 nwg::Event::OnTimerTick if handle == app.timer && r.state.borrow().busy => {
                     let n = r.progress.load(Ordering::Relaxed);
-                    r.set_status(&trf!("جارٍ العمل… ({} ملف)", "Working… ({} files)", fmt_num(n)));
+                    r.set_status(&trf!("جارٍ العمل… (عدد الملفات: {})", "Working… ({} files)", fmt_num(n)));
                 }
                 _ => {}
             }
@@ -366,7 +366,7 @@ impl App {
                 trf!("سيُبحث في {} ملفاً نصياً من النتائج الحالية.", "{} plain text files from the current results will be searched.", fmt_num(n))
             };
             if others > 0 {
-                msg.push_str(&trf!(" ({} نتيجة أخرى ليست ملفات نصية عادية وستُترك.)", " ({} other results are not plain text files and are left alone.)", fmt_num(others)));
+                msg.push_str(&trf!(" (نتائج أخرى ليست ملفات نصية عادية وستُترك، عددها: {}.)", " ({} other results are not plain text files and are left alone.)", fmt_num(others)));
             }
             r.set_status(&msg);
         }
@@ -528,7 +528,7 @@ impl App {
                     fmt_num(none)
                 );
                 if skipped_n > 0 {
-                    msg.push_str(&trf!(" تُركت {} ملفات (السبب في القائمة).", " {} files skipped (reason in the list).", fmt_num(skipped_n)));
+                    msg.push_str(&trf!(" الملفات المتروكة: {} (السبب في القائمة).", " {} files skipped (reason in the list).", fmt_num(skipped_n)));
                 }
                 r.set_status(&msg);
                 let mut st = r.state.borrow_mut();

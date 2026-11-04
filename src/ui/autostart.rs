@@ -13,13 +13,10 @@ use super::shell::wide;
 
 const RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const VALUE: &str = "BahthSari";
-/// Remembers that the user has been given the default once, so turning it
-/// off is respected.
+/// The program's own key; `AutostartChosen` there records that the user
+/// chose (kept for older versions, which read it).
 pub(super) const OWN_KEY: &str = "Software\\BahthSari";
 const CHOSEN: &str = "AutostartChosen";
-/// Set once 0.8.1 has turned starting with Windows back on (the user asked
-/// for it to be on); after that the user's choice counts again.
-const RESET_081: &str = "Autostart081";
 /// Where Task Manager's "Startup apps" page keeps apps it turned off.
 const APPROVED_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
 
@@ -151,18 +148,14 @@ pub fn point_to(exe: &std::path::Path) -> bool {
     !has_value(&key, VALUE) || set_string(&key, VALUE, &command(exe))
 }
 
-/// On by default: the first run turns it on once; after that only the user's
-/// choice counts. A stale path (the exe moved) is refreshed.
+/// Off by default: only the user turns it on, in the first-run question
+/// (`tray::ask_first_run`) or in Options. Up to 0.9.1 the first run turned
+/// it on by itself; an entry that is on stays on and is pointed at this exe
+/// again, in case it moved.
 pub fn apply_default() {
-    let own = open(OWN_KEY, false);
-    let chosen = own.as_ref().is_some_and(|k| has_value(k, CHOSEN));
-    // 0.8.1 turns it on once more, for those who had it off without meaning to.
-    let reset_done = own.as_ref().is_some_and(|k| has_value(k, RESET_081));
-    drop(own);
-    if !chosen || !reset_done || is_enabled() {
-        set_enabled(true);
-    }
-    if !reset_done && let Some(own) = open(OWN_KEY, true) {
-        set_string(&own, RESET_081, "1");
+    if is_enabled()
+        && let Ok(exe) = std::env::current_exe()
+    {
+        point_to(&exe);
     }
 }

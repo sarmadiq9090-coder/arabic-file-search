@@ -102,9 +102,10 @@ if (-not $gui.HasExited) {
         Write-Host '::warning::no main window handle; skipped the close-button check'
     }
 }
-# Starting with Windows is on by default.
+# Starting with Windows is off until the user turns it on (the first-run
+# question, left unanswered here, or Options).
 $run = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name BahthSari -ErrorAction SilentlyContinue
-if (-not $run -or $run.BahthSari -notmatch '--startup') { Fail 'start with Windows was not turned on' }
+if ($run) { Fail "start with Windows was turned on without the user: $($run.BahthSari)" }
 if (Test-Path $crash) { Fail "crash report written:"; Get-Content $crash | Write-Host }
 if (-not $gui.HasExited) { Stop-Process -Id $gui.Id -Force }
 if ($failed) { exit 1 }

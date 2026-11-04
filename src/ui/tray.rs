@@ -307,24 +307,37 @@ impl App {
         // Not while a message box of the window is open (the crash report
         // offer, say): its modal loop keeps this tick running.
         if !asked && tick >= 14 && self.crash_checked.get() && self.window.visible() && self.window.enabled() {
-            self.ask_floating_once();
+            self.ask_first_run();
         }
     }
 
-    fn ask_floating_once(&self) {
+    /// The one first-run question: the box above the clock (Yes / No) and,
+    /// in the same dialog, a check box for starting with Windows, unticked
+    /// unless it is already on (the user turns it on, never the program).
+    fn ask_first_run(&self) {
         self.state.borrow_mut().settings.floating_asked = true;
         self.save_settings();
-        let params = nwg::MessageParams {
-            title: title(),
-            content: tr!(
-                "هل تريد خانة البحث الصغيرة فوق الساعة؟ تقدر تغيّر هذا لاحقًا من الإعدادات.",
-                "Would you like the small search box above the clock? You can change this later in Options."
-            ),
-            buttons: nwg::MessageButtons::YesNo,
-            icons: nwg::MessageIcons::Question,
+        let startup_was = autostart::is_enabled();
+        let (yes, startup) = match self.first_run_dialog(startup_was) {
+            Some(answer) => answer,
+            None => {
+                // No task dialog (comctl32 6 missing): the box question alone.
+                let params = nwg::MessageParams {
+                    title: title(),
+                    content: tr!(
+                        "هل تريد خانة البحث الصغيرة فوق الساعة؟ تقدر تغيّر هذا لاحقًا من «خيارات…».",
+                        "Would you like the small search box above the clock? You can change this later in Options."
+                    ),
+                    buttons: nwg::MessageButtons::YesNo,
+                    icons: nwg::MessageIcons::Question,
+                };
+                (nwg::modal_message(&self.window, &params) == nwg::MessageChoice::Yes, startup_was)
+            }
         };
-        let yes = nwg::modal_message(&self.window, &params) == nwg::MessageChoice::Yes;
-        log(&format!("first run: floating box {}", if yes { "on" } else { "off" }));
+        log(&format!("first run: floating box {}, start with Windows {}", if yes { "on" } else { "off" }, if startup { "on" } else { "off" }));
+        if startup != startup_was && autostart::set_enabled(startup) {
+            self.menu_autostart.set_checked(startup);
+        }
         self.set_floating_mode(if yes { FloatingMode::Fade } else { FloatingMode::Off });
         if yes {
             self.set_status(&trf!(
@@ -332,5 +345,59 @@ impl App {
                 "The search box is above the clock: click it or press {HOTKEY_TEXT}. Drag its top edge to move it."
             ));
         }
+    }
+}
+
+impl App {
+    /// The first-run task dialog: `Some((box above the clock, start with
+    /// Windows))`, or `None` when TaskDialogIndirect is unavailable. It is
+    /// looked up at run time: importing it would stop the program from
+    /// starting where comctl32 6 is not active.
+    fn first_run_dialog(&self, startup_on: bool) -> Option<(bool, bool)> {
+        use winapi::um::commctrl::{
+            TASKDIALOGCONFIG, TDCBF_NO_BUTTON, TDCBF_YES_BUTTON, TDF_POSITION_RELATIVE_TO_WINDOW, TDF_RTL_LAYOUT,
+            TDF_VERIFICATION_FLAG_CHECKED,
+        };
+        use winapi::um::libloaderapi::{GetProcAddress, LoadLibraryW};
+        use winapi::um::winuser::IDYES;
+        type TaskDialogIndirect = unsafe extern "system" fn(*const TASKDIALOGCONFIG, *mut i32, *mut i32, *mut i32) -> i32;
+
+        let owner = self.window.handle.hwnd()?;
+        let lib = unsafe { LoadLibraryW(super::shell::wide("comctl32.dll").as_ptr()) };
+        if lib.is_null() {
+            return None;
+        }
+        let f = unsafe { GetProcAddress(lib, c"TaskDialogIndirect".as_ptr()) };
+        if f.is_null() {
+            return None;
+        }
+        // SAFETY: the documented signature of TaskDialogIndirect.
+        let task_dialog = unsafe { std::mem::transmute::<winapi::shared::minwindef::FARPROC, TaskDialogIndirect>(f) };
+        let window_title = super::shell::wide(title());
+        let heading = super::shell::wide(tr!("مرحباً بك في InstaFind", "Welcome to InstaFind"));
+        let content = super::shell::wide(&trf!(
+            "هل تريد خانة البحث الصغيرة فوق الساعة؟ تنقرها أو تضغط {HOTKEY_TEXT} لتبحث من أي مكان.\n\nتقدر تغيّر هذا والتشغيل مع ويندوز لاحقاً من «خيارات…».",
+            "Would you like the small search box above the clock? Click it or press {HOTKEY_TEXT} to search from anywhere.\n\nYou can change this, and starting with Windows, later in Options."
+        ));
+        let startup_text = super::shell::wide(tr!("التشغيل مع ويندوز (في الخلفية)", "Start with Windows (in the background)"));
+        let mut cfg: TASKDIALOGCONFIG = unsafe { std::mem::zeroed() };
+        cfg.cbSize = std::mem::size_of::<TASKDIALOGCONFIG>() as u32;
+        cfg.hwndParent = owner as _;
+        cfg.dwFlags = TDF_POSITION_RELATIVE_TO_WINDOW
+            | if startup_on { TDF_VERIFICATION_FLAG_CHECKED } else { 0 }
+            | if crate::i18n::is_en() { 0 } else { TDF_RTL_LAYOUT };
+        cfg.dwCommonButtons = TDCBF_YES_BUTTON | TDCBF_NO_BUTTON;
+        cfg.pszWindowTitle = window_title.as_ptr();
+        cfg.pszMainInstruction = heading.as_ptr();
+        cfg.pszContent = content.as_ptr();
+        cfg.pszVerificationText = startup_text.as_ptr();
+        cfg.nDefaultButton = IDYES;
+        let (mut button, mut checked) = (0i32, 0i32);
+        let hr = unsafe { task_dialog(&cfg, &mut button, std::ptr::null_mut(), &mut checked) };
+        if hr < 0 {
+            log(&format!("first run: the task dialog failed (0x{hr:08x})"));
+            return None;
+        }
+        Some((button == IDYES, checked != 0))
     }
 }

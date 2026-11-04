@@ -303,6 +303,12 @@ mod native {
         if PATH.set(wide).is_err() {
             return;
         }
+        // The handler can only open the file, not make its folder: without
+        // this a crash on the very first run, before anything else wrote to
+        // the data folder, left no report (seen in store.yml's install test).
+        if let Some(dir) = crash.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
         unsafe {
             // Room for the handler to run once the stack has overflowed.
             let mut guarantee: u32 = 64 * 1024;
