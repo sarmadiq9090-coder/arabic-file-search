@@ -203,11 +203,16 @@ jobs:
           TAG: ${{ steps.v.outputs.tag }}
         run: |
           for f in bahth.exe bahth-x86.exe bahth-arm64.exe; do test -s "$f"; done
+          # Checksums of exactly the files published below, in sha256sum's
+          # format ("<hash>  <name>"): `sha256sum -c SHA256SUMS.txt`, or
+          # compare with Get-FileHash on Windows (README, "Verify").
+          sha256sum bahth.exe bahth-x86.exe bahth-arm64.exe > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
           notes="releases/$TAG-notes.md"
           [ -f "$notes" ] || notes=/dev/null
           title=$(head -1 "$notes" | sed 's/^# *//')
           [ -n "$title" ] || title="$TAG"
-          gh release create "$TAG" bahth.exe bahth-x86.exe bahth-arm64.exe --target "$GITHUB_SHA" --title "$title" --notes-file "$notes" --latest
+          gh release create "$TAG" bahth.exe bahth-x86.exe bahth-arm64.exe SHA256SUMS.txt --target "$GITHUB_SHA" --title "$title" --notes-file "$notes" --latest
       # Package managers: packaging.yml rewrites the Scoop, winget and
       # Chocolatey manifests and commits them to main (and pushes to
       # Chocolatey/winget when their secrets exist). A release made with

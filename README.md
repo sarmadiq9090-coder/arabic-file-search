@@ -38,6 +38,14 @@
 2. ضعه في مجلد دائم، مثلاً `%LOCALAPPDATA%\Programs\Bahth\` (هذا المسار تستعمله إضافات `integrations/`)، ثم شغّله.
 3. إن ظهر تحذير SmartScreen لأن الملف غير موقّع رقمياً: «مزيد من المعلومات» ← «تشغيل على أي حال».
 
+**التحقق من الملف** (اختياري، من الإصدار 0.9.2): كل إصدار ينشر بجانب الملفات [`SHA256SUMS.txt`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/SHA256SUMS.txt) فيه بصمة SHA-256 لكل ملف. نزّله في مجلد الملف نفسه، ثم شغّل في PowerShell هناك:
+
+```powershell
+Get-Content SHA256SUMS.txt | ForEach-Object { $h, $f = $_ -split '\s+', 2; if (Test-Path $f) { "${f}: " + $(if ((Get-FileHash $f -Algorithm SHA256).Hash -eq $h) { 'OK' } else { 'MISMATCH' }) } }
+```
+
+يجب أن يظهر `OK` بجانب الملف. (في Git Bash أو لينكس: `sha256sum -c --ignore-missing SHA256SUMS.txt`.)
+
 أو ثبّته بأمر واحد عبر [Scoop](https://scoop.sh):
 
 ```powershell
@@ -209,6 +217,14 @@ InstaFind is a free, open-source file search tool for Windows, written in Rust. 
    - On ARM64 PCs (e.g. Snapdragon) download [`bahth-arm64.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-arm64.exe); on 32-bit Windows, [`bahth-x86.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-x86.exe). Each one updates itself with its own build.
 2. Put it in a permanent folder, for example `%LOCALAPPDATA%\Programs\Bahth\` (the path the `integrations/` plugins expect), and run it.
 3. If SmartScreen warns because the file is not code-signed: **More info → Run anyway**.
+
+**Verify the download** (optional, from 0.9.2): every release also publishes [`SHA256SUMS.txt`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/SHA256SUMS.txt) with the SHA-256 of each file. Save it next to the exe and run in PowerShell in that folder:
+
+```powershell
+Get-Content SHA256SUMS.txt | ForEach-Object { $h, $f = $_ -split '\s+', 2; if (Test-Path $f) { "${f}: " + $(if ((Get-FileHash $f -Algorithm SHA256).Hash -eq $h) { 'OK' } else { 'MISMATCH' }) } }
+```
+
+It should print `OK` for the file. (In Git Bash or on Linux: `sha256sum -c --ignore-missing SHA256SUMS.txt`.)
 
 Or install it with [Scoop](https://scoop.sh):
 
