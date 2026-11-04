@@ -193,6 +193,8 @@ bahth.exe -s عقد --json
 
 [MIT](LICENSE)
 
+اسم «InstaFind» و«بحث سريع» والأيقونة علامات تجارية لـ FastKiwi (Sarmad)، ولا تشملها رخصة MIT: انظر [TRADEMARKS.md](TRADEMARKS.md).
+
 </div>
 
 ---
@@ -363,3 +365,5 @@ Building from source, the code map and the release process are in [docs/DEVELOPM
 ### License
 
 [MIT](LICENSE)
+
+The InstaFind name and icon are trademarks of FastKiwi (Sarmad) and are not covered by the MIT License: see [TRADEMARKS.md](TRADEMARKS.md).
