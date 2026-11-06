@@ -27,7 +27,7 @@ use winapi::um::wingdi::{
     SelectObject, SetBkMode, SetTextColor, TRANSPARENT,
 };
 use winapi::um::winuser::{
-    DT_END_ELLIPSIS, DT_LEFT, DT_NOPREFIX, DT_RIGHT, DT_RTLREADING, DT_SINGLELINE, DT_VCENTER, DefWindowProcW, DrawTextW,
+    DT_END_ELLIPSIS, DT_LEFT, DT_NOCLIP, DT_NOPREFIX, DT_RIGHT, DT_RTLREADING, DT_SINGLELINE, DT_VCENTER, DefWindowProcW, DrawTextW,
     GWLP_USERDATA, GetWindowLongPtrW, SetWindowLongPtrW,
 };
 
@@ -533,7 +533,11 @@ pub(super) fn draw_text(dc: HDC, font: &Font, color: u32, text: &str, r: &Rect, 
     let w: Vec<u16> = text.encode_utf16().collect();
     let mut rc = win_rect(r);
     let right = rtl != far;
-    let mut flags = DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS | if right { DT_RIGHT } else { DT_LEFT };
+    // Not clipped to `r`: the rows' text boxes are a half row high, and the
+    // dots of a final ي (and other Arabic marks below the line) reach under
+    // the font's descent, so a clipped box drew «الطبي» as «الطبى». The
+    // ellipsis still keeps the text inside the box's width.
+    let mut flags = DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_NOCLIP | DT_END_ELLIPSIS | if right { DT_RIGHT } else { DT_LEFT };
     if rtl {
         flags |= DT_RTLREADING;
     }

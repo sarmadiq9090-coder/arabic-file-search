@@ -46,6 +46,11 @@ thread_local! {
     static QUIET: Cell<bool> = const { Cell::new(false) };
     /// Inside the hook already (a panic while reporting one).
     static IN_HOOK: Cell<bool> = const { Cell::new(false) };
+    /// The number [`QUIET_COUNT`] gave this thread's last quiet panic, so a
+    /// test knows whether its own panic got a log line, whatever other
+    /// threads counted meanwhile.
+    #[cfg(test)]
+    static LAST_QUIET: Cell<Option<usize>> = const { Cell::new(None) };
 }
 
 static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
@@ -81,6 +86,8 @@ pub fn install(log: PathBuf) {
         let location = info.location().map(|l| (l.file(), l.line(), l.column()));
         if QUIET.try_with(Cell::get).unwrap_or(false) {
             let n = QUIET_COUNT.fetch_add(1, Ordering::Relaxed);
+            #[cfg(test)]
+            let _ = LAST_QUIET.try_with(|c| c.set(Some(n)));
             if n < QUIET_LINES
                 && let Some(path) = LOG_PATH.get()
             {
@@ -457,6 +464,16 @@ mod native {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    /// The panic hook, its log and the count of contained panics are shared
+    /// by the whole test process: the tests here that panic take this lock,
+    /// so they run one at a time and `hook_writes_the_report` sees only its
+    /// own panics (it was flaky when they ran side by side).
+    fn serial() -> MutexGuard<'static, ()> {
+        static LOCK: Mutex<()> = Mutex::new(());
+        LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    }
 
     #[test]
     fn report_has_message_place_thread_and_backtrace() {
@@ -490,6 +507,7 @@ mod tests {
 
     #[test]
     fn guards_turn_panics_into_defaults() {
+        let _serial = serial();
         let h = guard3(|a: u32, _b: (), _c: ()| assert!(a < 5, "handler bug"));
         h(1, (), ());
         h(9, (), ()); // must not unwind out
@@ -539,6 +557,7 @@ mod tests {
 
     #[test]
     fn writing_a_report_where_it_cannot_go_is_harmless() {
+        let _serial = serial();
         let dir = std::env::temp_dir().join(format!("bahth_crash_nowhere_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("log.txt")).unwrap();
@@ -561,6 +580,7 @@ mod tests {
 
     #[test]
     fn panics_with_odd_payloads_are_contained() {
+        let _serial = serial();
         assert!(quietly(|| std::panic::panic_any(42u8)).is_err());
         assert!(catch(|| std::panic::panic_any(vec![1, 2, 3])).is_none());
         assert!(quietly(|| panic!("{}", "ب\u{0}\n".repeat(10_000))).is_err());
@@ -576,6 +596,7 @@ mod tests {
 
     #[test]
     fn hook_writes_the_report() {
+        let _serial = serial();
         let dir = std::env::temp_dir().join(format!("bahth_crash_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let log = dir.join("log.txt");
@@ -588,18 +609,25 @@ mod tests {
         })
         .unwrap();
         assert!(t.join().is_err());
+        LAST_QUIET.with(|c| c.set(None));
         assert!(quietly(|| panic!("bad pdf")).is_err());
+        // Whether this very panic got one of the QUIET_LINES log lines: other
+        // tests' contained panics, counted at the same time, may have used them.
+        let bad_pdf_logged = LAST_QUIET.with(Cell::get).is_some_and(|n| n < QUIET_LINES);
         if !installed_here {
             return; // another test installed the hook first
         }
-        let text = std::fs::read_to_string(&log).unwrap();
+        // Other tests' full reports go to the same log and can push it past
+        // LOG_MAX, which moves the earlier lines to log.old.txt: read both.
+        let old = std::fs::read_to_string(dir.join("log.old.txt")).unwrap_or_default();
+        let text = old + &std::fs::read_to_string(&log).unwrap();
         assert!(text.contains("in thread 'probe-thread': index out of bounds"), "{text}");
         assert!(text.contains("crash_log.rs:"), "{text}");
         assert!(text.contains("backtrace:"), "{text}");
-        // Other tests running at the same time also log contained panics, and
-        // only the first QUIET_LINES of a run get a line: once the cap is
-        // passed, this one may have been the one counted instead.
-        if QUIET_COUNT.load(Ordering::Relaxed) <= QUIET_LINES {
+        // Only the first QUIET_LINES contained panics of a run get a line,
+        // and other tests' panics count too: check ours only when it was given
+        // one (deterministic, unlike reading QUIET_COUNT afterwards).
+        if bad_pdf_logged {
             assert!(text.contains("contained a parser panic: bad pdf"), "{text}");
         }
         let crash = std::fs::read_to_string(dir.join("crash.txt")).unwrap();

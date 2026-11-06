@@ -425,6 +425,8 @@ impl Row {
         let icon = match &item.icon_path {
             Some(p) if !p.is_empty() => Icon::Shell { path: p.clone(), is_dir: false },
             _ => Icon::Glyph(match item.kind {
+                // The rates credit under a currency answer is a link.
+                Kind::Answer if matches!(item.action, Action::OpenUri(_)) => glyph::GLOBE,
                 Kind::Answer => glyph::CALCULATOR,
                 Kind::Window => glyph::WINDOW,
                 Kind::App => glyph::APPS,
@@ -1188,6 +1190,21 @@ mod tests {
         let none = |_: &str| 0;
         let ctx = crate::launcher::Context { english: true, windows_build: 22631, windows: &[], launches: &none, picked: &none, today: (2026, 11, 1) };
         catalog.query(q, &ctx, 40)
+    }
+
+    #[test]
+    fn currency_answer_shows_the_rates_credit_under_it() {
+        let items = catalog_items(&["Notepad"], "100 usd to iqd");
+        let rows = arrange(Parts { query: "100 usd to iqd".into(), pins: vec![], items, files: vec![], files_done: true });
+        assert_eq!(rows[0].group, Group::Best);
+        assert!(rows[0].title.ends_with(" IQD"), "{}", rows[0].title);
+        let credit = rows.iter().find(|r| r.title == "Rates By Exchange Rate API").expect("credit row");
+        assert_eq!(credit.group, Group::Answers);
+        assert_eq!(credit.target, Target::Launcher(Action::OpenUri("https://www.exchangerate-api.com".into())));
+        assert_eq!(credit.icon, Icon::Glyph(glyph::GLOBE));
+        // Other answers carry no credit.
+        let rows = arrange(Parts { query: "2+2".into(), pins: vec![], items: catalog_items(&[], "2+2"), files: vec![], files_done: true });
+        assert!(rows.iter().all(|r| r.title != "Rates By Exchange Rate API"));
     }
 
     #[test]

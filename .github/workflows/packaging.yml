@@ -26,7 +26,7 @@ on:
         required: true
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: packaging
@@ -35,11 +35,15 @@ concurrency:
 jobs:
   manifests:
     runs-on: ubuntu-latest
+    # Commits the new manifests to main.
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.up.outputs.version }}
       sha: ${{ steps.up.outputs.sha }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # Keeps the token: this job pushes the manifests to main.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0 # zizmor: ignore[artipacked]
         with:
           ref: main
       - name: Update manifests
@@ -88,6 +92,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.manifests.outputs.sha }}
+          persist-credentials: false
       - name: Pack and push
         shell: pwsh
         env:
@@ -106,6 +111,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.manifests.outputs.sha }}
+          persist-credentials: false
       - name: Submit to winget-pkgs
         shell: pwsh
         env:

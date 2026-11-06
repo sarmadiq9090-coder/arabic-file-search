@@ -43,7 +43,7 @@ PUBLISHER = "Sarmad"
 COPYRIGHT = "Copyright (c) 2026 Saif Second"  # as in LICENSE
 
 SHORT_EN = "Instant file search for Windows, in Arabic and English, even inside documents."
-SHORT_AR = "أسرع طريقة لإيجاد أي ملف على ويندوز، بالعربية والإنكليزية، وحتى داخل المستندات."
+SHORT_AR = "أسرع طريقة لإيجاد أي ملف على ويندوز، بالعربية والإنجليزية، وحتى داخل المستندات."
 
 DESC_EN = """\
 InstaFind (بحث سريع) indexes all your drives once and shows results while you type, even with millions of files.
@@ -57,7 +57,7 @@ DESC_AR = """\
 يفهم العربية كما تُكتب فعلاً: «احمد» تجد «أحمد»، و«التقرير» تجد «تقرير.pdf»، والكلمة المكتوبة بلوحة المفاتيح الخطأ أو بالفرانكو تُوجد أيضاً.
 يبحث داخل المستندات (docx وxlsx وpptx وpdf وodt وrtf والبريد وepub وملفات البرمجة)، وداخل الصور وملفات PDF الممسوحة ضوئياً بمحرك التعرف على النصوص في ويندوز، وداخل الملفات المضغوطة.
 ومعه: الملفات المكررة، أحجام المجلدات، المصغرات، الاستبدال في عدة ملفات، اختصار عام، سطر الأوامر، والبحث من الهاتف.
-ملف واحد لا يحتاج تثبيتاً، وبياناته في %LOCALAPPDATA%\\BahthSari، والواجهة عربية أو إنكليزية."""
+ملف واحد لا يحتاج تثبيتاً، وبياناته في %LOCALAPPDATA%\\BahthSari، والواجهة عربية أو إنجليزية."""
 
 TAGS = ["search", "file-search", "find", "arabic", "full-text-search", "ocr", "indexer", "desktop-search", "portable", "rust"]
 

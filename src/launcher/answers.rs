@@ -14,6 +14,50 @@ fn item(title: String, subtitle: String, copy: String) -> Item {
     Item { kind: Kind::Answer, title, subtitle, action: Action::CopyText(copy), score: ANSWER_SCORE, icon_path: None, strong: false }
 }
 
+/// Where the downloaded exchange rates come from. Their free terms ask for
+/// this attribution, with a link, wherever the rates are shown.
+pub const RATES_CREDIT: &str = "Rates By Exchange Rate API";
+/// The link that goes with [`RATES_CREDIT`].
+pub const RATES_CREDIT_URL: &str = "https://www.exchangerate-api.com";
+
+/// The row under every currency answer: the attribution, opening the
+/// provider's site on Enter or click. The credit itself stays in English
+/// (it is their wording); the line under it is in the interface language.
+pub fn rates_credit(english: bool) -> Item {
+    let subtitle = if english { "Exchange-rate source · Enter opens exchangerate-api.com" } else { "مصدر أسعار الصرف · Enter يفتح موقع exchangerate-api.com" };
+    Item {
+        kind: Kind::Answer,
+        title: RATES_CREDIT.to_string(),
+        subtitle: subtitle.to_string(),
+        action: Action::OpenUri(RATES_CREDIT_URL.to_string()),
+        score: ANSWER_SCORE - 1,
+        icon_path: None,
+        strong: false,
+    }
+}
+
+/// The instant answers for `query`: [`answer`], followed by the rates
+/// attribution ([`rates_credit`]) when the answer is a currency conversion.
+pub fn answers(query: &str, ctx: &Context) -> Vec<Item> {
+    let Some(a) = answer(query, ctx) else { return Vec::new() };
+    let money = is_currency(query.trim(), ctx);
+    let mut v = vec![a];
+    if money {
+        v.push(rates_credit(ctx.english));
+    }
+    v
+}
+
+/// True when [`answer`] answers `q` with a currency conversion (the same
+/// order of checks: dates and units win over money).
+fn is_currency(q: &str, ctx: &Context) -> bool {
+    !q.is_empty()
+        && q.len() <= 512
+        && hijri::answer(q, ctx.today, ctx.english).is_none()
+        && units::parse(q).is_none()
+        && currency::answer(q, ctx.english, &currency::current()).is_some()
+}
+
 /// An instant answer for `query`, if it is a calculation, a conversion or a date question.
 pub fn answer(query: &str, ctx: &Context) -> Option<Item> {
     let q = query.trim();
@@ -113,6 +157,23 @@ mod tests {
         assert_eq!(title("2+2").as_deref(), Some("= 4"));
         assert_eq!(answer("5 km to miles", &ctx(true)).unwrap().title, "5 km = 3.10686 mi");
         assert!(answer("100 pounds", &ctx(true)).unwrap().title.contains("kg"));
+    }
+
+    #[test]
+    fn currency_answers_carry_the_rates_credit() {
+        for (q, english) in [("100 usd to iqd", true), ("١٠٠ دولار", false), ("50 يورو بالدينار", false)] {
+            let v = answers(q, &ctx(english));
+            assert_eq!(v.len(), 2, "{q}");
+            assert_eq!(v[1].title, "Rates By Exchange Rate API");
+            assert_eq!(v[1].action, Action::OpenUri("https://www.exchangerate-api.com".into()));
+            assert!(v[1].score < v[0].score);
+            let arabic = v[1].subtitle.chars().any(|c| ('\u{0600}'..='\u{06FF}').contains(&c));
+            assert_eq!(arabic, !english, "{}", v[1].subtitle);
+        }
+        // Not money: no credit.
+        for q in ["2+2", "5 kg to lb", "100 pounds", "هجري", "تقرير", ""] {
+            assert!(answers(q, &ctx(true)).iter().all(|i| i.title != RATES_CREDIT), "{q}");
+        }
     }
 
     #[test]

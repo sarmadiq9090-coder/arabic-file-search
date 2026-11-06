@@ -66,11 +66,11 @@ impl App {
         self.save_settings();
         let where_now = match place {
             Place::Temp => tr!(
-                "يعمل «بحث سريع» الآن من مجلد مؤقت (ربما من داخل ملف مضغوط)، وقد يحذفه ويندوز في أي وقت.",
+                "يعمل «InstaFind» الآن من مجلد مؤقت (ربما من داخل ملف مضغوط)، وقد يحذفه ويندوز في أي وقت.",
                 "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time."
             ),
             _ => tr!(
-                "يعمل «بحث سريع» الآن من مجلد التنزيلات. إذا حُذف الملف أو نُظّف المجلد سيتوقف البرنامج.",
+                "يعمل «InstaFind» الآن من مجلد التنزيلات. إذا حُذف الملف أو نُظّف المجلد سيتوقف البرنامج.",
                 "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working."
             ),
         };

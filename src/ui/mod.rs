@@ -256,6 +256,10 @@ pub struct App {
     menu_feedback_bug: nwg::MenuItem,
     menu_feedback_idea: nwg::MenuItem,
     menu_feedback_talk: nwg::MenuItem,
+    /// Options ▸ «الدعم» / "Support": the support address and page.
+    support_menu: nwg::Menu,
+    menu_support_mail: nwg::MenuItem,
+    menu_support_page: nwg::MenuItem,
     /// The crash reports of the last run were already offered (or none).
     crash_checked: Cell<bool>,
     menu_export: nwg::MenuItem,

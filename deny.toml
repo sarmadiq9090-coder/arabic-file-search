@@ -1,0 +1,66 @@
+# cargo-deny (https://embarkstudios.github.io/cargo-deny/): run by build.yml's
+# `deny` job on every push and PR. It checks the dependencies of the shipped
+# Windows exes: known vulnerabilities (RustSec), licences, banned or
+# duplicated crates, and where crates come from.
+
+[graph]
+# The published exes: x64 and 32-bit (mingw), ARM64 (MSVC).
+targets = [
+    "x86_64-pc-windows-gnu",
+    "i686-pc-windows-gnu",
+    "aarch64-pc-windows-msvc",
+]
+all-features = false
+
+[advisories]
+# Every RustSec advisory, unmaintained and unsound crates included, fails the
+# check until the crate is updated or the advisory is listed here with a reason.
+version = 2
+yanked = "deny"
+ignore = [
+    # Unmaintained (no vulnerability): bincode 1.x reads and writes our own
+    # index cache only. The move to bincode 3 is its own PR (#32).
+    { id = "RUSTSEC-2025-0141", reason = "bincode 1.x unmaintained; only our own cache files; bincode 3 move in PR #32" },
+    # Unmaintained (no vulnerability), no newer release: pulled in by lopdf
+    # for fonts embedded in PDFs; replaced when lopdf moves off it.
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser unmaintained, used by lopdf; no fixed release" },
+]
+
+[licenses]
+version = 2
+# Permissive licences only (Apache/MIT/BSD/ISC/Zlib, Unicode data).
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "MIT-0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+]
+confidence-threshold = 0.9
+# The allow list is the policy, not an inventory: a licence no crate uses yet is fine.
+unused-allowed-license = "allow"
+# Named exceptions, each approved by the owner.
+exceptions = [
+    # bzip2 decoder used for .bz2/.7z/.zip archives: the bzip2 licence
+    # (BSD-style). Approved by the owner on 2026-11-06.
+    { allow = ["bzip2-1.0.6"], crate = "libbz2-rs-sys" },
+]
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

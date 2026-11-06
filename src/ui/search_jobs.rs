@@ -511,6 +511,11 @@ impl App {
             if n == 0 && self.state.borrow().scan.is_some() {
                 status = format!("{status} {}.", indexing_status::incomplete_text(crate::i18n::current()));
             }
+            // Images were searched without their Arabic text: say so rather
+            // than skipping it silently.
+            if crate::ocr::arabic_missing() {
+                status = format!("{status} {}", indexing_status::ocr_arabic_missing_text(crate::i18n::current()));
+            }
             self.set_status(&status);
             if n == 0 {
                 self.suggest_for_content(&self.query.text());

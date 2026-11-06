@@ -272,10 +272,12 @@ impl App {
             &self.window,
             tr!("حول بحث سريع", "About InstaFind"),
             &trf!(
-                "بحث سريع (InstaFind) — الإصدار {}\nبحث فوري عن الملفات وداخل المستندات، بالعربية والإنجليزية.\n\nاضغط {HOTKEY_TEXT} من أي مكان لتبحث.\n{}",
-                "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {HOTKEY_TEXT} anywhere to search.\n{}",
+                "بحث سريع (InstaFind) — الإصدار {}\nبحث فوري عن الملفات وداخل المستندات، بالعربية والإنجليزية.\n\nاضغط {HOTKEY_TEXT} من أي مكان لتبحث.\n{}\n\nالدعم: {}\n{}",
+                "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {HOTKEY_TEXT} anywhere to search.\n{}\n\nSupport: {}\n{}",
                 env!("CARGO_PKG_VERSION"),
-                crate::feedback::REPO_URL
+                crate::feedback::REPO_URL,
+                crate::feedback::SUPPORT_EMAIL,
+                crate::feedback::support_page(crate::i18n::is_en())
             ),
         );
     }

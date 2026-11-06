@@ -18,6 +18,17 @@ pub(super) fn build(options: &nwg::Menu, menu: &mut nwg::Menu, items: [&mut nwg:
     Ok(())
 }
 
+/// Adds the «الدعم» / "Support" submenu to the Options menu: write to the
+/// support address, or open the support page.
+pub(super) fn build_support(options: &nwg::Menu, menu: &mut nwg::Menu, items: [&mut nwg::MenuItem; 2]) -> Result<(), nwg::NwgError> {
+    nwg::Menu::builder().text(tr!("الدعم", "Support")).parent(options).build(menu)?;
+    let [mail, page] = items;
+    let mail_text = trf!("راسل الدعم: {}", "Email support: {}", feedback::SUPPORT_EMAIL);
+    nwg::MenuItem::builder().text(&mail_text).parent(&*menu).build(mail)?;
+    nwg::MenuItem::builder().text(tr!("صفحة الدعم (fastkiwi.app)", "Support page (fastkiwi.app)")).parent(&*menu).build(page)?;
+    Ok(())
+}
+
 impl App {
     /// Handles a click on one of the feedback items; false for any other item.
     pub(super) fn on_feedback_item(&self, handle: nwg::ControlHandle) -> bool {
@@ -27,11 +38,34 @@ impl App {
             feedback::issue_url(Kind::Idea, &SystemInfo::current(), None)
         } else if handle == self.menu_feedback_talk {
             feedback::discussions_url()
+        } else if handle == self.menu_support_mail || handle == self.menu_support_page {
+            self.open_support(handle == self.menu_support_mail);
+            return true;
         } else {
             return false;
         };
         self.open_feedback_page(&url);
         true
+    }
+
+    /// Options ▸ Support: the mail program on the support address, or the
+    /// support page; both shown in a message when Windows can't open them.
+    fn open_support(&self, mail: bool) {
+        let page = feedback::support_page(crate::i18n::is_en());
+        let target = if mail { feedback::support_mailto() } else { page.to_string() };
+        if !shell::open(&target) {
+            log("support: could not open the mail program or the browser");
+            nwg::modal_info_message(
+                &self.window,
+                title(),
+                &trf!(
+                    "تعذر فتح البريد أو المتصفح. راسلنا على:\n{}\nأو افتح صفحة الدعم:\n{}",
+                    "Could not open the mail program or the browser. Write to:\n{}\nor open the support page:\n{}",
+                    feedback::SUPPORT_EMAIL,
+                    page
+                ),
+            );
+        }
     }
 
     pub(super) fn open_feedback_page(&self, url: &str) {

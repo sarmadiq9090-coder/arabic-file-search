@@ -1,0 +1,9 @@
+# zizmor (https://docs.zizmor.sh): run by build.yml's `zizmor` job.
+rules:
+  artipacked:
+    ignore:
+      # Manual / claude-branch screenshot workflows: their last job commits
+      # the results back to the branch with git, so they keep the token.
+      # (Left unedited here: changing them starts them on the next push.)
+      - media.yml
+      - quick-shots.yml
