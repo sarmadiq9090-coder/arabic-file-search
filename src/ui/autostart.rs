@@ -130,12 +130,25 @@ pub fn set_enabled(on: bool) -> bool {
     if on {
         let Ok(exe) = std::env::current_exe() else { return false };
         unblock();
-        set_string(&key, VALUE, &format!("\"{}\" {STARTUP_ARG}", exe.display()))
+        set_string(&key, VALUE, &command(&exe))
     } else {
         let name = wide(VALUE);
         let r = unsafe { RegDeleteValueW(key.0, name.as_ptr()) };
         r == ERROR_SUCCESS as i32 || !has_value(&key, VALUE)
     }
+}
+
+/// What the `Run` entry starts.
+fn command(exe: &std::path::Path) -> String {
+    format!("\"{}\" {STARTUP_ARG}", exe.display())
+}
+
+/// After the exe was copied to a permanent place (`relocate`): an existing
+/// entry now starts `exe`. Nothing else changes: an entry that is off stays
+/// off (no entry, or turned off in Task Manager, which keeps its mark).
+pub fn point_to(exe: &std::path::Path) -> bool {
+    let Some(key) = open(RUN_KEY, true) else { return false };
+    !has_value(&key, VALUE) || set_string(&key, VALUE, &command(exe))
 }
 
 /// On by default: the first run turns it on once; after that only the user's

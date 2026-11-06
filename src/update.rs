@@ -1209,7 +1209,7 @@ mod tests {
         verify_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, SIGNED_TAG, &keys).unwrap();
         verify_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, SIGNED_TAG, &keys[..1]).unwrap();
         verify_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, " v9.9.9 ", &keys).unwrap();
-        assert_eq!(expected_trusted_comment("v0.9.1"), "instafind v0.9.1");
+        assert_eq!(expected_trusted_comment("v9.9.9"), "instafind v9.9.9");
         // CRLF line endings or a BOM (file re-saved on Windows) still parse.
         let crlf = format!("\u{feff}{}", SIG_PRIMARY.replace('\n', "\r\n"));
         verify_signature(PAYLOAD.as_bytes(), &crlf, SIGNED_TAG, &keys).unwrap();
@@ -1278,6 +1278,35 @@ mod tests {
         if TRUSTED_PUBLIC_KEYS.is_empty() {
             assert!(verify_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, SIGNED_TAG, TRUSTED_PUBLIC_KEYS).is_err());
         }
+    }
+
+    /// `keys/*.pub` (what CI's `sign` job checks against) and
+    /// `TRUSTED_PUBLIC_KEYS` (what the app accepts) must be set up together:
+    /// keys committed but not compiled in would sign releases nobody checks,
+    /// and keys compiled in but not committed would make `sign` publish
+    /// releases the app refuses. See keys/README.md.
+    #[test]
+    fn keys_dir_matches_trusted_keys() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("keys");
+        let mut committed = Vec::new();
+        for entry in std::fs::read_dir(&dir).expect("keys/ exists") {
+            let path = entry.unwrap().path();
+            match path.extension().and_then(|e| e.to_str()) {
+                Some("pub") => {
+                    let text = std::fs::read_to_string(&path).unwrap();
+                    let key = pub_key_line(&text).to_string();
+                    assert!(minisign_verify::PublicKey::from_base64(&key).is_ok(), "{} is not a minisign public key file", path.display());
+                    assert!(!TEST_PUBS.iter().any(|t| pub_key_line(t) == key), "{} is a TEST key", path.display());
+                    committed.push(key);
+                }
+                Some("key") => panic!("{} looks like a SECRET key: never commit one", path.display()),
+                _ => {}
+            }
+        }
+        let mut trusted: Vec<String> = TRUSTED_PUBLIC_KEYS.iter().map(|k| k.trim().to_string()).collect();
+        committed.sort();
+        trusted.sort();
+        assert_eq!(committed, trusted, "keys/*.pub and update::TRUSTED_PUBLIC_KEYS must hold the same keys (keys/README.md)");
     }
 
     #[test]

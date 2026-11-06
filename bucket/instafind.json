@@ -1,26 +1,26 @@
 {
-    "version": "0.9.0",
+    "version": "0.9.1",
     "description": "InstaFind (بحث سريع): Instant file search for Windows, in Arabic and English, even inside documents.",
     "homepage": "https://github.com/sarmadiq9090-coder/arabic-file-search",
     "license": "MIT",
     "notes": [
-        "InstaFind updates itself from GitHub (it offers new versions in the app). That is harmless,",
-        "but 'scoop update instafind' remains the way to keep Scoop's records in step.",
+        "Installed with Scoop, InstaFind does not update itself (versions up to 0.9.0 still offer to):",
+        "run 'scoop update instafind' to get new versions.",
         "Index, settings and log live in %LOCALAPPDATA%\\BahthSari (not in the Scoop folder);",
         "delete that folder and HKCU\\Software\\BahthSari yourself to remove all data."
     ],
     "architecture": {
         "64bit": {
-            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.9.0/bahth.exe",
-            "hash": "bf47a87882e644a5b1b564c740a309964ca5920713cfac1dadb11592e4794dda"
+            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.9.1/bahth.exe",
+            "hash": "4149de614a486b63f2e8c8dbc7a2a042632e9840b25e53c963b68be1dcda9b7a"
         },
         "32bit": {
-            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.9.0/bahth-x86.exe#/bahth.exe",
-            "hash": "2a4738b101b8556b1b61cfe2cfad69ac4025679142d917ad4232d9f32e81e382"
+            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.9.1/bahth-x86.exe#/bahth.exe",
+            "hash": "465c88f669467f68f865ef3b8deadb9074a7c0e39e979ed855fd05cc2355db41"
         },
         "arm64": {
-            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.9.0/bahth-arm64.exe#/bahth.exe",
-            "hash": "420f3309aaaa07851fa2a24948716f907e2acf8a7f8efef8cc8df84fce0cda0d"
+            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v0.9.1/bahth-arm64.exe#/bahth.exe",
+            "hash": "8651e4401d919c58d2e1ffd8df6be3cfcade267bd8ff0dafcc31c92a9fd1402e"
         }
     },
     "bin": [

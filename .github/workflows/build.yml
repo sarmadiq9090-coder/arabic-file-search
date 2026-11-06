@@ -30,11 +30,16 @@ jobs:
   linux-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
           components: clippy
-      - uses: Swatinem/rust-cache@v2
+      # Test-only job: nothing it builds is published, so a poisoned cache
+      # could not reach users (the exe jobs below build without a cache).
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3 # zizmor: ignore[cache-poisoning]
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
       - name: Test
@@ -49,23 +54,63 @@ jobs:
   windows-lint:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
           components: clippy
-      - uses: Swatinem/rust-cache@v2
+      # Test-only job: nothing it builds is published, so a poisoned cache
+      # could not reach users (the exe jobs below build without a cache).
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3 # zizmor: ignore[cache-poisoning]
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
+
+  # Dependencies of the Windows exes (deny.toml): RustSec advisories,
+  # licences (Apache/MIT/BSD/ISC/Zlib/Unicode plus named exceptions), banned
+  # crates and where crates come from.
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check
+          arguments: ""
+
+  # Static analysis of these workflows (zizmor): template injection,
+  # credential leaks, cache poisoning, unpinned actions… (.github/zizmor.yml).
+  zizmor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+        with:
+          inputs: .github/workflows
+          version: "1.32.0"
+          advanced-security: false
+          annotations: true
+          config: .github/zizmor.yml
 
   windows:
     needs: linux-test
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
           targets: i686-pc-windows-msvc
-      - uses: Swatinem/rust-cache@v2
+      # Test-only job: nothing it builds is published, so a poisoned cache
+      # could not reach users (the exe jobs below build without a cache).
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3 # zizmor: ignore[cache-poisoning]
       - name: Test
         run: cargo test --release
       # 32-bit (usize, the x86 updater asset) under WOW64.
@@ -78,11 +123,15 @@ jobs:
     needs: linux-test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
           targets: x86_64-pc-windows-gnu, i686-pc-windows-gnu
-      - uses: Swatinem/rust-cache@v2
+      # No build cache: these are the exes that get published (a cache
+      # restored from another run could poison them).
       - name: Build bahth.exe and bahth-x86.exe
         run: |
           sudo apt-get update -q && sudo apt-get install -y -q mingw-w64
@@ -90,11 +139,11 @@ jobs:
           cargo build --release --target i686-pc-windows-gnu
           cp target/x86_64-pc-windows-gnu/release/bahth.exe bahth.exe
           cp target/i686-pc-windows-gnu/release/bahth.exe bahth-x86.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bahth-exe
           path: bahth.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bahth-x86-exe
           path: bahth-x86.exe
@@ -104,11 +153,15 @@ jobs:
     needs: linux-test
     runs-on: windows-11-arm
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
           targets: aarch64-pc-windows-msvc
-      - uses: Swatinem/rust-cache@v2
+      # No build cache: these are the exes that get published (a cache
+      # restored from another run could poison them).
       - name: Test
         run: cargo test --release --target aarch64-pc-windows-msvc
       - name: Build bahth-arm64.exe
@@ -116,7 +169,7 @@ jobs:
         run: |
           cargo build --release --target aarch64-pc-windows-msvc
           Copy-Item target/aarch64-pc-windows-msvc/release/bahth.exe bahth-arm64.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bahth-arm64-exe
           path: bahth-arm64.exe
@@ -137,8 +190,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ${{ matrix.artifact }}
       - name: Smoke test
@@ -157,15 +212,17 @@ jobs:
     # The first index can take 40 minutes when the runner's disk is throttled.
     timeout-minutes: 80
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: bahth-exe
       - name: Real-user UI test
         shell: powershell
         run: ./ci/ui-test.ps1 -Exe ./bahth.exe -Out "$env:RUNNER_TEMP/ui-test"
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ui-test
           path: ${{ runner.temp }}/ui-test
@@ -182,6 +239,8 @@ jobs:
       new: ${{ steps.v.outputs.new }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Version
         id: v
         run: |
@@ -197,8 +256,16 @@ jobs:
   # The `release` Environment holds the secret key and asks the owner to
   # approve. This job runs no repository code: no checkout, only the exes
   # the smoke tests ran, a pinned and checksum-verified minisign, and the
-  # public keys committed in keys/. Until the owner adds MINISIGN_SECRET_KEY
-  # it signs nothing and passes, and the release is published unsigned.
+  # public keys committed in keys/.
+  #   no MINISIGN_SECRET_KEY, no keys/*.pub  warns, signs nothing, passes: the
+  #                                          release is published unsigned and
+  #                                          apps check its SHA-256, as before.
+  #   MINISIGN_SECRET_KEY, no keys/*.pub     signs (checked against the key's own
+  #                                          public half) and warns that apps
+  #                                          do not check signatures yet.
+  #   MINISIGN_SECRET_KEY and keys/*.pub     signs and checks against keys/*.pub.
+  #   keys/*.pub, no MINISIGN_SECRET_KEY     fails: apps built with those keys
+  #                                          would refuse an unsigned update.
   sign:
     needs: version
     if: needs.version.outputs.new == 'true'
@@ -222,31 +289,37 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/pub"
           for k in primary backup; do
-            gh api -H "Accept: application/vnd.github.raw" \
+            if ! gh api -H "Accept: application/vnd.github.raw" \
               "repos/${GITHUB_REPOSITORY}/contents/keys/minisign-${k}.pub?ref=${GITHUB_SHA}" \
-              > "$RUNNER_TEMP/pub/${k}.pub" 2>/dev/null || rm -f "$RUNNER_TEMP/pub/${k}.pub"
+              > "$RUNNER_TEMP/pub/${k}.pub" 2> "$RUNNER_TEMP/gh.err"; then
+              rm -f "$RUNNER_TEMP/pub/${k}.pub"
+              # Only "not committed" (404) means "no key". Any other API error
+              # must not quietly turn into an unsigned release.
+              if ! grep -q 'HTTP 404' "$RUNNER_TEMP/gh.err"; then
+                cat "$RUNNER_TEMP/gh.err"
+                echo "::error::Could not read keys/minisign-${k}.pub through the API"
+                exit 1
+              fi
+            fi
           done
 
-      # Not set up at all (no secret, no committed public key): a no-op that
-      # passes, so releases keep working until the owner sets up the keys.
-      # Half set up is an error: once keys/*.pub are committed, the app ships
-      # with TRUSTED_PUBLIC_KEYS and refuses an unsigned release.
       - name: Is signing set up?
         id: cfg
         env:
-          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          HAS_SECRET: ${{ secrets.MINISIGN_SECRET_KEY != '' }}
         run: |
-          if ls "$RUNNER_TEMP"/pub/*.pub >/dev/null 2>&1; then have_pub=1; else have_pub=; fi
-          if [ -n "$MINISIGN_SECRET_KEY" ] && [ -n "$have_pub" ]; then
+          if ls "$RUNNER_TEMP"/pub/*.pub >/dev/null 2>&1; then have_pub=true; else have_pub=false; fi
+          echo "have_pub=$have_pub" >> "$GITHUB_OUTPUT"
+          if [ "$HAS_SECRET" = true ]; then
             echo "signed=true" >> "$GITHUB_OUTPUT"
-          elif [ -n "$MINISIGN_SECRET_KEY" ]; then
-            echo "::error::MINISIGN_SECRET_KEY is set, but keys/minisign-primary.pub and keys/minisign-backup.pub are not in the repository. Finish the setup: docs/specs/signing.md"
-            exit 1
-          elif [ -n "$have_pub" ]; then
-            echo "::error::keys/*.pub are committed, but the release Environment has no MINISIGN_SECRET_KEY secret (or this job is not allowed to read it). Installed copies would refuse an unsigned release. See docs/specs/signing.md"
+            if [ "$have_pub" = false ]; then
+              echo "::warning::$TAG is signed, but keys/minisign-primary.pub and keys/minisign-backup.pub are not committed yet, so installed copies still check the SHA-256 only. Send the .pub files to finish the setup: keys/README.md"
+            fi
+          elif [ "$have_pub" = true ]; then
+            echo "::error::keys/*.pub are committed, but the release Environment has no MINISIGN_SECRET_KEY secret (or this job may not read it). Installed copies would refuse an unsigned update. See docs/specs/signing.md"
             exit 1
           else
-            echo "::notice::Release signing is not set up yet (no MINISIGN_SECRET_KEY, no keys/*.pub), so $TAG is published unsigned, as before. See docs/specs/signing.md."
+            echo "::warning::Release signing is not set up (no MINISIGN_SECRET_KEY in the release Environment), so $TAG is published without .minisig files and installed copies check its SHA-256 only, as before. See docs/specs/signing.md"
             echo "signed=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -271,6 +344,7 @@ jobs:
         env:
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
           MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+          HAVE_PUB: ${{ steps.cfg.outputs.have_pub }}
         run: |
           umask 077
           key="$RUNNER_TEMP/minisign.key"
@@ -281,16 +355,23 @@ jobs:
             printf '%s\n' "$MINISIGN_PASSWORD" |
               minisign -S -s "$key" -m "dist/$f" -t "instafind $TAG"
           done
+          # No committed public key yet: check against the secret key's own
+          # public half, so at least the signatures are known to be sound.
+          if [ "$HAVE_PUB" != true ]; then
+            printf '%s\n' "$MINISIGN_PASSWORD" |
+              minisign -R -s "$key" -p "$RUNNER_TEMP/pub/from-secret.pub"
+          fi
 
       - if: steps.cfg.outputs.signed == 'true'
-        name: Verify the signatures against the committed public keys
+        name: Verify the signatures
         run: |
           expected="instafind $TAG"
           for f in $EXES; do
             ok=
             for pub in "$RUNNER_TEMP"/pub/*.pub; do
-              if minisign -Vm "dist/$f" -p "$pub"; then
-                comment=$(minisign -V -Q -m "dist/$f" -p "$pub")
+              # -H: pre-hashed only, as the app requires.
+              if minisign -V -H -m "dist/$f" -p "$pub"; then
+                comment=$(minisign -V -H -Q -m "dist/$f" -p "$pub")
                 if [ "$comment" != "$expected" ]; then
                   echo "::error::$f: trusted comment is '$comment', expected '$expected'"
                   exit 1
@@ -337,6 +418,18 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: bahth-minisig
+      # A failed earlier run can leave a draft of this tag behind: remove it so
+      # "Re-run failed jobs" just works.
+      - name: Remove stale drafts of this tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.draft and .tag_name == \"${TAG}\") | .id" |
+            while read -r id; do
+              echo "Deleting stale draft release ${id}"
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${id}"
+            done
       # A draft first, then publish once every file is there: installed
       # copies ask for `releases/latest`, which never returns a draft, so
       # nobody is offered a half-uploaded release.
@@ -359,7 +452,7 @@ jobs:
           want=$(printf '%s\n' "${exes[@]}" "${sigs[@]}" | LC_ALL=C sort | paste -sd ' ' -)
           got=$(gh release view "$TAG" --json assets --jq '[.assets[] | select(.size > 0) | .name] | sort | join(" ")')
           if [ "$got" != "$want" ]; then
-            echo "::error::The draft release has [$got], expected [$want]. Delete the draft $TAG and re-run this job."
+            echo "::error::The draft release has [$got], expected [$want]. The draft was left unpublished; re-run the failed jobs."
             exit 1
           fi
           gh release edit "$TAG" --draft=false --latest

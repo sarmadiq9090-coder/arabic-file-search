@@ -30,7 +30,8 @@ Lemon (local-ai-chat), with its own key pair and InstaFind's release flow.
    - `MINISIGN_SECRET_KEY`: محتوى `primary.key` كاملاً (السطران).
    - `MINISIGN_PASSWORD`: كلمة مرور المفتاح الأساسي.
 5. **احفظ المفتاح الاحتياطي في مدير كلمات المرور فقط:** محتوى `backup.key` كاملاً وكلمة مروره. لا تضعه في GitHub ولا على أي جهاز.
-6. **أرسل المفتاحين العامّين إلى Claude:** انسخ محتوى `primary.pub` و`backup.pub` (ليسا سرّيين) وأرسلهما في جلسة Claude. سيفتح Claude طلب دمج يضيفهما إلى `keys/` وإلى قائمة `TRUSTED_PUBLIC_KEYS` في البرنامج.
+6. **أرسل المفتاحين العامّين إلى Claude:** انسخ محتوى `primary.pub` و`backup.pub` (ليسا سرّيين) وأرسلهما في جلسة Claude. سيفتح Claude طلب دمج يضيفهما إلى `keys/` وإلى قائمة `TRUSTED_PUBLIC_KEYS` في البرنامج (انظر [keys/README.md](../../keys/README.md)).
+   بين الخطوة 4 وهذا الطلب، تُوقَّع الإصدارات وتُرفع ملفات `.minisig` معها، لكن النسخ المثبّتة لا تتحقق منها بعد (تحذير في سجل GitHub).
 7. **احذف الـ Codespace:** من github.com/codespaces ← (…) ← Delete.
 
 بعد دمج طلب المفاتيح يصير التوقيع **إلزامياً**: النسخ الجديدة ترفض أي تحديث بلا توقيع صحيح.
@@ -53,7 +54,7 @@ stolen token or session, a collaborator account, or a compromised action in
 `bahth.exe.minisig`, `bahth-x86.exe.minisig` and `bahth-arm64.exe.minisig`. The
 app trusts only the public keys compiled into it
 (`update::TRUSTED_PUBLIC_KEYS`: a primary key and a backup key). The signature's
-trusted comment must be exactly `instafind <tag>`, e.g. `instafind v0.9.1`. The
+trusted comment must be exactly `instafind <tag>`, e.g. `instafind v1.0.0`. The
 comment is covered by the signature, so an older signed exe cannot be replayed as
 a newer version. The comment does not name the CPU. Another CPU's signed exe
 under this CPU's asset name is refused by `validate_pe` (machine type).
@@ -65,14 +66,14 @@ under this CPU's asset name is refused by `validate_pe` (machine type).
 | delete the `.minisig`, or serve a broken one | **Blocked.** A missing or invalid signature means refuse. There is never a fallback. |
 | push a version bump to main to start a release | `sign` **waits for the owner's approval** in the `release` Environment. |
 | change the app's key list | Only through a signed release, so they need the key first. |
-| compromise the **build** (a malicious dependency or action in `exe`) | **Not covered by signing**: CI signs whatever was built. Mitigated by SHA-pinned actions (`claude/ci-hygiene`) and Dependabot review. |
+| compromise the **build** (a malicious dependency or action in `exe`) | **Not covered by signing**: CI signs whatever was built. Mitigated by SHA-pinned actions and Dependabot review. |
 | take over the owner's GitHub account **and** approve | **Not covered.** Mitigated by 2FA and the approval being visible. |
 | steal the backup key | They would need the owner's password manager. The key is not on GitHub or on any PC. |
 
 Downgrades are never offered: the updater installs only a strictly newer version.
 
 **Transition.** The key list ships **empty**. Such builds behave exactly as
-before: they check the SHA-256 only (required since `claude/updater-fail-closed`)
+before: they check the SHA-256 only (required since 0.9.1)
 and log `signature checking not configured`. Once the owner has keys, a
 follow-up PR pastes them in. Every build after that **requires** a valid
 signature. The switch is compile-time only: there is no setting, environment
@@ -102,6 +103,9 @@ only.
   SHA-256. `finalize` checks the signature and the comment's global signature.
   Any failure deletes the download, keeps the current version, and shows
   `signature_error` (ar/en, with the manual download link).
+- `keys_dir_matches_trusted_keys`: `keys/*.pub` and `TRUSTED_PUBLIC_KEYS` must
+  hold the same keys, so the two are always added in one PR (`keys/README.md`).
+  A `.key` file in `keys/` fails it too.
 - Tests (`cargo test update::`) use a committed **TEST-ONLY** key set in
   `tests/fixtures/update-signing/`. `regen.sh` regenerates it, and the secret
   halves are not kept. The tests cover:
@@ -124,13 +128,13 @@ after every check (including `smoke` and `ui`) has passed.
 | Job | Token / secrets | Does |
 |---|---|---|
 | `version` | `contents: read` | Reads the version, and says whether its tag is new. Releasing is skipped unless it is. |
-| `sign` | Environment **`release`** (owner approval, branch `main`), with `MINISIGN_SECRET_KEY` and `MINISIGN_PASSWORD`. `contents: read` | Runs **no repository code** (no checkout). It reads `keys/minisign-{primary,backup}.pub` at the commit through the API. **Not set up** (no secret and no public key): it logs a notice and passes, so releases are published unsigned as before. **Half set up**: it fails. Otherwise it downloads the three smoke-tested exes and installs minisign 0.12 from a pinned URL with a pinned SHA-256 (the archive was verified with its author's key). It runs `minisign -S -t "instafind <tag>"` for each exe and checks each with `minisign -Vm` against the committed public keys, including the exact trusted comment. Finally it uploads artifact `bahth-minisig`. |
-| `release` | `contents: write`, `actions: write` | Creates the release as a **draft** with the three exes. If signed, it uploads the three `.minisig` files. It checks that the draft has exactly the expected non-empty assets, then publishes it (`--draft=false --latest`) and starts `packaging.yml`. |
+| `sign` | Environment **`release`** (owner approval, branch `main`), with `MINISIGN_SECRET_KEY` and `MINISIGN_PASSWORD`. `contents: read` | Runs **no repository code** (no checkout). It reads `keys/minisign-{primary,backup}.pub` at the commit through the API (only a 404 counts as "not committed"; any other API error fails). **No `MINISIGN_SECRET_KEY`** and no public key: it logs a warning, signs nothing and passes, so releases are published unsigned as before. **Secret, no public key yet**: it signs, checks against the public half recreated from the secret (`minisign -R`), and warns that apps do not check signatures yet. **Public keys but no secret**: it fails, since apps with those keys would refuse an unsigned update. To sign, it downloads the three smoke-tested exes and installs minisign 0.12 from a pinned URL with a pinned SHA-256 (the archive was verified with its author's key). It runs `minisign -S -t "instafind <tag>"` for each exe and checks each with `minisign -V -H` (pre-hashed only, as the app requires) against the public keys, including the exact trusted comment. Finally it uploads artifact `bahth-minisig`. |
+| `release` | `contents: write`, `actions: write` | Deletes any stale draft of the tag left by a failed run, then creates the release as a **draft** with the three exes. If signed, it uploads the three `.minisig` files. It checks that the draft has exactly the expected non-empty assets, then publishes it (`--draft=false --latest`) and starts `packaging.yml`. |
 
 Draft safety: `releases/latest`, which every installed copy asks for, never
 returns a draft, and the updater also ignores drafts. A half-made release is never
-offered. If `release` fails after creating the draft, delete the draft on the
-Releases page and re-run the job.
+offered. If `release` fails after creating the draft, re-run the failed jobs: the
+stale draft is deleted first.
 
 Compatibility: asset names are unchanged (`bahth.exe`, `bahth-x86.exe`,
 `bahth-arm64.exe`). The `.minisig` files are extra assets that old clients
@@ -161,5 +165,5 @@ be signed by a key that every client still in use trusts. Keep rotations rare.
 
 ```sh
 minisign -Vm bahth.exe -p keys/minisign-primary.pub   # or the backup key
-#   → "Trusted comment: instafind v0.9.1"
+#   → "Trusted comment: instafind vX.Y.Z"
 ```

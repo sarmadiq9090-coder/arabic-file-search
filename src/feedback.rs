@@ -18,6 +18,20 @@ use std::fmt::Write as _;
 
 pub const REPO_URL: &str = "https://github.com/sarmadiq9090-coder/arabic-file-search";
 
+/// Options ▸ «الدعم» / "Support": the support address, written to with the
+/// user's own mail program (the program itself sends nothing).
+pub const SUPPORT_EMAIL: &str = "support@fastkiwi.app";
+
+/// The `mailto:` link for [`SUPPORT_EMAIL`].
+pub fn support_mailto() -> String {
+    format!("mailto:{SUPPORT_EMAIL}")
+}
+
+/// The support page on fastkiwi.app, in Arabic for the Arabic interface.
+pub fn support_page(english: bool) -> &'static str {
+    if english { "https://fastkiwi.app/support/" } else { "https://fastkiwi.app/ar/support/" }
+}
+
 /// GitHub answers "414 URI Too Long" well above this; browsers and
 /// `ShellExecute` cope with it too.
 const MAX_URL: usize = 7000;
@@ -275,6 +289,13 @@ fn reg_dword(key: &str, name: &str) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn support_links() {
+        assert_eq!(support_mailto(), "mailto:support@fastkiwi.app");
+        assert_eq!(support_page(false), "https://fastkiwi.app/ar/support/");
+        assert_eq!(support_page(true), "https://fastkiwi.app/support/");
+    }
 
     fn info() -> SystemInfo {
         SystemInfo { version: "0.7.0".into(), os: "Windows 11 24H2 (build 26100.2314)".into(), arch: "aarch64".into(), lang: "ar".into() }
