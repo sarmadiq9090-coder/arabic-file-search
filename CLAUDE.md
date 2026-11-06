@@ -52,17 +52,19 @@ cargo clippy --all-targets -- -D warnings   # lint (CI fails on any warning)
 cargo test                                  # search/index/extraction tests also run on Linux
 cargo test --release
 cargo build --release                       # on Windows: target\release\bahth.exe
-# Cross-build from Linux exactly as CI does (needs mingw-w64; linkers in .cargo/config.toml):
-cargo build --release --target x86_64-pc-windows-gnu    # bahth.exe
-cargo build --release --target i686-pc-windows-gnu      # bahth-x86.exe
+# Published exes, as CI builds them on Windows (MSVC, static CRT via .cargo/config.toml):
+cargo build --release --target x86_64-pc-windows-msvc   # bahth.exe
+cargo build --release --target i686-pc-windows-msvc     # bahth-x86.exe
+python ci/check_imports.py bahth.exe                    # no VCRUNTIME / non-system DLL imports
+# From Linux, a quick mingw check build only: cargo build --release --target x86_64-pc-windows-gnu
 ```
 
 ## CI (.github/workflows)
 
 - `build.yml` (push to main, `v*` tags, PRs): `linux-test` (ubuntu: clippy, test, test --release),
-  `windows-lint` (clippy), `windows` (test --release, x64 and 32-bit), `exe` (mingw cross-builds on
-  ubuntu), `exe-arm64` (windows-11-arm), `smoke` (each exe on real Windows, `ci/smoke.ps1`), `ui`
-  (real-user test, `ci/ui-test.ps1`), then `release`.
+  `windows-lint` (clippy), `windows` (test --release, x64 and 32-bit), `exe` (MSVC + static CRT on
+  windows, imports checked by `ci/check_imports.py`), `exe-arm64` (windows-11-arm, same), `smoke`
+  (each exe on real Windows, `ci/smoke.ps1`), `ui` (real-user test, `ci/ui-test.ps1`), then `release`.
 - `release-notes.yml`: edits a published release's title/body when `releases/*-notes.md` changes.
 - `packaging.yml`: rewrites `bucket/`, winget and Chocolatey manifests after a release and commits
   them to main. Pushing to Chocolatey/winget is off until `CHOCOLATEY_API_KEY` / `WINGET_PAT` exist.
@@ -88,7 +90,7 @@ Must not break:
 
 ## Do not move or rename
 
-- `ci/` (scripts called by the workflows: smoke, ui-test, bench, demo, make-media, quick-shots).
+- `ci/` (scripts called by the workflows: smoke, ui-test, check_imports, bench, demo, make-media, quick-shots).
 - `bucket/` (this repo is a Scoop bucket: `bucket/instafind.json`; tafket's docs/PACKAGING.md
   also points users at this bucket).
 - `releases/*.md` (read by `release-notes.yml` and by `build.yml`'s release job).
