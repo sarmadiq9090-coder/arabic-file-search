@@ -4,7 +4,7 @@
 
 <h1 align="center">InstaFind — بحث سريع</h1>
 
-<p align="center"><b>أسرع طريقة لإيجاد أي ملف على ويندوز، بالعربية والإنكليزية، وحتى داخل المستندات.</b><br><b dir="ltr">Find any file on Windows as you type, in Arabic or English, even inside documents.</b></p>
+<p align="center"><b>أسرع طريقة لإيجاد أي ملف على ويندوز، بالعربية والإنجليزية، وحتى داخل المستندات.</b><br><b dir="ltr">Find any file on Windows as you type, in Arabic or English, even inside documents.</b></p>
 
 <p align="center">
 <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest"><img src="https://img.shields.io/github/v/release/sarmadiq9090-coder/arabic-file-search?label=%D8%A7%D9%84%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1&color=2f81f7" alt="الإصدار / Release"></a>
@@ -29,7 +29,7 @@
 
 ## العربية
 
-برنامج مجاني ومفتوح المصدر مكتوب بلغة Rust. يفهرس كل أقراصك مرة واحدة ثم يُظهر النتائج أثناء الكتابة، حتى مع ملايين الملفات. يفهم العربية كما تُكتب فعلاً: «احمد» تجد «أحمد»، و«التقرير» تجد «تقرير.pdf»، و`hgjrvdv` المكتوبة بلوحة المفاتيح الخطأ تجد «التقرير».
+برنامج مجاني ومفتوح المصدر مكتوب بلغة Rust. يفهرس كل أقراصك مرة واحدة ثم يُظهر النتائج أثناء الكتابة، حتى مع أكثر من مليون ملف. يفهم العربية كما تُكتب فعلاً: «احمد» تجد «أحمد»، و«التقرير» تجد «تقرير.pdf»، و`hgjrvdv` المكتوبة بلوحة المفاتيح الخطأ تجد «التقرير».
 
 ## التنزيل والتشغيل
 
@@ -49,7 +49,7 @@ scoop install instafind
 
 - **التحديث تلقائي**: يتحقق البرنامج مرة يومياً من GitHub ويعرض تثبيت الإصدار الجديد بنقرة ثم يعيد التشغيل، ويمكن التحقق يدوياً من «خيارات…». من لديه 0.3.1 أو أحدث يصله كل تحديث وحده.
 - **المتطلبات**: ويندوز 10 أو 11، بنسخ 64 بت وARM64 و32 بت (Rust لم تعد تدعم الأقدم). البحث داخل الصور يحتاج حزمة اللغة العربية في ويندوز لقراءة النص العربي.
-- **الخصوصية**: كل شيء يبقى على جهازك، ولا يجمع البرنامج أي بيانات استخدام. الاتصال الوحيد بالإنترنت هو التحقق من التحديثات على GitHub، والبحث من الهاتف مطفأ ما لم تشغّله، والملاحظات وتقارير الأخطاء لا تُرسل إلا حين تضغط أنت (انظر [الملاحظات والبلاغات](#الملاحظات-والبلاغات)).
+- **الخصوصية**: كل شيء يبقى على جهازك، ولا يجمع البرنامج أي بيانات استخدام. الاتصالان الوحيدان بالإنترنت هما التحقق من التحديثات على GitHub، وتنزيل أسعار صرف العملات لتحويل العملات (من open.er-api.com، مرة كل 12 ساعة تقريباً)، والبحث من الهاتف مطفأ ما لم تشغّله، والملاحظات وتقارير الأخطاء لا تُرسل إلا حين تضغط أنت (انظر [الملاحظات والبلاغات](#الملاحظات-والبلاغات)).
 - **بيانات البرنامج** في `%LOCALAPPDATA%\BahthSari\` (الفهرس والسجل والإعدادات)، وتفضيلاته في `HKCU\Software\BahthSari`. لإزالته: أطفئ «التشغيل مع ويندوز» من «خيارات…»، ثم احذف `bahth.exe` وذلك المجلد.
 
 ## السرعة
@@ -69,7 +69,7 @@ scoop install instafind
 - **البرامج بأسمائها العربية كما تكتبها**: أكثر من 45 برنامجاً ولعبة جديدة بتهجئاتها الشائعة (`كوكل كروم`، `تلكرام`، `وتساب`، `فوتشوب`، `بوبجي`)، ويُقبل حرف غلط واحد (`ديسكود` تجد Discord)، وبداية الاسم تكفي (`سبوت`).
 - **البرنامج يتعلّم من اختيارك**: إذا كتبت حروفاً وفتحت برنامجاً، يظهر أولاً في المرة الجاية لنفس الحروف.
 - **البرامج في النافذة الرئيسية أيضاً**: أزرار «تطبيق: …» فوق النتائج عندما يطابق البحث اسم برنامج.
-- **تحويل العملات**: `100 دولار`، `100 usd to iqd`، `50 يورو بالدينار`، `١٠٠ ريال سعودي` لـ 24 عملة، بأسعار تتحدث كل 12 ساعة.
+- **تحويل العملات**: `100 دولار`، `100 usd to iqd`، `50 يورو بالدينار`، `١٠٠ ريال سعودي` لـ 24 عملة، بأسعار تتحدث كل 12 ساعة (Rates By [Exchange Rate API](https://www.exchangerate-api.com)).
 - **الملفات الأخيرة والمفضلة** تظهر عند فتح البحث فارغاً.
 - **عندما لا توجد نتائج** يقترح البرنامج: «هل تقصد…؟»، البحث داخل المحتوى، كل الأقراص، كل الأنواع، أو الويب.
 - **ترتيب أذكى**: `notepda` تظهر Notepad قبل الملفات، و`2+2` تعطي الجواب بدون ملفات لا علاقة لها.
@@ -114,7 +114,7 @@ scoop install instafind
 - **سطر الأوامر** و**إضافة Flow Launcher** وأمثلة PowerShell وAutoHotkey.
 
 ### الراحة
-- **واجهة عربية أو إنكليزية**: تتبع لغة ويندوز، وتُغيَّر من «خيارات ← Language / اللغة».
+- **واجهة عربية أو إنجليزية**: تتبع لغة ويندوز، وتُغيَّر من «خيارات ← Language / اللغة».
 - **يعمل مع ويندوز** في الخلفية، وEsc أو زر الإغلاق يخفيانه إلى الأيقونة بجانب الساعة (للخروج: «خروج» من قائمة الأيقونة)، ونسخة واحدة فقط منه.
 - تواريخ نسبية («أمس»، «قبل 5 دقائق»)، وخيار الأرقام العربية، وأيقونات أنواع الملفات.
 - أي خطأ داخلي يُسجَّل في `log.txt` و`crash.txt` ولا يُغلق البرنامج.
@@ -181,6 +181,7 @@ bahth.exe -s عقد --json
 ## الملاحظات والبلاغات
 
 - **«خيارات ← أرسل ملاحظة»** يفتح في المتصفح صفحة GitHub جاهزة فيها رقم الإصدار ونظام ويندوز: «أبلغ عن مشكلة»، أو «اقترح ميزة جديدة»، أو «اسأل أو ناقش مع المستخدمين». تراجعها ثم تضغط «Submit» بنفسك، ويمكنك الكتابة بالعربية.
+- **«خيارات ← الدعم»**: راسلنا على [support@fastkiwi.app](mailto:support@fastkiwi.app) أو افتح [صفحة الدعم](https://fastkiwi.app/ar/support/).
 - **تقارير الأخطاء**: إن حدث خطأ داخلي، يسألك البرنامج مرة واحدة عند التشغيل التالي إن كنت تريد فتح صفحة GitHub فيها التقرير. التقرير محفوظ على جهازك فقط في `%LOCALAPPDATA%\BahthSari\crash.txt`، واسم المستخدم في المسارات يُستبدل بـ`<user>`.
 - **لا يُرسَل شيء تلقائياً**: لا تتبّع ولا إحصاءات، ولا اتصال بالإنترنت لهذا الغرض دون نقرتك.
 - أو اكتب مباشرة في [Issues](https://github.com/sarmadiq9090-coder/arabic-file-search/issues) أو [Discussions](https://github.com/sarmadiq9090-coder/arabic-file-search/discussions).
@@ -201,7 +202,7 @@ bahth.exe -s عقد --json
 
 <p align="center"><img src="docs/media/demo-en.gif" width="800" alt="Demo: instant name search, then search inside documents with a text snippet"></p>
 
-InstaFind is a free, open-source file search tool for Windows, written in Rust. It indexes all your drives once and shows results while you type, even with millions of files. It understands Arabic the way people actually type it: `احمد` finds `أحمد`, `التقرير` finds `تقرير.pdf`, and `hgjrvdv` typed on the wrong keyboard layout finds `التقرير`.
+InstaFind is a free, open-source file search tool for Windows, written in Rust. It indexes all your drives once and shows results while you type, even with more than 1 million files. It understands Arabic the way people actually type it: `احمد` finds `أحمد`, `التقرير` finds `تقرير.pdf`, and `hgjrvdv` typed on the wrong keyboard layout finds `التقرير`.
 
 ### Download and run
 
@@ -221,7 +222,7 @@ The first run indexes your drives in the background (a minute or more, depending
 
 - **Automatic updates**: once a day the app checks GitHub, offers the new version with one click and restarts. You can also check from **Options…**. Version 0.3.1 and later update themselves.
 - **Requirements**: Windows 10 or 11: x64, ARM64 or 32-bit (Rust no longer supports older versions). Text recognition in images needs the Windows language pack for each OCR language.
-- **Privacy**: everything stays on your PC and the app collects no usage data. The only internet connection is the update check against GitHub; phone search is off unless you turn it on; feedback and crash reports are sent only when you click (see [Feedback](#feedback)).
+- **Privacy**: everything stays on your PC and the app collects no usage data. The only internet connections are the update check against GitHub and the exchange-rate download for currency conversion (from open.er-api.com, about every 12 hours); phone search is off unless you turn it on; feedback and crash reports are sent only when you click (see [Feedback](#feedback)).
 - **Data** lives in `%LOCALAPPDATA%\BahthSari\` (index, log, settings) and `HKCU\Software\BahthSari`. To remove the app, turn off *Start with Windows* in **Options…**, then delete `bahth.exe` and that folder.
 
 ### Speed
@@ -241,7 +242,7 @@ InstaFind's second includes starting the command-line tool and loading the index
 - **Apps by the Arabic spelling you type**: 45+ more apps and games with their common spellings, one wrong letter forgiven (`ديسكود` finds Discord), and the start of a name is enough.
 - **Learns from your picks**: the app you open after typing some letters comes first next time.
 - **Apps in the main window too**: "App: …" buttons above the results when the search names an app.
-- **Currency conversion**: `100 usd to iqd`, `100 دولار`, `50 eur in gbp` for 24 currencies, rates refreshed every 12 hours.
+- **Currency conversion**: `100 usd to iqd`, `100 دولار`, `50 eur in gbp` for 24 currencies, rates refreshed every 12 hours ([Rates By Exchange Rate API](https://www.exchangerate-api.com)).
 - **Recent and favourite files** when the search box opens empty.
 - **When nothing is found**: "Did you mean…?", search inside contents, all drives, all file types, or the web.
 - **Smarter ranking**: `notepda` shows Notepad before files, and `2+2` gives the answer without unrelated files.
@@ -352,6 +353,7 @@ A Flow Launcher plugin (keyword `bs`) and PowerShell, AutoHotkey and Windows Ter
 ### Feedback
 
 - **Options → Send feedback** opens a prefilled GitHub page in your browser, with the app version and Windows version filled in: **Report a problem**, **Suggest a feature**, or **Ask or discuss with other users**. You review it and press **Submit** yourself; Arabic or English are both fine.
+- **Options → Support**: write to [support@fastkiwi.app](mailto:support@fastkiwi.app) or open the [support page](https://fastkiwi.app/support/).
 - **Crash reports**: if the app hit an internal error, at the next start it asks once whether to open a prefilled GitHub issue with the report. The report is kept only on your PC in `%LOCALAPPDATA%\BahthSari\crash.txt`, and user names in paths are replaced with `<user>`.
 - **Nothing is ever sent automatically**: no telemetry, and no network connection for this without your click.
 - Or go straight to [Issues](https://github.com/sarmadiq9090-coder/arabic-file-search/issues) or [Discussions](https://github.com/sarmadiq9090-coder/arabic-file-search/discussions).

@@ -147,7 +147,7 @@ impl Catalog {
         if q.is_empty() || limit == 0 {
             return Vec::new();
         }
-        let answer = answers::answer(q, ctx);
+        let answer = answers::answers(q, ctx);
 
         // A catalog filled field by field (Default, then pushes) has no index yet.
         let rebuilt;
@@ -193,7 +193,7 @@ impl Catalog {
         }
         items.extend(windows::matches(q, ctx));
         items.extend(system::commands(q, ctx));
-        let fallback = items.is_empty() && answer.is_none();
+        let fallback = items.is_empty() && answer.is_empty();
         items.extend(web::shortcuts(q, ctx, fallback));
 
         // Best first; on a tie the group order, then the shorter title ("Word" before "WordPad").
@@ -210,9 +210,7 @@ impl Catalog {
             let key = if key.is_empty() { format!("{:?}:{}", it.kind, it.title) } else { key };
             seen.insert(key)
         });
-        if let Some(a) = answer {
-            items.insert(0, a);
-        }
+        items.splice(0..0, answer);
         items.truncate(limit);
         items
     }

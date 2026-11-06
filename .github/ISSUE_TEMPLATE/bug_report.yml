@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        شكراً لأنك تساعد في تحسين البرنامج! يمكنك الكتابة بالعربية أو بالإنكليزية. لا تكتب أسماء ملفات أو مسارات خاصة بك، والصور (لقطات الشاشة) مرحّب بها: اسحبها إلى المربع.
+        شكراً لأنك تساعد في تحسين البرنامج! يمكنك الكتابة بالعربية أو بالإنجليزية. لا تكتب أسماء ملفات أو مسارات خاصة بك، والصور (لقطات الشاشة) مرحّب بها: اسحبها إلى المربع.
 
         Thanks for helping improve the app! You can write in Arabic or English. Please don't include private file names or paths. Screenshots are welcome: drag them into a box.
   - type: textarea

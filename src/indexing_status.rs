@@ -115,6 +115,23 @@ pub fn popup_note(lang: Lang, state: Indexing, no_files: bool, num: &dyn Fn(usiz
     Some(if no_files && state.names_incomplete() { format!("{} — {progress}", incomplete_text(lang)) } else { progress })
 }
 
+/// True when the OCR languages Windows offers (BCP-47 tags such as
+/// "en-US") leave out Arabic: images are then searched without their
+/// Arabic text, which the user is told about ([`ocr_arabic_missing_text`])
+/// rather than finding nothing silently.
+pub fn ocr_lacks_arabic(tags: &[String]) -> bool {
+    !tags.iter().any(|t| t.split('-').next().is_some_and(|p| p.eq_ignore_ascii_case("ar")))
+}
+
+/// The notice shown after a search inside documents when Windows has no
+/// Arabic OCR language ([`ocr_lacks_arabic`]).
+pub fn ocr_arabic_missing_text(lang: Lang) -> &'static str {
+    lang.pick(
+        "تنبيه: لا يمكن قراءة النص العربي داخل الصور لأن حزمة اللغة العربية غير مثبّتة في ويندوز.",
+        "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.",
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,10 +233,23 @@ mod tests {
             content_search_text(Lang::Ar, s, 1, 2, &num).unwrap(),
             popup_note(Lang::Ar, s, true, &num).unwrap(),
             incomplete_try(Lang::Ar).to_string(),
+            ocr_arabic_missing_text(Lang::Ar).to_string(),
         ];
         for t in texts {
             let first = t.chars().next().unwrap();
             assert!(('\u{0600}'..='\u{06FF}').contains(&first), "{t}");
         }
+    }
+
+    #[test]
+    fn arabic_ocr_language_detection() {
+        let tags = |t: &[&str]| t.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert!(ocr_lacks_arabic(&tags(&[])));
+        assert!(ocr_lacks_arabic(&tags(&["en-US"])));
+        assert!(ocr_lacks_arabic(&tags(&["en-US", "fr-FR", "arn"])));
+        assert!(!ocr_lacks_arabic(&tags(&["ar-SA", "en-US"])));
+        assert!(!ocr_lacks_arabic(&tags(&["en-GB", "AR"])));
+        assert!(ocr_arabic_missing_text(Lang::En).contains("Arabic text in images can't be read"));
+        assert!(ocr_arabic_missing_text(Lang::Ar).contains("لا يمكن قراءة النص العربي داخل الصور"));
     }
 }

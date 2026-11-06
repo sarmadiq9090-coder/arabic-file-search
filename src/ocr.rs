@@ -37,6 +37,12 @@ pub fn available() -> bool {
     !languages().is_empty()
 }
 
+/// Whether the Arabic text in images is skipped: Windows has no Arabic
+/// OCR language (the language pack is not installed), or no OCR at all.
+pub fn arabic_missing() -> bool {
+    crate::indexing_status::ocr_lacks_arabic(&languages())
+}
+
 /// BCP-47 tags of the OCR languages used, Arabic first: Arabic and English
 /// when installed, plus the user-profile language the engine picks.
 pub fn languages() -> Vec<String> {

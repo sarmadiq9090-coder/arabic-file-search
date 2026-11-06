@@ -457,6 +457,16 @@ mod native {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    /// The panic hook, its log and the count of contained panics are shared
+    /// by the whole test process: the tests here that panic take this lock,
+    /// so they run one at a time and `hook_writes_the_report` sees only its
+    /// own panics (it was flaky when they ran side by side).
+    fn serial() -> MutexGuard<'static, ()> {
+        static LOCK: Mutex<()> = Mutex::new(());
+        LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    }
 
     #[test]
     fn report_has_message_place_thread_and_backtrace() {
@@ -490,6 +500,7 @@ mod tests {
 
     #[test]
     fn guards_turn_panics_into_defaults() {
+        let _serial = serial();
         let h = guard3(|a: u32, _b: (), _c: ()| assert!(a < 5, "handler bug"));
         h(1, (), ());
         h(9, (), ()); // must not unwind out
@@ -539,6 +550,7 @@ mod tests {
 
     #[test]
     fn writing_a_report_where_it_cannot_go_is_harmless() {
+        let _serial = serial();
         let dir = std::env::temp_dir().join(format!("bahth_crash_nowhere_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("log.txt")).unwrap();
@@ -561,6 +573,7 @@ mod tests {
 
     #[test]
     fn panics_with_odd_payloads_are_contained() {
+        let _serial = serial();
         assert!(quietly(|| std::panic::panic_any(42u8)).is_err());
         assert!(catch(|| std::panic::panic_any(vec![1, 2, 3])).is_none());
         assert!(quietly(|| panic!("{}", "ب\u{0}\n".repeat(10_000))).is_err());
@@ -576,6 +589,7 @@ mod tests {
 
     #[test]
     fn hook_writes_the_report() {
+        let _serial = serial();
         let dir = std::env::temp_dir().join(format!("bahth_crash_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let log = dir.join("log.txt");
