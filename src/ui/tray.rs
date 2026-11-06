@@ -1,5 +1,5 @@
-//! The quick search's place in the rest of the program: the monochrome tray
-//! icon (white on a dark taskbar, black on a light one) and its menu, the
+//! The quick search's place in the rest of the program: the tray icon (the
+//! brand symbol without its tile, one for a dark and one for a light taskbar) and its menu, the
 //! new items of the Options menu, Alt+Space, the one-time question about
 //! the floating box, and starting it all after the main window is up.
 
@@ -20,8 +20,9 @@ use crate::settings::{FloatingMode, HotkeyOpens};
 /// Raw handler id for the main window's theme and Alt+Space messages.
 const RAW_ID: usize = 0x1_0F10;
 
-/// The tray icon in both colours, made at run time from
-/// [`crate::quick::magnifier_icon`] (the app icon stays as it is).
+/// The tray icon for both taskbar colours: the unplated InstaFind symbol
+/// (icon resources 2 and 3, FastKiwi brand v2), or, if a resource is missing,
+/// a monochrome magnifier made at run time from [`crate::quick::magnifier_icon`].
 #[derive(Default)]
 pub struct MonoIcons {
     white: Cell<usize>,
@@ -43,7 +44,12 @@ impl MonoIcons {
     pub fn get(&self, dark_taskbar: bool) -> HICON {
         let cell = if dark_taskbar { &self.white } else { &self.black };
         if cell.get() == 0 {
-            cell.set(make_icon(if dark_taskbar { 0xFF_FF_FF } else { 0x00_00_00 }) as usize);
+            let id = if dark_taskbar { crate::icon::TRAY_DARK } else { crate::icon::TRAY_LIGHT };
+            let mut icon = crate::icon::load_resource(id, true);
+            if icon.is_null() {
+                icon = make_icon(if dark_taskbar { 0xFF_FF_FF } else { 0x00_00_00 });
+            }
+            cell.set(icon as usize);
         }
         cell.get() as HICON
     }

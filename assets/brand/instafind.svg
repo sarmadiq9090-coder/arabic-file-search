@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="InstaFind">
+<title>InstaFind</title>
+<path fill="#2F6249" d="M56.32 0H199.68A56.32 56.32 0 0 1 256 56.32V199.68A56.32 56.32 0 0 1 199.68 256H56.32A56.32 56.32 0 0 1 0 199.68V56.32A56.32 56.32 0 0 1 56.32 0Z"/>
+<path fill="#123B2A" d="M56.32 1H199.68A55.32 55.32 0 0 1 255 56.32V199.68A55.32 55.32 0 0 1 199.68 255H56.32A55.32 55.32 0 0 1 1 199.68V56.32A55.32 55.32 0 0 1 56.32 1Z"/>
+<path fill="#78CFFF" d="M56 110A54 54 0 1 0 164 110A54 54 0 1 0 56 110ZM75 110A35 35 0 1 1 145 110A35 35 0 1 1 75 110Z"/>
+<path fill="#78CFFF" d="M135.46 155.25L164.1 183.9A14 14 0 0 0 183.9 164.1L155.25 135.46A14 14 0 0 0 135.46 155.25Z"/>
+<path fill="none" stroke="#78CFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" d="M135 95V107Q135 118 124 118H97Q84 118 84 104"/>
+<path fill="#78CFFF" d="M110 140.5L102.5 133L110 125.5L117.5 133Z"/>
+<path fill="#B9F34A" d="M228.8 197.69L223.85 223.85L197.69 228.8L202.64 202.64Z"/>
+</svg>

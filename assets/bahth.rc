@@ -1,2 +1,5 @@
 // Application icon (resource id 1). The manifest is embedded separately by embed-manifest in build.rs.
 1 ICON "bahth.ico"
+// Tray symbol without the tile (FastKiwi brand v2 altform-unplated): 2 for a dark taskbar, 3 for a light one.
+2 ICON "bahth-tray-dark.ico"
+3 ICON "bahth-tray-light.ico"

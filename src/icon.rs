@@ -11,9 +11,20 @@ use winapi::um::winuser::{
     SM_CXSMICON, SM_CYICON, SM_CYSMICON, SendMessageW, WM_SETICON,
 };
 
+/// Icon resource of the tray symbol for a dark taskbar (assets/bahth.rc).
+pub const TRAY_DARK: u16 = 2;
+/// Icon resource of the tray symbol for a light taskbar (assets/bahth.rc).
+pub const TRAY_LIGHT: u16 = 3;
+
 /// Loads icon resource 1 from the executable at the system small or large icon size.
 /// Returns a null handle on failure.
 pub fn load_icon(small: bool) -> HICON {
+    load_resource(1, small)
+}
+
+/// Loads icon resource `id` from the executable at the system small or large icon size.
+/// Returns a null handle on failure; the caller owns the handle (DestroyIcon).
+pub fn load_resource(id: u16, small: bool) -> HICON {
     unsafe {
         let (cx, cy) = if small {
             (GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON))
@@ -24,7 +35,7 @@ pub fn load_icon(small: bool) -> HICON {
         if module.is_null() {
             return std::ptr::null_mut();
         }
-        LoadImageW(module, MAKEINTRESOURCEW(1), IMAGE_ICON, cx, cy, LR_DEFAULTCOLOR) as HICON
+        LoadImageW(module, MAKEINTRESOURCEW(id), IMAGE_ICON, cx, cy, LR_DEFAULTCOLOR) as HICON
     }
 }
 

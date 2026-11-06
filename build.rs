@@ -31,4 +31,6 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets/bahth.rc");
     println!("cargo:rerun-if-changed=assets/bahth.ico");
+    println!("cargo:rerun-if-changed=assets/bahth-tray-dark.ico");
+    println!("cargo:rerun-if-changed=assets/bahth-tray-light.ico");
 }
