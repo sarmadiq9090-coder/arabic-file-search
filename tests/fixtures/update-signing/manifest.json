@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "app": "instafind",
+  "version": "9.9.9",
+  "tag": "v9.9.9",
+  "released": "2026-11-13T06:00:00Z",
+  "notes_url": "https://fastkiwi.app/releases/",
+  "notes": "",
+  "assets": {
+    "x64": {
+      "name": "bahth.exe",
+      "size": 58,
+      "sha256": "d6434b13cc4a38a7517b34da42c9681aabbb3915e22870c3d0019981f480b4bf",
+      "sha512": "yZ7qrNi6oFLQ9hR9RQmnwARyzl4KImQfcta0mCrQOhGIAKEoYf8o954h8I3KczlXCide5N0Ru5iMxu71MszhWQ==",
+      "urls": [
+        "https://updates.fastkiwi.app/instafind/v9.9.9/bahth.exe",
+        "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v9.9.9/bahth.exe"
+      ]
+    },
+    "x86": {
+      "name": "bahth-x86.exe",
+      "size": 58,
+      "sha256": "d6434b13cc4a38a7517b34da42c9681aabbb3915e22870c3d0019981f480b4bf",
+      "sha512": "yZ7qrNi6oFLQ9hR9RQmnwARyzl4KImQfcta0mCrQOhGIAKEoYf8o954h8I3KczlXCide5N0Ru5iMxu71MszhWQ==",
+      "urls": [
+        "https://updates.fastkiwi.app/instafind/v9.9.9/bahth-x86.exe",
+        "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v9.9.9/bahth-x86.exe"
+      ]
+    },
+    "arm64": {
+      "name": "bahth-arm64.exe",
+      "size": 58,
+      "sha256": "d6434b13cc4a38a7517b34da42c9681aabbb3915e22870c3d0019981f480b4bf",
+      "sha512": "yZ7qrNi6oFLQ9hR9RQmnwARyzl4KImQfcta0mCrQOhGIAKEoYf8o954h8I3KczlXCide5N0Ru5iMxu71MszhWQ==",
+      "urls": [
+        "https://updates.fastkiwi.app/instafind/v9.9.9/bahth-arm64.exe",
+        "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v9.9.9/bahth-arm64.exe"
+      ]
+    }
+  }
+}

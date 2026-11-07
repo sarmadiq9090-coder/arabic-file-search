@@ -13,7 +13,9 @@ name: build
 # Releasing is version -> sign -> release: `sign` (Environment `release`,
 # owner approval) adds a minisign signature `<exe>.minisig` for each exe once
 # the signing secret exists, and passes without signing until then
-# (docs/specs/signing.md).
+# (docs/specs/signing.md). `manifest` writes the update manifest latest.json
+# (docs/specs/update-manifest.md); `sign` signs it too when it signs the exes,
+# and `release` attaches both to the release for the Cloudflare mirror.
 
 on:
   push:
@@ -48,6 +50,8 @@ jobs:
       # only shows up optimised (and are what users run).
       - name: Test (release)
         run: cargo test --release
+      - name: Test the update manifest tool
+        run: python3 -m unittest discover -s tools -p "test_*.py"
 
   # Lints on Windows. Kept out of the release job so a lint added by a newer
   # Rust can never block publishing a release.
@@ -266,8 +270,43 @@ jobs:
   #   MINISIGN_SECRET_KEY and keys/*.pub     signs and checks against keys/*.pub.
   #   keys/*.pub, no MINISIGN_SECRET_KEY     fails: apps built with those keys
   #                                          would refuse an unsigned update.
-  sign:
+  # Writes latest.json, the update manifest the apps ask the Cloudflare mirror
+  # for first (docs/specs/update-manifest.md), from the smoke-tested exes. No
+  # secrets; `sign` signs it.
+  manifest:
     needs: version
+    if: needs.version.outputs.new == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: bahth-*exe
+          merge-multiple: true
+          path: dist
+      - name: Write latest.json
+        run: |
+          python3 tools/make-update-manifest build --app instafind --version "$TAG" \
+            --repo "$GITHUB_REPOSITORY" --notes-file "releases/$TAG-notes.md" \
+            --notes-url https://fastkiwi.app/releases/ \
+            --asset x64=dist/bahth.exe --asset x86=dist/bahth-x86.exe --asset arm64=dist/bahth-arm64.exe \
+            --out latest.json
+          python3 tools/make-update-manifest verify latest.json --app instafind --assets dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: update-manifest
+          path: latest.json
+          if-no-files-found: error
+          retention-days: 7
+
+  sign:
+    needs: [version, manifest]
     if: needs.version.outputs.new == 'true'
     runs-on: ubuntu-latest
     environment: release
@@ -329,6 +368,24 @@ jobs:
           pattern: bahth-*exe
           merge-multiple: true
           path: dist
+      - if: steps.cfg.outputs.signed == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: update-manifest
+          path: dist
+
+      # Signs only what it checked itself: the manifest is for this tag and
+      # its SHA-256s are those of the exes above.
+      - if: steps.cfg.outputs.signed == 'true'
+        name: Check the update manifest
+        run: |
+          jq -e --arg tag "$TAG" '.schema == 1 and .app == "instafind" and .tag == $tag' dist/latest.json
+          for pair in x64:bahth.exe x86:bahth-x86.exe arm64:bahth-arm64.exe; do
+            arch=${pair%%:*}; f=${pair#*:}
+            want=$(sha256sum "dist/$f" | cut -d' ' -f1)
+            jq -e --arg a "$arch" --arg f "$f" --arg h "$want" \
+              '.assets[$a].name == $f and .assets[$a].sha256 == $h' dist/latest.json
+          done
 
       - if: steps.cfg.outputs.signed == 'true'
         name: Install minisign (pinned, checksum-verified)
@@ -355,6 +412,9 @@ jobs:
             printf '%s\n' "$MINISIGN_PASSWORD" |
               minisign -S -s "$key" -m "dist/$f" -t "instafind $TAG"
           done
+          # The update manifest, with its own trusted comment.
+          printf '%s\n' "$MINISIGN_PASSWORD" |
+            minisign -S -s "$key" -m dist/latest.json -t "instafind update-manifest $TAG"
           # No committed public key yet: check against the secret key's own
           # public half, so at least the signatures are known to be sound.
           if [ "$HAVE_PUB" != true ]; then
@@ -386,6 +446,19 @@ jobs:
               exit 1
             fi
           done
+          expected="instafind update-manifest $TAG"
+          for pub in "$RUNNER_TEMP"/pub/*.pub; do
+            if comment=$(minisign -V -H -Q -m dist/latest.json -p "$pub"); then
+              if [ "$comment" != "$expected" ]; then
+                echo "::error::latest.json: trusted comment is '$comment', expected '$expected'"
+                exit 1
+              fi
+              echo "latest.json verified with $(basename "$pub"): $comment"
+              exit 0
+            fi
+          done
+          echo "::error::latest.json: the signature does not verify with any committed public key"
+          exit 1
 
       - if: steps.cfg.outputs.signed == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -396,7 +469,7 @@ jobs:
           retention-days: 7
 
   release:
-    needs: [version, sign]
+    needs: [version, manifest, sign]
     if: needs.version.outputs.new == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -414,6 +487,9 @@ jobs:
         with:
           pattern: bahth-*exe
           merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: update-manifest
       - if: needs.sign.outputs.signed == 'true'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -440,7 +516,10 @@ jobs:
         run: |
           exes=(bahth.exe bahth-x86.exe bahth-arm64.exe)
           sigs=()
-          if [ "$SIGNED" = true ]; then sigs=("${exes[@]/%/.minisig}"); fi
+          # The update manifest rides along (the Cloudflare mirror copies it);
+          # its signature is latest.json.minisig when signed.
+          if [ "$SIGNED" = true ]; then sigs=("${exes[@]/%/.minisig}" latest.json.minisig); fi
+          exes+=(latest.json)
           for f in "${exes[@]}" "${sigs[@]}"; do test -s "$f"; done
           notes="releases/$TAG-notes.md"
           [ -f "$notes" ] || notes=/dev/null

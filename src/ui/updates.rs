@@ -17,7 +17,8 @@ pub(super) enum UpdateEvent {
 impl App {
     // ---------------------------------------------------------------- updates
 
-    /// Looks for a newer release on GitHub in the background. The automatic
+    /// Looks for a newer release in the background: the signed manifest on
+    /// Cloudflare first, then GitHub (`update::check_latest`). The automatic
     /// check runs at most once a day and stays silent unless it finds one.
     pub(super) fn check_for_update(&self, manual: bool) {
         // Installed with winget or Scoop: they update it, never the program
@@ -43,7 +44,7 @@ impl App {
         let notice = self.update_notice.sender();
         std::thread::spawn(move || {
             background_priority();
-            let result = crate::update::check_latest();
+            let result = crate::update::check_latest(&mut |line| log(&format!("update: {line}")));
             if let Ok(mut s) = slot.lock() {
                 *s = Some(UpdateEvent::Checked { manual, result });
             }
@@ -159,10 +160,14 @@ impl App {
         let slot = self.update_result.clone();
         let notice = self.update_notice.sender();
         std::thread::spawn(move || {
-            let result = crate::update::download_and_install(&rel, |done, total| {
-                progress.0.store(done, Ordering::Relaxed);
-                progress.1.store(total, Ordering::Relaxed);
-            });
+            let result = crate::update::download_and_install(
+                &rel,
+                |done, total| {
+                    progress.0.store(done, Ordering::Relaxed);
+                    progress.1.store(total, Ordering::Relaxed);
+                },
+                log,
+            );
             progress.1.store(0, Ordering::Relaxed);
             if let Ok(mut s) = slot.lock() {
                 *s = Some(UpdateEvent::Installed(result));
