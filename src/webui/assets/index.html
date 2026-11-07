@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="{{LANG}}" dir="{{DIR}}">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="{{CSP}}">
+<meta name="instafind-token" content="{{TOKEN}}">
+<meta name="color-scheme" content="light dark">
+<title>InstaFind</title>
+<!-- InstaFind's main window (src/webui). Served from inside the exe by the
+     instafind:// protocol; no remote content. Every text that comes from a
+     file name or path is set with textContent, never as HTML (app.js). -->
+<link rel="stylesheet" href="app.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<div class="win" id="win">
+  <div class="head">
+    <label class="field" id="field">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <input id="q" role="combobox" aria-expanded="false" aria-controls="list" aria-autocomplete="list" dir="auto" autocomplete="off" spellcheck="false" data-i18n-placeholder="ph" data-i18n-label="ph">
+      <span class="meta" id="meta"></span>
+    </label>
+  </div>
+  <div class="chips" role="toolbar" id="chips">
+    <span class="chipwrap">
+      <button class="chip" id="kind" type="button" aria-haspopup="menu" aria-expanded="false">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+        <span id="kind-label" data-i18n="type"></span>
+        <svg class="i caret" id="kind-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="menu" id="kind-menu" role="menu" hidden></div>
+    </span>
+    <span class="end"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg><span data-i18n="sort"></span></span>
+  </div>
+
+  <div class="banner" id="banner" role="status" hidden>
+    <span class="t num" id="banner-title"></span>
+    <span class="s" id="banner-sub"></span>
+    <div class="bar" id="banner-bar"><i></i></div>
+  </div>
+
+  <div class="body" id="view-results" hidden>
+    <section class="results">
+      <div class="cols" aria-hidden="true"><span></span><span class="sorted" data-i18n="cName"></span><span data-i18n="cSize"></span><span data-i18n="cDate"></span></div>
+      <div class="list" id="list" role="listbox" data-i18n-label="results"></div>
+    </section>
+    <aside class="preview" id="preview" data-i18n-label="preview"></aside>
+  </div>
+
+  <div class="pane" id="view-empty">
+    <div class="home">
+      <section class="recent">
+        <div class="sec-h"><span data-i18n="recent"></span></div>
+        <div class="list" id="recent" role="listbox" data-i18n-label="recent"></div>
+        <p class="hint" id="recent-none" data-i18n="recentNone" hidden></p>
+      </section>
+      <section>
+        <div class="sec-h"><span data-i18n="tryThese"></span></div>
+        <div class="tips" id="tips"></div>
+        <div class="trust"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span data-i18n="trust"></span></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="pane" id="view-nores" hidden>
+    <div class="nores"><div class="card">
+      <div class="blob"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg></div>
+      <h2 id="nores-h"></h2>
+      <p class="sub" id="nores-sub"></p>
+      <div class="sugg" id="sugg" role="listbox"></div>
+      <p class="tagline"><b data-i18n="tagHead"></b><span data-i18n="tagTail"></span></p>
+    </div></div>
+  </div>
+
+  <footer class="status">
+    <span class="dot" id="dot"></span><span class="num" id="status-text"></span><span class="grow"></span>
+    <span class="keys" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="kNav"></span></span><span><kbd>Enter</kbd> <span data-i18n="kOpen"></span></span><span><kbd>Ctrl+Enter</kbd> <span data-i18n="kFolder"></span></span><span><kbd>Ctrl+Alt+F</kbd></span></span>
+  </footer>
+  <div class="sr" id="live" aria-live="polite"></div>
+</div>
+</body>
+</html>

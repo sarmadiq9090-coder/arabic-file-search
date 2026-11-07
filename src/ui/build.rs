@@ -73,8 +73,9 @@ impl NativeUi<AppUi> for App {
             .center(true)
             .ex_flags(crate::i18n::rtl_only(WS_EX_LAYOUTRTL))
             .flags({
-                // Started with Windows: wait in the tray until called.
-                let visible = if std::env::args().any(|a| a == autostart::STARTUP_ARG) {
+                // Started with Windows: wait in the tray until called. The
+                // new main window, when used, shows itself instead.
+                let visible = if std::env::args().any(|a| a == autostart::STARTUP_ARG) || super::webui::wanted() {
                     nwg::WindowFlags::empty()
                 } else {
                     nwg::WindowFlags::VISIBLE
@@ -564,6 +565,10 @@ impl NativeUi<AppUi> for App {
         let (handler, raw) = ui.inner.setup_quick()?;
         ui.handlers.borrow_mut().push(handler);
         ui.raw_handlers.borrow_mut().push(raw);
+        if let Some((handler, raw)) = ui.inner.setup_webui() {
+            ui.handlers.borrow_mut().push(handler);
+            ui.raw_handlers.borrow_mut().push(raw);
+        }
 
         ui.register_hotkey();
         ui.show_sort_arrow();
