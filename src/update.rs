@@ -1,4 +1,4 @@
-//! Auto-update: the signed manifest on Cloudflare first, GitHub Releases as
+//! Auto-update: the signed manifest on fastkiwi.app first, GitHub Releases as
 //! the fallback (docs/specs/update-manifest.md, docs/specs/signing.md).
 //!
 //! The pure logic (version comparison, parsing the GitHub API answer, notes
@@ -49,8 +49,8 @@ pub struct Release {
     pub tag: String,
     /// Release body, trimmed to about `NOTES_MAX_CHARS` characters.
     pub notes: String,
-    /// Where the program can be downloaded, tried in order (the Cloudflare
-    /// mirror first when the release came from the manifest, then GitHub).
+    /// Where the program can be downloaded, tried in order (GitHub first,
+    /// then the GitLab copy when the release came from the manifest).
     pub exe_urls: Vec<String>,
     pub exe_size: u64,
     /// SHA-256 of the program as hex, when GitHub publishes one (`digest`).
@@ -497,16 +497,19 @@ pub fn download_host_ok(url: &str) -> bool {
 
 // ---------------------------------------------------------------- update manifest
 
-/// The signed update manifest on Cloudflare (docs/specs/update-manifest.md).
-/// It is asked first, so updates keep working while GitHub is down; GitHub
-/// Releases stay the fallback.
+/// The signed update manifest on the website (Cloudflare Pages,
+/// docs/specs/update-manifest.md). It is asked first, so updates keep working
+/// while the GitHub API is down; GitHub Releases stay the fallback.
 #[cfg(windows)]
-pub const MANIFEST_URL: &str = "https://updates.fastkiwi.app/instafind/latest.json";
+pub const MANIFEST_URL: &str = "https://fastkiwi.app/updates/instafind/latest.json";
 /// Its detached minisign signature.
 #[cfg(windows)]
-pub const MANIFEST_SIG_URL: &str = "https://updates.fastkiwi.app/instafind/latest.json.minisig";
-/// The host that serves the manifest and the Cloudflare (R2) copies of the program.
-pub const MIRROR_HOST: &str = "updates.fastkiwi.app";
+pub const MANIFEST_SIG_URL: &str = "https://fastkiwi.app/updates/instafind/latest.json.minisig";
+/// The fallback copies of the program: release assets of this repository's
+/// GitLab copy (populated later; until then they answer 404 and GitHub's
+/// copy is the only one). Only this project's releases are accepted.
+pub const GITLAB_HOST: &str = "gitlab.com";
+pub const GITLAB_RELEASES_PATH: &str = "/fastkiwi1/arabic-file-search/-/releases/";
 /// The manifest's `app`.
 pub const MANIFEST_APP: &str = "instafind";
 /// Upper bound for the manifest (a real one is about 2 KB).
@@ -528,19 +531,24 @@ pub fn expected_manifest_comment(tag: &str) -> String {
     format!("{MANIFEST_APP} update-manifest {}", tag.trim())
 }
 
-/// A download address the updater accepts: GitHub, or the Cloudflare mirror.
+/// A download address the updater accepts: GitHub, or a release asset of
+/// this project on GitLab (no other GitLab project, no `..`, no escapes).
 pub fn update_host_ok(url: &str) -> bool {
     if download_host_ok(url) {
         return true;
     }
-    let Ok((host, port, _)) = split_https_url(url) else { return false };
-    port == 443 && host.eq_ignore_ascii_case(MIRROR_HOST)
+    let Ok((host, port, path)) = split_https_url(url) else { return false };
+    port == 443
+        && host.eq_ignore_ascii_case(GITLAB_HOST)
+        && path.starts_with(GITLAB_RELEASES_PATH)
+        && !path.contains(['%', '\\'])
+        && !path.split('/').any(|seg| seg == ".." || seg == ".")
 }
 
 /// Turns the manifest into this CPU's release (`asset_name` under `arch`),
 /// whatever its version: `resolve_update` decides whether it is offered.
-/// Download addresses that are not https on GitHub or the mirror, or that
-/// name another file, are dropped; at least one must remain.
+/// Download addresses that are not https on GitHub or this project's GitLab
+/// releases, or that name another file, are dropped; at least one must remain.
 pub fn parse_manifest_for(json: &[u8], arch: &str, asset_name: &str) -> Result<Release, String> {
     if json.len() as u64 > MAX_MANIFEST_BYTES {
         return Err("the update manifest is too large".into());
@@ -601,9 +609,9 @@ pub fn verify_manifest_signature(data: &[u8], sig_text: &str, tag: &str, keys: &
 /// Where an update check gets its answers: the network on Windows, fakes in
 /// the tests. Every method may fail; `resolve_update` decides what follows.
 pub trait UpdateSources {
-    /// The bytes of `latest.json` from the mirror.
+    /// The bytes of `latest.json` from fastkiwi.app.
     fn manifest(&mut self) -> Result<Vec<u8>, String>;
-    /// The bytes of `latest.json.minisig` from the mirror.
+    /// The bytes of `latest.json.minisig` from fastkiwi.app.
     fn manifest_sig(&mut self) -> Result<Vec<u8>, String>;
     /// The GitHub check (`check_latest_github`): the newest release, if newer.
     fn github(&mut self) -> Result<Option<Release>, String>;
@@ -617,9 +625,9 @@ pub trait UpdateSources {
 /// 2. With `keys`, its signature must verify. Without keys (today), it is
 ///    used only if GitHub reports the same release with the same SHA-256.
 /// 3. A trusted manifest that is newer than `current` is offered with its
-///    download addresses in order (mirror first). A trusted manifest that is
-///    not newer means up to date, unless GitHub knows a newer release (a
-///    stale mirror); a failed GitHub check then still means up to date.
+///    download addresses in order (GitHub, then GitLab). A trusted manifest
+///    that is not newer means up to date, unless GitHub knows a newer release
+///    (a stale manifest); a failed GitHub check then still means up to date.
 /// 4. Never a downgrade: only a strictly newer version is ever returned.
 pub fn resolve_update(src: &mut dyn UpdateSources, current: &str, keys: &[&str], arch: &str, asset_name: &str) -> Result<Option<Release>, String> {
     let mut github: Option<Result<Option<Release>, String>> = None;
@@ -1009,7 +1017,7 @@ mod win {
 
     // ---------------------------------------------------------------- API
 
-    /// Looks for a newer release: the signed manifest on Cloudflare first,
+    /// Looks for a newer release: the signed manifest on fastkiwi.app first,
     /// GitHub as the fallback (`resolve_update`). Some(..) only when it is
     /// newer than this build and has this CPU's program. `log` hears which
     /// source was used and why another one was not.
@@ -1156,7 +1164,7 @@ mod win {
         let new = sibling(&exe, ".new");
         let old = sibling(&exe, ".old");
         let _ = fs::remove_file(&new);
-        // Each address in order (the mirror first); a failed or altered copy
+        // Each address in order (GitHub, then GitLab); a failed or altered copy
         // is deleted before the next one is tried.
         let result = first_that_works(
             &rel.exe_urls,
@@ -1187,7 +1195,7 @@ mod win {
 
     fn fetch_signature_from(rel: &Release, url: &str) -> Result<SignatureCheck, String> {
         if !update_host_ok(url) {
-            return Err(signature_error("the signature file is not on GitHub or the update mirror"));
+            return Err(signature_error("the signature file is not on GitHub or GitLab"));
         }
         let mut body = Vec::new();
         http_get(
@@ -1212,7 +1220,7 @@ mod win {
             return Err("the update has an invalid size".into());
         }
         if !update_host_ok(url) {
-            return Err("the download address is not on GitHub or the update mirror".into());
+            return Err("the download address is not on GitHub or GitLab".into());
         }
         let file = fs::File::create(new).map_err(|e| format!("cannot create {}: {e}", new.display()))?;
         let mut out = std::io::BufWriter::with_capacity(256 * 1024, file);
@@ -1941,8 +1949,9 @@ mod tests {
     const MSIG_WRONG_VERSION: &str = fixture!("manifest.json.wrong-version.minisig");
     const MSIG_EXE_COMMENT: &str = fixture!("manifest.json.exe-comment.minisig");
     const MSIG_LEGACY: &str = fixture!("manifest.json.legacy.minisig");
-    const M_URL: &str = "https://updates.fastkiwi.app/instafind/latest.json";
-    const M_SIG_URL: &str = "https://updates.fastkiwi.app/instafind/latest.json.minisig";
+    const M_URL: &str = "https://fastkiwi.app/updates/instafind/latest.json";
+    const M_SIG_URL: &str = "https://fastkiwi.app/updates/instafind/latest.json.minisig";
+    const GL_DIR: &str = "https://gitlab.com/fastkiwi1/arabic-file-search/-/releases/v9.9.9/downloads/";
     const GH_LATEST: &str = "https://api.github.com/repos/sarmadiq9090-coder/arabic-file-search/releases/latest";
     const GH_TAG: &str = "https://api.github.com/repos/sarmadiq9090-coder/arabic-file-search/releases/tags/";
 
@@ -1980,8 +1989,8 @@ mod tests {
             self.files.insert(url.to_string(), Err(status));
             self
         }
-        /// The mirror holds the fixture manifest with signature `sig`.
-        fn mirror(self, sig: &str) -> FakeServer {
+        /// fastkiwi.app holds the fixture manifest with signature `sig`.
+        fn site(self, sig: &str) -> FakeServer {
             self.with(M_URL, MANIFEST).with(M_SIG_URL, sig)
         }
         fn get(&mut self, url: &str) -> Result<Vec<u8>, String> {
@@ -2023,7 +2032,7 @@ mod tests {
     }
 
     fn is_manifest_release(r: &Release) -> bool {
-        r.exe_urls.len() == 2 && r.exe_urls[0].starts_with("https://updates.fastkiwi.app/instafind/v9.9.9/")
+        r.exe_urls.len() == 2 && r.exe_urls[1].starts_with(GL_DIR)
     }
 
     #[test]
@@ -2033,12 +2042,12 @@ mod tests {
             assert_eq!((r.version.as_str(), r.tag.as_str()), ("9.9.9", "v9.9.9"));
             assert_eq!(r.exe_size, PAYLOAD.len() as u64);
             assert_eq!(r.sha256.as_deref(), Some(payload_sha256().as_str()));
-            // Cloudflare first, then GitHub; each signature next to its program.
+            // GitHub first, then GitLab; each signature next to its program.
             assert_eq!(
                 r.exe_urls,
                 vec![
-                    format!("https://updates.fastkiwi.app/instafind/v9.9.9/{name}"),
                     format!("https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v9.9.9/{name}"),
+                    format!("{GL_DIR}{name}"),
                 ]
             );
             assert_eq!(r.sig_urls, r.exe_urls.iter().map(|u| format!("{u}.minisig")).collect::<Vec<_>>());
@@ -2054,7 +2063,7 @@ mod tests {
     #[test]
     fn hostile_manifests_are_refused() {
         let m = |from: &str, to: &str| MANIFEST.replacen(from, to, 1);
-        let x64 = "https://updates.fastkiwi.app/instafind/v9.9.9/bahth.exe";
+        let gl = &format!("{GL_DIR}bahth.exe");
         let gh = "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v9.9.9/bahth.exe";
         for (what, bad) in [
             ("other app", m("\"app\": \"instafind\"", "\"app\": \"local-ai-chat\"")),
@@ -2067,7 +2076,7 @@ mod tests {
             ("upper-case sha", MANIFEST.replacen(&payload_sha256(), &payload_sha256().to_uppercase(), 1)),
             ("short sha", MANIFEST.replacen(&payload_sha256(), "abc", 1)),
             ("other name", m("\"name\": \"bahth.exe\"", "\"name\": \"evil.exe\"")),
-            ("no usable url", m(x64, "http://updates.fastkiwi.app/instafind/v9.9.9/bahth.exe").replacen(gh, "https://evil.example/bahth.exe", 1)),
+            ("no usable url", m(gl, &gl.replacen("https://", "http://", 1)).replacen(gh, "https://evil.example/bahth.exe", 1)),
             ("not json", "nope".into()),
             ("array", "[]".into()),
             ("too big", format!("{MANIFEST}{}", " ".repeat(MAX_MANIFEST_BYTES as usize))),
@@ -2076,14 +2085,17 @@ mod tests {
         }
         // Bad addresses are dropped, the good one stays.
         for evil in [
-            "https://evil.example/instafind/v9.9.9/bahth.exe",
-            "https://updates.fastkiwi.app.evil.example/bahth.exe",
-            "https://updates.fastkiwi.app:8443/instafind/v9.9.9/bahth.exe",
-            "https://u@updates.fastkiwi.app/instafind/v9.9.9/bahth.exe",
-            "https://updates.fastkiwi.app/instafind/v9.9.9/bahth.exe?x=bahth.exe",
-            "https://updates.fastkiwi.app/instafind/v9.9.9/bahth-x86.exe",
+            "https://evil.example/fastkiwi1/arabic-file-search/-/releases/v9.9.9/downloads/bahth.exe",
+            "https://gitlab.com.evil.example/fastkiwi1/arabic-file-search/-/releases/v9.9.9/downloads/bahth.exe",
+            "https://gitlab.com:8443/fastkiwi1/arabic-file-search/-/releases/v9.9.9/downloads/bahth.exe",
+            "https://u@gitlab.com/fastkiwi1/arabic-file-search/-/releases/v9.9.9/downloads/bahth.exe",
+            "https://gitlab.com/evil/arabic-file-search/-/releases/v9.9.9/downloads/bahth.exe",
+            "https://gitlab.com/fastkiwi1/arabic-file-search/-/releases/../../../../evil/x/-/releases/v9.9.9/downloads/bahth.exe",
+            "https://gitlab.com/fastkiwi1/arabic-file-search/-/releases/v9.9.9/downloads/bahth.exe?x=bahth.exe",
+            "https://gitlab.com/fastkiwi1/arabic-file-search/-/releases/v9.9.9/downloads/bahth-x86.exe",
+            "https://fastkiwi.app/updates/instafind/bahth.exe",
         ] {
-            let r = parse_manifest_for(m(x64, evil).as_bytes(), "x64", ASSET_X64).unwrap();
+            let r = parse_manifest_for(m(gl, evil).as_bytes(), "x64", ASSET_X64).unwrap();
             assert_eq!(r.exe_urls, vec![gh.to_string()], "{evil}");
         }
         // Random damage never panics.
@@ -2113,7 +2125,7 @@ mod tests {
         assert_refused(verify_manifest_signature(data, MSIG_LEGACY, "v9.9.9", &keys), "legacy");
         assert_refused(verify_manifest_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, "v9.9.9", &keys), "instafind v9.9.9");
         // A changed manifest (another address) fails.
-        let changed = MANIFEST.replacen("updates.fastkiwi.app", "updates.fastkiwi.app ", 1);
+        let changed = MANIFEST.replacen("gitlab.com", "gitlab.com ", 1);
         assert_refused(verify_manifest_signature(changed.as_bytes(), MSIG_PRIMARY, "v9.9.9", &keys), BAD_SIGNATURE);
         // No keys, nothing verifies.
         assert_refused(verify_manifest_signature(data, MSIG_PRIMARY, "v9.9.9", &[]), "not made by a trusted key");
@@ -2123,14 +2135,14 @@ mod tests {
     fn signed_manifest_works_while_github_is_down() {
         let keys = test_keys();
         for gh_status in [403, 404, 500] {
-            let mut s = FakeServer::new("9.9.8").mirror(MSIG_PRIMARY).failing(GH_LATEST, gh_status);
+            let mut s = FakeServer::new("9.9.8").site(MSIG_PRIMARY).failing(GH_LATEST, gh_status);
             let r = s.resolve(&keys).unwrap().expect("an update");
             assert!(is_manifest_release(&r), "{r:?}");
             assert_eq!(r.version, "9.9.9");
             assert!(!s.asked_github(), "{:?}", s.hits);
         }
         // Signed with the backup key: the same.
-        let mut s = FakeServer::new("9.9.8").mirror(MSIG_BACKUP);
+        let mut s = FakeServer::new("9.9.8").site(MSIG_BACKUP);
         assert!(is_manifest_release(&s.resolve(&keys).unwrap().unwrap()));
     }
 
@@ -2146,10 +2158,10 @@ mod tests {
             FakeServer::new("9.9.8").failing(M_URL, 503),
             FakeServer::new("9.9.8").with(M_URL, "<html>"),
             // Bad, missing or foreign signatures.
-            FakeServer::new("9.9.8").mirror(MSIG_OTHER_KEY),
-            FakeServer::new("9.9.8").mirror(MSIG_WRONG_VERSION),
-            FakeServer::new("9.9.8").mirror(MSIG_EXE_COMMENT),
-            FakeServer::new("9.9.8").mirror("garbage"),
+            FakeServer::new("9.9.8").site(MSIG_OTHER_KEY),
+            FakeServer::new("9.9.8").site(MSIG_WRONG_VERSION),
+            FakeServer::new("9.9.8").site(MSIG_EXE_COMMENT),
+            FakeServer::new("9.9.8").site("garbage"),
             FakeServer::new("9.9.8").with(M_URL, MANIFEST).failing(M_SIG_URL, 404),
             FakeServer::new("9.9.8").with(M_URL, MANIFEST.replacen("\"size\": 58", "\"size\": 59", 1)).with(M_SIG_URL, MSIG_PRIMARY),
         ];
@@ -2166,17 +2178,17 @@ mod tests {
     }
 
     #[test]
-    fn never_a_downgrade_and_a_stale_mirror_defers_to_github() {
+    fn never_a_downgrade_and_a_stale_manifest_defers_to_github() {
         let keys = test_keys();
         // Up to date, or newer than the manifest: nothing, whatever GitHub says.
         for current in ["9.9.9", "10.0.0"] {
-            let mut s = FakeServer::new(current).mirror(MSIG_PRIMARY).with(GH_LATEST, gh_json("v9.9.9", &payload_sha256()));
+            let mut s = FakeServer::new(current).site(MSIG_PRIMARY).with(GH_LATEST, gh_json("v9.9.9", &payload_sha256()));
             assert_eq!(s.resolve(&keys).unwrap(), None, "{current}");
-            let mut s = FakeServer::new(current).mirror(MSIG_PRIMARY).failing(GH_LATEST, 500);
+            let mut s = FakeServer::new(current).site(MSIG_PRIMARY).failing(GH_LATEST, 500);
             assert_eq!(s.resolve(&keys).unwrap(), None, "{current}: a trusted manifest says up to date");
         }
-        // The mirror still has v9.9.9 but GitHub has v9.9.10: GitHub's.
-        let mut s = FakeServer::new("9.9.9").mirror(MSIG_PRIMARY).with(GH_LATEST, gh_json("v9.9.10", &"cd".repeat(32)));
+        // The manifest still says v9.9.9 but GitHub has v9.9.10: GitHub's.
+        let mut s = FakeServer::new("9.9.9").site(MSIG_PRIMARY).with(GH_LATEST, gh_json("v9.9.10", &"cd".repeat(32)));
         assert_eq!(s.resolve(&keys).unwrap().unwrap().tag, "v9.9.10");
         // Without keys, the same rules.
         let mut s = FakeServer::new("10.0.0").with(M_URL, MANIFEST).with(GH_LATEST, gh_json("v9.9.9", &payload_sha256()));
@@ -2186,12 +2198,12 @@ mod tests {
     #[test]
     fn without_keys_the_manifest_needs_github_to_agree() {
         let sha = payload_sha256();
-        // Same release, same SHA-256: the manifest's addresses (mirror first).
-        let mut s = FakeServer::new("9.9.8").mirror("not even read").with(GH_LATEST, gh_json("v9.9.9", &sha));
+        // Same release, same SHA-256: the manifest's addresses (GitHub, then GitLab).
+        let mut s = FakeServer::new("9.9.8").site("not even read").with(GH_LATEST, gh_json("v9.9.9", &sha));
         let r = s.resolve(&[]).unwrap().unwrap();
         assert!(is_manifest_release(&r), "{r:?}");
         assert!(!s.hits.iter().any(|h| h == M_SIG_URL), "no keys, no signature download");
-        // GitHub's checksum differs: the mirror is skipped.
+        // GitHub's checksum differs: the manifest is skipped.
         let mut s = FakeServer::new("9.9.8").with(M_URL, MANIFEST).with(GH_LATEST, gh_json("v9.9.9", &"ef".repeat(32)));
         let r = s.resolve(&[]).unwrap().unwrap();
         assert!(!is_manifest_release(&r) && r.sha256 == Some("ef".repeat(32)), "{r:?}");
@@ -2243,19 +2255,24 @@ mod tests {
     #[test]
     fn update_hosts() {
         for (url, ok) in [
-            ("https://updates.fastkiwi.app/instafind/v1/bahth.exe", true),
-            ("https://UPDATES.fastkiwi.app/x", true),
+            ("https://gitlab.com/fastkiwi1/arabic-file-search/-/releases/v1/downloads/bahth.exe", true),
+            ("https://GITLAB.com/fastkiwi1/arabic-file-search/-/releases/v1/downloads/bahth.exe", true),
             ("https://github.com/x", true),
             ("https://fastkiwi.app/x", false),
-            ("https://evil.updates.fastkiwi.app/x", false),
-            ("https://updates.fastkiwi.app.evil.example/x", false),
-            ("https://updates.fastkiwi.app:444/x", false),
-            ("http://updates.fastkiwi.app/x", false),
+            ("https://updates.fastkiwi.app/instafind/v1/bahth.exe", false),
+            ("https://gitlab.com/x", false),
+            ("https://gitlab.com/fastkiwi1/other/-/releases/v1/downloads/bahth.exe", false),
+            ("https://gitlab.com/fastkiwi1/arabic-file-search/-/releases/v1/../../../../evil/bahth.exe", false),
+            ("https://gitlab.com/fastkiwi1/arabic-file-search/-/releases/v1/%2e%2e/bahth.exe", false),
+            ("https://evil.gitlab.com/fastkiwi1/arabic-file-search/-/releases/v1/downloads/bahth.exe", false),
+            ("https://gitlab.com.evil.example/fastkiwi1/arabic-file-search/-/releases/v1/downloads/bahth.exe", false),
+            ("https://gitlab.com:444/fastkiwi1/arabic-file-search/-/releases/v1/downloads/bahth.exe", false),
+            ("http://gitlab.com/fastkiwi1/arabic-file-search/-/releases/v1/downloads/bahth.exe", false),
         ] {
             assert_eq!(update_host_ok(url), ok, "{url}");
         }
         // The GitHub API path still accepts GitHub only.
-        assert!(!download_host_ok("https://updates.fastkiwi.app/x"));
+        assert!(!download_host_ok("https://gitlab.com/fastkiwi1/arabic-file-search/-/releases/v1/downloads/bahth.exe"));
     }
 
     struct TempDir(std::path::PathBuf);

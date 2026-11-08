@@ -18,7 +18,7 @@ impl App {
     // ---------------------------------------------------------------- updates
 
     /// Looks for a newer release in the background: the signed manifest on
-    /// Cloudflare first, then GitHub (`update::check_latest`). The automatic
+    /// fastkiwi.app first, then GitHub (`update::check_latest`). The automatic
     /// check runs at most once a day and stays silent unless it finds one.
     pub(super) fn check_for_update(&self, manual: bool) {
         // Installed with winget or Scoop: they update it, never the program

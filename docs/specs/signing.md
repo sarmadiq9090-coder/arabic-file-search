@@ -72,9 +72,9 @@ under this CPU's asset name is refused by `validate_pe` (machine type).
 
 Downgrades are never offered: the updater installs only a strictly newer version.
 
-The update manifest on Cloudflare (`updates.fastkiwi.app/instafind/latest.json`,
+The update manifest on the website (`fastkiwi.app/updates/instafind/latest.json`,
 docs/specs/update-manifest.md) is signed with these same keys, with the trusted
-comment `instafind update-manifest <tag>`, and lists the mirror and GitHub
+comment `instafind update-manifest <tag>`, and lists the GitHub and GitLab
 addresses of each exe. Each exe still needs its own `.minisig`.
 
 **Transition.** The key list ships **empty**. Such builds behave exactly as

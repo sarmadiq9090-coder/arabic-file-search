@@ -15,7 +15,10 @@ name: build
 # the signing secret exists, and passes without signing until then
 # (docs/specs/signing.md). `manifest` writes the update manifest latest.json
 # (docs/specs/update-manifest.md); `sign` signs it too when it signs the exes,
-# and `release` attaches both to the release for the Cloudflare mirror.
+# and `release` attaches both to the release and stages them as the artifact
+# `site-updates` (updates/instafind/latest.json[.minisig]), which the website
+# repo's deploy picks up and serves at fastkiwi.app/updates/instafind/. This
+# workflow uploads nothing anywhere else.
 
 on:
   push:
@@ -270,8 +273,8 @@ jobs:
   #   MINISIGN_SECRET_KEY and keys/*.pub     signs and checks against keys/*.pub.
   #   keys/*.pub, no MINISIGN_SECRET_KEY     fails: apps built with those keys
   #                                          would refuse an unsigned update.
-  # Writes latest.json, the update manifest the apps ask the Cloudflare mirror
-  # for first (docs/specs/update-manifest.md), from the smoke-tested exes. No
+  # Writes latest.json, the update manifest the apps ask fastkiwi.app for
+  # first (docs/specs/update-manifest.md), from the smoke-tested exes. No
   # secrets; `sign` signs it.
   manifest:
     needs: version
@@ -516,8 +519,8 @@ jobs:
         run: |
           exes=(bahth.exe bahth-x86.exe bahth-arm64.exe)
           sigs=()
-          # The update manifest rides along (the Cloudflare mirror copies it);
-          # its signature is latest.json.minisig when signed.
+          # The update manifest rides along; its signature is
+          # latest.json.minisig when signed.
           if [ "$SIGNED" = true ]; then sigs=("${exes[@]/%/.minisig}" latest.json.minisig); fi
           exes+=(latest.json)
           for f in "${exes[@]}" "${sigs[@]}"; do test -s "$f"; done
@@ -535,6 +538,17 @@ jobs:
             exit 1
           fi
           gh release edit "$TAG" --draft=false --latest
+      # The website serves the manifest (fastkiwi.app/updates/instafind/): this
+      # only hands it over as an artifact, after the release is public. The
+      # website repo's deploy downloads `site-updates` and publishes it.
+      - name: Stage latest.json for the website
+        run: python3 tools/make-update-manifest stage latest.json --out site-updates
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: site-updates
+          path: site-updates/
+          if-no-files-found: error
+          retention-days: 30
       # Package managers: packaging.yml rewrites the Scoop, winget and
       # Chocolatey manifests and commits them to main (and pushes to
       # Chocolatey/winget when their secrets exist). A release made with
