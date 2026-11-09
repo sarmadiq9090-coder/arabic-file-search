@@ -2,7 +2,10 @@
 // window.ipc.postMessage (requests) and window.__instafind.recv (answers);
 // see src/webui/bridge.rs for the message types. File names, paths and
 // document texts are untrusted: they only ever reach the page through
-// textContent. The page names rows ("row 7 of search 42"), never paths.
+// textContent. The page names rows ("row 7 of search 42"), never paths,
+// and the version of the list they were sent in: the program numbers every
+// list it sends and every new order of one, and refuses a row of any other
+// version (its place may hold another file by then).
 "use strict";
 (() => {
   const TOKEN = document.querySelector('meta[name="instafind-token"]').content;
@@ -120,7 +123,7 @@
 
   // ---------- state ----------
   const S = {
-    seq: 0, shown: -1, q: "", kind: 0, size: 0, date: 0, content: false, sort: "best", desc: false, scope: "",
+    seq: 0, shown: -1, ver: 0, recentVer: 0, q: "", kind: 0, size: 0, date: 0, content: false, sort: "best", desc: false, scope: "",
     kinds: [], sizes: [], dates: [], digits: false, version: "",
     rows: [], total: 0, ms: 0, done: true, sel: 0, asked: 0, running: false, isContent: false, contentFor: null,
     progress: "", warnings: [], files: 0, state: "ready", stateText: "",
@@ -292,13 +295,15 @@
       S.files = m.files ?? S.files; S.kindLabel = m.kind_label || ""; S.resultsScope = m.scope || "";
       S.isContent = !!m.content; S.running = !!m.running; S.warnings = m.warnings || [];
       if (!S.running && !S.isContent) S.progress = "";
-      if (!refresh) S.matches = null;
+      // Another version may hold other files at the same places.
+      if (!refresh || m.ver !== S.ver) S.matches = null;
+      S.ver = m.ver;
       S.sel = keep > 0 ? keep : 0;
       render(!!refresh);
       announce();
     },
     rows(m) {
-      if (m.seq !== S.seq || m.from !== S.rows.length) return;
+      if (m.seq !== S.shown || m.ver !== S.ver || m.from !== S.rows.length) return;
       S.rows = S.rows.concat(m.rows); S.done = S.rows.length >= S.total; S.asked = 0;
       if (S.view !== "results") render(); else appendRows(m.from);
     },
@@ -312,13 +317,13 @@
       if (m.done) announce();
     },
     matches(m) {
-      if (m.seq !== S.seq) return;
+      if (m.seq !== S.shown || m.ver !== S.ver) return;
       S.matches = m;
       const r = S.rows[S.sel];
       if (r && r.id === m.id) renderPreview();
       if (dlgFor === "matches:" + m.id) showMatches(m.id);
     },
-    recent(m) { S.recent = m.rows || []; renderRecent(); },
+    recent(m) { S.recent = m.rows || []; S.recentVer = m.ver || 0; renderRecent(); },
     history(m) { S.history = { recent: m.recent || [], saved: m.saved || [] }; if (!$("hist").hidden) renderHistory(); },
     scope(m) {
       S.scope = m.path || "";
@@ -332,7 +337,7 @@
       runSearch();
     },
     renamed(m) {
-      if (m.list !== "results" || m.seq !== S.seq) return;
+      if (m.list !== "results" || m.seq !== S.shown || m.ver !== S.ver) return;
       const r = S.rows[m.id];
       if (!r) return;
       r.name = [[m.name, false]];
@@ -341,7 +346,7 @@
       replaceRow(m.id);
     },
     removed(m) {
-      if (m.list !== "results" || m.seq !== S.seq || !S.rows[m.id]) return;
+      if (m.list !== "results" || m.seq !== S.shown || m.ver !== S.ver || !S.rows[m.id]) return;
       S.rows[m.id].gone = true;
       replaceRow(m.id);
     },
@@ -387,22 +392,28 @@
   }
   // The search box's text is not what the shown document results are for.
   const contentStale = () => S.content && S.contentFor !== q.value;
+  // The list the rows on screen were sent in: what every request about a
+  // row names. Taken when a menu or dialog opens, so it acts on the list it
+  // was opened for even if a newer one came meanwhile.
+  function listAt(listName = "results") {
+    return listName === "results" ? { list: listName, seq: Math.max(S.shown, 0), ver: S.ver } : { list: listName, seq: 0, ver: S.recentVer };
+  }
   function askMore() {
     if (S.done || S.asked || S.view !== "results") return;
     S.asked = S.rows.length || -1;
-    send({ op: "more", seq: S.seq, from: S.rows.length });
+    send({ op: "more", seq: Math.max(S.shown, 0), ver: S.ver, from: S.rows.length });
   }
   // More rows are there (a document search found them): fetch them if the list is short or near its end.
   function wantMore() {
     if (S.asked) return;
     if (S.rows.length < 60 || list.scrollTop + list.clientHeight > list.scrollHeight - FIRST_PAGE_GUARD) {
       S.asked = S.rows.length || -1;
-      send({ op: "more", seq: S.seq, from: S.rows.length });
+      send({ op: "more", seq: Math.max(S.shown, 0), ver: S.ver, from: S.rows.length });
     }
   }
-  function act(op, row, listName = "results") {
+  function act(op, row, listName = "results", at = listAt(listName)) {
     if (!row || row.gone) return;
-    send({ op, list: listName, seq: listName === "results" ? S.seq : 0, id: row.id });
+    send({ op, list: at.list, seq: at.seq, ver: at.ver, id: row.id });
   }
   function stop() { if (S.running) send({ op: "stop", seq: S.seq }); }
 
@@ -479,7 +490,7 @@
     // Every matching line of a document, once the selection rests on it.
     const r = S.rows[S.sel];
     clearTimeout(matchTimer);
-    if (r.snippet && !(S.matches && S.matches.id === r.id)) matchTimer = setTimeout(() => send({ op: "matches", seq: S.seq, id: r.id }), 120);
+    if (r.snippet && !(S.matches && S.matches.id === r.id)) { const at = listAt(); matchTimer = setTimeout(() => send({ op: "matches", seq: at.seq, ver: at.ver, id: r.id }), 120); }
     renderPreview();
   }
   function btn(cls, ic, label, onClick, extra) {
@@ -667,11 +678,11 @@
   document.addEventListener("mousedown", (e) => { if (!e.target.closest(".chipwrap,.popwrap,.ctx")) closeMenus(); });
 
   // ---------- the right-click menu ----------
-  let ctxRow = null; // [list, index]
+  let ctxRow = null; // { r: the row, at: its list (listAt) }
   function openCtx(i, anchor, listName = "results", at = null) {
     const r = (listName === "results" ? S.rows : S.recent)[i];
     if (!r || r.gone) return;
-    ctxRow = [listName, i];
+    ctxRow = { r, at: listAt(listName) };
     const item = (label, key, op, ic) => {
       const it = h("div", { role: "menuitem", tabindex: "-1" }, icon(ic), h("span", null, label), key ? h("kbd", null, key) : null);
       it.addEventListener("click", () => { closeMenus(); runCtx(op); });
@@ -699,14 +710,12 @@
   }
   function runCtx(op) {
     if (!ctxRow) return;
-    const [listName, i] = ctxRow;
-    const r = (listName === "results" ? S.rows : S.recent)[i];
+    const { r, at } = ctxRow;
     ctxRow = null;
-    if (!r) return;
-    if (op === "copy_all") send({ op: "copy_all", seq: S.seq });
-    else if (op === "rename") renameDialog(r, listName);
-    else if (op === "matches") showMatches(r.id);
-    else act(op, r, listName);
+    if (op === "copy_all") send({ op: "copy_all", seq: at.seq, ver: at.ver });
+    else if (op === "rename") renameDialog(r, at.list, at);
+    else if (op === "matches") { if (at.ver === S.ver) showMatches(r.id); }
+    else act(op, r, at.list, at);
     if (!$("veil").hidden) return;
     q.focus();
   }
@@ -724,11 +733,12 @@
     $("veil").hidden = true; dlgFor = "";
     (dlgBack && dlgBack.isConnected ? dlgBack : q).focus();
   }
-  function renameDialog(r, listName) {
+  // The dialogs name the list their row was in when they opened (`at`).
+  function renameDialog(r, listName, at = listAt(listName)) {
     const name = plainName(r);
     const input = h("input", { id: "rename", type: "text", dir: "auto", spellcheck: "false", autocomplete: "off", "aria-label": T.renameLabel });
     input.value = name;
-    const ok = () => { const v = input.value.trim(); closeDialog(); if (v && v !== name) send({ op: "rename", list: listName, seq: listName === "results" ? S.seq : 0, id: r.id, name: v }); };
+    const ok = () => { const v = input.value.trim(); closeDialog(); if (v && v !== name) send({ op: "rename", list: at.list, seq: at.seq, ver: at.ver, id: r.id, name: v }); };
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { ok(); e.preventDefault(); e.stopPropagation(); } });
     dialog(T.renameH, [h("label", { class: "lbl", for: "rename" }, T.renameLabel), input],
       [btn("primary", I.pen, T.renameOk, ok), btn("", I.x, T.cancel, closeDialog)], "rename");
@@ -741,7 +751,7 @@
     const r = S.rows[id];
     if (!r || !r.snippet) return;
     const m = S.matches && S.matches.id === id ? S.matches : null;
-    if (!m) send({ op: "matches", seq: S.seq, id });
+    if (!m) send({ op: "matches", seq: Math.max(S.shown, 0), ver: S.ver, id });
     const body = [h("div", { class: "pv-path" }, pathEl(joinPath(r.dir, plainName(r)), 999))];
     if (m) {
       body.push(h("p", { class: "sub num" }, T.nMatches(m.count) + (m.lines.length < m.count ? " " + T.firstLines(m.lines.length) : "")), linesEl(m, 1000));

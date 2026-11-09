@@ -152,6 +152,13 @@ impl LangCode {
 }
 
 /// A request of the page.
+///
+/// A request about rows names the list they were sent in: `seq` (the search)
+/// and `ver`, the version of the list the program gave it (see [`Lists`]).
+/// A row is named by its place, and the same search can be listed again in
+/// another order or with other files under the same `seq`, so a request for
+/// another version than the one listed now is refused, never applied to
+/// whatever file is at that place now.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
@@ -178,31 +185,31 @@ pub enum Request {
         #[serde(default)]
         desc: bool,
     },
-    /// The rows of search `seq` from `from` on.
-    More { seq: u64, from: usize },
+    /// The rows of search `seq` (version `ver`) from `from` on.
+    More { seq: u64, ver: u64, from: usize },
     /// Orders the results of search `seq` again without searching again
     /// (a search inside documents; a name search simply runs again).
     Sort { seq: u64, sort: Sort, #[serde(default)] desc: bool },
     /// Stops search `seq` inside documents.
     Stop { seq: u64 },
     /// Every matching line of row `id` of search `seq` (inside documents).
-    Matches { seq: u64, id: u32 },
+    Matches { seq: u64, ver: u64, id: u32 },
     /// Open the file of row `id`.
-    Open { list: List, seq: u64, id: u32 },
+    Open { list: List, seq: u64, ver: u64, id: u32 },
     /// Show the file of row `id` in Explorer.
-    Reveal { list: List, seq: u64, id: u32 },
+    Reveal { list: List, seq: u64, ver: u64, id: u32 },
     /// Copy the full path of row `id`.
-    Copy { list: List, seq: u64, id: u32 },
+    Copy { list: List, seq: u64, ver: u64, id: u32 },
     /// Put the file of row `id` itself on the clipboard (to paste in Explorer).
-    CopyFile { list: List, seq: u64, id: u32 },
+    CopyFile { list: List, seq: u64, ver: u64, id: u32 },
     /// Copy the paths of every result of search `seq`, one per line.
-    CopyAll { seq: u64 },
+    CopyAll { seq: u64, ver: u64 },
     /// Rename the file of row `id` to `name` (a name, not a path).
-    Rename { list: List, seq: u64, id: u32, name: String },
+    Rename { list: List, seq: u64, ver: u64, id: u32, name: String },
     /// Move the file of row `id` to the Recycle Bin (Windows asks first).
-    Recycle { list: List, seq: u64, id: u32 },
+    Recycle { list: List, seq: u64, ver: u64, id: u32 },
     /// Search only in the folder of row `id` (the folder itself for a folder).
-    Scope { list: List, seq: u64, id: u32 },
+    Scope { list: List, seq: u64, ver: u64, id: u32 },
     /// Choose the folder to search in with Windows' folder dialog.
     PickFolder {},
     /// Search all drives again.
@@ -391,6 +398,8 @@ pub enum Outbound {
     },
     Results {
         seq: u64,
+        /// The version of this list ([`Lists`]): requests about its rows name it.
+        ver: u64,
         total: usize,
         ms: usize,
         rows: Vec<RowOut>,
@@ -411,6 +420,7 @@ pub enum Outbound {
     },
     Rows {
         seq: u64,
+        ver: u64,
         from: usize,
         rows: Vec<RowOut>,
     },
@@ -425,11 +435,13 @@ pub enum Outbound {
     /// Every matching line of a document: (line number, the line in pieces).
     Matches {
         seq: u64,
+        ver: u64,
         id: u32,
         count: u32,
         lines: Vec<(u32, Pieces)>,
     },
     Recent {
+        ver: u64,
         rows: Vec<RowOut>,
     },
     /// The recent and saved searches.
@@ -453,6 +465,7 @@ pub enum Outbound {
     Renamed {
         list: List,
         seq: u64,
+        ver: u64,
         id: u32,
         name: String,
     },
@@ -460,6 +473,7 @@ pub enum Outbound {
     Removed {
         list: List,
         seq: u64,
+        ver: u64,
         id: u32,
     },
     Settings(SettingsOut),
@@ -658,12 +672,120 @@ pub fn rename_target(old: &str, name: &str) -> Result<String, BadName> {
     })
 }
 
+// ------------------------------------------------------------------ the lists on the page
+
+/// Why the row a request names can't be acted on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Miss {
+    /// The request names a list that is no longer the one listed (a newer
+    /// search, the same one run again, or a new order came since): its row
+    /// number may be another file now.
+    Stale,
+    /// No such row, or its file went to the Recycle Bin.
+    Gone,
+}
+
+impl Miss {
+    /// What to tell the user, if anything.
+    pub fn message(self, lang: Lang) -> Option<&'static str> {
+        match self {
+            Miss::Stale => Some(lang.pick("تغيّرت القائمة للتو، فلم يُنفَّذ شيء. حاول مرة أخرى.", "The list just changed, so nothing was done. Try again.")),
+            Miss::Gone => None,
+        }
+    }
+}
+
+/// The recently opened files listed while the search box is empty.
+#[derive(Debug, Default)]
+pub struct RecentList {
+    /// Its version; 0 before the first one was sent.
+    pub ver: u64,
+    pub paths: Vec<String>,
+}
+
+/// The lists the page was sent, to act on their rows.
+///
+/// Every list sent, and every new order of one, gets a version of its own
+/// ([`Lists::next_ver`], never given twice in a run), and the page names it
+/// with every request about a row. The rows are named by their place, so
+/// the version is what keeps a request about an older list (a name search
+/// run again in the background, a search inside documents put in order when
+/// it ends, another order chosen) from reaching the file at that place now.
+#[derive(Default)]
+pub struct Lists {
+    /// The last version given.
+    last: u64,
+    /// The search results listed now.
+    pub shown: Option<Shown>,
+    pub recent: RecentList,
+    /// The newest name search asked for while one was running.
+    pub pending: Option<Params>,
+}
+
+impl Lists {
+    /// A new version, for a list about to be made or reordered.
+    pub fn next_ver(&mut self) -> u64 {
+        self.last += 1;
+        self.last
+    }
+
+    /// Keeps `paths` as the recent files listed now; returns their version.
+    pub fn set_recent(&mut self, paths: Vec<String>) -> u64 {
+        let ver = self.next_ver();
+        self.recent = RecentList { ver, paths };
+        ver
+    }
+
+    /// The results listed now, if they are version `ver` of search `seq`.
+    pub fn shown_at(&self, seq: u64, ver: u64) -> Result<&Shown, Miss> {
+        self.shown.as_ref().filter(|s| s.seq == seq && s.ver == ver).ok_or(Miss::Stale)
+    }
+
+    pub fn shown_at_mut(&mut self, seq: u64, ver: u64) -> Result<&mut Shown, Miss> {
+        self.shown.as_mut().filter(|s| s.seq == seq && s.ver == ver).ok_or(Miss::Stale)
+    }
+
+    /// The full path of row `id` of version `ver` of `list` (`seq` for the results).
+    pub fn path(&self, list: List, seq: u64, ver: u64, id: u32) -> Result<&str, Miss> {
+        match list {
+            List::Results => self.shown_at(seq, ver)?.path(id).ok_or(Miss::Gone),
+            List::Recent if ver == 0 || ver != self.recent.ver => Err(Miss::Stale),
+            List::Recent => self.recent.paths.get(id as usize).map(String::as_str).ok_or(Miss::Gone),
+        }
+    }
+
+    /// Puts the results of search `seq` in another order, as a new version.
+    pub fn resort(&mut self, seq: u64, sort: Sort, desc: bool) -> Option<&mut Shown> {
+        let ver = self.next_ver();
+        let s = self.shown.as_mut().filter(|s| s.seq == seq)?;
+        s.resort(sort, desc);
+        s.ver = ver;
+        Some(s)
+    }
+
+    /// A name search ended with `shown`. It becomes the list unless a newer
+    /// one is listed. Returns
+    /// whether to send it to the page (not when a newer search waits, which
+    /// the page would drop it for), and the search waiting to run.
+    pub fn finished(&mut self, shown: Shown) -> (bool, Option<Params>) {
+        let pending = self.pending.take();
+        if self.shown.as_ref().is_some_and(|s| s.seq > shown.seq) {
+            return (false, pending);
+        }
+        let send = pending.as_ref().is_none_or(|p| p.seq == shown.seq);
+        self.shown = Some(shown);
+        (send, pending)
+    }
+}
+
 // ------------------------------------------------------------------ search
 
 /// What a search needs besides the index.
 #[derive(Debug, Clone, Default)]
 pub struct Params {
     pub seq: u64,
+    /// The version its list gets ([`Lists::next_ver`], numbered when the search starts).
+    pub ver: u64,
     pub text: String,
     /// Index into [`KINDS`].
     pub kind: usize,
@@ -697,6 +819,8 @@ pub struct Found {
 /// The rows a search found, kept to answer the page's later requests.
 pub struct Shown {
     pub seq: u64,
+    /// This list's version: a new one for every list and every new order ([`Lists`]).
+    pub ver: u64,
     pub index: Arc<Index>,
     pub hits: Vec<u32>,
     /// The query whose matches are marked (a fallback's, when one found the rows).
@@ -715,7 +839,7 @@ pub struct Shown {
 impl Shown {
     /// An empty list for a search inside documents with `q`, filled as it runs.
     pub fn documents(index: Arc<Index>, q: Query, params: Params) -> Shown {
-        Shown { seq: params.seq, index, hits: Vec::new(), marked: q, params, found: HashMap::new(), changed: HashMap::new(), done: false }
+        Shown { seq: params.seq, ver: params.ver, index, hits: Vec::new(), marked: q, params, found: HashMap::new(), changed: HashMap::new(), done: false }
     }
 
     /// Adds what a search inside documents found since the last call.
@@ -744,6 +868,11 @@ impl Shown {
         }
         let place: HashMap<u32, u32> = self.hits.iter().enumerate().map(|(i, &e)| (e, i as u32)).collect();
         self.changed = changed.into_iter().filter_map(|(e, c)| place.get(&e).map(|&id| (id, c))).collect();
+    }
+
+    /// The message with rows `from..from + n`, for the page's "more".
+    pub fn rows(&self, from: usize, n: usize) -> Outbound {
+        Outbound::Rows { seq: self.seq, ver: self.ver, from, rows: self.page(from, n) }
     }
 
     /// Rows `from..from + n`.
@@ -794,7 +923,7 @@ impl Shown {
     pub fn matches(&self, id: u32) -> Option<Outbound> {
         let f = self.found.get(self.hits.get(id as usize)?)?;
         let lines = f.lines.iter().map(|(n, l)| (*n, marked(l, &self.marked))).collect();
-        Some(Outbound::Matches { seq: self.seq, id, count: f.count, lines })
+        Some(Outbound::Matches { seq: self.seq, ver: self.ver, id, count: f.count, lines })
     }
 
     /// The message with the first rows (sent again when a search inside
@@ -802,6 +931,7 @@ impl Shown {
     pub fn results(&self, ms: usize, note: Option<String>, suggestions: Vec<SuggestionOut>, lang: Lang) -> Outbound {
         Outbound::Results {
             seq: self.seq,
+            ver: self.ver,
             total: self.hits.len(),
             ms,
             rows: self.page(0, FIRST_PAGE),
@@ -901,7 +1031,7 @@ pub fn search(index: Arc<Index>, p: Params, lang: Lang) -> (Shown, Outbound) {
     };
     let suggestions = if hits.is_empty() { suggestions(&p.text, situation) } else { Vec::new() };
     let note = fallback.map(|fb| fb.status(&p.text));
-    let shown = Shown { seq: p.seq, index, hits, marked, params: p, found: HashMap::new(), changed: HashMap::new(), done: true };
+    let shown = Shown { seq: p.seq, ver: p.ver, index, hits, marked, params: p, found: HashMap::new(), changed: HashMap::new(), done: true };
     let msg = shown.results(ms, note, suggestions, lang);
     (shown, msg)
 }
@@ -1034,7 +1164,7 @@ mod tests {
             Ok(Request::Search { seq: 3, q: "تقرير".into(), kind: 1, size: 0, date: 0, content: false, sort: Sort::Best, desc: false })
         );
         assert_eq!(req(r#""op":"hello""#), Ok(Request::Hello {}));
-        assert_eq!(req(r#""op":"open","list":"recent","seq":0,"id":2"#), Ok(Request::Open { list: List::Recent, seq: 0, id: 2 }));
+        assert_eq!(req(r#""op":"open","list":"recent","seq":0,"ver":4,"id":2"#), Ok(Request::Open { list: List::Recent, seq: 0, ver: 4, id: 2 }));
         // Another page, a missing or wrong token, junk, unknown fields or values.
         let hello = format!(r#"{{"t":"{TOKEN}","op":"hello"}}"#);
         for src in ["https://evil.example/", "http://instafind.localhost.evil.example/", "http://evil.localhost/", "file:///C:/x.html", ""] {
@@ -1047,7 +1177,7 @@ mod tests {
         assert_eq!(parse(&hello, SRC, ""), Err(Rejected::Token));
         assert_eq!(ok("not json"), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"read_file","path":"C:\\x""#), Err(Rejected::Malformed));
-        assert_eq!(req(r#""op":"open","list":"results","seq":1,"id":1,"path":"C:\\x""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"open","list":"results","seq":1,"ver":1,"id":1,"path":"C:\\x""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"search","seq":1,"q":"a","kind":99"#), Err(Rejected::Invalid));
         assert_eq!(req(r#""op":"web","q":"  ""#), Err(Rejected::Invalid));
         let long = format!(r#""op":"search","seq":1,"q":"{}""#, "a".repeat(MAX_QUERY + 1));
@@ -1065,11 +1195,11 @@ mod tests {
             assert!(req(&format!(r#""op":"search","seq":1,"q":"x",{bad}"#)).is_err(), "{bad}");
         }
         assert_eq!(req(r#""op":"sort","seq":2,"sort":"size""#), Ok(Request::Sort { seq: 2, sort: Sort::Size, desc: false }));
-        assert_eq!(req(r#""op":"matches","seq":2,"id":0"#), Ok(Request::Matches { seq: 2, id: 0 }));
-        assert_eq!(req(r#""op":"copy_file","list":"results","seq":2,"id":1"#), Ok(Request::CopyFile { list: List::Results, seq: 2, id: 1 }));
-        assert_eq!(req(r#""op":"copy_all","seq":2"#), Ok(Request::CopyAll { seq: 2 }));
-        assert_eq!(req(r#""op":"recycle","list":"recent","seq":0,"id":3"#), Ok(Request::Recycle { list: List::Recent, seq: 0, id: 3 }));
-        assert_eq!(req(r#""op":"scope","list":"results","seq":5,"id":0"#), Ok(Request::Scope { list: List::Results, seq: 5, id: 0 }));
+        assert_eq!(req(r#""op":"matches","seq":2,"ver":3,"id":0"#), Ok(Request::Matches { seq: 2, ver: 3, id: 0 }));
+        assert_eq!(req(r#""op":"copy_file","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::CopyFile { list: List::Results, seq: 2, ver: 3, id: 1 }));
+        assert_eq!(req(r#""op":"copy_all","seq":2,"ver":3"#), Ok(Request::CopyAll { seq: 2, ver: 3 }));
+        assert_eq!(req(r#""op":"recycle","list":"recent","seq":0,"ver":1,"id":3"#), Ok(Request::Recycle { list: List::Recent, seq: 0, ver: 1, id: 3 }));
+        assert_eq!(req(r#""op":"scope","list":"results","seq":5,"ver":6,"id":0"#), Ok(Request::Scope { list: List::Results, seq: 5, ver: 6, id: 0 }));
         assert_eq!(req(r#""op":"pick_folder""#), Ok(Request::PickFolder {}));
         assert_eq!(req(r#""op":"all_drives""#), Ok(Request::AllDrives {}));
         // The page can't name a folder or a path, only rows.
@@ -1078,11 +1208,11 @@ mod tests {
         assert_eq!(req(r#""op":"hide","now":1"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"scope","path":"C:\\""#), Err(Rejected::Malformed));
         assert_eq!(
-            req(r#""op":"rename","list":"results","seq":1,"id":0,"name":"جديد.txt""#),
-            Ok(Request::Rename { list: List::Results, seq: 1, id: 0, name: "جديد.txt".into() })
+            req(r#""op":"rename","list":"results","seq":1,"ver":2,"id":0,"name":"جديد.txt""#),
+            Ok(Request::Rename { list: List::Results, seq: 1, ver: 2, id: 0, name: "جديد.txt".into() })
         );
-        assert_eq!(req(r#""op":"rename","list":"results","seq":1,"id":0,"name":" ""#), Err(Rejected::Invalid));
-        assert_eq!(req(&format!(r#""op":"rename","list":"results","seq":1,"id":0,"name":"{}""#, "a".repeat(MAX_NAME + 1))), Err(Rejected::Invalid));
+        assert_eq!(req(r#""op":"rename","list":"results","seq":1,"ver":2,"id":0,"name":" ""#), Err(Rejected::Invalid));
+        assert_eq!(req(&format!(r#""op":"rename","list":"results","seq":1,"ver":2,"id":0,"name":"{}""#, "a".repeat(MAX_NAME + 1))), Err(Rejected::Invalid));
         assert_eq!(req(r#""op":"saved","id":2"#), Ok(Request::Saved { id: 2 }));
         assert_eq!(req(r#""op":"save_search","q":"عقد","content":true"#), Ok(Request::SaveSearch { q: "عقد".into(), kind: 0, content: true }));
         assert_eq!(req(r#""op":"save_search","q":"","content":true"#), Err(Rejected::Invalid));
@@ -1260,7 +1390,7 @@ mod tests {
         let snippet = rows[0].snippet.as_ref().unwrap();
         assert!(snippet.iter().any(|(t, m)| *m && t.contains("عقد")), "{snippet:?}");
         assert!(snippet.iter().any(|(t, m)| *m && t.contains("إيجار")), "{snippet:?}");
-        let Some(Outbound::Matches { count, lines, seq, id }) = shown.matches(0) else { panic!() };
+        let Some(Outbound::Matches { count, lines, seq, id, .. }) = shown.matches(0) else { panic!() };
         assert_eq!((count, seq, id, lines.len(), lines[1].0), (4, 11, 0, 2, 9));
         assert!(shown.matches(5).is_none());
         // At the end, best match is path order, as in the classic window.
@@ -1360,8 +1490,131 @@ mod tests {
         });
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.starts_with(r#"{"type":"settings","lang":"ar","next_lang":"en""#), "{json}");
-        let json = serde_json::to_string(&Outbound::Renamed { list: List::Recent, seq: 0, id: 1, name: "a".into() }).unwrap();
-        assert_eq!(json, r#"{"type":"renamed","list":"recent","seq":0,"id":1,"name":"a"}"#);
+        let json = serde_json::to_string(&Outbound::Renamed { list: List::Recent, seq: 0, ver: 3, id: 1, name: "a".into() }).unwrap();
+        assert_eq!(json, r#"{"type":"renamed","list":"recent","seq":0,"ver":3,"id":1,"name":"a"}"#);
+    }
+
+    /// A name search over the test index, numbered by `lists` as the program does.
+    fn listed(lists: &mut Lists, seq: u64, sort: Sort) -> (Shown, Outbound) {
+        let p = Params { seq, ver: lists.next_ver(), text: "تقرير".into(), sort, ..Params::default() };
+        search(index(), p, Lang::Ar)
+    }
+
+    /// [`Lists::finished`], with the waiting search by its seq.
+    fn fin(lists: &mut Lists, shown: Shown) -> (bool, Option<u64>) {
+        let (send, next) = lists.finished(shown);
+        (send, next.map(|p| p.seq))
+    }
+
+    fn ver_of(msg: &Outbound) -> u64 {
+        match msg {
+            Outbound::Results { ver, .. } | Outbound::Rows { ver, .. } | Outbound::Matches { ver, .. } | Outbound::Recent { ver, .. } => *ver,
+            _ => panic!("{msg:?}"),
+        }
+    }
+
+    #[test]
+    fn rows_are_named_with_the_version_of_their_list() {
+        let mut lists = Lists::default();
+        let (shown, msg) = listed(&mut lists, 4, Sort::Name);
+        let v1 = ver_of(&msg);
+        assert!(lists.finished(shown).0);
+        let first = lists.path(List::Results, 4, v1, 0).unwrap().to_string();
+        assert_eq!(ver_of(&lists.shown.as_ref().unwrap().rows(0, 5)), v1);
+
+        // The same search run again in the background (the index changed), in
+        // another order: same seq, same row numbers, other files at them.
+        let (again, msg) = listed(&mut lists, 4, Sort::Date);
+        let v2 = ver_of(&msg);
+        assert_ne!(v1, v2);
+        assert_eq!(fin(&mut lists, again), (true, None));
+        assert_ne!(lists.path(List::Results, 4, v2, 0).unwrap(), first, "the test needs another file at row 0");
+        // A request about the list the page had before is refused, not applied to row 0 now.
+        assert_eq!(lists.path(List::Results, 4, v1, 0), Err(Miss::Stale));
+        assert!(Miss::Stale.message(Lang::En).unwrap().contains("Try again"));
+        assert_eq!(Miss::Gone.message(Lang::Ar), None);
+
+        // Another order of the same list (Sort, or a search inside documents
+        // put in order when it ends) is a new version too.
+        let s = lists.resort(4, Sort::Size, true).unwrap();
+        let (v3, top) = (s.ver, s.path(0).unwrap().to_string());
+        assert!(v3 > v2);
+        let Outbound::Results { ver, .. } = s.results(0, None, Vec::new(), Lang::Ar) else { panic!() };
+        assert_eq!(ver, v3);
+        assert_eq!(lists.path(List::Results, 4, v2, 0), Err(Miss::Stale));
+        assert_eq!(lists.path(List::Results, 4, v3, 0), Ok(top.as_str()));
+        // Another search, or no list at all.
+        assert_eq!(lists.path(List::Results, 5, v3, 0), Err(Miss::Stale));
+        assert!(lists.resort(9, Sort::Name, false).is_none());
+        assert!(lists.shown_at_mut(4, v2).is_err() && lists.shown_at_mut(4, v3).is_ok());
+        assert_eq!(Lists::default().path(List::Results, 0, 0, 0), Err(Miss::Stale));
+        // A file sent to the Recycle Bin: nothing to do, nothing to say.
+        lists.shown_at_mut(4, v3).unwrap().changed.insert(0, None);
+        assert_eq!(lists.path(List::Results, 4, v3, 0), Err(Miss::Gone));
+        assert_eq!(lists.path(List::Results, 4, v3, 999), Err(Miss::Gone));
+    }
+
+    #[test]
+    fn a_dialog_acts_on_the_list_it_was_opened_for() {
+        // The rename dialog is opened on row 0 of version v1; while it is
+        // open the list is listed again. Its OK names v1, which is refused.
+        let mut lists = Lists::default();
+        let (shown, msg) = listed(&mut lists, 1, Sort::Name);
+        let opened = ver_of(&msg);
+        lists.finished(shown);
+        let (again, _) = listed(&mut lists, 1, Sort::Date);
+        lists.finished(again);
+        let ok = req(&format!(r#""op":"rename","list":"results","seq":1,"ver":{opened},"id":0,"name":"جديد.pdf""#)).unwrap();
+        let Request::Rename { list, seq, ver, id, .. } = ok else { panic!() };
+        assert_eq!(lists.path(list, seq, ver, id), Err(Miss::Stale));
+        // Every request about rows must name a version.
+        for body in [
+            r#""op":"rename","list":"results","seq":1,"id":0,"name":"x""#,
+            r#""op":"recycle","list":"results","seq":1,"id":0"#,
+            r#""op":"open","list":"recent","seq":0,"id":0"#,
+            r#""op":"copy_all","seq":1"#,
+            r#""op":"more","seq":1,"from":60"#,
+            r#""op":"matches","seq":1,"id":0"#,
+            r#""op":"scope","list":"results","seq":1,"id":0"#,
+        ] {
+            assert_eq!(req(body), Err(Rejected::Malformed), "{body}");
+        }
+        assert_eq!(req(r#""op":"more","seq":1,"ver":2,"from":60"#), Ok(Request::More { seq: 1, ver: 2, from: 60 }));
+    }
+
+    #[test]
+    fn recent_files_have_versions_too() {
+        let mut lists = Lists::default();
+        // Nothing listed yet: version 0 names nothing.
+        assert_eq!(lists.path(List::Recent, 0, 0, 0), Err(Miss::Stale));
+        let v1 = lists.set_recent(vec!["C:\\a\\one.txt".into(), "C:\\a\\two.txt".into()]);
+        assert_eq!(lists.path(List::Recent, 0, v1, 1), Ok("C:\\a\\two.txt"));
+        assert_eq!(lists.path(List::Recent, 0, 0, 1), Err(Miss::Stale));
+        // A file opened moves to the top: the list is sent again, and row 1 is another file.
+        let v2 = lists.set_recent(vec!["C:\\a\\two.txt".into(), "C:\\a\\one.txt".into()]);
+        assert_ne!(v1, v2);
+        assert_eq!(lists.path(List::Recent, 0, v1, 1), Err(Miss::Stale));
+        assert_eq!(lists.path(List::Recent, 0, v2, 1), Ok("C:\\a\\one.txt"));
+        assert_eq!(lists.path(List::Recent, 0, v2, 2), Err(Miss::Gone));
+        // Results and recent files never share a version.
+        let (shown, _) = listed(&mut lists, 1, Sort::Best);
+        assert!(shown.ver > v2);
+        let json = serde_json::to_string(&Outbound::Recent { ver: v2, rows: Vec::new() }).unwrap();
+        assert_eq!(json, format!(r#"{{"type":"recent","ver":{v2},"rows":[]}}"#));
+    }
+
+    #[test]
+    fn a_waiting_search_holds_back_the_answer() {
+        let mut lists = Lists::default();
+        let (shown, _) = listed(&mut lists, 2, Sort::Best);
+        lists.pending = Some(Params { seq: 3, ver: lists.next_ver(), ..Params::default() });
+        let (send, next) = lists.finished(shown);
+        assert!(!send);
+        assert_eq!(next.map(|p| p.seq), Some(3));
+        // An older search ending after a newer list is dropped.
+        let (old, _) = listed(&mut lists, 1, Sort::Best);
+        assert_eq!(fin(&mut lists, old), (false, None));
+        assert_eq!(lists.shown.as_ref().map(|s| s.seq), Some(2));
     }
 
     #[test]

@@ -37,7 +37,7 @@ mod imp {
     use crate::i18n::{self, Lang};
     use crate::search::{self, ContentHit, ContentProgress, KINDS};
     use crate::settings::{FloatingMode, HotkeyOpens};
-    use crate::webui::bridge::{self, ContentState, List, Outbound, Params, Request, Setting, SettingsOut, Shown, Sort};
+    use crate::webui::bridge::{self, ContentState, List, Lists, Miss, Outbound, Params, Request, Setting, SettingsOut, Shown, Sort};
     use crate::webui::host::{self, Host};
 
     /// Children of the window are not mirrored in Arabic (only its caption
@@ -93,13 +93,11 @@ mod imp {
         /// The finished background search, for the UI thread.
         inbox: Arc<Mutex<Option<(Shown, Outbound)>>>,
         running: Cell<bool>,
-        /// The newest search asked for while one was running.
-        pending: RefCell<Option<Params>>,
         /// The search inside documents under way, if any.
         content: RefCell<Option<ContentRun>>,
-        /// What the page lists now, to act on its rows.
-        shown: RefCell<Option<Shown>>,
-        recent: RefCell<Vec<String>>,
+        /// What the page lists now (results, recent files), with their
+        /// versions, to act on its rows; and the search waiting to run.
+        lists: RefCell<Lists>,
         /// The folder searched, "" for all drives (the page never sets it).
         scope: RefCell<String>,
         /// The language chosen for the next start, when it was changed.
@@ -346,8 +344,8 @@ mod imp {
                     Some((if m.is_dir() { 0 } else { m.len() }, mtime, m.is_dir()))
                 })
             };
-            self.webui.recent.replace(paths);
-            self.webui_send(&Outbound::Recent { rows });
+            let ver = self.webui.lists.borrow_mut().set_recent(paths);
+            self.webui_send(&Outbound::Recent { ver, rows });
         }
 
         fn webui_send_history(&self) {
@@ -434,12 +432,10 @@ mod imp {
                         self.webui_search(params);
                     }
                 }
-                Request::More { seq, from } => {
-                    let rows = match &*self.webui.shown.borrow() {
-                        Some(s) if s.seq == seq => s.page(from, bridge::MORE_PAGE),
-                        _ => return,
-                    };
-                    self.webui_send(&Outbound::Rows { seq, from, rows });
+                Request::More { seq, ver, from } => {
+                    // (Another version's rows would not fit the list the page has; it gets the new list anyway.)
+                    let Ok(msg) = self.webui.lists.borrow().shown_at(seq, ver).map(|s| s.rows(from, bridge::MORE_PAGE)) else { return };
+                    self.webui_send(&msg);
                 }
                 Request::Sort { seq, sort, desc } => {
                     {
@@ -447,13 +443,13 @@ mod imp {
                         s.sort_col = sort.column();
                         s.sort_desc = desc;
                     }
-                    let msg = match &mut *self.webui.shown.borrow_mut() {
-                        Some(s) if s.seq == seq => {
-                            s.resort(sort, desc);
+                    // A new order is a new version of the list.
+                    let msg = match self.webui.lists.borrow_mut().resort(seq, sort, desc) {
+                        Some(s) => {
                             let suggestions = if s.hits.is_empty() && s.done { bridge::content_suggestions(&s.params) } else { Vec::new() };
                             s.results(0, None, suggestions, lang)
                         }
-                        _ => return,
+                        None => return,
                     };
                     self.webui_send(&msg);
                 }
@@ -464,43 +460,49 @@ mod imp {
                         run.progress.cancel.store(true, Ordering::Relaxed);
                     }
                 }
-                Request::Matches { seq, id } => {
-                    let msg = self.webui.shown.borrow().as_ref().filter(|s| s.seq == seq).and_then(|s| s.matches(id));
+                Request::Matches { seq, ver, id } => {
+                    let msg = self.webui.lists.borrow().shown_at(seq, ver).ok().and_then(|s| s.matches(id));
                     if let Some(msg) = msg {
                         self.webui_send(&msg);
                     }
                 }
-                Request::Open { list, seq, id } => {
-                    if let Some(path) = self.webui_path(list, seq, id) {
+                Request::Open { list, seq, ver, id } => {
+                    if let Some(path) = self.webui_path(list, seq, ver, id) {
                         self.webui_note_use(&path);
                         if !shell::open(&path) {
                             self.webui_notice(trf!("تعذر فتح الملف: {}", "Could not open the file: {}", path));
                         }
                     }
                 }
-                Request::Reveal { list, seq, id } => {
-                    if let Some(path) = self.webui_path(list, seq, id) {
+                Request::Reveal { list, seq, ver, id } => {
+                    if let Some(path) = self.webui_path(list, seq, ver, id) {
                         self.webui_note_use(&path);
                         shell::reveal(&path);
                     }
                 }
-                Request::Copy { list, seq, id } => {
-                    if let Some(path) = self.webui_path(list, seq, id) {
+                Request::Copy { list, seq, ver, id } => {
+                    if let Some(path) = self.webui_path(list, seq, ver, id) {
                         nwg::Clipboard::set_data_text(&self.webui.parts.window, &path);
                         self.webui_notice(tr!("تم نسخ المسار.", "Path copied."));
                     }
                 }
-                Request::CopyFile { list, seq, id } => {
-                    if let Some(path) = self.webui_path(list, seq, id) {
+                Request::CopyFile { list, seq, ver, id } => {
+                    if let Some(path) = self.webui_path(list, seq, ver, id) {
                         let ok = self.webui.parts.window.handle.hwnd().is_some_and(|h| crate::dragdrop::copy_files(h, std::slice::from_ref(&path)));
                         self.webui_notice(if ok { tr!("تم نسخ الملف. الصقه حيث تريد بـ Ctrl+V.", "File copied. Paste it anywhere with Ctrl+V.") } else { tr!("تعذر نسخ الملف.", "Could not copy the file.") });
                     }
                 }
-                Request::CopyAll { seq } => {
+                Request::CopyAll { seq, ver } => {
                     let text = {
-                        let shown = self.webui.shown.borrow();
-                        let Some(s) = shown.as_ref().filter(|s| s.seq == seq) else { return };
-                        let paths = s.all_paths();
+                        let lists = self.webui.lists.borrow();
+                        let paths = match lists.shown_at(seq, ver) {
+                            Ok(s) => s.all_paths(),
+                            Err(miss) => {
+                                drop(lists);
+                                self.webui_missed(miss);
+                                return;
+                            }
+                        };
                         (!paths.is_empty()).then(|| (paths.len(), paths.join("\r\n")))
                     };
                     match text {
@@ -512,12 +514,12 @@ mod imp {
                         None => self.webui_notice(tr!("لا توجد نتائج لنسخها.", "There are no results to copy.")),
                     }
                 }
-                Request::Rename { list, seq, id, name } => self.webui_rename(list, seq, id, &name),
-                Request::Recycle { list, seq, id } => self.webui_recycle(list, seq, id),
-                Request::Scope { list, seq, id } => {
-                    let Some(path) = self.webui_path(list, seq, id) else { return };
+                Request::Rename { list, seq, ver, id, name } => self.webui_rename(list, seq, ver, id, &name),
+                Request::Recycle { list, seq, ver, id } => self.webui_recycle(list, seq, ver, id),
+                Request::Scope { list, seq, ver, id } => {
+                    let Some(path) = self.webui_path(list, seq, ver, id) else { return };
                     let is_dir = match list {
-                        List::Results => self.webui.shown.borrow().as_ref().is_some_and(|s| s.is_dir(id)),
+                        List::Results => self.webui.lists.borrow().shown_at(seq, ver).is_ok_and(|s| s.is_dir(id)),
                         List::Recent => std::path::Path::new(&path).is_dir(),
                     };
                     let scope = bridge::scope_for(&path, is_dir);
@@ -594,21 +596,24 @@ mod imp {
             }
         }
 
-        /// The full path of row `id`, from what the page was sent.
-        fn webui_path(&self, list: List, seq: u64, id: u32) -> Option<String> {
-            match list {
-                List::Results => {
-                    let shown = self.webui.shown.borrow();
-                    shown.as_ref().filter(|s| s.seq == seq).and_then(|s| s.path(id)).map(str::to_string)
-                }
-                List::Recent => self.webui.recent.borrow().get(id as usize).cloned(),
+        /// The full path of row `id` of version `ver` of `list`, from what
+        /// the page was sent; `None`, and a word to the user when the list
+        /// changed since, when it is not there.
+        fn webui_path(&self, list: List, seq: u64, ver: u64, id: u32) -> Option<String> {
+            let found = self.webui.lists.borrow().path(list, seq, ver, id).map(str::to_string);
+            found.map_err(|miss| self.webui_missed(miss)).ok()
+        }
+
+        fn webui_missed(&self, miss: Miss) {
+            if let Some(text) = miss.message(i18n::current()) {
+                self.webui_notice(text);
             }
         }
 
         /// A result was used: its search goes into the history and the file
         /// ranks higher next time (as in the classic window).
         fn webui_note_use(&self, path: &str) {
-            let text = self.webui.shown.borrow().as_ref().map(|s| s.params.text.clone()).unwrap_or_default();
+            let text = self.webui.lists.borrow().shown.as_ref().map(|s| s.params.text.clone()).unwrap_or_default();
             let mut st = self.state.borrow_mut();
             if !text.trim().is_empty() {
                 st.history.add_recent(&text);
@@ -646,8 +651,8 @@ mod imp {
         }
 
         /// Renames row `id`'s file to `name`, with the classic window's checks.
-        fn webui_rename(&self, list: List, seq: u64, id: u32, name: &str) {
-            let Some(old) = self.webui_path(list, seq, id) else { return };
+        fn webui_rename(&self, list: List, seq: u64, ver: u64, id: u32, name: &str) {
+            let Some(old) = self.webui_path(list, seq, ver, id) else { return };
             if let Some(why) = self.webui_index_busy() {
                 self.webui_notice(why);
                 return;
@@ -680,11 +685,11 @@ mod imp {
                 st.history.save();
             }
             if list == List::Results
-                && let Some(s) = self.webui.shown.borrow_mut().as_mut().filter(|s| s.seq == seq)
+                && let Ok(s) = self.webui.lists.borrow_mut().shown_at_mut(seq, ver)
             {
                 s.changed.insert(id, Some(new));
             }
-            self.webui_send(&Outbound::Renamed { list, seq, id, name: new_name.clone() });
+            self.webui_send(&Outbound::Renamed { list, seq, ver, id, name: new_name.clone() });
             if list == List::Recent {
                 self.webui_send_recent();
             }
@@ -692,8 +697,8 @@ mod imp {
         }
 
         /// Moves row `id`'s file to the Recycle Bin, Windows asking first.
-        fn webui_recycle(&self, list: List, seq: u64, id: u32) {
-            let Some(path) = self.webui_path(list, seq, id) else { return };
+        fn webui_recycle(&self, list: List, seq: u64, ver: u64, id: u32) {
+            let Some(path) = self.webui_path(list, seq, ver, id) else { return };
             if let Some(why) = self.webui_index_busy() {
                 self.webui_notice(why);
                 return;
@@ -711,11 +716,11 @@ mod imp {
                 st.history.save();
             }
             if list == List::Results
-                && let Some(s) = self.webui.shown.borrow_mut().as_mut().filter(|s| s.seq == seq)
+                && let Ok(s) = self.webui.lists.borrow_mut().shown_at_mut(seq, ver)
             {
                 s.changed.insert(id, None);
             }
-            self.webui_send(&Outbound::Removed { list, seq, id });
+            self.webui_send(&Outbound::Removed { list, seq, ver, id });
             self.webui_send_recent();
             self.webui_notice(tr!("نُقل الملف إلى سلة المحذوفات.", "The file was moved to the Recycle Bin."));
         }
@@ -783,11 +788,13 @@ mod imp {
         // ------------------------------------------------------------ search
 
         /// `p` with what the program knows: the folder, system files, the
-        /// often-opened files and whether to look for a better spelling.
+        /// often-opened files and whether to look for a better spelling; and
+        /// the version its list will have.
         fn webui_params(&self, p: Params) -> Params {
             let st = self.state.borrow();
             let scope = self.webui.scope.borrow().clone();
             Params {
+                ver: self.webui.lists.borrow_mut().next_ver(),
                 show_system: crate::system_files::show_system(st.settings.hide_system, &scope),
                 boosted: if p.sort == Sort::Best { st.history.boosted(&st.index, crate::index::now_secs()) } else { Vec::new() },
                 suggest: st.scan.is_none() && st.loading.is_none(),
@@ -800,7 +807,7 @@ mod imp {
         /// requests fold into a single follow-up search.
         fn webui_search(&self, params: Params) {
             if self.webui.running.get() {
-                self.webui.pending.replace(Some(params));
+                self.webui.lists.borrow_mut().pending = Some(params);
                 return;
             }
             self.webui.running.set(true);
@@ -824,18 +831,17 @@ mod imp {
         fn on_webui_found(&self) {
             self.webui.running.set(false);
             let found = self.webui.inbox.lock().ok().and_then(|mut s| s.take());
-            let pending = self.webui.pending.take();
-            if let Some((shown, msg)) = found {
-                // A search inside documents started since keeps its list.
-                let newer = self.webui.shown.borrow().as_ref().is_some_and(|s| s.seq > shown.seq);
-                if !newer {
-                    // A newer search is waiting: the page would drop this answer.
-                    if pending.as_ref().is_none_or(|p| p.seq == shown.seq) {
+            let pending = match found {
+                // (Not kept when a search inside documents started since.)
+                Some((shown, msg)) => {
+                    let (send, pending) = self.webui.lists.borrow_mut().finished(shown);
+                    if send {
                         self.webui_send(&msg);
                     }
-                    self.webui.shown.replace(Some(shown));
+                    pending
                 }
-            }
+                None => self.webui.lists.borrow_mut().pending.take(),
+            };
             if let Some(p) = pending {
                 self.webui_search(p);
             }
@@ -852,7 +858,7 @@ mod imp {
                 let mut shown = Shown::documents(index, Default::default(), params);
                 shown.done = true;
                 let msg = shown.results(0, None, Vec::new(), lang);
-                self.webui.shown.replace(Some(shown));
+                self.webui.lists.borrow_mut().shown = Some(shown);
                 self.webui_send(&msg);
                 self.webui_notice(tr!("اكتب الكلمة أو العبارة التي تريد البحث عنها داخل المستندات.", "Type the word or phrase to search for inside documents."));
                 return;
@@ -887,7 +893,7 @@ mod imp {
             let seq = params.seq;
             let shown = Shown::documents(index, marked, params);
             let msg = shown.results(0, None, Vec::new(), lang);
-            self.webui.shown.replace(Some(shown));
+            self.webui.lists.borrow_mut().shown = Some(shown);
             self.webui.content.replace(Some(ContentRun { seq, progress, hits, said: String::new() }));
             self.webui_send(&msg);
         }
@@ -910,21 +916,25 @@ mod imp {
             let done = progress.done.load(Ordering::Relaxed);
             let lang = i18n::current();
             let (found, results) = {
-                let mut shown = self.webui.shown.borrow_mut();
-                let Some(s) = shown.as_mut().filter(|s| s.seq == seq) else {
-                    drop(shown);
+                let mut lists = self.webui.lists.borrow_mut();
+                let Some(s) = lists.shown.as_mut().filter(|s| s.seq == seq) else {
+                    drop(lists);
                     self.webui_stop_content();
                     return;
                 };
                 s.absorb(new);
-                let results = done.then(|| {
-                    s.done = true;
-                    let (sort, desc) = (s.params.sort, s.params.desc);
-                    s.resort(sort, desc);
-                    let suggestions = if s.hits.is_empty() { bridge::content_suggestions(&s.params) } else { Vec::new() };
-                    s.results(0, None, suggestions, lang)
-                });
-                (s.hits.len(), results)
+                let (sort, desc) = (s.params.sort, s.params.desc);
+                // Put in order at the end: a new version of the list.
+                let results = if done {
+                    lists.resort(seq, sort, desc).map(|s| {
+                        s.done = true;
+                        let suggestions = if s.hits.is_empty() { bridge::content_suggestions(&s.params) } else { Vec::new() };
+                        s.results(0, None, suggestions, lang)
+                    })
+                } else {
+                    None
+                };
+                (lists.shown.as_ref().map_or(0, |s| s.hits.len()), results)
             };
             let state = ContentState {
                 checked: progress.checked.load(Ordering::Relaxed),
@@ -968,10 +978,10 @@ mod imp {
             }
             let stale = {
                 let st = self.state.borrow();
-                let shown = self.webui.shown.borrow();
+                let lists = self.webui.lists.borrow();
                 // A search inside documents is not run again by itself (it
                 // reads every document); its renamed rows are kept in `changed`.
-                shown.as_ref().filter(|s| !s.params.content && !Arc::ptr_eq(&s.index, &st.index)).map(|s| s.params.clone())
+                lists.shown.as_ref().filter(|s| !s.params.content && !Arc::ptr_eq(&s.index, &st.index)).map(|s| s.params.clone())
             };
             if let Some(p) = stale {
                 let params = self.webui_params(p);

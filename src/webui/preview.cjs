@@ -11,7 +11,10 @@
 // out left to right with its folder names in order (in Arabic too), that the
 // page follows the language's direction, and that every message the page
 // sends has the fields src/webui/bridge.rs accepts and nothing more (the
-// program refuses unknown fields).
+// program refuses unknown fields), and that every request about a row names
+// the version of the list it is on (the fake numbers its lists as
+// bridge.rs `Lists` does, and answers a request about an older one as the
+// program does: "the list changed").
 "use strict";
 const { chromium } = require("playwright");
 const fs = require("fs");
@@ -39,7 +42,7 @@ function fakeProgram(cfg) {
   const now = Math.floor(Date.now() / 1000);
   const U = "C:\\Users\\Sara";
   const ar = cfg.lang === "ar";
-  window.__sent = []; window.__fakeErrors = [];
+  window.__sent = []; window.__fakeErrors = []; window.__stale = [];
   const files = (ar ? [
     [`${U}\\Documents\\العمل\\المالية`, "تقرير المبيعات 2026.xlsx", 48 * 1024, 7 * 60],
     [`${U}\\Documents\\التقارير\\2026`, "التقرير السنوي النهائي.pdf", 2.4 * 1048576, 26 * 3600],
@@ -83,12 +86,16 @@ function fakeProgram(cfg) {
   const DATE_OK = [() => true, (f) => now - f.mtime < 86400, (f) => now - f.mtime < 7 * 86400, (f) => now - f.mtime < 30 * 86400, (f) => now - f.mtime < 200 * 86400, (f) => now - f.mtime > 365 * 86400];
   // The fields each request may carry (bridge.rs `Request`, deny_unknown_fields).
   const FIELDS = {
-    hello: [], search: ["seq", "q", "kind", "size", "date", "content", "sort", "desc"], more: ["seq", "from"], sort: ["seq", "sort", "desc"], stop: ["seq"],
-    matches: ["seq", "id"], open: ["list", "seq", "id"], reveal: ["list", "seq", "id"], copy: ["list", "seq", "id"], copy_file: ["list", "seq", "id"], copy_all: ["seq"],
-    rename: ["list", "seq", "id", "name"], recycle: ["list", "seq", "id"], scope: ["list", "seq", "id"], pick_folder: [], all_drives: [], saved: ["id"],
+    hello: [], search: ["seq", "q", "kind", "size", "date", "content", "sort", "desc"], more: ["seq", "ver", "from"], sort: ["seq", "sort", "desc"], stop: ["seq"],
+    matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
+    rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id"],
     save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [],
   };
-  const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "id", "name"] };
+  const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
+  // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
+  const ROW_OPS = ["more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope"];
+  let lastVer = 0, recentVer = 0;
+  const nextVer = () => ++lastVer;
   const send = (m) => setTimeout(() => window.__instafind.recv(m), 0);
   const mark = (text, term) => {
     const out = [], lower = text.toLowerCase(), t = term.toLowerCase();
@@ -111,10 +118,10 @@ function fakeProgram(cfg) {
     recent: ar ? ["تقرير المبيعات", "عقد الإيجار", "فاتورة الكهرباء .pdf", "صور العيد"] : ["sales report", "lease agreement", "electricity bill .pdf", "holiday photos"],
     saved: [{ id: 0, name: ar ? "عقود العمل" : "Work contracts", content: true, scoped: true }, { id: 1, name: ar ? "تقارير هذا الشهر" : "Reports this month", content: false, scoped: false }],
   };
-  let shown = { seq: 0, list: [], term: "" };
+  let shown = { seq: 0, ver: 0, list: [], term: "" };
   const SORT = { name: (a, b) => a.name.localeCompare(b.name), path: (a, b) => (a.dir + a.name).localeCompare(b.dir + b.name), size: (a, b) => a.size - b.size, date: (a, b) => a.mtime - b.mtime };
   const order = (list, sort, desc) => { if (sort === "best") return list; const s = [...list].sort(SORT[sort]); return desc ? s.reverse() : s; };
-  const results = (m, extra) => ({ type: "results", seq: m.seq, total: shown.list.length, ms: 18, rows: shown.list.slice(0, 60).map((f, i) => row(f, i, shown.term)), note: null, suggestions: [], files: status.files, kind_label: m.kind ? KINDS[m.kind] : "", scope: cfg.scope || "", content: false, running: false, warnings: [], ...extra });
+  const results = (m, extra) => ({ type: "results", seq: m.seq, ver: shown.ver, total: shown.list.length, ms: 18, rows: shown.list.slice(0, 60).map((f, i) => row(f, i, shown.term)), note: null, suggestions: [], files: status.files, kind_label: m.kind ? KINDS[m.kind] : "", scope: cfg.scope || "", content: false, running: false, warnings: [], ...extra });
   Object.defineProperty(window, "ipc", { value: { postMessage(s) {
     const m = JSON.parse(s);
     const fail = (why) => window.__fakeErrors.push(`${why}: ${s}`);
@@ -124,22 +131,33 @@ function fakeProgram(cfg) {
     for (const k of Object.keys(m)) if (k !== "t" && k !== "op" && !allowed.includes(k)) fail(`unknown field ${k}`);
     for (const k of REQUIRED[m.op] || allowed) if (!(k in m)) fail(`missing field ${k}`);
     window.__sent.push(m);
+    if (ROW_OPS.includes(m.op)) {
+      const current = m.list === "recent" ? m.ver === recentVer && recentVer > 0 : m.seq === shown.seq && m.ver === shown.ver;
+      if (!current) {
+        // As the program: "more" and "matches" of an older list are dropped, the rest refused with a word.
+        if (m.op !== "more" && m.op !== "matches") { window.__stale.push(m.op); send({ type: "notice", text: ar ? "تغيّرت القائمة للتو، فلم يُنفَّذ شيء. حاول مرة أخرى." : "The list just changed, so nothing was done. Try again." }); }
+        return;
+      }
+    }
     if (m.op === "hello") {
       send({ type: "hello", kinds: KINDS, sizes: SIZES, dates: DATES, kind: 0, sort: "best", desc: false, digits: false, version: "0.9.1" });
       send({ type: "scope", path: cfg.scope || "", search: false });
       send(settings); send(status); send(history);
-      send({ type: "recent", rows: files.slice(0, 6).map((f, i) => row(f, i, "")) });
+      recentVer = nextVer();
+      send({ type: "recent", ver: recentVer, rows: files.slice(0, 6).map((f, i) => row(f, i, "")) });
     } else if (m.op === "search" && m.content) {
       const words = m.q.trim().split(/\s+/);
       const term = ar ? (m.q.includes("الإيجار") ? "الإيجار" : words[0]) : (m.q.toLowerCase().includes("lease") ? "lease agreement" : words[0]);
       const found = docs.map(([dir, name, size, age, snippet, count]) => ({ dir, name, size, mtime: now - age, folder: false, ext: name.split(".").pop(), snippet, count }))
         .filter((f) => f.snippet.toLowerCase().includes(term.toLowerCase()));
-      shown = { seq: m.seq, list: [], term, content: true };
+      shown = { seq: m.seq, ver: nextVer(), list: [], term, content: true };
       send(results(m, { content: true, running: true, total: 0, rows: [] }));
       setTimeout(() => {
         shown.list = order(found, m.sort, m.desc);
         send({ type: "progress", seq: m.seq, total: found.length, done: false, text: ar ? "جارِ البحث داخل المستندات… تم فحص 1,840 من 4,210 — وجدت 3" : "Searching inside documents… checked 1,840 of 4,210 — found 3" });
         setTimeout(() => {
+          // Put in order at the end: a new version, as in the program.
+          shown.ver = nextVer();
           send(results(m, { content: true, running: cfg.keepRunning, suggestions: found.length ? [] : [{ kind: "web", label: ar ? "ابحث في الويب" : "Search the web", q: "" }] }));
           if (!cfg.keepRunning) send({ type: "progress", seq: m.seq, total: found.length, done: true, text: ar ? "انتهى البحث داخل 4,210 مستند: وجدت 3 ملف. (من الفهرس: 4,102)" : "Searched 4,210 documents: found 3 files. (4,102 from the index)" });
         }, 40);
@@ -151,7 +169,7 @@ function fakeProgram(cfg) {
       if (m.kind === 1) hits = hits.filter((f) => DOCS.includes(f.ext));
       if (cfg.scope) hits = hits.filter((f) => f.dir.startsWith(cfg.scope.replace(/\\$/, "")));
       if (cfg.indexing) hits = hits.slice(0, 4);
-      shown = { seq: m.seq, list: order(hits, m.sort || "best", m.desc), term };
+      shown = { seq: m.seq, ver: nextVer(), list: order(hits, m.sort || "best", m.desc), term };
       const n = cfg.indexing || cfg.scope || m.size || m.date ? hits.length : hits.length ? Math.max(hits.length, 312) : 0;
       const sugg = hits.length ? [] : [
         { kind: "query", label: ar ? "هل تقصد «عقد الإيجار 2023»؟" : "Did you mean “lease 2023”?", q: ar ? "عقد الإيجار 2023" : "lease 2023" },
@@ -161,18 +179,19 @@ function fakeProgram(cfg) {
       ];
       send(results(m, { total: n, suggestions: sugg }));
     } else if (m.op === "more") {
-      if (m.seq === shown.seq) send({ type: "rows", seq: m.seq, from: m.from, rows: shown.list.slice(m.from, m.from + 200).map((f, i) => row(f, m.from + i, shown.term)) });
+      send({ type: "rows", seq: m.seq, ver: m.ver, from: m.from, rows: shown.list.slice(m.from, m.from + 200).map((f, i) => row(f, m.from + i, shown.term)) });
     } else if (m.op === "sort") {
       shown.list = order(shown.list, m.sort, m.desc);
+      shown.ver = nextVer();
       send(results(m, { content: !!shown.content }));
     } else if (m.op === "matches") {
       const f = shown.list[m.id];
-      if (f && f.snippet) send({ type: "matches", seq: m.seq, id: m.id, count: f.count, lines: Array.from({ length: Math.min(f.count, 6) }, (_, k) => [4 + k * 7, mark(k ? f.snippet.replace("…", "") : f.snippet, shown.term)]) });
+      if (f && f.snippet) send({ type: "matches", seq: m.seq, ver: m.ver, id: m.id, count: f.count, lines: Array.from({ length: Math.min(f.count, 6) }, (_, k) => [4 + k * 7, mark(k ? f.snippet.replace("…", "") : f.snippet, shown.term)]) });
     } else if (m.op === "rename") {
-      send({ type: "renamed", list: m.list, seq: m.seq, id: m.id, name: m.name });
+      send({ type: "renamed", list: m.list, seq: m.seq, ver: m.ver, id: m.id, name: m.name });
       send({ type: "notice", text: (ar ? "تم تغيير الاسم إلى «" : "Renamed to “") + m.name + (ar ? "»." : "”.") });
     } else if (m.op === "recycle") {
-      send({ type: "removed", list: m.list, seq: m.seq, id: m.id });
+      send({ type: "removed", list: m.list, seq: m.seq, ver: m.ver, id: m.id });
     } else if (["copy", "copy_file", "copy_all", "open", "reveal"].includes(m.op)) {
       send({ type: "notice", text: ar ? "تم نسخ المسار." : "Path copied." });
     } else if (m.op === "pick_folder" || m.op === "all_drives" || m.op === "scope") {
@@ -191,6 +210,8 @@ function fakeProgram(cfg) {
       send({ ...history });
     }
   } } });
+  // The name search run again in the background (the index changed), in another order.
+  window.__rerun = () => { shown.list = [...shown.list].reverse(); shown.ver = nextVer(); send(results({ seq: shown.seq, kind: 0 }, {})); };
 }
 
 // name, lang, theme, steps (run in the page with Playwright), fake program options
@@ -213,6 +234,9 @@ const SHOTS = [
   ["ctx-en-dark", "en", "dark", [["type", "report"], ["key", "ArrowDown"], ["key", "Shift+F10"]], { expect: { menu: true } }],
   ["rename-ar-light", "ar", "light", [["type", "تقرير"], ["key", "F2"], ["wait", 50]], { expect: { dialog: true } }],
   ["rename-done-en-light", "en", "light", [["type", "report"], ["key", "F2"], ["fill", "#rename", "Sales report 2026 (final).xlsx"], ["key", "Enter"], ["wait", 50], ["key", "ArrowDown"], ["key", "Delete"], ["wait", 50]], { expect: { renamed: "Sales report 2026 (final).xlsx", gone: 1 } }],
+  // The rename dialog names the list it was opened on: the list listed again
+  // meanwhile, its OK is refused with a word, never applied to the file now at that place.
+  ["rename-stale-en-light", "en", "light", [["type", "report"], ["key", "F2"], ["eval", "window.__rerun()"], ["wait", 50], ["fill", "#rename", "Other name.xlsx"], ["key", "Enter"], ["wait", 50]], { expect: { stale: 1, dialog: false } }],
   ["history-ar-light", "ar", "light", [["click", "#hist-btn"]], { expect: { menu: true } }],
   ["history-en-dark", "en", "dark", [["key", "ArrowDown"]], { expect: { menu: true } }],
   ["saved-ar-light", "ar", "light", [["click", "#hist-btn"], ["click", "#hist [role=menuitem]"], ["wait", 300]], { expect: { content: true } }],
@@ -248,6 +272,7 @@ const SHOTS = [
       else if (what === "fill") { await pg.fill(a, b); }
       else if (what === "chip") { await pg.click(`#chip-${a}`); await pg.click(`#menu-${a} [data-k="${b}"]`); await pg.waitForTimeout(120); }
       else if (what === "wait") await pg.waitForTimeout(a);
+      else if (what === "eval") await pg.evaluate(a);
     }
     await pg.evaluate(() => document.fonts.ready);
     await pg.waitForTimeout(100);
@@ -287,10 +312,12 @@ const SHOTS = [
         chipsOn: document.querySelectorAll(".chip.on").length, settings: view === "view-settings",
         names: [...document.querySelectorAll("#list .row .n1 .t")].map((e) => e.textContent), gone: document.querySelectorAll("#list .row.gone").length,
         sent: window.__sent.map((m) => m.op),
+        stale: window.__stale.length,
       };
     }, lang);
     for (const b of check.bad) errors.push(`${name}: ${b}`);
     const want = opts.expect || {};
+    if (check.stale && !("stale" in want)) errors.push(`${name}: a request named an older list: ${check.stale}`);
     for (const [k, v] of Object.entries(want)) {
       const ok = k === "renamed" ? check.names.includes(v) : check[k] === v;
       if (!ok) errors.push(`${name}: expected ${k} = ${JSON.stringify(v)}, got ${JSON.stringify(k === "renamed" ? check.names : check[k])}`);
