@@ -693,14 +693,16 @@ mod imp {
                 }
             };
             let new_name = name.trim().to_string();
-            // fs::rename replaces an existing file, so check first. Changing
-            // only the letter case of the same file is fine.
+            // Another file by that name: said before trying, and the rename
+            // itself never replaces one (one that appears meanwhile makes it
+            // fail). Changing only the letter case of the same file is fine.
+            let taken = || trf!("يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد.", "Another file named “{new_name}” already exists in this folder.");
             if std::path::Path::new(&new).exists() && new.to_lowercase() != old.to_lowercase() {
-                self.webui_notice(trf!("يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد.", "Another file named “{new_name}” already exists in this folder."));
+                self.webui_notice(taken());
                 return;
             }
-            if let Err(e) = std::fs::rename(&old, &new) {
-                self.webui_notice(trf!("تعذر تغيير الاسم: {e}", "Could not rename: {e}"));
+            if let Err(e) = shell::rename_no_replace(&old, &new) {
+                self.webui_notice(if shell::already_exists(&e) { taken() } else { trf!("تعذر تغيير الاسم: {e}", "Could not rename: {e}") });
                 return;
             }
             self.update_index(|idx| {

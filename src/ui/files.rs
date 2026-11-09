@@ -91,8 +91,13 @@ impl App {
             nwg::modal_info_message(&self.window, title(), &trf!("يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد.", "Another file named “{new_name}” already exists in this folder."));
             return false;
         }
-        if let Err(e) = std::fs::rename(&old, &new) {
-            nwg::modal_error_message(&self.window, tr!("خطأ", "Error"), &trf!("تعذر تغيير الاسم:\n{e}", "Could not rename:\n{e}"));
+        // Never over a file that appeared since the check.
+        if let Err(e) = shell::rename_no_replace(&old, &new) {
+            if shell::already_exists(&e) {
+                nwg::modal_info_message(&self.window, title(), &trf!("يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد.", "Another file named “{new_name}” already exists in this folder."));
+            } else {
+                nwg::modal_error_message(&self.window, tr!("خطأ", "Error"), &trf!("تعذر تغيير الاسم:\n{e}", "Could not rename:\n{e}"));
+            }
             return false;
         }
         self.update_index(|idx| {
