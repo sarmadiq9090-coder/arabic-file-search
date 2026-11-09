@@ -414,6 +414,11 @@ mod imp {
             let lang = i18n::current();
             match req {
                 Request::Hello {} => {
+                    // A new page (the first, or WebView2 loaded it again): it
+                    // lists nothing yet, so nothing of the page before is
+                    // acted on or sent to it.
+                    self.webui_stop_content();
+                    self.webui.lists.borrow_mut().reset();
                     self.webui.ready.set(true);
                     self.webui.last_status.replace(String::new());
                     let hello = {
@@ -855,7 +860,7 @@ mod imp {
             self.webui.running.set(false);
             let found = self.webui.inbox.lock().ok().and_then(|mut s| s.take());
             let pending = match found {
-                // (Not kept when a search inside documents started since.)
+                // (Not kept when a search inside documents started since, or the page loaded again.)
                 Some((shown, msg)) => {
                     let (send, pending) = self.webui.lists.borrow_mut().finished(shown);
                     if send {

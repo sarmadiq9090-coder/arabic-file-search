@@ -715,6 +715,9 @@ pub struct RecentList {
 pub struct Lists {
     /// The last version given.
     last: u64,
+    /// Versions up to this one were given before the page last loaded: their
+    /// lists are not the page's.
+    floor: u64,
     /// The search results listed now.
     pub shown: Option<Shown>,
     pub recent: RecentList,
@@ -727,6 +730,20 @@ impl Lists {
     pub fn next_ver(&mut self) -> u64 {
         self.last += 1;
         self.last
+    }
+
+    /// The page (re)loaded: it lists nothing yet, and nothing made for the
+    /// page before (a search still running, one waiting) is for this one.
+    pub fn reset(&mut self) {
+        self.floor = self.last;
+        self.shown = None;
+        self.recent = RecentList::default();
+        self.pending = None;
+    }
+
+    /// Whether a list numbered `ver` was made for the page loaded now.
+    pub fn fresh(&self, ver: u64) -> bool {
+        ver > self.floor
     }
 
     /// Keeps `paths` as the recent files listed now; returns their version.
@@ -764,12 +781,12 @@ impl Lists {
     }
 
     /// A name search ended with `shown`. It becomes the list unless a newer
-    /// one is listed. Returns
+    /// one is listed or the page loaded again since it started. Returns
     /// whether to send it to the page (not when a newer search waits, which
     /// the page would drop it for), and the search waiting to run.
     pub fn finished(&mut self, shown: Shown) -> (bool, Option<Params>) {
         let pending = self.pending.take();
-        if self.shown.as_ref().is_some_and(|s| s.seq > shown.seq) {
+        if !self.fresh(shown.ver) || self.shown.as_ref().is_some_and(|s| s.seq > shown.seq) {
             return (false, pending);
         }
         let send = pending.as_ref().is_none_or(|p| p.seq == shown.seq);
@@ -1601,6 +1618,32 @@ mod tests {
         assert!(shown.ver > v2);
         let json = serde_json::to_string(&Outbound::Recent { ver: v2, rows: Vec::new() }).unwrap();
         assert_eq!(json, format!(r#"{{"type":"recent","ver":{v2},"rows":[]}}"#));
+    }
+
+    #[test]
+    fn hello_forgets_the_lists_of_the_page_before() {
+        let mut lists = Lists::default();
+        let (shown, _) = listed(&mut lists, 37, Sort::Best);
+        lists.finished(shown);
+        lists.set_recent(vec!["C:\\a.txt".into()]);
+        // A search of the old page still running, and one waiting.
+        let (late, _) = listed(&mut lists, 38, Sort::Best);
+        lists.pending = Some(Params { seq: 39, ver: lists.next_ver(), ..Params::default() });
+        let (old_shown, old_recent) = (lists.shown.as_ref().unwrap().ver, lists.recent.ver);
+
+        lists.reset();
+        assert!(lists.shown.is_none() && lists.pending.is_none() && lists.recent.paths.is_empty());
+        assert_eq!(lists.path(List::Results, 37, old_shown, 0), Err(Miss::Stale));
+        assert_eq!(lists.path(List::Recent, 0, old_recent, 0), Err(Miss::Stale));
+        // The old page's search ends: dropped, so it can't hide the new page's
+        // first search (seq 1, lower than 38).
+        assert!(!lists.fresh(late.ver));
+        assert_eq!(fin(&mut lists, late), (false, None));
+        assert!(lists.shown.is_none());
+        let (first, _) = listed(&mut lists, 1, Sort::Best);
+        assert!(lists.fresh(first.ver));
+        assert!(lists.finished(first).0);
+        assert_eq!(lists.shown.as_ref().map(|s| s.seq), Some(1));
     }
 
     #[test]
