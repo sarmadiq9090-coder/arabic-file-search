@@ -40,7 +40,7 @@ ICON_URL = "https://cdn.jsdelivr.net/gh/sarmadiq9090-coder/arabic-file-search@ma
 WINGET_ID = "Sarmad.InstaFind"
 WINGET_SCHEMA = "1.12.0"  # the version winget-pkgs currently recommends
 PUBLISHER = "Sarmad"
-COPYRIGHT = "Copyright (c) 2026 Saif Second"  # as in LICENSE
+COPYRIGHT = "Copyright (c) 2026 Sarmad"  # as in LICENSE
 
 SHORT_EN = "Instant file search for Windows, in Arabic and English, even inside documents."
 SHORT_AR = "أسرع طريقة لإيجاد أي ملف على ويندوز، بالعربية والإنجليزية، وحتى داخل المستندات."
