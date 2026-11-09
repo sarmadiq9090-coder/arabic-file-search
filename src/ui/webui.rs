@@ -495,7 +495,7 @@ mod imp {
                 }
                 Request::Open { list, seq, ver, id } => {
                     if let Some(path) = self.webui_path(list, seq, ver, id) {
-                        self.webui_note_use(&path);
+                        self.webui_note_use(list, &path);
                         if !shell::open(&path) {
                             self.webui_notice(trf!("تعذر فتح الملف: {}", "Could not open the file: {}", path));
                         }
@@ -503,7 +503,7 @@ mod imp {
                 }
                 Request::Reveal { list, seq, ver, id } => {
                     if let Some(path) = self.webui_path(list, seq, ver, id) {
-                        self.webui_note_use(&path);
+                        self.webui_note_use(list, &path);
                         shell::reveal(&path);
                     }
                 }
@@ -637,12 +637,13 @@ mod imp {
             }
         }
 
-        /// A result was used: its search goes into the history and the file
-        /// ranks higher next time (as in the classic window).
-        fn webui_note_use(&self, path: &str) {
-            let text = self.webui.lists.borrow().shown.as_ref().map(|s| s.params.text.clone()).unwrap_or_default();
+        /// A row was used: the file ranks higher next time and, for a
+        /// result, its search goes into the history (as in the classic
+        /// window). The recent files were listed by no search.
+        fn webui_note_use(&self, list: List, path: &str) {
+            let text = self.webui.lists.borrow().used_search(list).map(str::to_string);
             let mut st = self.state.borrow_mut();
-            if !text.trim().is_empty() {
+            if let Some(text) = text {
                 st.history.add_recent(&text);
             }
             st.history.record_open(path, crate::index::now_secs());

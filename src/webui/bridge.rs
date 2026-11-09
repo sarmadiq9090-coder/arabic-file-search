@@ -793,6 +793,15 @@ impl Lists {
         self.shown = Some(shown);
         (send, pending)
     }
+
+    /// The search to remember in the history when a row of `list` is used:
+    /// the results' own search; none for the recent files, which no search listed.
+    pub fn used_search(&self, list: List) -> Option<&str> {
+        match list {
+            List::Results => self.shown.as_ref().map(|s| s.params.text.as_str()).filter(|t| !t.trim().is_empty()),
+            List::Recent => None,
+        }
+    }
 }
 
 // ------------------------------------------------------------------ search
@@ -1658,6 +1667,20 @@ mod tests {
         let (old, _) = listed(&mut lists, 1, Sort::Best);
         assert_eq!(fin(&mut lists, old), (false, None));
         assert_eq!(lists.shown.as_ref().map(|s| s.seq), Some(2));
+    }
+
+    #[test]
+    fn only_results_add_their_search_to_the_history() {
+        let mut lists = Lists::default();
+        assert_eq!(lists.used_search(List::Results), None);
+        let (shown, _) = listed(&mut lists, 1, Sort::Best);
+        lists.finished(shown);
+        lists.set_recent(vec!["C:\\a.txt".into()]);
+        assert_eq!(lists.used_search(List::Results), Some("تقرير"));
+        // A recent file was listed by no search: opening it adds none.
+        assert_eq!(lists.used_search(List::Recent), None);
+        lists.shown.as_mut().unwrap().params.text = "  ".into();
+        assert_eq!(lists.used_search(List::Results), None);
     }
 
     #[test]
