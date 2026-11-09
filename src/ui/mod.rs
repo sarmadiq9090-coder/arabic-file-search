@@ -11,6 +11,7 @@
 //! - `empty_state`: the files opened lately (empty box) and what to try when nothing is found
 //! - `updates`: checking for, downloading and installing new versions
 //! - `feedback`: the "Send feedback" menu and the offer to report a crash
+//! - `more_apps`: the "More from FastKiwi" menu (the other FastKiwi apps)
 //! - `content_index`: the stored document text and its background warm-up
 //! - `watching`: applying changes from the drive watcher to the index
 //! - `keys`: keyboard handling and the global hotkey
@@ -43,6 +44,7 @@ mod lang_menu;
 mod keys;
 mod launcher_shim; // thin glue to crate::launcher, see the file
 mod lazy;
+mod more_apps;
 mod quick;
 mod quickswitch;
 mod relocate;
@@ -260,6 +262,10 @@ pub struct App {
     support_menu: nwg::Menu,
     menu_support_mail: nwg::MenuItem,
     menu_support_page: nwg::MenuItem,
+    /// Options ▸ «المزيد من FastKiwi» / "More from FastKiwi": each item and
+    /// the page it opens (`crate::more_apps`).
+    more_apps_menu: nwg::Menu,
+    more_apps_items: Vec<(nwg::MenuItem, String)>,
     /// The crash reports of the last run were already offered (or none).
     crash_checked: Cell<bool>,
     menu_export: nwg::MenuItem,

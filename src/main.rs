@@ -59,6 +59,8 @@ mod launcher;
 #[cfg(any(windows, test))]
 mod layout;
 #[cfg(any(windows, test))]
+mod more_apps;
+#[cfg(any(windows, test))]
 mod normalize;
 #[cfg(any(windows, test))]
 mod quick;
