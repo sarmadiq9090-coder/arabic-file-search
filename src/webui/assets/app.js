@@ -49,6 +49,8 @@
       mScope: "البحث في هذا المجلد", mRename: "تغيير الاسم", mRecycle: "نقل إلى سلة المحذوفات", mMatches: "عرض كل التطابقات داخل الملف",
       // dialogs
       renameH: "تغيير الاسم", renameLabel: "الاسم الجديد", renameOk: "تغيير الاسم", cancel: "إلغاء", close: "إغلاق",
+      recycleH: "نقل إلى سلة المحذوفات", recycleQ: ["هل تريد نقل «", "» إلى سلة المحذوفات؟"], recycleQDir: ["هل تريد نقل المجلد «", "» وكل ما فيه إلى سلة المحذوفات؟"],
+      recycleSub: "يمكنك استعادته من سلة المحذوفات.", recycleOk: "نقل إلى سلة المحذوفات",
       matchesH: (name) => `كل التطابقات — ${name}`, line: (n) => `سطر ${num(n)}`, firstLines: (n) => `(أول ${num(n)} سطر)`,
       matchesNone: "يُعرض هنا كل سطر يطابق البحث.",
       gone: "نُقل إلى سلة المحذوفات",
@@ -101,6 +103,8 @@
       mOpen: "Open file", mReveal: "Open containing folder", mCopyFile: "Copy file", mCopyPath: "Copy path", mCopyAll: "Copy paths of all results",
       mScope: "Search in this folder", mRename: "Rename", mRecycle: "Move to Recycle Bin", mMatches: "Show all matches in the file",
       renameH: "Rename", renameLabel: "New name", renameOk: "Rename", cancel: "Cancel", close: "Close",
+      recycleH: "Move to the Recycle Bin", recycleQ: ["Move “", "” to the Recycle Bin?"], recycleQDir: ["Move the folder “", "” and everything in it to the Recycle Bin?"],
+      recycleSub: "You can restore it from the Recycle Bin.", recycleOk: "Move to Recycle Bin",
       matchesH: (name) => `All matches — ${name}`, line: (n) => `Line ${num(n)}`, firstLines: (n) => `(first ${num(n)} lines)`,
       matchesNone: "Every line that matches the search shows here.",
       gone: "Moved to the Recycle Bin",
@@ -480,12 +484,13 @@
   }
   let matchTimer = 0;
   function select(i, scroll = true) {
-    if (!S.rows.length) { q.removeAttribute("aria-activedescendant"); renderPreview(); return; }
+    if (!S.rows.length) { q.removeAttribute("aria-activedescendant"); list.removeAttribute("aria-activedescendant"); renderPreview(); return; }
     S.sel = Math.max(0, Math.min(S.rows.length - 1, i));
     for (const el of list.querySelectorAll('.row[aria-selected="true"]')) el.setAttribute("aria-selected", "false");
     const el = $("r" + S.sel);
     if (el) { el.setAttribute("aria-selected", "true"); if (scroll) el.scrollIntoView({ block: "nearest" }); }
     q.setAttribute("aria-activedescendant", "r" + S.sel);
+    list.setAttribute("aria-activedescendant", "r" + S.sel);
     if (S.sel > S.rows.length - 20) askMore();
     // Every matching line of a document, once the selection rests on it.
     const r = S.rows[S.sel];
@@ -679,10 +684,12 @@
 
   // ---------- the right-click menu ----------
   let ctxRow = null; // { r: the row, at: its list (listAt) }
+  let ctxBack = null; // where the focus was before the menu
   function openCtx(i, anchor, listName = "results", at = null) {
     const r = (listName === "results" ? S.rows : S.recent)[i];
     if (!r || r.gone) return;
     ctxRow = { r, at: listAt(listName) };
+    ctxBack = document.activeElement;
     const item = (label, key, op, ic) => {
       const it = h("div", { role: "menuitem", tabindex: "-1" }, icon(ic), h("span", null, label), key ? h("kbd", null, key) : null);
       it.addEventListener("click", () => { closeMenus(); runCtx(op); });
@@ -714,6 +721,7 @@
     ctxRow = null;
     if (op === "copy_all") send({ op: "copy_all", seq: at.seq, ver: at.ver });
     else if (op === "rename") renameDialog(r, at.list, at);
+    else if (op === "recycle") recycleDialog(r, at.list, at);
     else if (op === "matches") { if (at.ver === S.ver) showMatches(r.id); }
     else act(op, r, at.list, at);
     if (!$("veil").hidden) return;
@@ -723,7 +731,8 @@
   // ---------- dialogs ----------
   let dlgFor = "", dlgBack = null;
   function dialog(title, body, buttons, tag) {
-    dlgFor = tag; dlgBack = document.activeElement;
+    // (Opened from the right-click menu: back to where the focus was before it.)
+    dlgFor = tag; dlgBack = document.activeElement && document.activeElement.closest("#ctx") ? ctxBack : document.activeElement;
     $("dlg-h").textContent = title;
     $("dlg-body").replaceChildren(...body);
     $("dlg-btns").replaceChildren(...buttons);
@@ -746,6 +755,16 @@
     // The name without its extension, ready to type over.
     const dot = r.folder ? -1 : name.lastIndexOf(".");
     input.setSelectionRange(0, dot > 0 ? dot : name.length);
+  }
+  // The program's own question before the Recycle Bin: Windows asks only
+  // when its Recycle Bin is set to (off by default).
+  function recycleDialog(r, listName, at = listAt(listName)) {
+    if (!r || r.gone) return;
+    const name = plainName(r), [before, after] = r.folder ? T.recycleQDir : T.recycleQ;
+    const ok = btn("primary", I.trash, T.recycleOk, () => { closeDialog(); act("recycle", r, at.list, at); }, { id: "recycle-ok" });
+    dialog(T.recycleH, [h("p", null, before, h("bdi", null, name), after), h("div", { class: "pv-path" }, pathEl(joinPath(r.dir, name), 999)), h("p", { class: "sub" }, T.recycleSub)],
+      [ok, btn("", I.x, T.cancel, closeDialog)], "recycle");
+    ok.focus();
   }
   function showMatches(id) {
     const r = S.rows[id];
@@ -845,11 +864,14 @@
   // ---------- input ----------
   q.addEventListener("input", onInput);
   $("stop").addEventListener("click", () => { stop(); q.focus(); });
-  // Clicking a row keeps the caret in the search box.
+  // Clicking a suggestion or a recent file keeps the caret in the search box;
+  // clicking a result puts the focus on the list, as in the classic window
+  // (Delete works only there). Typing there goes back to the box.
   for (const el of [list, $("recent"), $("sugg"), $("cols")]) el.addEventListener("mousedown", (e) => { if (e.target.closest(".row,.sg,.colbtn")) e.preventDefault(); });
-  list.addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) select(+r.dataset.i); });
+  const focusList = () => list.focus({ preventScroll: true });
+  list.addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) { focusList(); select(+r.dataset.i); } });
   list.addEventListener("dblclick", (e) => { const r = e.target.closest(".row"); if (r) act("open", S.rows[+r.dataset.i]); });
-  list.addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) { select(+r.dataset.i, false); openCtx(+r.dataset.i, null, "results", { left: e.clientX, top: e.clientY }); } });
+  list.addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) { focusList(); select(+r.dataset.i, false); openCtx(+r.dataset.i, null, "results", { left: e.clientX, top: e.clientY }); } });
   list.addEventListener("scroll", () => { if (list.scrollTop + list.clientHeight > list.scrollHeight - FIRST_PAGE_GUARD) askMore(); });
   $("recent").addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) act("open", S.recent[+r.dataset.i], "recent"); });
   $("recent").addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) openCtx(+r.dataset.i, null, "recent", { left: e.clientX, top: e.clientY }); });
@@ -893,19 +915,24 @@
       return;
     }
     if (S.view !== "results" || !S.rows.length) return;
+    const inList = document.activeElement === list;
+    // Typing in the list goes on in the search box.
+    if (inList && !ctrl && !e.altKey && (e.key.length === 1 || e.key === "Backspace")) { q.focus(); return; }
+    if (inList && e.key === "ArrowUp" && S.sel === 0) { q.focus(); e.preventDefault(); return; }
     const row = S.rows[S.sel];
     const page = Math.max(1, Math.floor(list.clientHeight / 56) - 1);
     const moves = { ArrowDown: 1, ArrowUp: -1, PageDown: page, PageUp: -page };
-    if (e.key in moves && inBox) { select(S.sel + moves[e.key]); e.preventDefault(); return; }
+    if (e.key in moves && (inBox || inList)) { select(S.sel + moves[e.key]); e.preventDefault(); return; }
     if (ctrl && (e.key === "Home" || e.key === "End")) { select(e.key === "Home" ? 0 : S.rows.length - 1); e.preventDefault(); return; }
-    if (e.key === "Enter" && inBox) { act(ctrl ? "reveal" : "open", row); e.preventDefault(); return; }
-    // The keys of the classic list (the caret stays in the box, so only when no text is selected there).
-    const noSelection = q.selectionStart === q.selectionEnd;
+    if (e.key === "Enter" && (inBox || inList)) { act(ctrl ? "reveal" : "open", row); e.preventDefault(); return; }
+    // The keys of the classic list (in the box, only when no text is selected there).
+    const noSelection = inList || q.selectionStart === q.selectionEnd;
     if (ctrl && (e.key === "c" || e.key === "C") && noSelection) { act(e.shiftKey ? "copy" : "copy_file", row); e.preventDefault(); return; }
     if (e.key === "F2") { if (!row.gone) renameDialog(row, "results"); e.preventDefault(); return; }
     if (e.key === "F4") { showMatches(S.sel); e.preventDefault(); return; }
-    // Delete with the caret at the end of the box (where it would delete nothing); Windows asks first.
-    if (e.key === "Delete" && inBox && noSelection && q.selectionStart === q.value.length && !ctrl && !e.shiftKey) { act("recycle", row); e.preventDefault(); return; }
+    // Delete only in the list, as in the classic window (in the box it edits
+    // the text), and only after the program's own question.
+    if (e.key === "Delete" && inList && !ctrl && !e.shiftKey && !e.altKey) { recycleDialog(row, "results"); e.preventDefault(); return; }
     if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) { openCtx(S.sel, $("r" + S.sel)); e.preventDefault(); }
   });
 

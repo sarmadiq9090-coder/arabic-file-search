@@ -233,7 +233,13 @@ const SHOTS = [
   ["ctx-ar-light", "ar", "light", [["type", "تقرير"], ["rclick", "#r1"]], { expect: { menu: true } }],
   ["ctx-en-dark", "en", "dark", [["type", "report"], ["key", "ArrowDown"], ["key", "Shift+F10"]], { expect: { menu: true } }],
   ["rename-ar-light", "ar", "light", [["type", "تقرير"], ["key", "F2"], ["wait", 50]], { expect: { dialog: true } }],
-  ["rename-done-en-light", "en", "light", [["type", "report"], ["key", "F2"], ["fill", "#rename", "Sales report 2026 (final).xlsx"], ["key", "Enter"], ["wait", 50], ["key", "ArrowDown"], ["key", "Delete"], ["wait", 50]], { expect: { renamed: "Sales report 2026 (final).xlsx", gone: 1 } }],
+  // Delete in the search box edits the text; in the list it asks first, then recycles.
+  ["rename-done-en-light", "en", "light", [["type", "report"], ["key", "F2"], ["fill", "#rename", "Sales report 2026 (final).xlsx"], ["key", "Enter"], ["wait", 50], ["key", "ArrowDown"], ["key", "Delete"], ["wait", 50], ["click", "#r1"], ["key", "Delete"], ["wait", 50], ["click", "#recycle-ok"], ["wait", 50]], { expect: { renamed: "Sales report 2026 (final).xlsx", gone: 1, recycles: 1, dialog: false } }],
+  ["delete-in-box-en-dark", "en", "dark", [["type", "report"], ["key", "ArrowDown"], ["key", "Delete"], ["wait", 50]], { expect: { dialog: false, recycles: 0, q: "report" } }],
+  ["recycle-ar-light", "ar", "light", [["type", "تقرير"], ["click", "#r1"], ["key", "Delete"], ["wait", 50]], { expect: { dialog: true, recycles: 0, focus: "recycle-ok" } }],
+  ["recycle-cancel-ar-dark", "ar", "dark", [["type", "تقرير"], ["rclick", "#r2"], ["click", "#ctx [role=menuitem]:last-child"], ["wait", 50], ["key", "Escape"], ["wait", 50]], { expect: { dialog: false, recycles: 0, gone: 0, focus: "list" } }],
+  // Typing with the focus on the list goes on in the box.
+  ["list-typing-en-light", "en", "light", [["type", "report"], ["click", "#r1"], ["key", "s"], ["wait", 200]], { expect: { q: "reports", focus: "q" } }],
   // The rename dialog names the list it was opened on: the list listed again
   // meanwhile, its OK is refused with a word, never applied to the file now at that place.
   ["rename-stale-en-light", "en", "light", [["type", "report"], ["key", "F2"], ["eval", "window.__rerun()"], ["wait", 50], ["fill", "#rename", "Other name.xlsx"], ["key", "Enter"], ["wait", 50]], { expect: { stale: 1, dialog: false } }],
@@ -311,8 +317,8 @@ const SHOTS = [
         content: document.querySelectorAll("#list .row .n3").length > 0, stop: visible(document.getElementById("stop")),
         chipsOn: document.querySelectorAll(".chip.on").length, settings: view === "view-settings",
         names: [...document.querySelectorAll("#list .row .n1 .t")].map((e) => e.textContent), gone: document.querySelectorAll("#list .row.gone").length,
-        sent: window.__sent.map((m) => m.op),
-        stale: window.__stale.length,
+        sent: window.__sent.map((m) => m.op), recycles: window.__sent.filter((m) => m.op === "recycle").length,
+        stale: window.__stale.length, q: document.querySelector("#q").value, focus: document.activeElement && document.activeElement.id,
       };
     }, lang);
     for (const b of check.bad) errors.push(`${name}: ${b}`);

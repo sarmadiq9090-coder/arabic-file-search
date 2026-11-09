@@ -696,7 +696,8 @@ mod imp {
             self.webui_notice(trf!("تم تغيير الاسم إلى «{new_name}».", "Renamed to “{new_name}”."));
         }
 
-        /// Moves row `id`'s file to the Recycle Bin, Windows asking first.
+        /// Moves row `id`'s file to the Recycle Bin (the page asked first,
+        /// with the file's name).
         fn webui_recycle(&self, list: List, seq: u64, ver: u64, id: u32) {
             let Some(path) = self.webui_path(list, seq, ver, id) else { return };
             if let Some(why) = self.webui_index_busy() {

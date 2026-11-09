@@ -206,7 +206,7 @@ pub enum Request {
     CopyAll { seq: u64, ver: u64 },
     /// Rename the file of row `id` to `name` (a name, not a path).
     Rename { list: List, seq: u64, ver: u64, id: u32, name: String },
-    /// Move the file of row `id` to the Recycle Bin (Windows asks first).
+    /// Move the file of row `id` to the Recycle Bin (the page asked first).
     Recycle { list: List, seq: u64, ver: u64, id: u32 },
     /// Search only in the folder of row `id` (the folder itself for a folder).
     Scope { list: List, seq: u64, ver: u64, id: u32 },
