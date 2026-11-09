@@ -344,7 +344,8 @@ impl App {
             buttons: nwg::MessageButtons::YesNo,
             icons: nwg::MessageIcons::Question,
         };
-        let yes = nwg::modal_message(&self.window, &params) == nwg::MessageChoice::Yes;
+        // Over the new main window when it is the one on screen.
+        let yes = self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) == nwg::MessageChoice::Yes;
         log(&format!("first run: floating box {}", if yes { "on" } else { "off" }));
         self.set_floating_mode(if yes { FloatingMode::Fade } else { FloatingMode::Off });
         if yes {

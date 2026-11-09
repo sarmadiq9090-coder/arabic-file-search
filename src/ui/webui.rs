@@ -28,7 +28,7 @@ mod imp {
 
     use winapi::shared::minwindef::{LPARAM, UINT, WPARAM};
     use winapi::shared::windef::HWND;
-    use winapi::um::winuser::{GetForegroundWindow, IsIconic, SW_RESTORE, SetForegroundWindow, ShowWindow, WA_INACTIVE, WM_ACTIVATE};
+    use winapi::um::winuser::{EnableWindow, GetForegroundWindow, IsIconic, IsWindowEnabled, SW_RESTORE, SetForegroundWindow, ShowWindow, WA_INACTIVE, WM_ACTIVATE};
 
     use super::super::lazy::Lazy;
     use super::super::startup::log;
@@ -236,6 +236,28 @@ mod imp {
         /// Whether the new main window is the one in use and on screen.
         pub(in super::super) fn webui_visible(&self) -> bool {
             self.webui.active.get() && self.webui.parts.window.visible()
+        }
+
+        /// Runs `f` with the window a message box of the program belongs to
+        /// (the first-run offers, the crash report): the new main window
+        /// when it is the one on screen, so the box comes over it and keeps
+        /// it disabled while open (MessageBoxW disables its owner); the
+        /// classic window otherwise, as before. The hidden classic window is
+        /// disabled meanwhile too: the offers wait for it to be enabled
+        /// before asking the next question.
+        pub(in super::super) fn with_modal_owner<R>(&self, f: impl FnOnce(HWND) -> R) -> R {
+            let classic = self.window.handle.hwnd().unwrap_or(std::ptr::null_mut());
+            let owner = if self.webui_visible() { self.webui.parts.window.handle.hwnd() } else { None };
+            let Some(owner) = owner else { return f(classic) };
+            let was_enabled = !classic.is_null() && unsafe { IsWindowEnabled(classic) } != 0;
+            if was_enabled {
+                unsafe { EnableWindow(classic, 0) };
+            }
+            let answer = f(owner);
+            if was_enabled {
+                unsafe { EnableWindow(classic, 1) };
+            }
+            answer
         }
 
         /// Shows the new main window in front, if it is the one in use.
@@ -1035,6 +1057,10 @@ mod imp {
 
         pub(in super::super) fn webui_visible(&self) -> bool {
             false
+        }
+
+        pub(in super::super) fn with_modal_owner<R>(&self, f: impl FnOnce(winapi::shared::windef::HWND) -> R) -> R {
+            f(self.window.handle.hwnd().unwrap_or(std::ptr::null_mut()))
         }
 
         pub(in super::super) fn webui_show(&self) -> bool {
