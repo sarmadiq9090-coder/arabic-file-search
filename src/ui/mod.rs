@@ -525,6 +525,12 @@ impl App {
         self.window.close();
     }
 
+    /// Whether the main window is on screen: the classic one, or the new
+    /// one when it replaces it (the first-run offers wait for this).
+    fn main_shown(&self) -> bool {
+        self.window.visible() || self.webui_visible()
+    }
+
     fn show_window(&self) {
         if self.webui_show() {
             return;

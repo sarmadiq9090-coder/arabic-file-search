@@ -8,7 +8,8 @@
 <title>InstaFind</title>
 <!-- InstaFind's main window (src/webui). Served from inside the exe by the
      instafind:// protocol; no remote content. Every text that comes from a
-     file name or path is set with textContent, never as HTML (app.js). -->
+     file name, a path or a document is set with textContent, never as HTML
+     (app.js). -->
 <link rel="stylesheet" href="app.css">
 <script src="app.js" defer></script>
 </head>
@@ -20,18 +21,17 @@
       <input id="q" role="combobox" aria-expanded="false" aria-controls="list" aria-autocomplete="list" dir="auto" autocomplete="off" spellcheck="false" data-i18n-placeholder="ph" data-i18n-label="ph">
       <span class="meta" id="meta"></span>
     </label>
-  </div>
-  <div class="chips" role="toolbar" id="chips">
-    <span class="chipwrap">
-      <button class="chip" id="kind" type="button" aria-haspopup="menu" aria-expanded="false">
-        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
-        <span id="kind-label" data-i18n="type"></span>
-        <svg class="i caret" id="kind-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    <span class="popwrap">
+      <button class="hbtn" id="hist-btn" type="button" aria-haspopup="menu" aria-expanded="false" data-i18n-label="history" data-i18n-title="historyKey">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
       </button>
-      <div class="menu" id="kind-menu" role="menu" hidden></div>
+      <div class="menu pop" id="hist" role="menu" hidden></div>
     </span>
-    <span class="end"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg><span data-i18n="sort"></span></span>
+    <button class="hbtn" id="set-btn" type="button" aria-pressed="false" data-i18n-label="settings" data-i18n-title="settingsKey">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
   </div>
+  <div class="chips" role="toolbar" id="chips" data-i18n-label="filters"></div>
 
   <div class="banner" id="banner" role="status" hidden>
     <span class="t num" id="banner-title"></span>
@@ -41,7 +41,7 @@
 
   <div class="body" id="view-results" hidden>
     <section class="results">
-      <div class="cols" aria-hidden="true"><span></span><span class="sorted" data-i18n="cName"></span><span data-i18n="cSize"></span><span data-i18n="cDate"></span></div>
+      <div class="cols" id="cols"></div>
       <div class="list" id="list" role="listbox" data-i18n-label="results"></div>
     </section>
     <aside class="preview" id="preview" data-i18n-label="preview"></aside>
@@ -72,10 +72,24 @@
     </div></div>
   </div>
 
+  <div class="pane" id="view-settings" hidden>
+    <div class="settings" id="settings"></div>
+  </div>
+
   <footer class="status">
-    <span class="dot" id="dot"></span><span class="num" id="status-text"></span><span class="grow"></span>
-    <span class="keys" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="kNav"></span></span><span><kbd>Enter</kbd> <span data-i18n="kOpen"></span></span><span><kbd>Ctrl+Enter</kbd> <span data-i18n="kFolder"></span></span><span><kbd>Ctrl+Alt+F</kbd></span></span>
+    <span class="dot" id="dot"></span><span class="num" id="status-text"></span>
+    <button class="btn small" id="stop" type="button" hidden data-i18n="stop"></button>
+    <span class="grow"></span>
+    <span class="keys" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="kNav"></span></span><span><kbd>Enter</kbd> <span data-i18n="kOpen"></span></span><span><kbd>Ctrl+Enter</kbd> <span data-i18n="kFolder"></span></span><span><kbd>Shift+F10</kbd> <span data-i18n="kMenu"></span></span><span><kbd>Ctrl+Alt+F</kbd></span></span>
   </footer>
+  <div class="menu ctx" id="ctx" role="menu" hidden></div>
+  <div class="veil" id="veil" hidden>
+    <div class="dlg" id="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-h">
+      <h3 id="dlg-h"></h3>
+      <div id="dlg-body"></div>
+      <div class="dlg-btns" id="dlg-btns"></div>
+    </div>
+  </div>
   <div class="sr" id="live" aria-live="polite"></div>
 </div>
 </body>

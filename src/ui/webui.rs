@@ -1,5 +1,5 @@
-//! The new main window (phase 1 of the new interface, opt-in while it is
-//! built: `--webui` or `BAHTH_WEBUI=1`, see `crate::webui`).
+//! The new main window (the new interface, opt-in while it is built:
+//! `--webui` or `BAHTH_WEBUI=1`, see `crate::webui`).
 //!
 //! The program runs as always (index, drive watcher, tray icon, Ctrl+Alt+F
 //! and its quick popup, the box above the clock, updates); only the main
@@ -8,6 +8,13 @@
 //! launch brings it to the front. Without WebView2, in a mingw build, or when
 //! the page can't be created (tried twice), the classic window is used as
 //! before.
+//!
+//! Phase 2 brings the classic window's features to the page: search inside
+//! documents (snippets, match counts, every matching line), the size, date
+//! and folder filters, sorting, the right-click actions (copy the file,
+//! rename, Recycle Bin, search in this folder…), recent and saved searches,
+//! and the settings. Every action names a row the page was sent, never a
+//! path (`crate::webui::bridge`).
 
 pub(super) use imp::{WebUi, wanted};
 
@@ -16,6 +23,7 @@ mod imp {
     use native_windows_gui as nwg;
     use std::cell::{Cell, RefCell};
     use std::rc::Rc;
+    use std::sync::atomic::Ordering;
     use std::sync::{Arc, Mutex, OnceLock};
 
     use winapi::shared::minwindef::{LPARAM, UINT, WPARAM};
@@ -24,8 +32,12 @@ mod imp {
 
     use super::super::lazy::Lazy;
     use super::super::startup::log;
-    use super::super::{App, WS_EX_LAYOUTRTL, autostart, shell, surface, title};
-    use crate::webui::bridge::{self, List, Outbound, Params, Request, Shown};
+    use super::super::{App, WS_EX_LAYOUTRTL, autostart, content_index, shell, surface, title};
+    use crate::history::SavedSearch;
+    use crate::i18n::{self, Lang};
+    use crate::search::{self, ContentHit, ContentProgress, KINDS};
+    use crate::settings::{FloatingMode, HotkeyOpens};
+    use crate::webui::bridge::{self, ContentState, List, Outbound, Params, Request, Setting, SettingsOut, Shown, Sort};
     use crate::webui::host::{self, Host};
 
     /// Children of the window are not mirrored in Arabic (only its caption
@@ -60,6 +72,15 @@ mod imp {
         notice: nwg::Notice,
     }
 
+    /// A search inside documents running on its own threads.
+    struct ContentRun {
+        seq: u64,
+        progress: Arc<ContentProgress>,
+        hits: Arc<Mutex<Vec<ContentHit>>>,
+        /// The last progress text sent.
+        said: String,
+    }
+
     #[derive(Default)]
     pub(in super::super) struct WebUi {
         // Dropped before the window that holds it.
@@ -74,9 +95,15 @@ mod imp {
         running: Cell<bool>,
         /// The newest search asked for while one was running.
         pending: RefCell<Option<Params>>,
+        /// The search inside documents under way, if any.
+        content: RefCell<Option<ContentRun>>,
         /// What the page lists now, to act on its rows.
         shown: RefCell<Option<Shown>>,
         recent: RefCell<Vec<String>>,
+        /// The folder searched, "" for all drives (the page never sets it).
+        scope: RefCell<String>,
+        /// The language chosen for the next start, when it was changed.
+        next_lang: Cell<Option<Lang>>,
         last_status: RefCell<String>,
         /// The classic search box's text last handed to the page (the quick
         /// popup's "open in the full window" puts its search there).
@@ -208,6 +235,11 @@ mod imp {
             Ok((handler, raw))
         }
 
+        /// Whether the new main window is the one in use and on screen.
+        pub(in super::super) fn webui_visible(&self) -> bool {
+            self.webui.active.get() && self.webui.parts.window.visible()
+        }
+
         /// Shows the new main window in front, if it is the one in use.
         pub(in super::super) fn webui_show(&self) -> bool {
             if !self.webui.active.get() {
@@ -267,6 +299,7 @@ mod imp {
 
         /// Called when the program closes: the page goes before its window.
         pub(in super::super) fn webui_close(&self) {
+            self.webui_stop_content();
             self.webui.ready.set(false);
             self.webui.host.replace(None);
         }
@@ -280,6 +313,10 @@ mod imp {
             {
                 host.eval(&bridge::script(msg));
             }
+        }
+
+        fn webui_notice(&self, text: impl Into<String>) {
+            self.webui_send(&Outbound::Notice { text: text.into() });
         }
 
         /// The quick popup's search, when it asked for the full window.
@@ -313,6 +350,37 @@ mod imp {
             self.webui_send(&Outbound::Recent { rows });
         }
 
+        fn webui_send_history(&self) {
+            let msg = bridge::history(&self.state.borrow().history);
+            self.webui_send(&msg);
+        }
+
+        fn webui_send_settings(&self) {
+            let current = i18n::current();
+            let msg = {
+                let s = &self.state.borrow().settings;
+                Outbound::Settings(SettingsOut {
+                    lang: current.code(),
+                    next_lang: self.webui.next_lang.get().unwrap_or(current).code(),
+                    digits: s.arabic_digits,
+                    autostart: autostart::is_enabled(),
+                    content_index: s.content_index,
+                    auto_index: s.auto_index,
+                    hide_system: s.hide_system,
+                    hotkey_quick: s.hotkey_opens == HotkeyOpens::Quick,
+                    floating: s.floating_mode != FloatingMode::Off,
+                    tray_icon: s.tray_icon,
+                    version: env!("CARGO_PKG_VERSION"),
+                })
+            };
+            self.webui_send(&msg);
+        }
+
+        fn webui_set_scope(&self, scope: String, search: bool) {
+            self.webui.scope.replace(scope.clone());
+            self.webui_send(&Outbound::Scope { path: scope, search });
+        }
+
         // ------------------------------------------------------------ messages
 
         fn on_webui_message(&self, body: &str, source: &str) {
@@ -323,34 +391,90 @@ mod imp {
                     return;
                 }
             };
+            let lang = i18n::current();
             match req {
-                Request::Hello => {
+                Request::Hello {} => {
                     self.webui.ready.set(true);
                     self.webui.last_status.replace(String::new());
-                    let digits = self.state.borrow().settings.arabic_digits;
-                    let kinds = bridge::kinds(crate::i18n::current());
-                    self.webui_send(&Outbound::Hello { kinds, digits, version: env!("CARGO_PKG_VERSION") });
+                    let hello = {
+                        let s = &self.state.borrow().settings;
+                        Outbound::Hello {
+                            kinds: bridge::kinds(lang),
+                            sizes: bridge::labels(bridge::SIZES, lang),
+                            dates: bridge::labels(bridge::DATES, lang),
+                            kind: s.kind.min(KINDS.len() - 1),
+                            sort: Sort::from_column(s.sort_col),
+                            desc: s.sort_desc,
+                            digits: s.arabic_digits,
+                            version: env!("CARGO_PKG_VERSION"),
+                        }
+                    };
+                    self.webui_send(&hello);
+                    let scope = self.webui.scope.borrow().clone();
+                    self.webui_send(&Outbound::Scope { path: scope, search: false });
+                    self.webui_send_settings();
                     self.webui_status(true);
                     self.webui_send_recent();
+                    self.webui_send_history();
                     self.webui.handed.replace(String::new());
                     self.webui_hand_over_query();
                 }
-                Request::Search { seq, q, kind } => {
-                    let params = self.webui_params(seq, q, kind);
-                    self.webui_search(params);
+                Request::Search { seq, q, kind, size, date, content, sort, desc } => {
+                    {
+                        let s = &mut self.state.borrow_mut().settings;
+                        s.kind = kind;
+                        s.sort_col = sort.column();
+                        s.sort_desc = desc;
+                    }
+                    let params = self.webui_params(Params { seq, text: q, kind, size, date, content, sort, desc, ..Params::default() });
+                    if content {
+                        self.webui_content(params);
+                    } else {
+                        self.webui_stop_content();
+                        self.webui_search(params);
+                    }
                 }
                 Request::More { seq, from } => {
                     let rows = match &*self.webui.shown.borrow() {
-                        Some(s) if s.params.seq == seq => s.page(from, bridge::MORE_PAGE),
+                        Some(s) if s.seq == seq => s.page(from, bridge::MORE_PAGE),
                         _ => return,
                     };
                     self.webui_send(&Outbound::Rows { seq, from, rows });
+                }
+                Request::Sort { seq, sort, desc } => {
+                    {
+                        let s = &mut self.state.borrow_mut().settings;
+                        s.sort_col = sort.column();
+                        s.sort_desc = desc;
+                    }
+                    let msg = match &mut *self.webui.shown.borrow_mut() {
+                        Some(s) if s.seq == seq => {
+                            s.resort(sort, desc);
+                            let suggestions = if s.hits.is_empty() && s.done { bridge::content_suggestions(&s.params) } else { Vec::new() };
+                            s.results(0, None, suggestions, lang)
+                        }
+                        _ => return,
+                    };
+                    self.webui_send(&msg);
+                }
+                Request::Stop { seq } => {
+                    if let Some(run) = &*self.webui.content.borrow()
+                        && run.seq == seq
+                    {
+                        run.progress.cancel.store(true, Ordering::Relaxed);
+                    }
+                }
+                Request::Matches { seq, id } => {
+                    let msg = self.webui.shown.borrow().as_ref().filter(|s| s.seq == seq).and_then(|s| s.matches(id));
+                    if let Some(msg) = msg {
+                        self.webui_send(&msg);
+                    }
                 }
                 Request::Open { list, seq, id } => {
                     if let Some(path) = self.webui_path(list, seq, id) {
                         self.webui_note_use(&path);
                         if !shell::open(&path) {
-                            self.webui_send(&Outbound::Notice { text: trf!("تعذر فتح الملف: {}", "Could not open the file: {}", path) });
+                            self.webui_notice(trf!("تعذر فتح الملف: {}", "Could not open the file: {}", path));
                         }
                     }
                 }
@@ -363,13 +487,110 @@ mod imp {
                 Request::Copy { list, seq, id } => {
                     if let Some(path) = self.webui_path(list, seq, id) {
                         nwg::Clipboard::set_data_text(&self.webui.parts.window, &path);
-                        self.webui_send(&Outbound::Notice { text: tr!("تم نسخ المسار.", "Path copied.").to_string() });
+                        self.webui_notice(tr!("تم نسخ المسار.", "Path copied."));
                     }
                 }
-                Request::Web { q } => {
-                    shell::open(&crate::suggest::web_url(&q));
+                Request::CopyFile { list, seq, id } => {
+                    if let Some(path) = self.webui_path(list, seq, id) {
+                        let ok = self.webui.parts.window.handle.hwnd().is_some_and(|h| crate::dragdrop::copy_files(h, std::slice::from_ref(&path)));
+                        self.webui_notice(if ok { tr!("تم نسخ الملف. الصقه حيث تريد بـ Ctrl+V.", "File copied. Paste it anywhere with Ctrl+V.") } else { tr!("تعذر نسخ الملف.", "Could not copy the file.") });
+                    }
                 }
-                Request::Hide => self.webui_hide(),
+                Request::CopyAll { seq } => {
+                    let text = {
+                        let shown = self.webui.shown.borrow();
+                        let Some(s) = shown.as_ref().filter(|s| s.seq == seq) else { return };
+                        let paths = s.all_paths();
+                        (!paths.is_empty()).then(|| (paths.len(), paths.join("\r\n")))
+                    };
+                    match text {
+                        // Not borrowed while the clipboard notifies its previous owner.
+                        Some((n, text)) => {
+                            nwg::Clipboard::set_data_text(&self.webui.parts.window, &text);
+                            self.webui_notice(trf!("تم نسخ {} مسار.", "Copied {} paths.", crate::indexing_status::group_digits(n)));
+                        }
+                        None => self.webui_notice(tr!("لا توجد نتائج لنسخها.", "There are no results to copy.")),
+                    }
+                }
+                Request::Rename { list, seq, id, name } => self.webui_rename(list, seq, id, &name),
+                Request::Recycle { list, seq, id } => self.webui_recycle(list, seq, id),
+                Request::Scope { list, seq, id } => {
+                    let Some(path) = self.webui_path(list, seq, id) else { return };
+                    let is_dir = match list {
+                        List::Results => self.webui.shown.borrow().as_ref().is_some_and(|s| s.is_dir(id)),
+                        List::Recent => std::path::Path::new(&path).is_dir(),
+                    };
+                    let scope = bridge::scope_for(&path, is_dir);
+                    if !scope.is_empty() {
+                        self.webui_set_scope(scope, true);
+                    }
+                }
+                Request::PickFolder {} => self.webui_pick_folder(),
+                Request::AllDrives {} => self.webui_set_scope(String::new(), true),
+                Request::Saved { id } => {
+                    let Some(s) = self.state.borrow().history.saved.get(id as usize).cloned() else { return };
+                    self.webui_set_scope(s.scope, false);
+                    self.webui_send(&Outbound::Apply { q: s.query, kind: s.kind.min(KINDS.len() - 1), content: s.content });
+                }
+                Request::SaveSearch { q, kind, content } => {
+                    let text = q.trim().to_string();
+                    {
+                        let scope = self.webui.scope.borrow().clone();
+                        let mut st = self.state.borrow_mut();
+                        st.history.add_saved(SavedSearch { name: text.clone(), query: text.clone(), kind, scope, content });
+                        st.history.save();
+                    }
+                    self.webui_send_history();
+                    self.webui_notice(trf!("حُفظ البحث «{text}». تجده في قائمة «السجل».", "Saved the search “{text}”. Find it in the “History” menu."));
+                }
+                Request::ClearRecent {} => self.webui_clear_history(true),
+                Request::ClearSaved {} => self.webui_clear_history(false),
+                Request::Set { key, on } => self.webui_set(key, on),
+                Request::Lang { lang: chosen } => {
+                    let chosen = chosen.lang();
+                    if i18n::save(chosen) {
+                        self.menu_lang_ar.set_checked(chosen == Lang::Ar);
+                        self.menu_lang_en.set_checked(chosen == Lang::En);
+                        self.webui.next_lang.set(Some(chosen));
+                    } else {
+                        self.webui_notice(tr!("تعذر حفظ اللغة.", "Could not save the language."));
+                    }
+                    self.webui_send_settings();
+                }
+                Request::Restart {} => match crate::update::restart_new_version() {
+                    Ok(()) => {
+                        // As after an update: save everything and leave at
+                        // once, so the new copy gets the single-instance lock.
+                        self.on_close();
+                        std::process::exit(0);
+                    }
+                    Err(e) => self.webui_notice(trf!(
+                        "تعذرت إعادة التشغيل تلقائياً ({e}). أغلق البرنامج وافتحه من جديد.",
+                        "The program could not restart itself ({e}). Close the program and open it again."
+                    )),
+                },
+                Request::Reindex {} => {
+                    if self.webui.content.borrow().is_some() {
+                        self.webui_notice(tr!("انتظر انتهاء البحث داخل المستندات أو أوقفه أولاً.", "Wait for the document search to finish, or stop it first."));
+                        return;
+                    }
+                    self.start_scan();
+                    let st = self.state.borrow();
+                    let text = if st.loading.is_some() {
+                        tr!("انتظر حتى يكتمل تحميل الفهرس، ثم حدّثه.", "Wait until the index has loaded, then update it.")
+                    } else {
+                        tr!("جاري فهرسة الملفات على كل الأقراص…", "Indexing files on all drives…")
+                    };
+                    drop(st);
+                    self.webui_notice(text);
+                    self.webui_status(true);
+                }
+                Request::Web { q } => {
+                    if !shell::open(&crate::suggest::web_url(&q)) {
+                        self.webui_notice(tr!("تعذر فتح المتصفح.", "Could not open the browser."));
+                    }
+                }
+                Request::Hide {} => self.webui_hide(),
             }
         }
 
@@ -378,7 +599,7 @@ mod imp {
             match list {
                 List::Results => {
                     let shown = self.webui.shown.borrow();
-                    shown.as_ref().filter(|s| s.params.seq == seq).and_then(|s| s.path(id)).map(str::to_string)
+                    shown.as_ref().filter(|s| s.seq == seq).and_then(|s| s.path(id)).map(str::to_string)
                 }
                 List::Recent => self.webui.recent.borrow().get(id as usize).cloned(),
             }
@@ -394,22 +615,184 @@ mod imp {
             }
             st.history.record_open(path, crate::index::now_secs());
             st.history.save();
+            drop(st);
+            self.webui_send_history();
+        }
+
+        /// Forgets the recent searches, or deletes the saved ones.
+        fn webui_clear_history(&self, recent: bool) {
+            {
+                let mut st = self.state.borrow_mut();
+                if recent {
+                    st.history.recent.clear();
+                } else {
+                    st.history.saved.clear();
+                }
+                st.history.save();
+            }
+            self.webui_send_history();
+        }
+
+        // ------------------------------------------------------------ files
+
+        /// Why the index can't change now, if it can't: a search inside
+        /// documents points into it, or it is being built.
+        fn webui_index_busy(&self) -> Option<&'static str> {
+            if self.webui.content.borrow().is_some() {
+                return Some(tr!("انتظر انتهاء البحث داخل المستندات أو أوقفه أولاً.", "Wait for the document search to finish, or stop it first."));
+            }
+            let st = self.state.borrow();
+            (st.scan.is_some() || st.loading.is_some()).then(|| tr!("انتظر حتى تكتمل الفهرسة.", "Wait until indexing is complete."))
+        }
+
+        /// Renames row `id`'s file to `name`, with the classic window's checks.
+        fn webui_rename(&self, list: List, seq: u64, id: u32, name: &str) {
+            let Some(old) = self.webui_path(list, seq, id) else { return };
+            if let Some(why) = self.webui_index_busy() {
+                self.webui_notice(why);
+                return;
+            }
+            let new = match bridge::rename_target(&old, name) {
+                Ok(new) => new,
+                Err(bridge::BadName::Unchanged) => return,
+                Err(e) => {
+                    self.webui_notice(e.message(i18n::current()));
+                    return;
+                }
+            };
+            let new_name = name.trim().to_string();
+            // fs::rename replaces an existing file, so check first. Changing
+            // only the letter case of the same file is fine.
+            if std::path::Path::new(&new).exists() && new.to_lowercase() != old.to_lowercase() {
+                self.webui_notice(trf!("يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد.", "Another file named “{new_name}” already exists in this folder."));
+                return;
+            }
+            if let Err(e) = std::fs::rename(&old, &new) {
+                self.webui_notice(trf!("تعذر تغيير الاسم: {e}", "Could not rename: {e}"));
+                return;
+            }
+            self.update_index(|idx| {
+                idx.rename_path(&old, &new);
+            });
+            {
+                let mut st = self.state.borrow_mut();
+                st.history.rename_path(&old, &new);
+                st.history.save();
+            }
+            if list == List::Results
+                && let Some(s) = self.webui.shown.borrow_mut().as_mut().filter(|s| s.seq == seq)
+            {
+                s.changed.insert(id, Some(new));
+            }
+            self.webui_send(&Outbound::Renamed { list, seq, id, name: new_name.clone() });
+            if list == List::Recent {
+                self.webui_send_recent();
+            }
+            self.webui_notice(trf!("تم تغيير الاسم إلى «{new_name}».", "Renamed to “{new_name}”."));
+        }
+
+        /// Moves row `id`'s file to the Recycle Bin, Windows asking first.
+        fn webui_recycle(&self, list: List, seq: u64, id: u32) {
+            let Some(path) = self.webui_path(list, seq, id) else { return };
+            if let Some(why) = self.webui_index_busy() {
+                self.webui_notice(why);
+                return;
+            }
+            if !shell::recycle(&path) {
+                self.webui_notice(tr!("لم يُحذف الملف.", "The file was not deleted."));
+                return;
+            }
+            self.update_index(|idx| {
+                idx.remove_path(&path);
+            });
+            {
+                let mut st = self.state.borrow_mut();
+                st.history.forget_path(&path);
+                st.history.save();
+            }
+            if list == List::Results
+                && let Some(s) = self.webui.shown.borrow_mut().as_mut().filter(|s| s.seq == seq)
+            {
+                s.changed.insert(id, None);
+            }
+            self.webui_send(&Outbound::Removed { list, seq, id });
+            self.webui_send_recent();
+            self.webui_notice(tr!("نُقل الملف إلى سلة المحذوفات.", "The file was moved to the Recycle Bin."));
+        }
+
+        /// Windows' folder dialog; the chosen folder becomes the one searched.
+        fn webui_pick_folder(&self) {
+            let mut dialog = nwg::FileDialog::default();
+            let built = nwg::FileDialog::builder()
+                .title(tr!("اختر المجلد الذي تريد البحث فيه", "Choose the folder to search in"))
+                .action(nwg::FileDialogAction::OpenDirectory)
+                .build(&mut dialog);
+            if built.is_err() {
+                return;
+            }
+            // Nothing is borrowed while it runs: its loop delivers the page's messages.
+            let chosen = if dialog.run(Some(&self.webui.parts.window)) { dialog.get_selected_item().ok() } else { None };
+            if let Some(dir) = chosen {
+                let mut dir = dir.to_string_lossy().into_owned();
+                if !dir.ends_with('\\') {
+                    dir.push('\\');
+                }
+                self.webui_set_scope(dir, true);
+            }
+        }
+
+        // ------------------------------------------------------------ settings
+
+        fn webui_set(&self, key: Setting, on: bool) {
+            match key {
+                Setting::Digits => {
+                    if self.menu_digits.checked() != on {
+                        self.toggle_digits();
+                    }
+                }
+                Setting::Autostart => {
+                    if autostart::set_enabled(on) {
+                        self.menu_autostart.set_checked(on);
+                    } else {
+                        self.webui_notice(tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting."));
+                    }
+                }
+                Setting::ContentIndex => {
+                    if self.menu_content_index.checked() != on {
+                        self.toggle_content_index();
+                    }
+                }
+                Setting::AutoIndex => {
+                    if self.menu_auto_index.checked() != on {
+                        self.toggle_auto_index();
+                    }
+                }
+                Setting::HideSystem => {
+                    if self.menu_hide_system.checked() != on {
+                        self.toggle_hide_system();
+                    }
+                }
+                Setting::HotkeyQuick => self.set_hotkey_quick(on),
+                Setting::Floating => self.set_floating_mode(if on { FloatingMode::Fade } else { FloatingMode::Off }),
+                Setting::TrayIcon => self.set_tray_icon(on),
+            }
+            self.save_settings();
+            self.webui_send_settings();
         }
 
         // ------------------------------------------------------------ search
 
-        fn webui_params(&self, seq: u64, text: String, kind: usize) -> Params {
+        /// `p` with what the program knows: the folder, system files, the
+        /// often-opened files and whether to look for a better spelling.
+        fn webui_params(&self, p: Params) -> Params {
             let st = self.state.borrow();
-            // Phase 1 searches all drives (the folder chip comes later).
-            let scope = String::new();
+            let scope = self.webui.scope.borrow().clone();
             Params {
-                seq,
-                text,
-                kind,
                 show_system: crate::system_files::show_system(st.settings.hide_system, &scope),
-                boosted: st.history.boosted(&st.index, crate::index::now_secs()),
+                boosted: if p.sort == Sort::Best { st.history.boosted(&st.index, crate::index::now_secs()) } else { Vec::new() },
                 suggest: st.scan.is_none() && st.loading.is_none(),
                 scope,
+                ..p
             }
         }
 
@@ -443,22 +826,140 @@ mod imp {
             let found = self.webui.inbox.lock().ok().and_then(|mut s| s.take());
             let pending = self.webui.pending.take();
             if let Some((shown, msg)) = found {
-                // A newer search is waiting: the page would drop this answer.
-                if pending.as_ref().is_none_or(|p| p.seq == shown.params.seq) {
-                    self.webui_send(&msg);
+                // A search inside documents started since keeps its list.
+                let newer = self.webui.shown.borrow().as_ref().is_some_and(|s| s.seq > shown.seq);
+                if !newer {
+                    // A newer search is waiting: the page would drop this answer.
+                    if pending.as_ref().is_none_or(|p| p.seq == shown.seq) {
+                        self.webui_send(&msg);
+                    }
+                    self.webui.shown.replace(Some(shown));
                 }
-                self.webui.shown.replace(Some(shown));
             }
             if let Some(p) = pending {
                 self.webui_search(p);
             }
         }
 
-        /// From the timer, about once a second: the indexing status, and the
-        /// shown results kept in step with the index (finished scan, files
-        /// changed on disk).
+        /// Starts a search inside documents; its rows arrive as it runs
+        /// (`webui_poll_content`).
+        fn webui_content(&self, params: Params) {
+            self.webui_stop_content();
+            let lang = i18n::current();
+            let index = self.state.borrow().index.clone();
+            let (Some(q), Some(marked)) = (bridge::content_query(&params), bridge::content_query(&params)) else {
+                // Only filters, or nothing typed: nothing to look for in a text.
+                let mut shown = Shown::documents(index, Default::default(), params);
+                shown.done = true;
+                let msg = shown.results(0, None, Vec::new(), lang);
+                self.webui.shown.replace(Some(shown));
+                self.webui_send(&msg);
+                self.webui_notice(tr!("اكتب الكلمة أو العبارة التي تريد البحث عنها داخل المستندات.", "Type the word or phrase to search for inside documents."));
+                return;
+            };
+            let use_index = {
+                let mut st = self.state.borrow_mut();
+                st.history.add_recent(&params.text);
+                st.history.save();
+                st.settings.content_index
+            };
+            self.webui_send_history();
+            let progress = Arc::new(ContentProgress::default());
+            let hits = Arc::new(Mutex::new(Vec::new()));
+            let (p, h, idx, scope) = (progress.clone(), hits.clone(), index.clone(), params.scope.clone());
+            let started = crate::crash_log::spawn_named("webui-content", move || {
+                let cache = if use_index { content_index::shared() } else { None };
+                let started = std::time::Instant::now();
+                // After a panic (logged by the hook) the search still ends.
+                if crate::crash_log::catch(|| search::search_content(&idx.entries, &q, &scope, &p, &h, cache)).is_none() {
+                    p.done.store(true, Ordering::Relaxed);
+                }
+                log(&format!(
+                    "webui content search: {} documents ({} from the content index) in {} ms",
+                    p.checked.load(Ordering::Relaxed),
+                    p.from_cache.load(Ordering::Relaxed),
+                    started.elapsed().as_millis()
+                ));
+            });
+            if started.is_none() {
+                progress.done.store(true, Ordering::Relaxed);
+            }
+            let seq = params.seq;
+            let shown = Shown::documents(index, marked, params);
+            let msg = shown.results(0, None, Vec::new(), lang);
+            self.webui.shown.replace(Some(shown));
+            self.webui.content.replace(Some(ContentRun { seq, progress, hits, said: String::new() }));
+            self.webui_send(&msg);
+        }
+
+        fn webui_stop_content(&self) {
+            if let Some(run) = self.webui.content.take() {
+                run.progress.cancel.store(true, Ordering::Relaxed);
+            }
+        }
+
+        /// From the timer, five times a second: the rows a search inside
+        /// documents found since, and how far it got.
+        fn webui_poll_content(&self) {
+            let Some((seq, progress, new)) = self.webui.content.borrow().as_ref().map(|run| {
+                let new: Vec<ContentHit> = run.hits.lock().map(|mut h| h.drain(..).collect()).unwrap_or_default();
+                (run.seq, run.progress.clone(), new)
+            }) else {
+                return;
+            };
+            let done = progress.done.load(Ordering::Relaxed);
+            let lang = i18n::current();
+            let (found, results) = {
+                let mut shown = self.webui.shown.borrow_mut();
+                let Some(s) = shown.as_mut().filter(|s| s.seq == seq) else {
+                    drop(shown);
+                    self.webui_stop_content();
+                    return;
+                };
+                s.absorb(new);
+                let results = done.then(|| {
+                    s.done = true;
+                    let (sort, desc) = (s.params.sort, s.params.desc);
+                    s.resort(sort, desc);
+                    let suggestions = if s.hits.is_empty() { bridge::content_suggestions(&s.params) } else { Vec::new() };
+                    s.results(0, None, suggestions, lang)
+                });
+                (s.hits.len(), results)
+            };
+            let state = ContentState {
+                checked: progress.checked.load(Ordering::Relaxed),
+                total: progress.total.load(Ordering::Relaxed),
+                found,
+                cached: progress.from_cache.load(Ordering::Relaxed),
+                done,
+                indexing: self.indexing(),
+                ocr_arabic_missing: done && crate::ocr::arabic_missing(),
+            };
+            let text = bridge::content_text(&state, lang);
+            if let Some(results) = results {
+                self.webui.content.replace(None);
+                self.webui_send(&results);
+            } else {
+                let mut content = self.webui.content.borrow_mut();
+                let Some(run) = content.as_mut() else { return };
+                if run.said == text {
+                    return;
+                }
+                run.said = text.clone();
+            }
+            self.webui_send(&Outbound::Progress { seq, total: found, done, text });
+        }
+
+        /// From the timer, five times a second: a search inside documents;
+        /// about once a second: the indexing status, and the shown name
+        /// results kept in step with the index (finished scan, files changed
+        /// on disk).
         pub(in super::super) fn webui_tick(&self, tick: u32) {
-            if !self.webui.active.get() || !self.webui.ready.get() || !tick.is_multiple_of(5) {
+            if !self.webui.active.get() || !self.webui.ready.get() {
+                return;
+            }
+            self.webui_poll_content();
+            if !tick.is_multiple_of(5) {
                 return;
             }
             self.webui_status(false);
@@ -468,10 +969,12 @@ mod imp {
             let stale = {
                 let st = self.state.borrow();
                 let shown = self.webui.shown.borrow();
-                shown.as_ref().filter(|s| !Arc::ptr_eq(&s.index, &st.index)).map(|s| (s.params.seq, s.params.text.clone(), s.params.kind))
+                // A search inside documents is not run again by itself (it
+                // reads every document); its renamed rows are kept in `changed`.
+                shown.as_ref().filter(|s| !s.params.content && !Arc::ptr_eq(&s.index, &st.index)).map(|s| s.params.clone())
             };
-            if let Some((seq, text, kind)) = stale {
-                let params = self.webui_params(seq, text, kind);
+            if let Some(p) = stale {
+                let params = self.webui_params(p);
                 self.webui_search(params);
             }
         }
@@ -517,6 +1020,10 @@ mod imp {
                 super::super::startup::log("webui: the new interface needs the MSVC build; using the classic window");
             }
             None
+        }
+
+        pub(in super::super) fn webui_visible(&self) -> bool {
+            false
         }
 
         pub(in super::super) fn webui_show(&self) -> bool {

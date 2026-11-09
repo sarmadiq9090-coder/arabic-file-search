@@ -1,7 +1,8 @@
 // InstaFind main window (src/webui). Talks to the Rust side only through
 // window.ipc.postMessage (requests) and window.__instafind.recv (answers);
-// see src/webui/bridge.rs for the message types. File names and paths are
-// untrusted: they only ever reach the page through textContent.
+// see src/webui/bridge.rs for the message types. File names, paths and
+// document texts are untrusted: they only ever reach the page through
+// textContent. The page names rows ("row 7 of search 42"), never paths.
 "use strict";
 (() => {
   const TOKEN = document.querySelector('meta[name="instafind-token"]').content;
@@ -11,61 +12,120 @@
   // ---------- strings ----------
   const T = {
     ar: {
-      ph: "ابحث باسم الملف…", type: "النوع", sort: "الأنسب أولاً",
+      ph: "ابحث باسم الملف…", phContent: "ابحث داخل المستندات ثم اضغط Enter…", type: "النوع", size: "الحجم", date: "التاريخ",
+      filters: "عوامل التصفية", lookIn: "البحث في", allDrives: "كل الأقراص", chooseFolder: "اختيار مجلد…", clearFilter: "إزالة",
+      inside: "داخل المستندات", sortBy: "الترتيب",
+      sorts: { best: "الأنسب أولاً", name: "الاسم", path: "المسار", size: "الحجم", date: "آخر تعديل" },
+      asc: "تصاعدي", desc: "تنازلي",
       cName: "الاسم والمسار", cSize: "الحجم", cDate: "آخر تعديل",
       results: "النتائج", preview: "المعاينة",
       recent: "فتحتها مؤخراً", recentNone: "الملفات التي تفتحها تظهر هنا.", tryThese: "جرّب هذه",
       trust: "كل شيء يبقى على جهازك. لا نجمع أي بيانات استخدام.",
       tips: [["تقرير .pdf", "ملفات PDF فقط"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"], ['"عقد إيجار"', "العبارة كما هي"], ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["hgjrvdv", "لوحة المفاتيح الخطأ ← «التقرير»"]],
-      kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد",
-      open: "فتح", openFolder: "فتح المجلد", copyPath: "نسخ المسار",
-      fType: "النوع", fSize: "الحجم", fMod: "آخر تعديل", folder: "مجلد", file: "ملف",
+      kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد", kMenu: "إجراءات",
+      open: "فتح", openFolder: "فتح المجلد", copyPath: "نسخ المسار", more: "إجراءات أخرى",
+      fType: "النوع", fSize: "الحجم", fMod: "آخر تعديل", fMatches: "التطابقات", folder: "مجلد", file: "ملف",
       nres: (n) => (n === 0 ? "لا نتائج" : n === 1 ? "نتيجة واحدة" : n === 2 ? "نتيجتان" : n <= 10 ? `${num(n)} نتائج` : `${num(n)} نتيجة`),
+      nMatches: (n) => (n === 1 ? "تطابق واحد" : n === 2 ? "تطابقان" : n <= 10 ? `${num(n)} تطابقات` : `${num(n)} تطابقاً`),
       count: (n, ms) => `عدد النتائج: ${num(n)} (خلال ${num(ms)} ملّي ثانية)`,
       files: (n) => `الفهرس محدَّث · ${num(n)} ملف`,
       noresH: (q) => `لا توجد نتائج لـ «${q}»`,
-      noresSub: (n, kind) => `بحثنا في أسماء ${num(n)} ملف في كل الأقراص${kind ? `، ضمن «${kind}» فقط` : ""}.`,
+      noresSub: (n, kind, scope) => `بحثنا في أسماء ${num(n)} ملف ${scope ? `داخل ${scope}` : "في كل الأقراص"}${kind ? `، ضمن «${kind}» فقط` : ""}.`,
+      noresSubContent: (scope) => `بحثنا داخل المستندات ${scope ? `في ${scope}` : "في كل الأقراص"}.`,
       noresIx: "الفهرسة ما زالت جارية، وقد يظهر الملف حين تنتهي.",
       tagHead: "لا شيء يضيع بصمت", tagTail: ": إذا لم نجد شيئاً نقول لك أين بحثنا وماذا تجرّب.",
       loading: "جارِ تحميل الفهرس…", ixSub: "يمكنك البحث الآن، وقد تكون النتائج ناقصة حتى ننتهي. القائمة تتحدث وحدها.",
-      more: "مرّر لعرض المزيد",
-      sugg: { query: "يبحث بهذا النص بدلاً مما كتبت", all_kinds: "يزيل فلتر النوع", web: "يفتح المتصفح، ولا يرسل شيئاً غير ما كتبته" },
+      moreRows: "مرّر لعرض المزيد", searching: "جارِ البحث داخل المستندات…", pressEnter: "اضغط Enter للبحث داخل المستندات.",
+      sugg: { query: "يبحث بهذا النص بدلاً مما كتبت", all_kinds: "يزيل فلتر النوع", all_drives: "يبحث خارج المجلد المختار", contents: "يقرأ نص المستندات أيضاً", web: "يفتح المتصفح، ولا يرسل شيئاً غير ما كتبته" },
       now: "الآن", minAgo: (n) => (n === 1 ? "قبل دقيقة" : n === 2 ? "قبل دقيقتين" : n <= 10 ? `قبل ${num(n)} دقائق` : `قبل ${num(n)} دقيقة`),
       today: "اليوم", yesterday: "أمس",
       units: ["بايت", "كيلوبايت", "ميغابايت", "غيغابايت", "تيرابايت"],
+      stop: "إيقاف", note: "تنبيه",
+      // right-click menu
+      mOpen: "فتح الملف", mReveal: "فتح المجلد الذي يحتويه", mCopyFile: "نسخ الملف", mCopyPath: "نسخ المسار", mCopyAll: "نسخ مسارات كل النتائج",
+      mScope: "البحث في هذا المجلد", mRename: "تغيير الاسم", mRecycle: "نقل إلى سلة المحذوفات", mMatches: "عرض كل التطابقات داخل الملف",
+      // dialogs
+      renameH: "تغيير الاسم", renameLabel: "الاسم الجديد", renameOk: "تغيير الاسم", cancel: "إلغاء", close: "إغلاق",
+      matchesH: (name) => `كل التطابقات — ${name}`, line: (n) => `سطر ${num(n)}`, firstLines: (n) => `(أول ${num(n)} سطر)`,
+      matchesNone: "يُعرض هنا كل سطر يطابق البحث.",
+      gone: "نُقل إلى سلة المحذوفات",
+      // history
+      history: "السجل", historyKey: "السجل (Ctrl+H)", savedH: "البحوث المحفوظة", recentH: "عمليات البحث الأخيرة", recentEmpty: "لا توجد عمليات بحث سابقة بعد",
+      saveCurrent: "حفظ البحث الحالي", clearRecent: "مسح عمليات البحث الأخيرة", clearSaved: "حذف كل البحوث المحفوظة",
+      savedInside: "داخل المستندات", savedScoped: "في مجلد",
+      // settings
+      settings: "الإعدادات", settingsKey: "الإعدادات (Ctrl+,)", back: "رجوع إلى البحث",
+      sLang: "اللغة", sLangNote: "ستظهر الواجهة باللغة المختارة بعد إعادة تشغيل البرنامج.", restart: "إعادة التشغيل الآن",
+      sDisplay: "العرض", sDigits: "عرض الأرقام بالعربية (٠١٢٣)",
+      sSearch: "البحث والفهرسة", sHideSystem: "إخفاء ملفات النظام", sHideSystemSub: "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
+      sContentIndex: "فهرسة محتوى المستندات في الخلفية", sContentIndexSub: "بحث أسرع داخل الملفات، ويشمل النص في الصور والملفات الممسوحة",
+      sAutoIndex: "تحديث الفهرس تلقائياً عند تغيّر الملفات", reindex: "تحديث الفهرس الآن",
+      sAnywhere: "البحث من أي مكان", sHotkey: "Ctrl+Alt+F يفتح نافذة البحث الصغيرة (وإلا هذه النافذة)",
+      sFloating: "خانة بحث شفافة فوق الساعة", sTray: "أيقونة بجانب الساعة",
+      sStartup: "التشغيل", sAutostart: "التشغيل مع ويندوز (في الخلفية)",
+      sAbout: "حول البرنامج", version: (v) => `بحث سريع (InstaFind) — الإصدار ${v}`,
     },
     en: {
-      ph: "Search file names…", type: "Type", sort: "Best match first",
+      ph: "Search file names…", phContent: "Search inside documents, then press Enter…", type: "Type", size: "Size", date: "Date",
+      filters: "Filters", lookIn: "Look in", allDrives: "All drives", chooseFolder: "Choose folder…", clearFilter: "Remove",
+      inside: "Inside documents", sortBy: "Sort",
+      sorts: { best: "Best match first", name: "Name", path: "Path", size: "Size", date: "Modified" },
+      asc: "ascending", desc: "descending",
       cName: "Name and path", cSize: "Size", cDate: "Modified",
       results: "Results", preview: "Preview",
       recent: "Recently opened", recentNone: "Files you open show up here.", tryThese: "Try these",
       trust: "Everything stays on your PC. No usage data is collected.",
       tips: [["report .pdf", "PDF files only"], ["size:>10mb", "Bigger than 10 MB"], ["dm:thisweek", "Changed this week"], ['"lease agreement"', "Exact phrase"], ["root: كتاب", "Arabic root: مكتبة، الكاتب"], ["احمد", "Also finds «أحمد»"]],
-      kNav: "Move", kOpen: "Open", kFolder: "Folder",
-      open: "Open", openFolder: "Open folder", copyPath: "Copy path",
-      fType: "Type", fSize: "Size", fMod: "Modified", folder: "Folder", file: "File",
+      kNav: "Move", kOpen: "Open", kFolder: "Folder", kMenu: "Actions",
+      open: "Open", openFolder: "Open folder", copyPath: "Copy path", more: "More actions",
+      fType: "Type", fSize: "Size", fMod: "Modified", fMatches: "Matches", folder: "Folder", file: "File",
       nres: (n) => (n === 0 ? "No results" : n === 1 ? "1 result" : `${num(n)} results`),
+      nMatches: (n) => (n === 1 ? "1 match" : `${num(n)} matches`),
       count: (n, ms) => `${num(n)} results in ${num(ms)} ms`,
       files: (n) => `Index up to date · ${num(n)} files`,
       noresH: (q) => `No results for “${q}”`,
-      noresSub: (n, kind) => `We searched ${num(n)} file names on all drives${kind ? `, “${kind}” only` : ""}.`,
+      noresSub: (n, kind, scope) => `We searched ${num(n)} file names ${scope ? `in ${scope}` : "on all drives"}${kind ? `, “${kind}” only` : ""}.`,
+      noresSubContent: (scope) => `We searched inside documents ${scope ? `in ${scope}` : "on all drives"}.`,
       noresIx: "Indexing is still running; the file may appear when it finishes.",
       tagHead: "Nothing gets lost silently", tagTail: ": when we find nothing, we tell you where we looked and what to try.",
       loading: "Loading the index…", ixSub: "You can search now; results may be incomplete until we finish. The list updates by itself.",
-      more: "Scroll for more",
-      sugg: { query: "Searches for this instead", all_kinds: "Removes the type filter", web: "Opens your browser with only what you typed" },
+      moreRows: "Scroll for more", searching: "Searching inside documents…", pressEnter: "Press Enter to search inside documents.",
+      sugg: { query: "Searches for this instead", all_kinds: "Removes the type filter", all_drives: "Looks outside the chosen folder", contents: "Reads the documents' text too", web: "Opens your browser with only what you typed" },
       now: "Just now", minAgo: (n) => (n === 1 ? "1 min ago" : `${num(n)} min ago`),
       today: "Today", yesterday: "Yesterday",
       units: ["bytes", "KB", "MB", "GB", "TB"],
+      stop: "Stop", note: "Note",
+      mOpen: "Open file", mReveal: "Open containing folder", mCopyFile: "Copy file", mCopyPath: "Copy path", mCopyAll: "Copy paths of all results",
+      mScope: "Search in this folder", mRename: "Rename", mRecycle: "Move to Recycle Bin", mMatches: "Show all matches in the file",
+      renameH: "Rename", renameLabel: "New name", renameOk: "Rename", cancel: "Cancel", close: "Close",
+      matchesH: (name) => `All matches — ${name}`, line: (n) => `Line ${num(n)}`, firstLines: (n) => `(first ${num(n)} lines)`,
+      matchesNone: "Every line that matches the search shows here.",
+      gone: "Moved to the Recycle Bin",
+      history: "History", historyKey: "History (Ctrl+H)", savedH: "Saved searches", recentH: "Recent searches", recentEmpty: "No recent searches yet",
+      saveCurrent: "Save the current search", clearRecent: "Clear recent searches", clearSaved: "Delete all saved searches",
+      savedInside: "inside documents", savedScoped: "in a folder",
+      settings: "Settings", settingsKey: "Settings (Ctrl+,)", back: "Back to search",
+      sLang: "Language", sLangNote: "The interface changes language after the program restarts.", restart: "Restart now",
+      sDisplay: "Display", sDigits: "Show Arabic-Indic digits (٠١٢٣)",
+      sSearch: "Search and indexing", sHideSystem: "Hide system files", sHideSystemSub: "The Windows folder, temporary and cache files",
+      sContentIndex: "Index document contents in the background", sContentIndexSub: "Faster search inside files, text in pictures and scans included",
+      sAutoIndex: "Update the index automatically when files change", reindex: "Update the index now",
+      sAnywhere: "Search from anywhere", sHotkey: "Ctrl+Alt+F opens the quick search (otherwise this window)",
+      sFloating: "Search box above the clock", sTray: "Icon in the notification area",
+      sStartup: "Start-up", sAutostart: "Start with Windows (in the background)",
+      sAbout: "About", version: (v) => `InstaFind — version ${v}`,
     },
   }[LANG];
+  const SORTS = ["best", "name", "path", "size", "date"];
 
   // ---------- state ----------
   const S = {
-    seq: 0, shown: -1, q: "", kind: 0, kindLabel: "", kinds: [], digits: false,
-    rows: [], total: 0, ms: 0, done: true, sel: 0, asked: 0,
-    files: 0, state: "ready", stateText: "",
-    recent: [], sugg: [], ssel: 0, view: "empty", note: "", notice: "",
+    seq: 0, shown: -1, q: "", kind: 0, size: 0, date: 0, content: false, sort: "best", desc: false, scope: "",
+    kinds: [], sizes: [], dates: [], digits: false, version: "",
+    rows: [], total: 0, ms: 0, done: true, sel: 0, asked: 0, running: false, isContent: false, contentFor: null,
+    progress: "", warnings: [], files: 0, state: "ready", stateText: "",
+    recent: [], sugg: [], ssel: 0, view: "empty", note: "", notice: "", resultsScope: "",
+    matches: null, history: { recent: [], saved: [] }, settings: null,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -78,7 +138,7 @@
   function size(bytes) {
     let v = Number(bytes), u = 0;
     while (v >= 1024 && u < T.units.length - 1) { v /= 1024; u++; }
-    const s = u === 0 ? String(v) : v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(0) : v.toFixed(1).replace(/\.0$/, "");
+    const s = u === 0 ? String(v) : v >= 10 ? v.toFixed(0) : v.toFixed(1).replace(/\.0$/, "");
     return `${digits(s)} ${T.units[u]}`;
   }
   const LOCALE = LANG === "ar" ? "ar-u-nu-latn" : "en-US";
@@ -105,7 +165,7 @@
       if (v === null || v === undefined || v === false) continue;
       if (k === "class") el.className = v; else el.setAttribute(k, v === true ? "" : v);
     }
-    for (const k of kids) if (k !== null && k !== undefined) el.append(k);
+    for (const k of kids) if (k !== null && k !== undefined && k !== false) el.append(k);
     return el;
   }
   // Static icon markup only (constants below); never data.
@@ -130,6 +190,18 @@
     search: [["circle", { cx: "11", cy: "11", r: "7" }], ["path", { d: "m20 20-3.6-3.6" }]],
     x: [["path", { d: "M6 6l12 12M18 6 6 18" }]],
     down: [["path", { d: "m6 9 6 6 6-6" }]],
+    up: [["path", { d: "m6 15 6-6 6 6" }]],
+    doc: [["path", { d: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" }], ["path", { d: "M14 3v5h5" }]],
+    text: [["path", { d: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" }], ["path", { d: "M14 3v5h5M9 13h6M9 17h4" }]],
+    scale: [["path", { d: "M4 20h16M7 20V10M12 20V4M17 20v-7" }]],
+    cal: [["rect", { x: "3", y: "5", width: "18", height: "16", rx: "2" }], ["path", { d: "M3 10h18M8 3v4M16 3v4" }]],
+    sort: [["path", { d: "M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3" }]],
+    dots: [["circle", { cx: "5", cy: "12", r: "1.4" }], ["circle", { cx: "12", cy: "12", r: "1.4" }], ["circle", { cx: "19", cy: "12", r: "1.4" }]],
+    star: [["path", { d: "m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" }]],
+    clock: [["circle", { cx: "12", cy: "12", r: "9" }], ["path", { d: "M12 7v5l3 2" }]],
+    trash: [["path", { d: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" }]],
+    pen: [["path", { d: "M4 20h4L20 8l-4-4L4 16z" }]],
+    back: [["path", { d: "M15 6l-6 6 6 6" }]],
   };
 
   // File-type badge: colour by family, the extension as its label.
@@ -163,12 +235,13 @@
     return svg;
   }
 
-  // The name with the matched parts in <mark>; the name takes the direction of its first strong letter.
-  function nameEl(r) {
-    const el = h("bdi", { class: "t" });
-    for (const [text, hl] of r.name) el.append(hl ? h("mark", null, text) : document.createTextNode(text));
+  // Text in pieces with the matched parts in <mark>; it takes the direction of its first strong letter.
+  function marked(pieces, cls = "t") {
+    const el = h("bdi", { class: cls });
+    for (const [text, hl] of pieces) el.append(hl ? h("mark", null, text) : document.createTextNode(text));
     return el;
   }
+  const nameEl = (r) => marked(r.name);
   function plainName(r) { return r.name.map(([t]) => t).join(""); }
 
   // A full path, always left to right, each folder name isolated (<bdi>) so
@@ -188,6 +261,7 @@
       if (i) { el.append(h("span", { class: "sep" }, "\\"), h("wbr")); }
       el.append(s === null ? h("span", { class: "ell" }, "…") : h("bdi", null, s));
     });
+    if (segs.length === 1 && full.endsWith("\\")) el.append(h("span", { class: "sep" }, "\\"));
     return el;
   }
   function joinPath(dir, name) { return dir.endsWith("\\") ? dir + name : dir + "\\" + name; }
@@ -199,19 +273,26 @@
   }
   const handlers = {
     hello(m) {
-      S.kinds = m.kinds || []; S.digits = !!m.digits;
-      renderKind(); renderStatus();
+      S.kinds = m.kinds || []; S.sizes = m.sizes || []; S.dates = m.dates || [];
+      S.kind = m.kind < S.kinds.length ? m.kind : 0;
+      S.sort = SORTS.includes(m.sort) ? m.sort : "best"; S.desc = !!m.desc;
+      S.digits = !!m.digits; S.version = m.version || "";
+      renderChips(); renderStatus();
     },
     results(m) {
       if (m.seq !== S.seq) return; // an older search: the user typed on
-      // The same search again (the index changed): keep the selected file.
+      // The same search again (the index changed, a document search ended,
+      // another order): keep the selected file.
       const refresh = m.seq === S.shown && S.rows[S.sel];
       const was = refresh && joinPath(S.rows[S.sel].dir, plainName(S.rows[S.sel]));
       const keep = refresh ? m.rows.findIndex((r) => joinPath(r.dir, plainName(r)) === was) : -1;
       S.shown = m.seq;
       S.rows = m.rows; S.total = m.total; S.ms = m.ms; S.done = m.rows.length >= m.total;
       S.asked = 0; S.note = m.note || ""; S.sugg = m.suggestions || []; S.ssel = 0;
-      S.files = m.files ?? S.files; S.kindLabel = m.kind_label || "";
+      S.files = m.files ?? S.files; S.kindLabel = m.kind_label || ""; S.resultsScope = m.scope || "";
+      S.isContent = !!m.content; S.running = !!m.running; S.warnings = m.warnings || [];
+      if (!S.running && !S.isContent) S.progress = "";
+      if (!refresh) S.matches = null;
       S.sel = keep > 0 ? keep : 0;
       render(!!refresh);
       announce();
@@ -219,80 +300,162 @@
     rows(m) {
       if (m.seq !== S.seq || m.from !== S.rows.length) return;
       S.rows = S.rows.concat(m.rows); S.done = S.rows.length >= S.total; S.asked = 0;
-      appendRows(m.from);
+      if (S.view !== "results") render(); else appendRows(m.from);
+    },
+    progress(m) {
+      if (m.seq !== S.seq) return;
+      S.total = Math.max(S.total, m.total); S.running = !m.done; S.progress = m.text || "";
+      S.done = S.rows.length >= S.total;
+      if (!S.done) wantMore();
+      if (S.view === "results" && !S.rows.length) renderRows(false);
+      renderStatus(); renderStop();
+      if (m.done) announce();
+    },
+    matches(m) {
+      if (m.seq !== S.seq) return;
+      S.matches = m;
+      const r = S.rows[S.sel];
+      if (r && r.id === m.id) renderPreview();
+      if (dlgFor === "matches:" + m.id) showMatches(m.id);
     },
     recent(m) { S.recent = m.rows || []; renderRecent(); },
+    history(m) { S.history = { recent: m.recent || [], saved: m.saved || [] }; if (!$("hist").hidden) renderHistory(); },
+    scope(m) {
+      S.scope = m.path || "";
+      renderChips();
+      if (m.search && S.q.trim()) runSearch();
+    },
+    apply(m) {
+      q.value = m.q; S.q = m.q;
+      S.kind = m.kind < S.kinds.length ? m.kind : 0; S.content = !!m.content;
+      closeSettings(); renderChips(); q.focus();
+      runSearch();
+    },
+    renamed(m) {
+      if (m.list !== "results" || m.seq !== S.seq) return;
+      const r = S.rows[m.id];
+      if (!r) return;
+      r.name = [[m.name, false]];
+      const dot = m.name.lastIndexOf(".");
+      if (!r.folder) r.ext = dot > 0 ? m.name.slice(dot + 1).toLowerCase() : "";
+      replaceRow(m.id);
+    },
+    removed(m) {
+      if (m.list !== "results" || m.seq !== S.seq || !S.rows[m.id]) return;
+      S.rows[m.id].gone = true;
+      replaceRow(m.id);
+    },
+    settings(m) {
+      const hide = S.settings && S.settings.hide_system !== m.hide_system;
+      S.settings = m;
+      if (S.digits !== !!m.digits) { S.digits = !!m.digits; render(true); renderRecent(); }
+      if (S.view === "settings") renderSettings();
+      if (hide && S.q.trim() && !S.content) runSearch();
+    },
     status(m) {
       S.state = m.state; S.stateText = m.text || ""; S.files = m.files;
       renderBanner(); renderStatus();
       if (S.view === "nores") renderNoResults();
     },
-    query(m) { q.value = m.q; onInput(); },
+    query(m) { closeSettings(); q.value = m.q; onInput(); },
     focus() { q.focus(); },
     notice(m) {
       S.notice = m.text; renderStatus();
       clearTimeout(handlers.noticeTimer);
-      handlers.noticeTimer = setTimeout(() => { S.notice = ""; renderStatus(); }, 2500);
+      handlers.noticeTimer = setTimeout(() => { S.notice = ""; renderStatus(); }, 3500);
     },
   };
   Object.defineProperty(window, "__instafind", { value: Object.freeze({ recv: (m) => { const f = handlers[m && m.type]; if (f) f(m); } }) });
 
   // ---------- searching ----------
-  function onInput() {
+  function runSearch() {
     S.q = q.value;
     S.seq++;
-    if (!S.q.trim()) {
-      S.rows = []; S.total = 0; S.sel = 0; S.view = "empty";
-      render();
-      return;
-    }
-    send({ op: "search", seq: S.seq, q: S.q, kind: S.kind });
+    if (!S.q.trim()) { S.rows = []; S.total = 0; S.sel = 0; S.running = false; render(); return; }
+    if (S.content) { S.contentFor = S.q; S.rows = []; S.total = 0; S.running = true; S.progress = T.searching; }
+    send({ op: "search", seq: S.seq, q: S.q, kind: S.kind, size: S.size, date: S.date, content: S.content, sort: S.sort, desc: S.desc });
+    renderStop();
   }
+  function onInput() {
+    if (S.view === "settings") closeSettings();
+    S.q = q.value;
+    if (!S.q.trim()) { S.seq++; S.rows = []; S.total = 0; S.sel = 0; S.running = false; S.contentFor = null; render(); return; }
+    // Reading every document on each keystroke would be slow: the search
+    // inside documents runs on Enter, as in the classic window.
+    if (S.content) { renderStatus(); return; }
+    runSearch();
+  }
+  // The search box's text is not what the shown document results are for.
+  const contentStale = () => S.content && S.contentFor !== q.value;
   function askMore() {
     if (S.done || S.asked || S.view !== "results") return;
-    S.asked = S.rows.length;
+    S.asked = S.rows.length || -1;
     send({ op: "more", seq: S.seq, from: S.rows.length });
   }
+  // More rows are there (a document search found them): fetch them if the list is short or near its end.
+  function wantMore() {
+    if (S.asked) return;
+    if (S.rows.length < 60 || list.scrollTop + list.clientHeight > list.scrollHeight - FIRST_PAGE_GUARD) {
+      S.asked = S.rows.length || -1;
+      send({ op: "more", seq: S.seq, from: S.rows.length });
+    }
+  }
   function act(op, row, listName = "results") {
-    if (!row) return;
+    if (!row || row.gone) return;
     send({ op, list: listName, seq: listName === "results" ? S.seq : 0, id: row.id });
   }
+  function stop() { if (S.running) send({ op: "stop", seq: S.seq }); }
 
   // ---------- rendering ----------
   function setView(v) {
     S.view = v;
-    $("view-results").hidden = v !== "results";
-    $("view-empty").hidden = v !== "empty";
-    $("view-nores").hidden = v !== "nores";
+    for (const id of ["results", "empty", "nores", "settings"]) $("view-" + id).hidden = v !== id;
+    $("chips").hidden = v === "settings";
+    $("set-btn").setAttribute("aria-pressed", String(v === "settings"));
     q.setAttribute("aria-expanded", String(v === "results"));
     q.setAttribute("aria-controls", v === "nores" ? "sugg" : "list");
   }
   function render(refresh = false) {
+    if (S.view === "settings") { renderStatus(); renderBanner(); return; }
     if (!S.q.trim()) setView("empty");
-    else setView(S.rows.length ? "results" : "nores");
-    $("meta").textContent = S.q.trim() ? T.nres(S.total) : "";
-    if (S.view === "results") renderRows(refresh);
+    else setView(S.rows.length || S.running ? "results" : "nores");
+    $("meta").textContent = S.q.trim() && !S.running ? T.nres(S.total) : "";
+    if (S.view === "results") { renderCols(); renderRows(refresh); }
     if (S.view === "nores") renderNoResults();
     renderPreview();
-    renderStatus();
+    renderStatus(); renderStop();
     renderBanner();
   }
   function rowEl(r, i, listName) {
     const name = plainName(r);
-    const el = h("div", { class: "row", role: "option", id: (listName === "recent" ? "rr" : "r") + i, "aria-selected": String(listName === "results" && i === S.sel), "aria-label": `${name}, ${r.dir}${r.folder ? "" : ", " + size(r.size)}, ${when(r.mtime)}` });
+    const el = h("div", { class: "row" + (r.gone ? " gone" : "") + (r.snippet ? " doc" : ""), role: "option", id: (listName === "recent" ? "rr" : "r") + i, "aria-selected": String(listName === "results" && i === S.sel), "aria-label": `${name}, ${r.dir}${r.folder ? "" : ", " + size(r.size)}, ${when(r.mtime)}${r.gone ? ", " + T.gone : ""}` });
     el.dataset.i = i;
-    el.append(
-      h("span", null, badge(r)),
-      h("span", { class: "nm" }, h("span", { class: "n1" }, nameEl(r)), h("span", { class: "n2" }, pathEl(r.dir))),
-    );
+    const nm = h("span", { class: "nm" }, h("span", { class: "n1" }, nameEl(r), r.matches > 1 ? h("span", { class: "cnt num" }, T.nMatches(r.matches)) : null), h("span", { class: "n2" }, pathEl(r.dir)));
+    if (r.snippet) nm.append(h("span", { class: "n3" }, marked(r.snippet, "sn")));
+    el.append(h("span", null, badge(r)), nm);
     if (listName === "results") el.append(h("span", { class: "sz num" }, r.folder ? "" : size(r.size)));
     el.append(h("span", { class: "dt num" }, when(r.mtime)));
     return el;
   }
+  function replaceRow(i) {
+    const old = $("r" + i);
+    if (old) { old.replaceWith(rowEl(S.rows[i], i, "results")); if (i === S.sel) select(i, false); }
+    if (i === S.sel) renderPreview();
+  }
+  function renderCols() {
+    const col = (key, label, cls) => {
+      const on = S.sort === key;
+      const b = h("button", { class: "colbtn" + (on ? " sorted" : "") + (cls ? " " + cls : ""), type: "button", "aria-pressed": String(on) }, h("span", null, label));
+      if (on) b.append(icon(S.desc ? I.down : I.up, "i caret"));
+      b.dataset.sort = key;
+      return b;
+    };
+    $("cols").replaceChildren(h("span"), col("name", T.cName), col("size", T.cSize, "end"), col("date", T.cDate, "end"));
+  }
   function renderRows(refresh) {
     const top = list.scrollTop;
     list.replaceChildren(...S.rows.map((r, i) => rowEl(r, i, "results")));
-    if (!S.done) list.append(h("div", { class: "more", "aria-hidden": "true" }, T.more));
+    if (!S.done || (S.running && !S.rows.length)) list.append(h("div", { class: "more", "aria-hidden": "true" }, S.running && !S.rows.length ? T.searching : T.moreRows));
     list.scrollTop = refresh ? top : 0;
     select(S.sel, refresh);
   }
@@ -300,18 +463,35 @@
     const more = list.querySelector(".more");
     const frag = document.createDocumentFragment();
     S.rows.slice(from).forEach((r, k) => frag.append(rowEl(r, from + k, "results")));
-    if (more) more.before(frag); else list.append(frag);
+    if (more) { more.before(frag); more.textContent = T.moreRows; } else list.append(frag);
     if (S.done && more) more.remove();
+    if (from === 0) select(0, false);
   }
+  let matchTimer = 0;
   function select(i, scroll = true) {
-    if (!S.rows.length) { q.removeAttribute("aria-activedescendant"); return; }
+    if (!S.rows.length) { q.removeAttribute("aria-activedescendant"); renderPreview(); return; }
     S.sel = Math.max(0, Math.min(S.rows.length - 1, i));
     for (const el of list.querySelectorAll('.row[aria-selected="true"]')) el.setAttribute("aria-selected", "false");
     const el = $("r" + S.sel);
     if (el) { el.setAttribute("aria-selected", "true"); if (scroll) el.scrollIntoView({ block: "nearest" }); }
     q.setAttribute("aria-activedescendant", "r" + S.sel);
     if (S.sel > S.rows.length - 20) askMore();
+    // Every matching line of a document, once the selection rests on it.
+    const r = S.rows[S.sel];
+    clearTimeout(matchTimer);
+    if (r.snippet && !(S.matches && S.matches.id === r.id)) matchTimer = setTimeout(() => send({ op: "matches", seq: S.seq, id: r.id }), 120);
     renderPreview();
+  }
+  function btn(cls, ic, label, onClick, extra) {
+    const b = h("button", Object.assign({ class: "btn " + cls, type: "button" }, extra), icon(ic));
+    if (label) b.append(label);
+    b.addEventListener("click", onClick);
+    return b;
+  }
+  function linesEl(m, max) {
+    const box = h("ol", { class: "lines" });
+    for (const [n, pieces] of m.lines.slice(0, max)) box.append(h("li", null, h("span", { class: "ln num" }, T.line(n)), marked(pieces, "lt")));
+    return box;
   }
   function renderPreview() {
     const pv = $("preview");
@@ -321,30 +501,36 @@
     const facts = h("dl", { class: "facts" }, h("dt", null, T.fType), h("dd", null, kind));
     if (!r.folder) facts.append(h("dt", null, T.fSize), h("dd", { class: "num" }, size(r.size)));
     facts.append(h("dt", null, T.fMod), h("dd", { class: "num" }, when(r.mtime)));
-    const btn = (cls, ic, label, op, extra) => {
-      const b = h("button", Object.assign({ class: "btn " + cls, type: "button" }, extra), icon(ic));
-      if (label) b.append(label);
-      b.addEventListener("click", () => act(op, S.rows[S.sel]));
-      return b;
-    };
-    const open = btn("primary", I.open, T.open + " ", "open");
+    if (r.matches) facts.append(h("dt", null, T.fMatches), h("dd", { class: "num" }, T.nMatches(r.matches)));
+    const open = btn("primary", I.open, T.open + " ", () => act("open", S.rows[S.sel]), { disabled: r.gone });
     open.append(h("kbd", null, "Enter"));
-    pv.replaceChildren(
+    const parts = [
       h("div", { class: "thumb" }, badge(r)),
       h("div", null, h("div", { class: "pv-name" }, nameEl(r)), h("div", { class: "pv-path" }, pathEl(joinPath(r.dir, plainName(r)), 999))),
-      h("div", { class: "actions" }, open, btn("", I.folder, T.openFolder, "reveal"), btn("icon", I.copy, null, "copy", { "aria-label": T.copyPath, title: T.copyPath })),
-      facts,
-    );
+    ];
+    if (r.gone) parts.push(h("p", { class: "gone-note" }, T.gone));
+    else parts.push(h("div", { class: "actions" }, open, btn("", I.folder, T.openFolder, () => act("reveal", S.rows[S.sel])),
+      btn("icon", I.copy, null, () => act("copy", S.rows[S.sel]), { "aria-label": T.copyPath, title: T.copyPath }),
+      btn("icon", I.dots, null, (e) => openCtx(S.sel, e.currentTarget), { "aria-label": T.more, title: T.more, "aria-haspopup": "menu" })));
+    parts.push(facts);
+    if (r.snippet) {
+      const m = S.matches && S.matches.id === r.id ? S.matches : null;
+      const sec = h("section", { class: "pv-lines" }, h("div", { class: "sec-h" }, h("span", null, T.mMatches), h("kbd", null, "F4")));
+      sec.append(m ? linesEl(m, 12) : h("p", { class: "snip" }, marked(r.snippet, "sn")));
+      parts.push(sec);
+    }
+    pv.replaceChildren(...parts);
   }
   function renderRecent() {
     const el = $("recent");
     el.replaceChildren(...S.recent.map((r, i) => rowEl(r, i, "recent")));
     $("recent-none").hidden = S.recent.length > 0;
   }
-  const SUGG_ICON = { query: I.bulb, all_kinds: I.filter, all_drives: I.folder, web: I.globe };
+  const SUGG_ICON = { query: I.bulb, all_kinds: I.filter, all_drives: I.folder, contents: I.text, web: I.globe };
   function renderNoResults() {
     $("nores-h").textContent = T.noresH(S.q.trim());
-    let sub = T.noresSub(S.files, S.kind ? S.kindLabel : "");
+    const scope = S.resultsScope ? S.resultsScope : "";
+    let sub = S.isContent ? T.noresSubContent(scope) : T.noresSub(S.files, S.kind ? S.kindLabel : "", scope);
     if (S.state !== "ready") sub += " " + T.noresIx;
     $("nores-sub").textContent = sub;
     $("sugg").replaceChildren(...S.sugg.map((s, k) => {
@@ -359,13 +545,15 @@
   }
   function applySuggestion(s) {
     if (!s) return;
-    if (s.kind === "query") { q.value = s.q; onInput(); }
-    else if (s.kind === "all_kinds") setKind(0);
+    if (s.kind === "query") { q.value = s.q; runSearch(); }
+    else if (s.kind === "all_kinds") setFilter("kind", 0);
+    else if (s.kind === "all_drives") send({ op: "all_drives" });
+    else if (s.kind === "contents") { S.content = true; renderChips(); runSearch(); }
     else if (s.kind === "web") send({ op: "web", q: S.q });
   }
   function renderBanner() {
     const busy = S.state !== "ready";
-    $("banner").hidden = !busy;
+    $("banner").hidden = !busy || S.view === "settings";
     if (!busy) return;
     $("banner-title").textContent = S.state === "loading" ? T.loading : digits(S.stateText);
     $("banner-sub").textContent = T.ixSub;
@@ -373,14 +561,20 @@
   }
   function renderStatus() {
     const busy = S.state !== "ready";
-    $("dot").classList.toggle("busy", busy);
+    $("dot").classList.toggle("busy", busy || S.running);
     let text;
     if (S.notice) text = S.notice;
     else if (busy) text = S.state === "loading" ? T.loading : digits(S.stateText);
     else text = T.files(S.files);
-    if (!S.notice && S.view !== "empty") text = (S.note ? S.note + " · " : "") + T.count(S.total, S.ms) + " · " + text;
+    if (!S.notice && S.view !== "empty" && S.view !== "settings") {
+      if (S.content && contentStale()) text = T.pressEnter + " · " + text;
+      else if (S.isContent && S.progress) text = digits(S.progress);
+      else text = (S.note ? S.note + " · " : "") + T.count(S.total, S.ms) + " · " + text;
+      if (S.warnings.length) text += ` — ${T.note}: ${S.warnings.join(LANG === "ar" ? "، " : "; ")}`;
+    } else if (!S.notice && S.content && contentStale() && S.q.trim()) text = T.pressEnter;
     $("status-text").textContent = text;
   }
+  function renderStop() { $("stop").hidden = !S.running; }
   // The result count for screen readers, once typing pauses.
   let liveTimer = 0;
   function announce() {
@@ -388,94 +582,331 @@
     liveTimer = setTimeout(() => { $("live").textContent = T.nres(S.total); }, 500);
   }
 
-  // ---------- the type chip ----------
-  function renderKind() {
-    const chip = $("kind"), label = $("kind-label");
-    const on = S.kind > 0 && S.kinds[S.kind];
-    chip.classList.toggle("on", !!on);
-    chip.setAttribute("aria-pressed", String(!!on));
-    label.textContent = on ? `${T.type}: ${S.kinds[S.kind]}` : T.type;
-    $("kind-caret").replaceWith(Object.assign(icon(on ? I.x : I.down, "i caret"), { id: "kind-caret" }));
-    const menu = $("kind-menu");
-    menu.replaceChildren(...S.kinds.map((k, i) => {
-      const it = h("div", { role: "menuitemradio", tabindex: "-1", "aria-checked": String(i === S.kind) }, k);
-      it.dataset.k = i;
+  // ---------- filter chips and their menus ----------
+  // Each chip: [id, icon, label when off, the label when on, its choices, chosen, pick].
+  function chipDefs() {
+    const sortLabel = `${T.sortBy}: ${T.sorts[S.sort]}${S.sort === "best" ? "" : ` (${S.desc ? T.desc : T.asc})`}`;
+    return [
+      { id: "kind", ic: I.doc, label: T.type, on: S.kind > 0 && S.kinds[S.kind], value: `${T.type}: ${S.kinds[S.kind] || ""}`, items: S.kinds, cur: S.kind, pick: (i) => setFilter("kind", i), clear: () => setFilter("kind", 0) },
+      { id: "size", ic: I.scale, label: T.size, on: S.size > 0, value: `${T.size}: ${S.sizes[S.size] || ""}`, items: S.sizes, cur: S.size, pick: (i) => setFilter("size", i), clear: () => setFilter("size", 0) },
+      { id: "date", ic: I.cal, label: T.date, on: S.date > 0, value: `${T.date}: ${S.dates[S.date] || ""}`, items: S.dates, cur: S.date, pick: (i) => setFilter("date", i), clear: () => setFilter("date", 0) },
+      { id: "scope", ic: I.folder, label: `${T.lookIn}: ${T.allDrives}`, on: !!S.scope, value: null, items: [T.allDrives, T.chooseFolder], cur: S.scope ? -1 : 0, pick: (i) => send({ op: i ? "pick_folder" : "all_drives" }), clear: () => send({ op: "all_drives" }) },
+      { id: "content", ic: I.text, label: T.inside, toggle: true, on: S.content },
+      { id: "sort", ic: I.sort, label: sortLabel, end: true, items: SORTS.map((k) => T.sorts[k]), cur: SORTS.indexOf(S.sort), pick: (i) => setSort(SORTS[i], SORTS[i] === S.sort ? !S.desc : false) },
+    ];
+  }
+  function renderChips() {
+    const wraps = chipDefs().map((d) => {
+      const chip = h("button", { class: "chip" + (d.on ? " on" : "") + (d.end ? " end" : ""), id: "chip-" + d.id, type: "button", "aria-pressed": d.toggle || d.on ? String(!!d.on) : null, "aria-haspopup": d.items ? "menu" : null, "aria-expanded": d.items ? "false" : null }, icon(d.ic));
+      if (d.id === "scope" && S.scope) chip.append(h("span", null, `${T.lookIn}: `), pathEl(S.scope, 48));
+      else chip.append(h("span", null, d.on && d.value ? d.value : d.label));
+      if (d.items) {
+        const caret = icon(d.on && d.clear ? I.x : I.down, "i caret");
+        if (d.on && d.clear) { caret.dataset.clear = "1"; caret.setAttribute("aria-label", T.clearFilter); }
+        chip.append(caret);
+      }
+      const wrap = h("span", { class: "chipwrap" + (d.end ? " end" : "") }, chip);
+      if (d.items) {
+        const menu = h("div", { class: "menu", role: "menu", id: "menu-" + d.id, hidden: true });
+        d.items.forEach((label, i) => { const it = h("div", { role: "menuitemradio", tabindex: "-1", "aria-checked": String(i === d.cur) }, label); it.dataset.k = i; menu.append(it); });
+        wrap.append(menu);
+      }
+      chip.addEventListener("click", (e) => {
+        if (d.toggle) { S.content = !S.content; renderChips(); q.focus(); updatePlaceholder(); if (S.q.trim()) runSearch(); return; }
+        if (d.on && d.clear && e.target.closest("[data-clear]")) { d.clear(); return; }
+        toggleMenu("menu-" + d.id);
+      });
+      wrap.addEventListener("click", (e) => { const it = e.target.closest("[data-k]"); if (it) { closeMenus(); d.pick(+it.dataset.k); } });
+      return wrap;
+    });
+    $("chips").replaceChildren(...wraps);
+    updatePlaceholder();
+  }
+  function updatePlaceholder() { q.placeholder = S.content ? T.phContent : T.ph; }
+  function setFilter(key, i) {
+    S[key] = i;
+    if (key === "kind") S.kindLabel = S.kinds[i] || "";
+    closeMenus(); renderChips(); q.focus();
+    if (S.q.trim()) runSearch();
+  }
+  function setSort(sort, desc) {
+    S.sort = sort; S.desc = sort === "best" ? false : desc;
+    renderChips(); if (S.view === "results") renderCols();
+    // Documents are not read again for another order.
+    if (S.isContent && S.shown === S.seq && !contentStale()) send({ op: "sort", seq: S.seq, sort: S.sort, desc: S.desc });
+    else if (S.q.trim()) runSearch();
+  }
+  function openMenus() { return [...document.querySelectorAll(".menu")].filter((m) => !m.hidden); }
+  function closeMenus() {
+    for (const m of openMenus()) m.hidden = true;
+    for (const b of document.querySelectorAll('[aria-haspopup="menu"][aria-expanded="true"]')) b.setAttribute("aria-expanded", "false");
+  }
+  function toggleMenu(id, focusFirst = true) {
+    const menu = $(id), open = !menu.hidden;
+    closeMenus();
+    if (open) return;
+    menu.hidden = false;
+    const owner = menu.parentElement.querySelector('[aria-haspopup="menu"]');
+    if (owner) owner.setAttribute("aria-expanded", "true");
+    if (focusFirst) (menu.querySelector('[aria-checked="true"]') || menu.querySelector('[tabindex="-1"]:not([aria-disabled="true"])'))?.focus();
+  }
+  // Arrow keys, Enter and Esc inside any open menu.
+  document.addEventListener("keydown", (e) => {
+    const menu = document.activeElement && document.activeElement.closest && document.activeElement.closest(".menu");
+    if (!menu || menu.hidden) return;
+    const items = [...menu.querySelectorAll('[tabindex="-1"]:not([aria-disabled="true"])')], i = items.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") items[(i + 1) % items.length]?.focus();
+    else if (e.key === "ArrowUp") items[(i - 1 + items.length) % items.length]?.focus();
+    else if (e.key === "Home") items[0]?.focus();
+    else if (e.key === "End") items[items.length - 1]?.focus();
+    else if (e.key === "Enter" || e.key === " ") document.activeElement.click();
+    else if (e.key === "Escape" || e.key === "Tab") { closeMenus(); q.focus(); }
+    else return;
+    e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
+  document.addEventListener("mousedown", (e) => { if (!e.target.closest(".chipwrap,.popwrap,.ctx")) closeMenus(); });
+
+  // ---------- the right-click menu ----------
+  let ctxRow = null; // [list, index]
+  function openCtx(i, anchor, listName = "results", at = null) {
+    const r = (listName === "results" ? S.rows : S.recent)[i];
+    if (!r || r.gone) return;
+    ctxRow = [listName, i];
+    const item = (label, key, op, ic) => {
+      const it = h("div", { role: "menuitem", tabindex: "-1" }, icon(ic), h("span", null, label), key ? h("kbd", null, key) : null);
+      it.addEventListener("click", () => { closeMenus(); runCtx(op); });
       return it;
-    }));
+    };
+    const items = [item(T.mOpen, "Enter", "open", I.open), item(T.mReveal, "Ctrl+Enter", "reveal", I.folder), item(T.mCopyFile, "Ctrl+C", "copy_file", I.copy), item(T.mCopyPath, "Ctrl+Shift+C", "copy", I.copy)];
+    if (listName === "results") items.push(item(T.mCopyAll, null, "copy_all", I.copy));
+    items.push(item(T.mScope, null, "scope", I.search));
+    if (r.snippet) items.push(item(T.mMatches, "F4", "matches", I.text));
+    items.push(h("div", { class: "sep", role: "separator" }), item(T.mRename, "F2", "rename", I.pen), item(T.mRecycle, "Delete", "recycle", I.trash));
+    const menu = $("ctx");
+    menu.replaceChildren(...items);
+    closeMenus();
+    menu.hidden = false;
+    const rect = at || (anchor ? anchor.getBoundingClientRect() : { left: innerWidth / 2, right: innerWidth / 2, top: innerHeight / 2, bottom: innerHeight / 2 });
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    const rtl = document.documentElement.dir === "rtl";
+    let x = at ? at.left : rtl ? rect.right - mw : rect.left;
+    let y = at ? at.top : rect.bottom + 4;
+    if (at && rtl) x -= mw;
+    x = Math.max(8, Math.min(innerWidth - mw - 8, x));
+    if (y + mh > innerHeight - 8) y = Math.max(8, (at ? at.top : rect.top) - mh - 4);
+    menu.style.left = x + "px"; menu.style.top = y + "px";
+    menu.querySelector('[tabindex="-1"]').focus();
   }
-  function setKind(k) {
-    S.kind = k; S.kindLabel = S.kinds[k] || "";
-    closeMenu(); renderKind();
+  function runCtx(op) {
+    if (!ctxRow) return;
+    const [listName, i] = ctxRow;
+    const r = (listName === "results" ? S.rows : S.recent)[i];
+    ctxRow = null;
+    if (!r) return;
+    if (op === "copy_all") send({ op: "copy_all", seq: S.seq });
+    else if (op === "rename") renameDialog(r, listName);
+    else if (op === "matches") showMatches(r.id);
+    else act(op, r, listName);
+    if (!$("veil").hidden) return;
     q.focus();
-    onInput();
   }
-  function openMenu() {
-    const menu = $("kind-menu");
-    menu.hidden = false; $("kind").setAttribute("aria-expanded", "true");
-    (menu.querySelector('[aria-checked="true"]') || menu.firstChild)?.focus();
+
+  // ---------- dialogs ----------
+  let dlgFor = "", dlgBack = null;
+  function dialog(title, body, buttons, tag) {
+    dlgFor = tag; dlgBack = document.activeElement;
+    $("dlg-h").textContent = title;
+    $("dlg-body").replaceChildren(...body);
+    $("dlg-btns").replaceChildren(...buttons);
+    $("veil").hidden = false;
   }
-  function closeMenu() { $("kind-menu").hidden = true; $("kind").setAttribute("aria-expanded", "false"); }
-  $("kind").addEventListener("click", (e) => {
-    // The × of an active filter clears it; the rest opens the list.
-    if (S.kind && e.target.closest("#kind-caret")) { setKind(0); return; }
-    if ($("kind-menu").hidden) openMenu(); else closeMenu();
+  function closeDialog() {
+    $("veil").hidden = true; dlgFor = "";
+    (dlgBack && dlgBack.isConnected ? dlgBack : q).focus();
+  }
+  function renameDialog(r, listName) {
+    const name = plainName(r);
+    const input = h("input", { id: "rename", type: "text", dir: "auto", spellcheck: "false", autocomplete: "off", "aria-label": T.renameLabel });
+    input.value = name;
+    const ok = () => { const v = input.value.trim(); closeDialog(); if (v && v !== name) send({ op: "rename", list: listName, seq: listName === "results" ? S.seq : 0, id: r.id, name: v }); };
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { ok(); e.preventDefault(); e.stopPropagation(); } });
+    dialog(T.renameH, [h("label", { class: "lbl", for: "rename" }, T.renameLabel), input],
+      [btn("primary", I.pen, T.renameOk, ok), btn("", I.x, T.cancel, closeDialog)], "rename");
+    input.focus();
+    // The name without its extension, ready to type over.
+    const dot = r.folder ? -1 : name.lastIndexOf(".");
+    input.setSelectionRange(0, dot > 0 ? dot : name.length);
+  }
+  function showMatches(id) {
+    const r = S.rows[id];
+    if (!r || !r.snippet) return;
+    const m = S.matches && S.matches.id === id ? S.matches : null;
+    if (!m) send({ op: "matches", seq: S.seq, id });
+    const body = [h("div", { class: "pv-path" }, pathEl(joinPath(r.dir, plainName(r)), 999))];
+    if (m) {
+      body.push(h("p", { class: "sub num" }, T.nMatches(m.count) + (m.lines.length < m.count ? " " + T.firstLines(m.lines.length) : "")), linesEl(m, 1000));
+    } else body.push(h("p", { class: "sub" }, T.matchesNone));
+    dialog(T.matchesH(plainName(r)), body, [btn("", I.x, T.close, closeDialog)], "matches:" + id);
+    $("dlg-btns").querySelector("button").focus();
+  }
+  $("veil").addEventListener("mousedown", (e) => { if (e.target === $("veil")) { closeDialog(); e.preventDefault(); } });
+  $("veil").addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { closeDialog(); e.preventDefault(); e.stopPropagation(); return; }
+    if (e.key !== "Tab") return;
+    // Keep the focus inside the dialog.
+    const f = [...$("dlg").querySelectorAll("input,button")];
+    const i = f.indexOf(document.activeElement);
+    const next = f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length];
+    if (next) { next.focus(); e.preventDefault(); }
   });
-  $("kind-menu").addEventListener("click", (e) => { const it = e.target.closest("[data-k]"); if (it) setKind(+it.dataset.k); });
-  $("kind-menu").addEventListener("keydown", (e) => {
-    const items = [...$("kind-menu").children], i = items.indexOf(document.activeElement);
-    if (e.key === "ArrowDown") { items[(i + 1) % items.length].focus(); e.preventDefault(); }
-    else if (e.key === "ArrowUp") { items[(i - 1 + items.length) % items.length].focus(); e.preventDefault(); }
-    else if (e.key === "Enter" || e.key === " ") { if (i >= 0) setKind(i); e.preventDefault(); }
-    else if (e.key === "Escape") { closeMenu(); $("kind").focus(); e.preventDefault(); e.stopPropagation(); }
-  });
-  document.addEventListener("mousedown", (e) => { if (!e.target.closest(".chipwrap")) closeMenu(); });
+
+  // ---------- history ----------
+  function renderHistory() {
+    const menu = $("hist");
+    const item = (cls, ic, label, sub, onClick, disabled) => {
+      const it = h("div", { role: "menuitem", tabindex: "-1", class: cls, "aria-disabled": disabled ? "true" : null }, icon(ic), h("bdi", { class: "lbl" }, label), sub ? h("span", { class: "sub" }, sub) : null);
+      if (!disabled) it.addEventListener("click", () => { closeMenus(); onClick(); });
+      return it;
+    };
+    const kids = [];
+    if (S.history.saved.length) {
+      kids.push(h("div", { class: "mh", role: "presentation" }, T.savedH));
+      for (const s of S.history.saved) kids.push(item("", I.star, s.name, [s.content ? T.savedInside : "", s.scoped ? T.savedScoped : ""].filter(Boolean).join(" · "), () => send({ op: "saved", id: s.id })));
+      kids.push(h("div", { class: "sep", role: "separator" }));
+    }
+    kids.push(h("div", { class: "mh", role: "presentation" }, S.history.recent.length ? T.recentH : T.recentEmpty));
+    for (const r of S.history.recent) kids.push(item("", I.clock, r, null, () => { closeSettings(); q.value = r; runSearch(); q.focus(); }));
+    kids.push(h("div", { class: "sep", role: "separator" }));
+    kids.push(item("act", I.star, T.saveCurrent, null, () => send({ op: "save_search", q: S.q, kind: S.kind, content: S.content }), !S.q.trim()));
+    kids.push(item("act", I.x, T.clearRecent, null, () => send({ op: "clear_recent" }), !S.history.recent.length));
+    kids.push(item("act", I.trash, T.clearSaved, null, () => send({ op: "clear_saved" }), !S.history.saved.length));
+    menu.replaceChildren(...kids);
+  }
+  function openHistory() { renderHistory(); toggleMenu("hist"); if (!$("hist").hidden) $("hist").querySelector('[tabindex="-1"]:not([aria-disabled="true"])')?.focus(); }
+  $("hist-btn").addEventListener("click", openHistory);
+
+  // ---------- settings ----------
+  function openSettings() {
+    closeMenus();
+    S.prevView = S.view === "settings" ? S.prevView : S.view;
+    setView("settings");
+    renderSettings(); renderBanner(); renderStatus();
+    $("settings").querySelector("button")?.focus();
+  }
+  function closeSettings() {
+    if (S.view !== "settings") return;
+    S.view = S.prevView || "empty";
+    render(true);
+    q.focus();
+  }
+  function renderSettings() {
+    const st = S.settings;
+    const box = $("settings");
+    if (!st) { box.replaceChildren(); return; }
+    const sw = (key, label, sub) => {
+      const on = !!st[key];
+      const b = h("button", { class: "sw", type: "button", role: "switch", "aria-checked": String(on), id: "set-" + key, "aria-label": label }, h("span", { class: "knob" }));
+      b.addEventListener("click", () => send({ op: "set", key, on: !on }));
+      return h("div", { class: "srow" }, h("label", { for: "set-" + key }, h("span", null, label), sub ? h("small", null, sub) : null), b);
+    };
+    const section = (title, ...rows) => h("section", { class: "sbox" }, h("h3", null, title), ...rows);
+    const langBtn = (code, label) => {
+      const on = st.next_lang === code;
+      const b = h("button", { class: "seg" + (on ? " on" : ""), type: "button", role: "radio", "aria-checked": String(on), lang: code, dir: code === "ar" ? "rtl" : "ltr" }, label);
+      b.addEventListener("click", () => send({ op: "lang", lang: code }));
+      return b;
+    };
+    const lang = section(T.sLang, h("div", { class: "segs", role: "radiogroup", "aria-label": T.sLang }, langBtn("ar", "العربية"), langBtn("en", "English")));
+    if (st.next_lang !== st.lang) lang.append(h("div", { class: "snote" }, h("span", null, T.sLangNote), btn("primary", I.open, T.restart, () => send({ op: "restart" }))));
+    const reindex = btn("", I.search, T.reindex, () => send({ op: "reindex" }));
+    const back = btn("", I.back, T.back, closeSettings, { class: "btn back" });
+    box.replaceChildren(
+      h("div", { class: "shead" }, back, h("h2", null, T.settings)),
+      lang,
+      section(T.sDisplay, sw("digits", T.sDigits)),
+      section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
+      section(T.sAnywhere, sw("hotkey_quick", T.sHotkey), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
+      section(T.sStartup, sw("autostart", T.sAutostart)),
+      section(T.sAbout, h("p", { class: "num" }, digits(T.version(st.version))), h("p", { class: "muted" }, T.trust)),
+    );
+  }
+  $("set-btn").addEventListener("click", () => (S.view === "settings" ? closeSettings() : openSettings()));
 
   // ---------- input ----------
   q.addEventListener("input", onInput);
+  $("stop").addEventListener("click", () => { stop(); q.focus(); });
   // Clicking a row keeps the caret in the search box.
-  for (const el of [list, $("recent"), $("sugg")]) el.addEventListener("mousedown", (e) => { if (e.target.closest(".row,.sg")) e.preventDefault(); });
+  for (const el of [list, $("recent"), $("sugg"), $("cols")]) el.addEventListener("mousedown", (e) => { if (e.target.closest(".row,.sg,.colbtn")) e.preventDefault(); });
   list.addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) select(+r.dataset.i); });
   list.addEventListener("dblclick", (e) => { const r = e.target.closest(".row"); if (r) act("open", S.rows[+r.dataset.i]); });
+  list.addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) { select(+r.dataset.i, false); openCtx(+r.dataset.i, null, "results", { left: e.clientX, top: e.clientY }); } });
   list.addEventListener("scroll", () => { if (list.scrollTop + list.clientHeight > list.scrollHeight - FIRST_PAGE_GUARD) askMore(); });
   $("recent").addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) act("open", S.recent[+r.dataset.i], "recent"); });
+  $("recent").addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) openCtx(+r.dataset.i, null, "recent", { left: e.clientX, top: e.clientY }); });
   $("sugg").addEventListener("click", (e) => { const s = e.target.closest(".sg"); if (s) applySuggestion(S.sugg[+s.dataset.k]); });
-  $("tips").addEventListener("click", (e) => { const c = e.target.closest("code"); if (c) { q.value = c.textContent; q.focus(); onInput(); } });
+  $("tips").addEventListener("click", (e) => { const c = e.target.closest("code"); if (c) { q.value = c.textContent; q.focus(); runSearch(); } });
+  $("cols").addEventListener("click", (e) => {
+    const b = e.target.closest(".colbtn");
+    if (!b) return;
+    // As the classic column headers: ascending, then descending, then best match.
+    const key = b.dataset.sort;
+    if (S.sort !== key) setSort(key, false); else if (!S.desc) setSort(key, true); else setSort("best", false);
+  });
+  // Nothing else of the browser's own menu.
+  document.addEventListener("contextmenu", (e) => { if (!e.target.closest("input")) e.preventDefault(); });
 
   document.addEventListener("keydown", (e) => {
-    if (!$("kind-menu").hidden && $("kind-menu").contains(document.activeElement)) return;
+    if (!$("veil").hidden) return;
     const ctrl = e.ctrlKey || e.metaKey;
-    if (ctrl && (e.key === "k" || e.key === "K" || e.key === "f" || e.key === "F")) { q.focus(); q.select(); e.preventDefault(); return; }
+    if (ctrl && (e.key === "k" || e.key === "K" || e.key === "f" || e.key === "F") || e.key === "F3") { closeSettings(); q.focus(); q.select(); e.preventDefault(); return; }
+    if (ctrl && (e.key === "h" || e.key === "H")) { openHistory(); e.preventDefault(); return; }
+    if (ctrl && e.key === ",") { S.view === "settings" ? closeSettings() : openSettings(); e.preventDefault(); return; }
     if (e.key === "Escape") {
-      if (!$("kind-menu").hidden) closeMenu();
+      if (openMenus().length) closeMenus();
+      else if (S.view === "settings") closeSettings();
+      else if (S.running) stop();
       else if (q.value) { q.value = ""; onInput(); q.focus(); }
       else send({ op: "hide" });
       e.preventDefault();
       return;
     }
+    if (S.view === "settings") return;
+    const inBox = document.activeElement === q || document.activeElement === document.body;
+    // Down in an empty box opens the history, as in the classic window.
+    if (e.key === "ArrowDown" && inBox && !q.value.trim()) { openHistory(); e.preventDefault(); return; }
+    if (e.key === "Enter" && inBox && S.content && contentStale() && q.value.trim()) { runSearch(); e.preventDefault(); return; }
     if (S.view === "nores" && S.sugg.length) {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         S.ssel = (S.ssel + (e.key === "ArrowDown" ? 1 : S.sugg.length - 1)) % S.sugg.length;
         renderNoResults(); e.preventDefault();
-      } else if (e.key === "Enter" && document.activeElement === q) { applySuggestion(S.sugg[S.ssel]); e.preventDefault(); }
+      } else if (e.key === "Enter" && inBox) { applySuggestion(S.sugg[S.ssel]); e.preventDefault(); }
       return;
     }
-    if (S.view !== "results") return;
+    if (S.view !== "results" || !S.rows.length) return;
+    const row = S.rows[S.sel];
     const page = Math.max(1, Math.floor(list.clientHeight / 56) - 1);
     const moves = { ArrowDown: 1, ArrowUp: -1, PageDown: page, PageUp: -page };
-    if (e.key in moves && (document.activeElement === q || document.activeElement === document.body)) { select(S.sel + moves[e.key]); e.preventDefault(); return; }
+    if (e.key in moves && inBox) { select(S.sel + moves[e.key]); e.preventDefault(); return; }
     if (ctrl && (e.key === "Home" || e.key === "End")) { select(e.key === "Home" ? 0 : S.rows.length - 1); e.preventDefault(); return; }
-    if (e.key === "Enter" && (document.activeElement === q || document.activeElement === document.body)) {
-      act(ctrl ? "reveal" : "open", S.rows[S.sel]); e.preventDefault(); return;
-    }
-    if (ctrl && e.shiftKey && (e.key === "c" || e.key === "C")) { act("copy", S.rows[S.sel]); e.preventDefault(); }
+    if (e.key === "Enter" && inBox) { act(ctrl ? "reveal" : "open", row); e.preventDefault(); return; }
+    // The keys of the classic list (the caret stays in the box, so only when no text is selected there).
+    const noSelection = q.selectionStart === q.selectionEnd;
+    if (ctrl && (e.key === "c" || e.key === "C") && noSelection) { act(e.shiftKey ? "copy" : "copy_file", row); e.preventDefault(); return; }
+    if (e.key === "F2") { if (!row.gone) renameDialog(row, "results"); e.preventDefault(); return; }
+    if (e.key === "F4") { showMatches(S.sel); e.preventDefault(); return; }
+    // Delete with the caret at the end of the box (where it would delete nothing); Windows asks first.
+    if (e.key === "Delete" && inBox && noSelection && q.selectionStart === q.value.length && !ctrl && !e.shiftKey) { act("recycle", row); e.preventDefault(); return; }
+    if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) { openCtx(S.sel, $("r" + S.sel)); e.preventDefault(); }
   });
 
   // ---------- start ----------
   for (const el of document.querySelectorAll("[data-i18n]")) el.textContent = T[el.dataset.i18n];
   for (const el of document.querySelectorAll("[data-i18n-placeholder]")) el.placeholder = T[el.dataset.i18nPlaceholder];
   for (const el of document.querySelectorAll("[data-i18n-label]")) el.setAttribute("aria-label", T[el.dataset.i18nLabel]);
+  for (const el of document.querySelectorAll("[data-i18n-title]")) el.title = T[el.dataset.i18nTitle];
   $("tips").replaceChildren(...T.tips.map(([c, s]) => h("div", { class: "tip" }, h("code", { dir: "auto" }, c), h("span", null, s))));
   setView("empty");
+  renderChips();
   renderRecent();
   renderStatus();
   q.focus();

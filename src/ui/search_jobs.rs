@@ -429,7 +429,7 @@ impl App {
         }
         // Offer to report a crash of the last run once the window is up
         // (not while the program waits hidden in the tray).
-        if t >= 10 && !self.crash_checked.get() && self.window.visible() {
+        if t >= 10 && !self.crash_checked.get() && self.main_shown() {
             self.crash_checked.set(true);
             self.offer_crash_report();
         }
@@ -437,7 +437,7 @@ impl App {
         // before the first-run question about the floating box (tick 14 in
         // `quick_tick`, and not while this offer's message box is open), so
         // a copy that moves asks that question from its new place.
-        if t >= 12 && self.crash_checked.get() && !self.move_checked.get() && self.window.visible() && self.window.enabled() {
+        if t >= 12 && self.crash_checked.get() && !self.move_checked.get() && self.main_shown() && self.window.enabled() {
             self.move_checked.set(true);
             self.offer_move();
         }
