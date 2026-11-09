@@ -660,16 +660,26 @@ pub fn rename_target(old: &str, name: &str) -> Result<String, BadName> {
         return Err(BadName::Characters);
     }
     // Windows drops a final dot or space and reserves device names.
-    let stem = name.split('.').next().unwrap_or("").trim_end().to_ascii_uppercase();
-    let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-        || (stem.len() == 4 && (stem.starts_with("COM") || stem.starts_with("LPT")) && stem.as_bytes()[3].is_ascii_digit());
-    if name.ends_with(['.', ' ']) || reserved {
+    if name.ends_with(['.', ' ']) || reserved_name(name) {
         return Err(BadName::Reserved);
     }
     Ok(match old.rfind(['\\', '/']) {
         Some(i) => format!("{}\\{name}", &old[..i]),
         None => name.to_string(),
     })
+}
+
+/// Whether Windows keeps `name` for a device, with or without an
+/// extension: CON, PRN, AUX, NUL, CONIN$, CONOUT$, COM0-9 and LPT0-9, and
+/// COM/LPT with a superscript ¹ ² ³ (Windows reads those as digits too).
+pub fn reserved_name(name: &str) -> bool {
+    let stem = name.split('.').next().unwrap_or("").trim_end().to_ascii_uppercase();
+    if matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$") {
+        return true;
+    }
+    let port = stem.strip_prefix("COM").or_else(|| stem.strip_prefix("LPT"));
+    let mut rest = port.into_iter().flat_map(str::chars);
+    matches!((rest.next(), rest.next()), (Some('0'..='9' | '¹' | '²' | '³'), None))
 }
 
 // ------------------------------------------------------------------ the lists on the page
@@ -1456,11 +1466,12 @@ mod tests {
         for bad in ["a\\b", "..\\x", "a/b", "C:x", "a*", "a?", "\"q\"", "<a>", "a|b", "a\u{0}b", "a\nb"] {
             assert_eq!(rename_target(old, bad), Err(BadName::Characters), "{bad:?}");
         }
-        for bad in ["CON", "nul.txt", "com1.doc", "LPT9", "name.", "aux .txt"] {
+        for bad in ["CON", "nul.txt", "com1.doc", "LPT9", "name.", "aux .txt", "CONIN$", "conout$.log", "COM¹", "lpt³.txt", "Com² .txt", "COM0"] {
             assert_eq!(rename_target(old, bad), Err(BadName::Reserved), "{bad:?}");
         }
-        assert!(rename_target(old, "COM10.txt").is_ok());
-        assert!(rename_target(old, "console.txt").is_ok());
+        for ok in ["COM10.txt", "console.txt", "COM⁴.txt", "COM", "LPT.txt", "CONIN.txt", "conin$x.txt", "my CON.txt"] {
+            assert!(rename_target(old, ok).is_ok(), "{ok:?}");
+        }
         assert!(BadName::Characters.message(Lang::En).contains('|'));
     }
 
