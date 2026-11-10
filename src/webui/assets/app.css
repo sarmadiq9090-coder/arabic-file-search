@@ -144,6 +144,12 @@ kbd { font: 500 11.5px/1 var(--font); direction: ltr; unicode-bidi: isolate; dis
 .row .nm { min-width: 0; }
 .row .n1 { font-weight: 500; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; gap: 8px; align-items: center; }
 .row .n1 .t { overflow: hidden; text-overflow: ellipsis; }
+/* A file name: its base, then its extension isolated left to right at the
+   logical end (app.js fileName). In a row the base is cut, never the extension. */
+.fname { unicode-bidi: isolate; }
+.row .n1 .fname { display: inline-flex; min-width: 0; }
+.row .n1 .fname .base { overflow: hidden; text-overflow: ellipsis; white-space: pre; min-width: 0; }
+.row .n1 .fname .ext { flex: none; white-space: pre; }
 .row .n2 { display: block; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; }
 .row .sz, .row .dt { text-align: end; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
 .row.doc { min-height: 76px; padding-block: 6px; }
@@ -151,7 +157,7 @@ kbd { font: 500 11.5px/1 var(--font); direction: ltr; unicode-bidi: isolate; dis
 .row .n3 .sn, .snip .sn, .lines .lt { unicode-bidi: plaintext; }
 .row .cnt { flex: none; font-size: 11.5px; font-weight: 500; color: var(--link); background: var(--sky-soft); border-radius: 99px; padding: 0 8px; line-height: 20px; }
 .row.gone { opacity: .55; }
-.row.gone .n1 .t { text-decoration: line-through; }
+.row.gone .n1 .t, .row.gone .n1 .t bdi { text-decoration: line-through; }
 mark { background: var(--mark-bg); color: var(--mark-fg); border-radius: 3px; padding: 0 1px; box-decoration-break: clone; }
 .path { direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-nums; }
 .path .sep { color: var(--faint); padding-inline: 1px; }

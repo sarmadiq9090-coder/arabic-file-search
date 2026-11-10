@@ -9,7 +9,10 @@
 // text that reads "undefined"/"NaN", a menu or dialog off screen, or a
 // horizontal overflow fails the run. It also checks that every path is laid
 // out left to right with its folder names in order (in Arabic too), that the
-// page follows the language's direction, and that every message the page
+// page follows the language's direction, that a file name shows its
+// extension left to right at its logical end (".xlsx" on the left of an
+// Arabic name, on the right of an English one) with the matches still
+// marked, and that every message the page
 // sends has the fields src/webui/bridge.rs accepts and nothing more (the
 // program refuses unknown fields), and that every request about a row names
 // the version of the list it is on (the fake numbers its lists as
@@ -44,7 +47,7 @@ function fakeProgram(cfg) {
   const ar = cfg.lang === "ar";
   window.__sent = []; window.__fakeErrors = []; window.__stale = [];
   const files = (ar ? [
-    [`${U}\\Documents\\العمل\\المالية`, "تقرير المبيعات 2026.xlsx", 48 * 1024, 7 * 60],
+    [`${U}\\Documents\\العمل\\المالية`, "تقرير المبيعات ٢٠٢٦.xlsx", 48 * 1024, 7 * 60],
     [`${U}\\Documents\\التقارير\\2026`, "التقرير السنوي النهائي.pdf", 2.4 * 1048576, 26 * 3600],
     [`${U}\\Desktop`, "تقرير الاجتماع الأسبوعي.docx", 31 * 1024, 5 * 3600],
     [`${U}\\Documents\\العمل`, "خطة الميزانية والتقرير.docx", 64 * 1024, 3 * 86400],
@@ -250,6 +253,8 @@ const SHOTS = [
   ["settings-en-dark", "en", "dark", [["key", "Control+,"]], { expect: { settings: true } }],
   // «العودة إلى الشكل القديم»: one typed request.
   ["classic-look-ar-light", "ar", "light", [["click", "#set-btn"], ["click", "#classic-look"], ["wait", 50]], { expect: { settings: true, lastSent: "classic_look" } }],
+  // A name split into base and extension keeps its matches marked, in the extension too.
+  ["names-split-ar-light", "ar", "light", [["type", "xlsx"]], { expect: { marks: 2, fnames: 2 } }],
 ];
 
 (async () => {
@@ -294,11 +299,25 @@ const SHOTS = [
       // Every path: left to right, its folder names placed left to right in order.
       for (const p of document.querySelectorAll(".path")) {
         if (getComputedStyle(p).direction !== "ltr") bad.push("path not LTR: " + p.textContent);
-        const xs = [...p.querySelectorAll("bdi")].filter((b) => b.getClientRects().length).map((b) => b.getClientRects()[0]);
+        const xs = [...p.querySelectorAll(":scope > bdi")].filter((b) => b.getClientRects().length).map((b) => b.getClientRects()[0]);
         for (let i = 1; i < xs.length; i++) if (xs[i].top === xs[i - 1].top && xs[i].left < xs[i - 1].left) bad.push("path segments out of order: " + p.textContent);
       }
       // Names, snippets and matching lines pick their own direction.
-      for (const el of document.querySelectorAll(".pv-name .t, .row .n3 .sn, .lines .lt, .field input")) if (visible(el) && getComputedStyle(el).unicodeBidi !== "plaintext" && el.tagName !== "BDI") bad.push("text without its own direction: " + el.className);
+      for (const el of document.querySelectorAll(".pv-name .t, .row .n3 .sn, .lines .lt, .field input")) if (visible(el) && getComputedStyle(el).unicodeBidi !== "plaintext" && el.tagName !== "BDI" && !(el.classList.contains("fname") && el.dir)) bad.push("text without its own direction: " + el.className);
+      // File names: the extension (".xlsx") left to right, at the end of the
+      // name as it reads: on the left of an Arabic name, on the right of an
+      // English one.
+      let fnames = 0;
+      for (const el of document.querySelectorAll(".fname")) {
+        if (!visible(el)) continue;
+        fnames++;
+        const base = el.querySelector(":scope > .base"), ext = el.querySelector(":scope > .ext");
+        if (!base || !ext || !ext.textContent.startsWith(".") || getComputedStyle(ext).direction !== "ltr") { bad.push("file name not split: " + el.textContent); continue; }
+        const b = base.getBoundingClientRect(), x = ext.getBoundingClientRect();
+        if (b.width === 0 || Math.abs(b.bottom - x.bottom) > 2) continue; // wrapped: no order on one line
+        const rtl = /^[^\p{L}]*[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/u.test(base.textContent);
+        if (rtl ? x.right > b.left + 1 : x.left < b.right - 1) bad.push(`extension on the wrong side (${rtl ? "rtl" : "ltr"}): ${el.textContent}`);
+      }
       // Strings that went missing.
       const text = document.body.innerText;
       for (const w of ["undefined", "NaN", "[object", "null"]) if (text.includes(w)) bad.push(`"${w}" on screen`);
@@ -319,6 +338,7 @@ const SHOTS = [
         content: document.querySelectorAll("#list .row .n3").length > 0, stop: visible(document.getElementById("stop")),
         chipsOn: document.querySelectorAll(".chip.on").length, settings: view === "view-settings",
         names: [...document.querySelectorAll("#list .row .n1 .t")].map((e) => e.textContent), gone: document.querySelectorAll("#list .row.gone").length,
+        fnames: document.querySelectorAll("#list .row .fname").length, marks: document.querySelectorAll("#list .row .n1 mark").length,
         sent: window.__sent.map((m) => m.op), recycles: window.__sent.filter((m) => m.op === "recycle").length,
         stale: window.__stale.length, q: document.querySelector("#q").value, focus: document.activeElement && document.activeElement.id,
         lastSent: window.__sent.length ? window.__sent[window.__sent.length - 1].op : null,

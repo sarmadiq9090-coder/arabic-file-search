@@ -250,8 +250,46 @@
     for (const [text, hl] of pieces) el.append(hl ? h("mark", null, text) : document.createTextNode(text));
     return el;
   }
-  const nameEl = (r) => marked(r.name);
   function plainName(r) { return r.name.map(([t]) => t).join(""); }
+
+  // A file name as its base and its extension: «تقرير المبيعات ٢٠٢٦.xlsx»
+  // in a right-to-left line would show as "xlsx.٢٠٢٦ …" if laid out as one
+  // piece of text. The base takes the direction of its first letter, and the
+  // extension is a left-to-right isolate at its logical end (on the left of
+  // an Arabic name, on the right of an English one), never cut off by a
+  // long name. The matched parts stay marked on both sides of the split.
+  // Folders, and names whose last dot starts no extension, stay one piece.
+  const RTL_LETTER = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+  function extAt(name, folder) {
+    const dot = name.lastIndexOf(".");
+    if (folder || dot <= 0 || !name.slice(0, dot).trim()) return -1;
+    return /^[\p{L}\p{N}_~-]{1,16}$/u.test(name.slice(dot + 1)) && !RTL_LETTER.test(name.slice(dot + 1)) ? dot : -1;
+  }
+  function firstStrongDir(text) {
+    const m = text.match(/\p{L}/u);
+    return m ? (RTL_LETTER.test(m[0]) ? "rtl" : "ltr") : "ltr";
+  }
+  // `pieces` split at character `at` into the parts before and after it.
+  function splitPieces(pieces, at) {
+    const before = [], after = [];
+    let pos = 0;
+    for (const [text, hl] of pieces) {
+      const cut = Math.max(0, Math.min(text.length, at - pos));
+      if (cut > 0) before.push([text.slice(0, cut), hl]);
+      if (cut < text.length) after.push([text.slice(cut), hl]);
+      pos += text.length;
+    }
+    return [before, after];
+  }
+  function fileName(pieces, folder, cls = "t") {
+    const name = pieces.map(([t]) => t).join("");
+    const dot = extAt(name, folder);
+    if (dot < 0) return marked(pieces, cls);
+    const [base, ext] = splitPieces(pieces, dot);
+    const fill = (el, ps) => { for (const [text, hl] of ps) el.append(hl ? h("mark", null, text) : document.createTextNode(text)); return el; };
+    return h("span", { class: cls + " fname", dir: firstStrongDir(name.slice(0, dot)) }, fill(h("bdi", { class: "base", dir: "auto" }), base), fill(h("bdi", { class: "ext", dir: "ltr" }), ext));
+  }
+  const nameEl = (r) => fileName(r.name, r.folder);
 
   // A full path, always left to right, each folder name isolated (<bdi>) so
   // Arabic names never swap places. Long paths are shortened in the middle.
@@ -764,7 +802,7 @@
     if (!r || r.gone) return;
     const name = plainName(r), [before, after] = r.folder ? T.recycleQDir : T.recycleQ;
     const ok = btn("primary", I.trash, T.recycleOk, () => { closeDialog(); act("recycle", r, at.list, at); }, { id: "recycle-ok" });
-    dialog(T.recycleH, [h("p", null, before, h("bdi", null, name), after), h("div", { class: "pv-path" }, pathEl(joinPath(r.dir, name), 999)), h("p", { class: "sub" }, T.recycleSub)],
+    dialog(T.recycleH, [h("p", null, before, fileName([[name, false]], r.folder, "dname"), after), h("div", { class: "pv-path" }, pathEl(joinPath(r.dir, name), 999)), h("p", { class: "sub" }, T.recycleSub)],
       [ok, btn("", I.x, T.cancel, closeDialog)], "recycle");
     ok.focus();
   }
