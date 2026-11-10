@@ -52,6 +52,20 @@ impl App {
         }
         let path = self.row_path(row);
         let refuse = path.is_none();
+        // The box starts with the shown text; an Arabic name's has marks
+        // before its extension (`bidi_layout::list_name`): give it the name.
+        if let Some(path) = &path {
+            let name = path.rsplit('\\').next().unwrap_or(path);
+            if crate::bidi_layout::list_name(name, false).1.is_some()
+                && let Some(list) = self.list.handle.hwnd()
+            {
+                let edit = unsafe { SendMessageW(list, winapi::um::commctrl::LVM_GETEDITCONTROL, 0, 0) };
+                if edit != 0 {
+                    let text = shell::wide(name);
+                    unsafe { winapi::um::winuser::SetWindowTextW(edit as _, text.as_ptr()) };
+                }
+            }
+        }
         *self.renaming_path.borrow_mut() = path;
         self.renaming.set(!refuse);
         refuse
@@ -61,9 +75,10 @@ impl App {
     pub(super) fn finish_rename(&self, new_name: Option<String>) -> bool {
         self.renaming.set(false);
         let old = self.renaming_path.borrow_mut().take();
-        let Some(new_name) = new_name.map(|n| n.trim().to_string()) else { return false };
         let Some(old) = old else { return false };
         let old_name = old.rsplit('\\').next().unwrap_or(&old).to_string();
+        // (Without the marks the shown name has, should the box have kept them.)
+        let Some(new_name) = new_name.map(|n| crate::bidi_layout::typed_name(n.trim(), &old_name)) else { return false };
         if new_name.is_empty() || new_name == old_name {
             return false;
         }
