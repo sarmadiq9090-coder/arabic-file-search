@@ -68,6 +68,7 @@ The updater fails closed: it installs a release only when GitHub publishes a SHA
 | `src/update.rs` | Auto-update from GitHub Releases (WinHTTP, required SHA-256 check, fallback when the API is rate-limited, defers to winget/Scoop installs) |
 | `src/crash_log.rs` | Panic hook writing `log.txt` and `crash.txt` with a backtrace |
 | `src/feedback.rs` | Prefilled GitHub issue links (Options ▸ Send feedback) and the opt-in crash report offered at the next start; nothing is sent without the user (UI in `src/ui/feedback.rs`) |
+| `src/rating.rs`, `src/ui/rating.rs` | Microsoft Store build only (`rating::is_packaged`, via `GetCurrentPackageFullName`): after 5 files opened from results (`file_opens` in `settings.txt`, local only), one calm row above the results asks «قيّم InstaFind في المتجر» / «ليس الآن»; once shown, `rating_asked=1` and it never asks again. Options and the tray menu keep "Rate in the Store" (`ms-windows-store://review/?ProductId=9MTK4KMFQ657`). **TODO (new WebView2 UI):** expose the same `rating::rating_due` / `show_now` decision and the answer (`rating_asked`) there instead of re-implementing it |
 | `src/cli.rs` | `bahth.exe -s …` |
 | `integrations/` | Flow Launcher plugin, PowerShell, AutoHotkey and Windows Terminal examples |
 | `assets/` | Icon (`python3 assets/make_icon.py` regenerates it) and the resource script |

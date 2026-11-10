@@ -314,6 +314,7 @@ impl NativeUi<AppUi> for App {
         nwg::MenuItem::builder().text(tr!("النافذة الكاملة", "Full window")).parent(&app.tray_menu).build(&mut app.tray_show)?;
         nwg::MenuItem::builder().text(tr!("الإعدادات…", "Settings…")).parent(&app.tray_menu).build(&mut app.tray_settings)?;
         nwg::MenuItem::builder().text(tr!("حول InstaFind", "About InstaFind")).parent(&app.tray_menu).build(&mut app.tray_about)?;
+        app.build_rating_tray_item()?;
         nwg::MenuItem::builder().text(tr!("خروج", "Exit")).parent(&app.tray_menu).build(&mut app.tray_exit)?;
 
         phase("tray");
@@ -324,6 +325,7 @@ impl NativeUi<AppUi> for App {
         app.build_web_ui()?;
         app.build_thumbs()?;
         app.build_suggest_bar()?;
+        app.build_rating()?;
         app.build_quick_menus(&settings)?;
         app.state.get_mut().settings = settings.clone();
         app.state.get_mut().history = History::load();
@@ -362,7 +364,10 @@ impl NativeUi<AppUi> for App {
                         app.on_close();
                     }
                 }
-                E::OnTextInput if handle == app.query => app.on_query_changed(),
+                E::OnTextInput if handle == app.query => {
+                    app.note_typing();
+                    app.on_query_changed();
+                }
                 // The dialog-style message loop turns Enter into IDOK and Esc
                 // into IDCANCEL, which nwg reports as OnKeyEnter / OnKeyEsc.
                 E::OnKeyEnter => app.on_enter(),
@@ -374,7 +379,7 @@ impl NativeUi<AppUi> for App {
                 E::OnNotice if handle == app.watch_notice => app.on_watch_notice(),
                 E::OnComboxBoxSelection if handle == app.kind_combo => app.on_kind_changed(),
                 E::OnButtonClick => {
-                    if app.on_suggestion_click(handle) {
+                    if app.on_suggestion_click(handle) || app.on_rating_click(handle) {
                     } else if handle == app.search_btn {
                         app.on_search();
                     } else if handle == app.history_btn {
@@ -445,7 +450,7 @@ impl NativeUi<AppUi> for App {
                         } else {
                             app.set_status(tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting."));
                         }
-                    } else if app.on_lang_item(handle) || app.on_feedback_item(handle) {
+                    } else if app.on_lang_item(handle) || app.on_feedback_item(handle) || app.on_rating_item(handle) {
                     } else if handle == app.menu_update {
                         app.check_for_update(true);
                     } else if handle == app.menu_digits {

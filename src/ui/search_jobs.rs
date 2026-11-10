@@ -441,6 +441,7 @@ impl App {
             self.offer_move();
         }
         self.quick_tick(t);
+        self.rating_tick(t);
     }
 
     pub(super) fn poll_scan(&self) {
