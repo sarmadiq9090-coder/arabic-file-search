@@ -53,7 +53,130 @@ pub struct Release {
     /// SHA-256 of the program as hex, when GitHub publishes one (`digest`).
     /// Installing requires it (`required_sha256`).
     pub sha256: Option<String>,
+    /// The program's minisign signature (`<asset>.minisig`), if the release
+    /// has one. Required once `TRUSTED_PUBLIC_KEYS` is not empty.
+    pub sig_url: Option<String>,
 }
+
+// ---------------------------------------------------------------- signing keys
+
+// TODO(owner): paste the InstaFind minisign public keys here.
+//
+// Each entry is the SECOND line of a `minisign.pub` file (the base64 key that
+// starts with `RW`), NOT the "untrusted comment" line and never a secret key.
+// InstaFind has its own key pair (not Lemon's). Primary first, backup second:
+//
+//     pub const TRUSTED_PUBLIC_KEYS: &[&str] = &[
+//         "RWQ...primary...", // keys/minisign-primary.pub (signs releases in CI)
+//         "RWQ...backup...",  // keys/minisign-backup.pub (secret in the owner's password manager)
+//     ];
+//
+// How the keys are made and where the secrets live: docs/specs/signing.md.
+//
+// While this list is EMPTY, updates are checked by SHA-256 only (as before)
+// and the log says signature checking is not configured. As soon as it holds
+// a key, every update MUST come with a valid `<asset>.minisig` made by one of
+// these keys, with the trusted comment `instafind <tag>`, or it is refused.
+// This is decided at compile time only: there is no setting or switch.
+/// Production minisign public keys trusted to sign updates (see the comment above).
+pub const TRUSTED_PUBLIC_KEYS: &[&str] = &[];
+/// Largest `.minisig` file that is downloaded (a real one is about 350 bytes).
+#[cfg(windows)]
+pub const MAX_SIG_BYTES: u64 = 4096;
+
+/// The keys this build trusts (`TRUSTED_PUBLIC_KEYS`).
+pub fn trusted_keys() -> &'static [&'static str] {
+    TRUSTED_PUBLIC_KEYS
+}
+
+/// False while no key is compiled in: updates are then checked by SHA-256 only.
+pub fn signature_checking_configured() -> bool {
+    !trusted_keys().is_empty()
+}
+
+/// Name of the signature asset for a program asset: `bahth.exe.minisig`.
+pub fn sig_asset_name(asset: &str) -> String {
+    format!("{asset}.minisig")
+}
+
+/// The trusted comment a release signature must carry: `instafind v0.9.1`.
+/// The comment is signed too, so an older signed exe cannot be passed off as
+/// a newer release. (The CPU is not in it: `validate_pe` refuses another
+/// CPU's program.)
+pub fn expected_trusted_comment(tag: &str) -> String {
+    format!("instafind {}", tag.trim())
+}
+
+/// Why a signature check refused the update (`why` is technical, in English).
+pub fn signature_error(why: &str) -> String {
+    trf!(
+        "تعذّر التحقق من توقيع هذا التحديث ({}) لذلك لم يُثبَّت.\nيمكنك تنزيل الإصدار الجديد يدوياً من:\n{}",
+        "The update's signature could not be verified ({}), so it was not installed.\nYou can download the new version by hand from:\n{}",
+        why,
+        MANUAL_DOWNLOAD_URL
+    )
+}
+
+/// A signature that passed every check that does not need the program
+/// itself: it parses, is pre-hashed, was made by a trusted key, and its
+/// trusted comment names this release. `verifier` then checks the program
+/// as it downloads; only its `finalize` proves the comment and the file.
+pub struct SignatureCheck {
+    sig: minisign_verify::Signature,
+    key: minisign_verify::PublicKey,
+}
+
+impl SignatureCheck {
+    pub fn new(sig_text: &str, tag: &str, keys: &[&str]) -> Result<SignatureCheck, String> {
+        let sig = minisign_verify::Signature::decode(sig_text.trim_start_matches('\u{feff}'))
+            .map_err(|e| signature_error(&format!("the signature file is not valid: {e}")))?;
+        // The trusted key with this signature's key id. A malformed compiled-in
+        // key is skipped (a unit test makes sure there is none).
+        let (mut key, mut legacy) = (None, false);
+        for k in keys.iter().filter_map(|k| minisign_verify::PublicKey::from_base64(k.trim()).ok()) {
+            match k.verify_stream(&sig).map(drop) {
+                Ok(()) => {
+                    key = Some(k);
+                    break;
+                }
+                // Right key, but not pre-hashed: refused, never verified the old way.
+                Err(minisign_verify::Error::UnsupportedLegacyMode) => legacy = true,
+                Err(_) => {}
+            }
+        }
+        let Some(key) = key else {
+            return Err(signature_error(if legacy {
+                "legacy signatures are not accepted"
+            } else {
+                "it was not made by a trusted key"
+            }));
+        };
+        let expected = expected_trusted_comment(tag);
+        if sig.trusted_comment() != expected {
+            return Err(signature_error(&format!("the signature is for {:?}, not {expected:?}", sig.trusted_comment())));
+        }
+        Ok(SignatureCheck { sig, key })
+    }
+
+    /// Feed it the program's bytes with `update`, then call `finalize`.
+    pub fn verifier(&self) -> Result<minisign_verify::StreamVerifier<'_>, String> {
+        self.key.verify_stream(&self.sig).map_err(|e| signature_error(&e.to_string()))
+    }
+}
+
+/// Checks `data` against the minisign signature file `sig_text` for release
+/// `tag` (see `SignatureCheck`). An empty `keys` list never verifies. The
+/// updater does the same while streaming the download (`download_to`).
+#[cfg(test)]
+pub fn verify_signature(data: &[u8], sig_text: &str, tag: &str, keys: &[&str]) -> Result<(), String> {
+    let check = SignatureCheck::new(sig_text, tag, keys)?;
+    let mut v = check.verifier()?;
+    v.update(data);
+    v.finalize().map_err(|_| signature_error(BAD_SIGNATURE))
+}
+
+/// `finalize` failed: the program or the signature (its comment) was changed.
+pub const BAD_SIGNATURE: &str = "the program or its signature was altered";
 
 /// Web page that redirects to the newest release; used when the API refuses
 /// (it allows only 60 calls an hour per address without a login).
@@ -176,10 +299,11 @@ pub fn release_from_tag(tag: &str, current: &str) -> Option<Release> {
         return None;
     }
     let version = tag.trim().trim_start_matches(['v', 'V']).to_string();
+    let exe_url = format!("https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/{tag}/{ASSET_NAME}");
     Some(Release {
-        exe_url: format!(
-            "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/{tag}/{ASSET_NAME}"
-        ),
+        // Not known to exist: a missing one fails the download (404).
+        sig_url: Some(sig_asset_name(&exe_url)),
+        exe_url,
         version,
         tag: tag.to_string(),
         notes: String::new(),
@@ -296,7 +420,16 @@ pub fn parse_release_for(json: &str, current: &str, asset_name: &str) -> Result<
         .and_then(|d| d.strip_prefix("sha256:"))
         .map(|h| h.trim().to_ascii_lowercase())
         .filter(|h| h.len() == 64 && h.bytes().all(|b| b.is_ascii_hexdigit()));
-    Ok(Some(Release { version, tag, notes, exe_url, exe_size, sha256 }))
+    // Optional here, so the check still reports an unsigned release; the
+    // install refuses it when signatures are required.
+    let sig_name = sig_asset_name(asset_name);
+    let sig_url = v["assets"]
+        .as_array()
+        .and_then(|a| a.iter().find(|x| x["name"].as_str() == Some(sig_name.as_str())))
+        .and_then(|s| s["browser_download_url"].as_str())
+        .filter(|u| download_host_ok(u))
+        .map(str::to_string);
+    Ok(Some(Release { version, tag, notes, exe_url, exe_size, sha256, sig_url }))
 }
 
 /// The program is only ever downloaded from GitHub (`github.com`, which
@@ -728,18 +861,46 @@ mod win {
         }
         required_sha256(&rel)?;
         let rel = &rel;
+        // With trusted keys compiled in, the signature is mandatory: it is
+        // fetched and checked first, and the program is checked against it
+        // as it downloads. No signature, no update; there is no fallback.
+        let sig = if signature_checking_configured() { Some(fetch_signature(rel)?) } else { None };
         let exe = original_exe()?.to_path_buf();
         let new = sibling(&exe, ".new");
         let old = sibling(&exe, ".old");
         let _ = fs::remove_file(&new);
-        let result = download_to(rel, &new, &progress).and_then(|()| swap_in(&exe, &new, &old));
+        let result = download_to(rel, &new, &progress, sig.as_ref()).and_then(|()| swap_in(&exe, &new, &old));
         if result.is_err() {
             let _ = fs::remove_file(&new);
         }
         result
     }
 
-    fn download_to(rel: &Release, new: &Path, progress: &dyn Fn(u64, u64)) -> Result<(), String> {
+    /// Downloads and pre-checks the release's `.minisig` (`SignatureCheck`).
+    fn fetch_signature(rel: &Release) -> Result<SignatureCheck, String> {
+        let url = rel.sig_url.as_deref().ok_or_else(|| signature_error("the release has no signature file"))?;
+        if !download_host_ok(url) {
+            return Err(signature_error("the signature file is not on GitHub"));
+        }
+        let mut body = Vec::new();
+        http_get(
+            url,
+            "application/octet-stream",
+            MAX_SIG_BYTES,
+            &mut |_| Ok(()),
+            &mut |chunk| {
+                body.extend_from_slice(chunk);
+                Ok(())
+            },
+            None,
+        )
+        .map_err(|e| signature_error(&format!("cannot download the signature file: {e}")))?;
+        let text = String::from_utf8(body).map_err(|_| signature_error("the signature file is not text"))?;
+        SignatureCheck::new(&text, &rel.tag, trusted_keys())
+    }
+
+    fn download_to(rel: &Release, new: &Path, progress: &dyn Fn(u64, u64), sig: Option<&SignatureCheck>) -> Result<(), String> {
+        let mut verifier = sig.map(SignatureCheck::verifier).transpose()?;
         if rel.exe_size > MAX_DOWNLOAD {
             return Err("the update has an invalid size".into());
         }
@@ -767,6 +928,9 @@ mod win {
             &mut |chunk| {
                 out.write_all(chunk).map_err(|e| format!("cannot write the update: {e}"))?;
                 sha2::Digest::update(&mut hasher, chunk);
+                if let Some(v) = verifier.as_mut() {
+                    v.update(chunk);
+                }
                 done += chunk.len() as u64;
                 progress(done, total.get());
                 Ok(())
@@ -781,6 +945,9 @@ mod win {
         let got: String = sha2::Digest::finalize(hasher).iter().map(|b| format!("{b:02x}")).collect();
         if got != want {
             return Err(tr!("الملف الذي نُزّل لا يطابق بصمة الإصدار (SHA-256)", "the downloaded file does not match the release checksum (SHA-256)").into());
+        }
+        if let Some(v) = verifier.as_mut() {
+            v.finalize().map_err(|_| signature_error(BAD_SIGNATURE))?;
         }
         let size = fs::metadata(new).map_err(|e| e.to_string())?.len();
         if size != total.get() {
@@ -1000,6 +1167,172 @@ mod tests {
             assert!(m.contains(pm.name()) && m.contains(cmd), "{m}");
             assert_eq!(pm.update_command(), cmd);
         }
+    }
+
+    // ------------------------------------------------------------ signatures
+    // Fixtures: tests/fixtures/update-signing (TEST-ONLY keys, see regen.sh).
+
+    macro_rules! fixture {
+        ($name:literal) => {
+            include_str!(concat!("../tests/fixtures/update-signing/", $name))
+        };
+    }
+    const PAYLOAD: &str = fixture!("payload.bin");
+    const SIG_PRIMARY: &str = fixture!("payload.bin.minisig");
+    const SIG_BACKUP: &str = fixture!("payload.bin.backup.minisig");
+    const SIG_OTHER_KEY: &str = fixture!("payload.bin.other-key.minisig");
+    const SIG_WRONG_VERSION: &str = fixture!("payload.bin.wrong-version.minisig");
+    const SIG_WRONG_NAME: &str = fixture!("payload.bin.wrong-name.minisig");
+    const SIG_LEGACY: &str = fixture!("payload.bin.legacy.minisig");
+    const TEST_PUBS: [&str; 3] = [fixture!("test-primary.pub"), fixture!("test-backup.pub"), fixture!("test-other.pub")];
+    /// The tag the fixtures were signed for (`instafind v9.9.9`).
+    const SIGNED_TAG: &str = "v9.9.9";
+
+    /// The base64 key line of a `minisign.pub` file (its second line).
+    fn pub_key_line(pub_file: &str) -> &str {
+        pub_file.lines().nth(1).unwrap_or_default().trim()
+    }
+
+    /// Primary + backup test keys, as the production list will hold them.
+    fn test_keys() -> Vec<&'static str> {
+        vec![pub_key_line(TEST_PUBS[0]), pub_key_line(TEST_PUBS[1])]
+    }
+
+    fn assert_refused(r: Result<(), String>, needle: &str) {
+        let e = r.expect_err("verification should fail");
+        assert!(e.contains(needle) && e.contains(MANUAL_DOWNLOAD_URL), "{needle:?} not in: {e}");
+    }
+
+    #[test]
+    fn signature_valid_passes() {
+        let keys = test_keys();
+        verify_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, SIGNED_TAG, &keys).unwrap();
+        verify_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, SIGNED_TAG, &keys[..1]).unwrap();
+        verify_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, " v9.9.9 ", &keys).unwrap();
+        assert_eq!(expected_trusted_comment("v9.9.9"), "instafind v9.9.9");
+        // CRLF line endings or a BOM (file re-saved on Windows) still parse.
+        let crlf = format!("\u{feff}{}", SIG_PRIMARY.replace('\n', "\r\n"));
+        verify_signature(PAYLOAD.as_bytes(), &crlf, SIGNED_TAG, &keys).unwrap();
+        // Streamed in pieces, as the download does.
+        let check = SignatureCheck::new(SIG_PRIMARY, SIGNED_TAG, &keys).unwrap();
+        let mut v = check.verifier().unwrap();
+        for piece in PAYLOAD.as_bytes().chunks(7) {
+            v.update(piece);
+        }
+        v.finalize().unwrap();
+    }
+
+    #[test]
+    fn signature_backup_key_passes_only_when_trusted() {
+        let keys = test_keys();
+        verify_signature(PAYLOAD.as_bytes(), SIG_BACKUP, SIGNED_TAG, &keys).unwrap();
+        assert_refused(verify_signature(PAYLOAD.as_bytes(), SIG_BACKUP, SIGNED_TAG, &keys[..1]), "not made by a trusted key");
+    }
+
+    #[test]
+    fn signature_refusals() {
+        let keys = test_keys();
+        let data = PAYLOAD.as_bytes();
+        // The program was changed.
+        let mut tampered = data.to_vec();
+        tampered[0] ^= 1;
+        assert_refused(verify_signature(&tampered, SIG_PRIMARY, SIGNED_TAG, &keys), BAD_SIGNATURE);
+        assert_refused(verify_signature(&data[..data.len() - 1], SIG_PRIMARY, SIGNED_TAG, &keys), BAD_SIGNATURE);
+        // Made by a key the program does not trust.
+        assert_refused(verify_signature(data, SIG_OTHER_KEY, SIGNED_TAG, &keys), "not made by a trusted key");
+        // Signed for another version or another app (no replay of an old exe).
+        assert_refused(verify_signature(data, SIG_WRONG_VERSION, SIGNED_TAG, &keys), "\"instafind v9.9.8\"");
+        assert_refused(verify_signature(data, SIG_PRIMARY, "v9.9.8", &keys), "not \"instafind v9.9.8\"");
+        assert_refused(verify_signature(data, SIG_PRIMARY, "V9.9.9", &keys), "not \"instafind V9.9.9\"");
+        assert_refused(verify_signature(data, SIG_WRONG_NAME, SIGNED_TAG, &keys), "\"local-ai-chat v9.9.9\"");
+        // The trusted comment edited to name this release: the global signature fails.
+        let edited = SIG_WRONG_VERSION.replace("instafind v9.9.8", "instafind v9.9.9");
+        assert_refused(verify_signature(data, &edited, SIGNED_TAG, &keys), BAD_SIGNATURE);
+        // Legacy (not pre-hashed) signatures are refused, never verified the old way.
+        assert_refused(verify_signature(data, SIG_LEGACY, SIGNED_TAG, &keys), "legacy");
+        // Missing or malformed signature file.
+        for bad in ["", "not a signature", "untrusted comment: x\nRW\ntrusted comment: instafind v9.9.9\nAA==", &SIG_PRIMARY[..SIG_PRIMARY.len() / 2]] {
+            assert_refused(verify_signature(data, bad, SIGNED_TAG, &keys), "");
+        }
+        // No keys, or only broken ones: nothing verifies.
+        assert_refused(verify_signature(data, SIG_PRIMARY, SIGNED_TAG, &[]), "not made by a trusted key");
+        assert_refused(verify_signature(data, SIG_PRIMARY, SIGNED_TAG, &["", "RWnope", "untrusted comment: x"]), "not made by a trusted key");
+    }
+
+    #[test]
+    fn production_keys_never_contain_test_keys() {
+        for p in TEST_PUBS {
+            let t = pub_key_line(p);
+            assert!(t.starts_with("RW") && t.len() == 56, "bad fixture key {t:?}");
+            assert!(!TRUSTED_PUBLIC_KEYS.iter().any(|k| k.trim() == t), "a TEST key is in update::TRUSTED_PUBLIC_KEYS");
+            assert!(!TRUSTED_PUBLIC_KEYS.iter().any(|k| p.contains(k.trim())), "a TEST key is in update::TRUSTED_PUBLIC_KEYS");
+        }
+        // Every production key must parse: a typo would silently drop it.
+        for k in TRUSTED_PUBLIC_KEYS {
+            assert!(minisign_verify::PublicKey::from_base64(k.trim()).is_ok(), "TRUSTED_PUBLIC_KEYS entry {k:?} is not a minisign public key");
+        }
+        assert_eq!(trusted_keys(), TRUSTED_PUBLIC_KEYS);
+        assert_eq!(signature_checking_configured(), !TRUSTED_PUBLIC_KEYS.is_empty());
+        // The production signature cannot pass with the production list
+        // unless it holds the real key (and it never holds a test key).
+        if TRUSTED_PUBLIC_KEYS.is_empty() {
+            assert!(verify_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, SIGNED_TAG, TRUSTED_PUBLIC_KEYS).is_err());
+        }
+    }
+
+    /// `keys/*.pub` (what CI's `sign` job checks against) and
+    /// `TRUSTED_PUBLIC_KEYS` (what the app accepts) must be set up together:
+    /// keys committed but not compiled in would sign releases nobody checks,
+    /// and keys compiled in but not committed would make `sign` publish
+    /// releases the app refuses. See keys/README.md.
+    #[test]
+    fn keys_dir_matches_trusted_keys() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("keys");
+        let mut committed = Vec::new();
+        for entry in std::fs::read_dir(&dir).expect("keys/ exists") {
+            let path = entry.unwrap().path();
+            match path.extension().and_then(|e| e.to_str()) {
+                Some("pub") => {
+                    let text = std::fs::read_to_string(&path).unwrap();
+                    let key = pub_key_line(&text).to_string();
+                    assert!(minisign_verify::PublicKey::from_base64(&key).is_ok(), "{} is not a minisign public key file", path.display());
+                    assert!(!TEST_PUBS.iter().any(|t| pub_key_line(t) == key), "{} is a TEST key", path.display());
+                    committed.push(key);
+                }
+                Some("key") => panic!("{} looks like a SECRET key: never commit one", path.display()),
+                _ => {}
+            }
+        }
+        let mut trusted: Vec<String> = TRUSTED_PUBLIC_KEYS.iter().map(|k| k.trim().to_string()).collect();
+        committed.sort();
+        trusted.sort();
+        assert_eq!(committed, trusted, "keys/*.pub and update::TRUSTED_PUBLIC_KEYS must hold the same keys (keys/README.md)");
+    }
+
+    #[test]
+    fn release_signature_asset() {
+        // No .minisig: still a release (the check reports it), sig_url None.
+        let r = parse_release(SAMPLE, "0.2.2").unwrap().unwrap();
+        assert_eq!(r.sig_url, None);
+        // Each CPU gets its own .minisig, and only from GitHub.
+        let sig = |name: &str, host: &str| {
+            format!(r#"{{"name": "{name}.minisig", "size": 300, "browser_download_url": "https://{host}/sarmadiq9090-coder/arabic-file-search/releases/download/v0.3.1/{name}.minisig"}},"#)
+        };
+        let with = SAMPLE.replace(
+            "\"assets\": [",
+            &format!("\"assets\": [{}{}{}", sig(ASSET_X64, "github.com"), sig(ASSET_ARM64, "github.com"), sig(ASSET_X86, "github.com")),
+        );
+        for name in [ASSET_X64, ASSET_ARM64, ASSET_X86] {
+            let r = parse_release_for(&with, "0.2.2", name).unwrap().unwrap();
+            assert_eq!(r.sig_url.as_deref(), Some(format!("{}.minisig", r.exe_url).as_str()), "{name}");
+            assert_eq!(sig_asset_name(name), format!("{name}.minisig"));
+        }
+        let evil = SAMPLE.replace("\"assets\": [", &format!("\"assets\": [{}", sig(ASSET_NAME, "evil.example")));
+        assert_eq!(parse_release(&evil, "0.2.2").unwrap().unwrap().sig_url, None);
+        // Found through the web page: the usual address next to the program.
+        let r = release_from_tag("v0.4.1", "0.4.0").unwrap();
+        assert_eq!(r.sig_url, Some(format!("{}.minisig", r.exe_url)));
+        assert!(download_host_ok(r.sig_url.as_deref().unwrap()));
     }
 
     #[test]

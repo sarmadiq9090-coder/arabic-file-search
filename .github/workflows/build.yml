@@ -10,6 +10,10 @@ name: build
 #   bahth-arm64.exe  ARM64, built natively on a Windows ARM runner
 #                    (aarch64-pc-windows-msvc, static CRT).
 # The updater in each build fetches the asset for its own CPU (src/update.rs).
+# Releasing is version -> sign -> release: `sign` (Environment `release`,
+# owner approval) adds a minisign signature `<exe>.minisig` for each exe once
+# the signing secret exists, and passes without signing until then
+# (docs/specs/signing.md).
 
 on:
   push:
@@ -223,13 +227,16 @@ jobs:
           name: ui-test
           path: ${{ runner.temp }}/ui-test
 
-  release:
+  # Is there a version to publish? (main's Cargo.toml version has no tag yet.)
+  # Its own job so that `sign`, which waits for the owner's approval, only
+  # runs for a real release, not on every push to main.
+  version:
     needs: [linux-test, windows, smoke, ui]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: write
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      new: ${{ steps.v.outputs.new }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -244,31 +251,216 @@ jobs:
           else
             echo "new=true" >> "$GITHUB_OUTPUT"
           fi
-      # Publishes the very exes the smoke tests ran.
-      - if: steps.v.outputs.new == 'true'
+
+  # Signs the three exes with the owner's minisign key (docs/specs/signing.md).
+  # The `release` Environment holds the secret key and asks the owner to
+  # approve. This job runs no repository code: no checkout, only the exes
+  # the smoke tests ran, a pinned and checksum-verified minisign, and the
+  # public keys committed in keys/.
+  #   no MINISIGN_SECRET_KEY, no keys/*.pub  warns, signs nothing, passes: the
+  #                                          release is published unsigned and
+  #                                          apps check its SHA-256, as before.
+  #   MINISIGN_SECRET_KEY, no keys/*.pub     signs (checked against the key's own
+  #                                          public half) and warns that apps
+  #                                          do not check signatures yet.
+  #   MINISIGN_SECRET_KEY and keys/*.pub     signs and checks against keys/*.pub.
+  #   keys/*.pub, no MINISIGN_SECRET_KEY     fails: apps built with those keys
+  #                                          would refuse an unsigned update.
+  sign:
+    needs: version
+    if: needs.version.outputs.new == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read # read keys/*.pub through the API
+    outputs:
+      signed: ${{ steps.cfg.outputs.signed }}
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
+      EXES: bahth.exe bahth-x86.exe bahth-arm64.exe
+      # minisign 0.12, verified with its author's key
+      # RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3.
+      MINISIGN_URL: https://github.com/jedisct1/minisign/releases/download/0.12/minisign-0.12-linux.tar.gz
+      MINISIGN_SHA256: 9a599b48ba6eb7b1e80f12f36b94ceca7c00b7a5173c95c3efc88d9822957e73
+    steps:
+      - name: Fetch the committed public keys
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/pub"
+          for k in primary backup; do
+            if ! gh api -H "Accept: application/vnd.github.raw" \
+              "repos/${GITHUB_REPOSITORY}/contents/keys/minisign-${k}.pub?ref=${GITHUB_SHA}" \
+              > "$RUNNER_TEMP/pub/${k}.pub" 2> "$RUNNER_TEMP/gh.err"; then
+              rm -f "$RUNNER_TEMP/pub/${k}.pub"
+              # Only "not committed" (404) means "no key". Any other API error
+              # must not quietly turn into an unsigned release.
+              if ! grep -q 'HTTP 404' "$RUNNER_TEMP/gh.err"; then
+                cat "$RUNNER_TEMP/gh.err"
+                echo "::error::Could not read keys/minisign-${k}.pub through the API"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Is signing set up?
+        id: cfg
+        env:
+          HAS_SECRET: ${{ secrets.MINISIGN_SECRET_KEY != '' }}
+        run: |
+          if ls "$RUNNER_TEMP"/pub/*.pub >/dev/null 2>&1; then have_pub=true; else have_pub=false; fi
+          echo "have_pub=$have_pub" >> "$GITHUB_OUTPUT"
+          if [ "$HAS_SECRET" = true ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            if [ "$have_pub" = false ]; then
+              echo "::warning::$TAG is signed, but keys/minisign-primary.pub and keys/minisign-backup.pub are not committed yet, so installed copies still check the SHA-256 only. Send the .pub files to finish the setup: keys/README.md"
+            fi
+          elif [ "$have_pub" = true ]; then
+            echo "::error::keys/*.pub are committed, but the release Environment has no MINISIGN_SECRET_KEY secret (or this job may not read it). Installed copies would refuse an unsigned update. See docs/specs/signing.md"
+            exit 1
+          else
+            echo "::warning::Release signing is not set up (no MINISIGN_SECRET_KEY in the release Environment), so $TAG is published without .minisig files and installed copies check its SHA-256 only, as before. See docs/specs/signing.md"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.cfg.outputs.signed == 'true'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: bahth-*exe
           merge-multiple: true
-      - if: steps.v.outputs.new == 'true'
-        name: Publish the release
+          path: dist
+
+      - if: steps.cfg.outputs.signed == 'true'
+        name: Install minisign (pinned, checksum-verified)
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -sSfL -o minisign.tar.gz "$MINISIGN_URL"
+          echo "${MINISIGN_SHA256}  minisign.tar.gz" | sha256sum -c -
+          tar xzf minisign.tar.gz minisign-linux/x86_64/minisign
+          echo "$RUNNER_TEMP/minisign-linux/x86_64" >> "$GITHUB_PATH"
+
+      - if: steps.cfg.outputs.signed == 'true'
+        name: Sign
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+          HAVE_PUB: ${{ steps.cfg.outputs.have_pub }}
+        run: |
+          umask 077
+          key="$RUNNER_TEMP/minisign.key"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$MINISIGN_SECRET_KEY" > "$key"
+          for f in $EXES; do
+            test -s "dist/$f"
+            printf '%s\n' "$MINISIGN_PASSWORD" |
+              minisign -S -s "$key" -m "dist/$f" -t "instafind $TAG"
+          done
+          # No committed public key yet: check against the secret key's own
+          # public half, so at least the signatures are known to be sound.
+          if [ "$HAVE_PUB" != true ]; then
+            printf '%s\n' "$MINISIGN_PASSWORD" |
+              minisign -R -s "$key" -p "$RUNNER_TEMP/pub/from-secret.pub"
+          fi
+
+      - if: steps.cfg.outputs.signed == 'true'
+        name: Verify the signatures
+        run: |
+          expected="instafind $TAG"
+          for f in $EXES; do
+            ok=
+            for pub in "$RUNNER_TEMP"/pub/*.pub; do
+              # -H: pre-hashed only, as the app requires.
+              if minisign -V -H -m "dist/$f" -p "$pub"; then
+                comment=$(minisign -V -H -Q -m "dist/$f" -p "$pub")
+                if [ "$comment" != "$expected" ]; then
+                  echo "::error::$f: trusted comment is '$comment', expected '$expected'"
+                  exit 1
+                fi
+                echo "$f verified with $(basename "$pub"): $comment"
+                ok=1
+                break
+              fi
+            done
+            if [ -z "$ok" ]; then
+              echo "::error::$f: the signature does not verify with any committed public key (wrong MINISIGN_SECRET_KEY?)"
+              exit 1
+            fi
+          done
+
+      - if: steps.cfg.outputs.signed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bahth-minisig
+          path: dist/*.minisig
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: [version, sign]
+    if: needs.version.outputs.new == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
+      SIGNED: ${{ needs.sign.outputs.signed }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      # Publishes the very exes the smoke tests ran.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: bahth-*exe
+          merge-multiple: true
+      - if: needs.sign.outputs.signed == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bahth-minisig
+      # A failed earlier run can leave a draft of this tag behind: remove it so
+      # "Re-run failed jobs" just works.
+      - name: Remove stale drafts of this tag
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.v.outputs.tag }}
         run: |
-          for f in bahth.exe bahth-x86.exe bahth-arm64.exe; do test -s "$f"; done
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.draft and .tag_name == \"${TAG}\") | .id" |
+            while read -r id; do
+              echo "Deleting stale draft release ${id}"
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${id}"
+            done
+      # A draft first, then publish once every file is there: installed
+      # copies ask for `releases/latest`, which never returns a draft, so
+      # nobody is offered a half-uploaded release.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          exes=(bahth.exe bahth-x86.exe bahth-arm64.exe)
+          sigs=()
+          if [ "$SIGNED" = true ]; then sigs=("${exes[@]/%/.minisig}"); fi
+          for f in "${exes[@]}" "${sigs[@]}"; do test -s "$f"; done
           notes="releases/$TAG-notes.md"
           [ -f "$notes" ] || notes=/dev/null
           title=$(head -1 "$notes" | sed 's/^# *//')
           [ -n "$title" ] || title="$TAG"
-          gh release create "$TAG" bahth.exe bahth-x86.exe bahth-arm64.exe --target "$GITHUB_SHA" --title "$title" --notes-file "$notes" --latest
+          gh release create "$TAG" "${exes[@]}" --draft --target "$GITHUB_SHA" --title "$title" --notes-file "$notes"
+          if [ "${#sigs[@]}" -gt 0 ]; then gh release upload "$TAG" "${sigs[@]}"; fi
+          # Every expected file, non-empty, and nothing else.
+          want=$(printf '%s\n' "${exes[@]}" "${sigs[@]}" | LC_ALL=C sort | paste -sd ' ' -)
+          got=$(gh release view "$TAG" --json assets --jq '[.assets[] | select(.size > 0) | .name] | sort | join(" ")')
+          if [ "$got" != "$want" ]; then
+            echo "::error::The draft release has [$got], expected [$want]. The draft was left unpublished; re-run the failed jobs."
+            exit 1
+          fi
+          gh release edit "$TAG" --draft=false --latest
       # Package managers: packaging.yml rewrites the Scoop, winget and
       # Chocolatey manifests and commits them to main (and pushes to
       # Chocolatey/winget when their secrets exist). A release made with
       # GITHUB_TOKEN does not fire its `release` event, so start it here.
-      - if: steps.v.outputs.new == 'true'
-        name: Update package manifests
+      - name: Update package manifests
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.v.outputs.tag }}
         run: gh workflow run packaging.yml --ref main -f tag="$TAG"
