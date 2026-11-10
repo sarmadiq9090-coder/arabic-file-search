@@ -1,5 +1,8 @@
-//! The new main window (the new interface, opt-in while it is built:
-//! `--webui` or `BAHTH_WEBUI=1`, see `crate::webui`).
+//! The new main window (the new interface, opt-in while it is built: «جرّب
+//! الشكل الجديد» in the classic window's Options menu, kept in the settings
+//! as `new_ui`, or `--webui` / `BAHTH_WEBUI=1` for one launch; see
+//! `crate::webui`). Its settings page has «العودة إلى الشكل القديم». Either
+//! way the windows are swapped at once, without a restart.
 //!
 //! The program runs as always (index, drive watcher, tray icon, Ctrl+Alt+F
 //! and its quick popup, the box above the clock, updates); only the main
@@ -16,7 +19,7 @@
 //! and the settings. Every action names a row the page was sent, never a
 //! path (`crate::webui::bridge`).
 
-pub(super) use imp::{WebUi, wanted};
+pub(super) use imp::{WebUi, available, wanted};
 
 #[cfg(target_env = "msvc")]
 mod imp {
@@ -44,25 +47,27 @@ mod imp {
     /// buttons are): WebView2 lays the page out right to left itself.
     const WS_EX_NOINHERITLAYOUT: u32 = 0x0010_0000;
 
-    /// Whether this launch uses the new main window: it was asked for and
-    /// WebView2 is installed. Decided once, before the windows are built.
-    pub(in super::super) fn wanted() -> bool {
-        static WANTED: OnceLock<bool> = OnceLock::new();
-        *WANTED.get_or_init(|| {
-            if !crate::webui::requested() {
-                return false;
+    /// Whether WebView2 is installed, so the new main window can be used.
+    /// Asked once.
+    pub(in super::super) fn available() -> bool {
+        static AVAILABLE: OnceLock<bool> = OnceLock::new();
+        *AVAILABLE.get_or_init(|| match host::runtime_version() {
+            Some(v) => {
+                log(&format!("webui: WebView2 {v}"));
+                true
             }
-            match host::runtime_version() {
-                Some(v) => {
-                    log(&format!("webui: WebView2 {v}"));
-                    true
-                }
-                None => {
-                    log("webui: asked for, but WebView2 is not installed; using the classic window");
-                    false
-                }
+            None => {
+                log("webui: WebView2 is not installed");
+                false
             }
         })
+    }
+
+    /// Whether this launch starts with the new main window: it was chosen
+    /// (`new_ui` in the settings) or asked for (`--webui`, `BAHTH_WEBUI`),
+    /// and WebView2 is installed. Asked before the windows are built.
+    pub(in super::super) fn wanted(new_ui: bool) -> bool {
+        crate::webui::chosen(new_ui) && available()
     }
 
     #[derive(Default)]
@@ -106,35 +111,58 @@ mod imp {
         /// The classic search box's text last handed to the page (the quick
         /// popup's "open in the full window" puts its search there).
         handed: RefCell<String>,
+        /// The page asked for the classic window: its WebView2 is dropped on
+        /// the next tick (not inside its own message handler).
+        leaving: Cell<bool>,
+        /// A switch to the new window is under way (creating the page runs
+        /// a message loop).
+        switching: Cell<bool>,
     }
 
     impl App {
         /// Builds the new main window when it is wanted, right after the
         /// classic one (built hidden then). Returns its event handlers;
-        /// `None` when the classic window is used.
+        /// `None` when the classic window is used from the start.
         pub(in super::super) fn setup_webui(self: &Rc<Self>) -> Option<(nwg::EventHandler, nwg::RawEventHandler)> {
-            if !wanted() {
+            if !wanted(self.state.borrow().settings.new_ui) {
                 return None;
             }
-            match self.build_webui() {
-                Ok(handler) => Some(handler),
+            let handlers = match self.build_webui_window() {
+                Ok(handlers) => handlers,
                 Err(e) => {
                     log(&format!("webui: {e}; using the classic window"));
-                    self.webui.active.set(false);
-                    self.webui.host.replace(None);
-                    self.window.set_text(title());
-                    if let Some(h) = self.webui.parts.window.handle.hwnd() {
-                        unsafe { winapi::um::winuser::DestroyWindow(h) };
-                    }
-                    if !started_hidden() {
-                        self.window.set_visible(true);
-                    }
-                    None
+                    self.webui_fall_back();
+                    return None;
                 }
+            };
+            match self.start_webui() {
+                Ok(()) => {
+                    if !started_hidden() {
+                        self.webui_show();
+                    }
+                    log("webui: main window ready");
+                }
+                // (The window stays, hidden: "Try the new look" can use it later.)
+                Err(e) => {
+                    log(&format!("webui: {e}; using the classic window"));
+                    self.webui_fall_back();
+                }
+            }
+            Some(handlers)
+        }
+
+        /// The classic window after the new one failed to start.
+        fn webui_fall_back(&self) {
+            self.webui.active.set(false);
+            self.webui.host.replace(None);
+            self.webui_titles();
+            if !started_hidden() {
+                self.window.set_visible(true);
             }
         }
 
-        fn build_webui(self: &Rc<Self>) -> Result<(nwg::EventHandler, nwg::RawEventHandler), String> {
+        /// The window that holds the page, and its event handlers.
+        fn build_webui_window(self: &Rc<Self>) -> Result<(nwg::EventHandler, nwg::RawEventHandler), String> {
             let (w, h, maximized) = {
                 let s = &self.state.borrow().settings;
                 (s.width as i32, s.height as i32, s.maximized)
@@ -142,7 +170,7 @@ mod imp {
             let mut parts = Parts::default();
             let flags = if maximized { nwg::WindowFlags::MAIN_WINDOW | nwg::WindowFlags::MAXIMIZED } else { nwg::WindowFlags::MAIN_WINDOW };
             nwg::Window::builder()
-                .title(title())
+                .title(&format!("{} (new)", title()))
                 .size((w, h))
                 .center(true)
                 .ex_flags(crate::i18n::rtl_only(WS_EX_LAYOUTRTL | WS_EX_NOINHERITLAYOUT))
@@ -153,29 +181,6 @@ mod imp {
             let hwnd = parts.window.handle.hwnd().ok_or("no window handle")?;
             crate::icon::set_window_icon(hwnd);
             self.webui.parts.set(parts);
-
-            let token = bridge::new_token();
-            self.webui.token.replace(token.clone());
-            let dark = surface::apps_dark();
-            let make = || {
-                let weak = Rc::downgrade(self);
-                Host::create(hwnd as isize, crate::i18n::current(), &token, dark, move |body, source| {
-                    if let Some(app) = weak.upgrade() {
-                        app.on_webui_message(body, source);
-                    }
-                })
-            };
-            // A WebView2 that fails to start once (its browser process
-            // crashed, a busy profile) often starts the second time.
-            let host = make().or_else(|e| {
-                log(&format!("webui: first try failed: {e}"));
-                make()
-            })?;
-            self.webui.host.replace(Some(host));
-            self.webui.active.set(true);
-            // The second launch looks for the main window by its title: let
-            // it find this one, not the hidden classic window.
-            self.window.set_text(&format!("{} (classic)", title()));
 
             let weak = Rc::downgrade(self);
             let handle = self.webui.parts.window.handle;
@@ -219,18 +224,113 @@ mod imp {
                     None
                 }),
             );
-            let raw = match raw {
-                Ok(raw) => raw,
+            match raw {
+                Ok(raw) => Ok((handler, raw)),
                 Err(e) => {
                     nwg::unbind_event_handler(&handler);
-                    return Err(e.to_string());
+                    Err(e.to_string())
                 }
+            }
+        }
+
+        /// Fills the window with a new page (with a new token) and makes it
+        /// the main window. Not called from the page's own message handler:
+        /// it drops the page there was.
+        fn start_webui(self: &Rc<Self>) -> Result<(), String> {
+            let hwnd = self.webui.parts.window.handle.hwnd().ok_or("no window handle")?;
+            self.webui.leaving.set(false);
+            self.webui.ready.set(false);
+            self.webui.host.replace(None);
+            let token = bridge::new_token();
+            self.webui.token.replace(token.clone());
+            let dark = surface::apps_dark();
+            let make = || {
+                let weak = Rc::downgrade(self);
+                Host::create(hwnd as isize, crate::i18n::current(), &token, dark, move |body, source| {
+                    if let Some(app) = weak.upgrade() {
+                        app.on_webui_message(body, source);
+                    }
+                })
             };
-            if !started_hidden() {
+            // A WebView2 that fails to start once (its browser process
+            // crashed, a busy profile) often starts the second time.
+            let host = make().or_else(|e| {
+                log(&format!("webui: first try failed: {e}"));
+                make()
+            })?;
+            self.webui.host.replace(Some(host));
+            self.webui.active.set(true);
+            self.webui_titles();
+            Ok(())
+        }
+
+        /// A second launch looks for the main window by its title: let it
+        /// find the one in use, not the hidden one.
+        fn webui_titles(&self) {
+            let active = self.webui.active.get();
+            self.window.set_text(&if active { format!("{} (classic)", title()) } else { title().to_string() });
+            if self.webui.parts.is_built() {
+                self.webui.parts.window.set_text(&if active { title().to_string() } else { format!("{} (new)", title()) });
+            }
+        }
+
+        /// «جرّب الشكل الجديد» in the classic window: the new main window
+        /// takes its place now, and from now on (`new_ui`). When the page
+        /// can't be created the classic window stays, with a word why.
+        pub(in super::super) fn webui_enter(self: &Rc<Self>) {
+            if self.webui.active.get() || self.webui.switching.replace(true) {
+                return;
+            }
+            let started = (|| {
+                if !available() {
+                    return Err("WebView2 is not installed".to_string());
+                }
+                if !self.webui.parts.is_built() {
+                    let built = self.build_lazily("new main", |app| {
+                        app.build_webui_window().map(|(h, raw)| (vec![h], vec![raw])).map_err(nwg::NwgError::ControlCreationError)
+                    });
+                    if !built {
+                        return Err("the window could not be created".to_string());
+                    }
+                }
+                self.start_webui()
+            })();
+            self.webui.switching.set(false);
+            if let Err(e) = started {
+                log(&format!("webui: {e}; staying with the classic window"));
+                self.webui.active.set(false);
+                self.webui.host.replace(None);
+                self.webui_titles();
+                self.set_status(tr!("تعذر فتح الشكل الجديد، فبقي الشكل القديم.", "Could not open the new look; the classic one stays."));
+                return;
+            }
+            log("webui: switched to the new look");
+            self.state.borrow_mut().settings.new_ui = true;
+            self.save_settings();
+            let visible = self.window.visible();
+            place_like(&self.window, &self.webui.parts.window);
+            self.remember_query();
+            self.window.set_visible(false);
+            if visible {
                 self.webui_show();
             }
-            log("webui: main window ready");
-            Ok((handler, raw))
+        }
+
+        /// «العودة إلى الشكل القديم» on the page's settings: the classic
+        /// window takes its place now, and from now on. Called from the
+        /// page's message handler, so the page itself goes on the next tick.
+        fn webui_leave(&self) {
+            log("webui: back to the classic look");
+            self.webui_stop_content();
+            self.webui.ready.set(false);
+            self.webui.active.set(false);
+            self.webui.leaving.set(true);
+            self.webui_titles();
+            place_like(&self.webui.parts.window, &self.window);
+            self.webui.parts.window.set_visible(false);
+            self.show_window();
+            self.state.borrow_mut().settings.new_ui = false;
+            self.save_settings();
         }
 
         /// Whether the new main window is the one in use and on screen.
@@ -411,6 +511,11 @@ mod imp {
                     return;
                 }
             };
+            // Back on the classic window: the page goes on the next tick, and
+            // until then what it asks is not done.
+            if !self.webui.active.get() && !matches!(req, Request::Hello {}) {
+                return;
+            }
             let lang = i18n::current();
             match req {
                 Request::Hello {} => {
@@ -620,6 +725,7 @@ mod imp {
                     }
                 }
                 Request::Hide {} => self.webui_hide(),
+                Request::ClassicLook {} => self.webui_leave(),
             }
         }
 
@@ -996,6 +1102,10 @@ mod imp {
         /// results kept in step with the index (finished scan, files changed
         /// on disk).
         pub(in super::super) fn webui_tick(&self, tick: u32) {
+            if self.webui.leaving.replace(false) {
+                // Back to the classic window: its WebView2 is freed.
+                self.webui.host.replace(None);
+            }
             if !self.webui.active.get() || !self.webui.ready.get() {
                 return;
             }
@@ -1038,6 +1148,21 @@ mod imp {
     fn started_hidden() -> bool {
         std::env::args().any(|a| a == autostart::STARTUP_ARG)
     }
+
+    /// Puts window `to` where `from` is, with its size, so a switch of
+    /// look keeps the window in place (not from a minimised or maximised
+    /// window, nor one never shown).
+    fn place_like(from: &nwg::Window, to: &nwg::Window) {
+        use winapi::um::winuser::IsZoomed;
+        let Some(h) = from.handle.hwnd() else { return };
+        if !from.visible() || unsafe { IsIconic(h) != 0 || IsZoomed(h) != 0 } {
+            return;
+        }
+        let (x, y) = from.position();
+        let (w, ht) = from.size();
+        to.set_position(x, y);
+        to.set_size(w, ht);
+    }
 }
 
 /// mingw builds have no WebView2 host (see Cargo.toml): always the classic window.
@@ -1048,7 +1173,11 @@ mod imp {
 
     use super::super::App;
 
-    pub(in super::super) fn wanted() -> bool {
+    pub(in super::super) fn available() -> bool {
+        false
+    }
+
+    pub(in super::super) fn wanted(_new_ui: bool) -> bool {
         false
     }
 
@@ -1057,11 +1186,14 @@ mod imp {
 
     impl App {
         pub(in super::super) fn setup_webui(self: &Rc<Self>) -> Option<(nwg::EventHandler, nwg::RawEventHandler)> {
-            if crate::webui::requested() {
+            if crate::webui::chosen(self.state.borrow().settings.new_ui) {
                 super::super::startup::log("webui: the new interface needs the MSVC build; using the classic window");
             }
             None
         }
+
+        /// Never called: the classic window offers no new look here.
+        pub(in super::super) fn webui_enter(self: &Rc<Self>) {}
 
         pub(in super::super) fn webui_visible(&self) -> bool {
             false

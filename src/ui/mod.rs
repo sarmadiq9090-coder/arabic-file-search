@@ -243,6 +243,9 @@ pub struct App {
     matches_window: nwg::Window,
     matches_text: nwg::TextBox,
     options_menu: nwg::Menu,
+    /// «جرّب الشكل الجديد»: only built when WebView2 is there (MSVC builds).
+    menu_new_ui: nwg::MenuItem,
+    menu_new_ui_sep: nwg::MenuSeparator,
     menu_hotkey: nwg::MenuItem,
     menu_digits: nwg::MenuItem,
     menu_content_index: nwg::MenuItem,

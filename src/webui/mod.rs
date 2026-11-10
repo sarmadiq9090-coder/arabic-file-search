@@ -9,9 +9,11 @@
 //!   Win32 window, serving `assets` through the `instafind://` protocol
 //!
 //! The window itself, wired to the running program, is `ui/webui.rs`. While
-//! the new interface is incomplete it is opt-in ([`requested`]), and the
-//! classic Win32 window stays the default and the fallback when WebView2 is
-//! missing or fails.
+//! the new interface is incomplete it is opt-in ([`chosen`]): «جرّب الشكل
+//! الجديد» in the classic window's Options menu turns it on (the `new_ui`
+//! setting), «العودة إلى الشكل القديم» on its settings page turns it off,
+//! and the classic Win32 window stays the default and the fallback when
+//! WebView2 is missing or fails.
 
 // Only MSVC builds host the page (see Cargo.toml); elsewhere the shared parts
 // are compiled for their tests and for the opt-in switch alone.
@@ -22,7 +24,8 @@ pub mod bridge;
 #[cfg(all(windows, target_env = "msvc"))]
 pub mod host;
 
-/// The switch that turns the new interface on while it is being built.
+/// The switch that turns the new interface on for one launch, whatever the
+/// settings say (the tests use it).
 pub const ARG: &str = "--webui";
 /// The same switch as an environment variable (`BAHTH_WEBUI=1`).
 pub const ENV: &str = "BAHTH_WEBUI";
@@ -38,6 +41,13 @@ pub fn requested_by<S: AsRef<str>>(args: &[S], env: Option<&str>) -> bool {
 pub fn requested() -> bool {
     let args: Vec<String> = std::env::args().skip(1).collect();
     requested_by(&args, std::env::var(ENV).ok().as_deref())
+}
+
+/// Whether this launch should use the new interface: chosen in the settings
+/// (`new_ui`, see `crate::settings`), or asked for by [`ARG`] or [`ENV`].
+/// (WebView2 must be installed too; the window checks that.)
+pub fn chosen(new_ui: bool) -> bool {
+    new_ui || requested()
 }
 
 #[cfg(test)]

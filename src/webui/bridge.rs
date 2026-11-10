@@ -240,6 +240,9 @@ pub enum Request {
     Web { q: String },
     /// Hide the window (Esc in an empty box).
     Hide {},
+    /// Go back to the classic window, now and from the next start («العودة
+    /// إلى الشكل القديم» in the settings).
+    ClassicLook {},
 }
 
 /// Why a message was refused.
@@ -1260,6 +1263,10 @@ mod tests {
         assert_eq!(req(r#""op":"lang","lang":"en""#), Ok(Request::Lang { lang: LangCode::En }));
         assert_eq!(req(r#""op":"lang","lang":"fr""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"restart""#), Ok(Request::Restart {}));
+        assert_eq!(req(r#""op":"classic_look""#), Ok(Request::ClassicLook {}));
+        assert_eq!(req(r#""op":"classic_look","forever":true"#), Err(Rejected::Malformed));
+        assert_eq!(parse(r#"{"op":"classic_look"}"#, SRC, TOKEN), Err(Rejected::Token));
+        assert_eq!(parse(&format!(r#"{{"t":"{TOKEN}","op":"classic_look"}}"#), "https://evil.example/", TOKEN), Err(Rejected::Origin));
         assert_eq!(req(r#""op":"reindex""#), Ok(Request::Reindex {}));
         assert_eq!(req(r#""op":"stop","seq":9"#), Ok(Request::Stop { seq: 9 }));
     }
