@@ -466,8 +466,9 @@ impl App {
             y3 += CTRL_H + GAP;
         }
         let y3 = self.place_suggestions(M, y3, w - 2 * M);
-        let y3 = self.place_rating(M, y3, w - 2 * M);
-        style::place(&self.list.handle, M, y3, (w - 2 * M).max(100), (y_btn - GAP - y3).max(50));
+        // The Store rating question goes under the list, so its top rows stay put.
+        let list_bottom = self.place_rating(M, y_btn - GAP, w - 2 * M);
+        style::place(&self.list.handle, M, y3, (w - 2 * M).max(100), (list_bottom - y3).max(50));
 
         // Status bar: messages on one side, the selected file's path on the
         // other, and while indexing runs its progress at the far end.

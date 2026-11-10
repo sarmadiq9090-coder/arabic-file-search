@@ -1122,10 +1122,11 @@ impl App {
                 return;
             }
             (Target::File { path, .. }, How::Admin) => shell_execute(Some("runas"), path, ""),
-            (Target::File { path, .. }, _) => {
+            (Target::File { path, is_dir }, _) => {
                 self.popup_note_file(path, &query);
                 let ok = shell::open(path);
-                if ok {
+                // Files only: opening a folder is not the success that counts.
+                if ok && !is_dir {
                     self.count_file_open();
                 }
                 ok
