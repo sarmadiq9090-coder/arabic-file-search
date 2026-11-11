@@ -11,6 +11,7 @@
 //! - `empty_state`: the files opened lately (empty box) and what to try when nothing is found
 //! - `updates`: checking for, downloading and installing new versions
 //! - `feedback`: the "Send feedback" menu and the offer to report a crash
+//! - `rating`: the Store build's one-time rating question and "Rate in the Store" items
 //! - `content_index`: the stored document text and its background warm-up
 //! - `watching`: applying changes from the drive watcher to the index
 //! - `keys`: keyboard handling and the global hotkey
@@ -46,6 +47,7 @@ mod launcher_shim; // thin glue to crate::launcher, see the file
 mod lazy;
 mod quick;
 mod quickswitch;
+mod rating;
 mod relocate;
 mod replace_window;
 mod results;
@@ -287,6 +289,8 @@ pub struct App {
     popup: quick::Popup,
     /// What to try when a search finds nothing, above the result list.
     suggest: empty_state::SuggestBar,
+    /// The Store build's one-time rating question above the result list.
+    rating: rating::RatingBar,
     /// The search box above the clock.
     floating: floating::Floating,
     /// The recent/saved searches menu, rebuilt each time it opens.
@@ -470,7 +474,9 @@ impl App {
             y3 += CTRL_H + GAP;
         }
         let y3 = self.place_suggestions(M, y3, w - 2 * M);
-        style::place(&self.list.handle, M, y3, (w - 2 * M).max(100), (y_btn - GAP - y3).max(50));
+        // The Store rating question goes under the list, so its top rows stay put.
+        let list_bottom = self.place_rating(M, y_btn - GAP, w - 2 * M);
+        style::place(&self.list.handle, M, y3, (w - 2 * M).max(100), (list_bottom - y3).max(50));
 
         // Status bar: messages on one side, the selected file's path on the
         // other, and while indexing runs its progress at the far end.

@@ -1122,9 +1122,14 @@ impl App {
                 return;
             }
             (Target::File { path, .. }, How::Admin) => shell_execute(Some("runas"), path, ""),
-            (Target::File { path, .. }, _) => {
+            (Target::File { path, is_dir }, _) => {
                 self.popup_note_file(path, &query);
-                shell::open(path)
+                let ok = shell::open(path);
+                // Files only: opening a folder is not the success that counts.
+                if ok && !is_dir {
+                    self.count_file_open();
+                }
+                ok
             }
             (Target::Launcher(action), how) => {
                 // A system command the user said "No" to: back to the list.

@@ -63,6 +63,8 @@ mod normalize;
 #[cfg(any(windows, test))]
 mod quick;
 #[cfg(any(windows, test))]
+mod rating;
+#[cfg(any(windows, test))]
 mod relocate;
 #[cfg(any(windows, test))]
 mod replace;

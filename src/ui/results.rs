@@ -85,7 +85,12 @@ impl App {
         match self.selected_path() {
             Some(p) => {
                 self.note_use(&p);
-                if !shell::open(&p) {
+                if shell::open(&p) {
+                    // Files only: opening a folder is not the success that counts.
+                    if !std::path::Path::new(&p).is_dir() {
+                        self.count_file_open();
+                    }
+                } else {
                     nwg::modal_error_message(&self.window, tr!("خطأ", "Error"), &trf!("تعذر فتح الملف:\n{p}", "Could not open the file:\n{p}"));
                 }
             }
