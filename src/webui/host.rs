@@ -9,7 +9,8 @@ use std::num::NonZeroIsize;
 
 use raw_window_handle::{HandleError, HasWindowHandle, RawWindowHandle, Win32WindowHandle, WindowHandle};
 use webview2_com::Microsoft::Web::WebView2::Win32::{
-    COREWEBVIEW2_PROCESS_FAILED_KIND, COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED, ICoreWebView2Controller4,
+    COREWEBVIEW2_PROCESS_FAILED_KIND, COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED, COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED,
+    COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE, ICoreWebView2Controller4,
 };
 use webview2_com::ProcessFailedEventHandler;
 use windows::core::Interface;
@@ -30,6 +31,11 @@ pub fn runtime_version() -> Option<String> {
     }
     Some(webview2_com::take_pwstr(info)).filter(|v| !v.trim().is_empty())
 }
+
+// `super::failed_kind` is WebView2's numbering.
+const _: () = assert!(COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED.0 == super::failed_kind::BROWSER_PROCESS_EXITED);
+const _: () = assert!(COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED.0 == super::failed_kind::RENDER_PROCESS_EXITED);
+const _: () = assert!(COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE.0 == super::failed_kind::RENDER_PROCESS_UNRESPONSIVE);
 
 /// The page inside a window.
 pub struct Host {
@@ -105,12 +111,17 @@ impl Host {
         if let Ok(c) = webview.controller().cast::<ICoreWebView2Controller4>() {
             let _ = unsafe { c.SetAllowExternalDrop(false) };
         }
+        // Only the failures that concern the page (`super::failure`); an
+        // event whose kind can't be read is left alone.
         let failed = ProcessFailedEventHandler::create(Box::new(move |_, args| {
+            let Some(args) = args else { return Ok(()) };
             let mut kind = COREWEBVIEW2_PROCESS_FAILED_KIND::default();
-            if let Some(args) = args {
-                let _ = unsafe { args.ProcessFailedKind(&mut kind) };
+            if unsafe { args.ProcessFailedKind(&mut kind) }.is_err() {
+                return Ok(());
             }
-            let _ = crate::crash_log::catch(|| on_failed(kind == COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED));
+            if let Some(failure) = super::failure(kind.0) {
+                let _ = crate::crash_log::catch(|| on_failed(failure == super::Failure::Browser));
+            }
             Ok(())
         }));
         let mut token = 0i64;
