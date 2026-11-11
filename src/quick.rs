@@ -315,6 +315,25 @@ pub fn hides_for_notification_state(state: i32) -> bool {
     matches!(state, 2..=4)
 }
 
+// ------------------------------------------------------------------ tray icon
+
+/// Whether window message `msg` is the shell's `TaskbarCreated` broadcast:
+/// Explorer restarted (or made its taskbar again) and forgot every tray
+/// icon. `registered` is what `RegisterWindowMessage("TaskbarCreated")`
+/// gave; 0 (it failed) never matches, not even `WM_NULL`.
+pub fn is_taskbar_created(msg: u32, registered: u32) -> bool {
+    registered != 0 && msg == registered
+}
+
+/// How many times the tray icon is put back after `TaskbarCreated`, one try
+/// per timer tick: a shell that is still starting can refuse the first.
+pub const TRAY_RESTORE_TRIES: u8 = 10;
+
+/// The tries left after one that `worked` or not.
+pub fn tray_restore_left(left: u8, worked: bool) -> u8 {
+    if worked { 0 } else { left.saturating_sub(1) }
+}
+
 // ------------------------------------------------------------------ results
 
 /// The sections of the quick-search list, in display order.
@@ -1396,5 +1415,30 @@ mod tests {
         // Dark and light palettes differ where it matters.
         assert_ne!(Palette::new(true).text, Palette::new(false).text);
         assert!(has_backdrop(22621) && !has_backdrop(22000) && has_round_corners(22000) && !has_round_corners(19045));
+    }
+}
+
+#[cfg(test)]
+mod everyday_tests {
+    use super::*;
+
+    /// Explorer restarted: only the registered `TaskbarCreated` message puts
+    /// the tray icon back, and a few tries are made while the shell starts.
+    #[test]
+    fn tray_icon_after_explorer_restart() {
+        assert!(is_taskbar_created(0xC123, 0xC123));
+        assert!(!is_taskbar_created(0xC124, 0xC123));
+        // Registration failed: WM_NULL (0), which the program posts to itself, is not it.
+        assert!(!is_taskbar_created(0, 0));
+        assert!(!is_taskbar_created(0x001A, 0));
+        let mut left = TRAY_RESTORE_TRIES;
+        let mut tries = 0;
+        while left > 0 {
+            tries += 1;
+            left = tray_restore_left(left, false);
+        }
+        assert_eq!(tries, TRAY_RESTORE_TRIES);
+        assert_eq!(tray_restore_left(TRAY_RESTORE_TRIES, true), 0);
+        assert_eq!(tray_restore_left(0, false), 0);
     }
 }

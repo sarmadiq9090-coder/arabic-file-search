@@ -118,6 +118,46 @@ impl TrayNotification {
         }
     }
 
+    /// Adds the icon to the system tray again, with the data the builder
+    /// gives it (callback message, icon, tooltip, visibility).
+    ///
+    /// For the shell's `TaskbarCreated` message: when Explorer restarts it
+    /// forgets every icon, and `NIM_MODIFY` (all the setters of this control)
+    /// does nothing until the icon is added anew. If the icon is still there
+    /// (the taskbar was only rebuilt), it is brought up to date instead.
+    ///
+    /// Returns false when the shell took neither.
+    /// Note: tip will be truncated to 127 characters
+    pub fn restore<'a>(&self, icon: &Icon, tip: Option<&'a str>, visible: bool) -> bool {
+        use winapi::um::shellapi::{NIM_ADD, NIM_MODIFY, NIF_ICON, NIF_TIP, NIF_SHOWTIP, NIF_MESSAGE, NIS_HIDDEN, NIF_STATE,
+         NOTIFYICON_VERSION_4};
+        use winapi::shared::windef::HICON;
+
+        if self.handle.blank() { panic!("{}", NOT_BOUND); }
+        self.handle.tray().expect(BAD_HANDLE);
+
+        unsafe {
+            let mut data = self.notify_default();
+            *data.u.uVersion_mut() = NOTIFYICON_VERSION_4;
+            data.uFlags = NIF_ICON | NIF_MESSAGE | NIF_STATE;
+            data.uCallbackMessage = wh::NWG_TRAY;
+            data.hIcon = icon.handle as HICON;
+            data.dwState = if visible { 0 } else { NIS_HIDDEN };
+            data.dwStateMask = NIS_HIDDEN;
+
+            if let Some(tip) = tip {
+                data.uFlags |= NIF_TIP | NIF_SHOWTIP;
+                let tip_v = to_utf16(tip);
+                let length = if tip_v.len() >= 128 { 127 } else { tip_v.len() };
+                for i in 0..length {
+                    data.szTip[i] = tip_v[i];
+                }
+            }
+
+            Shell_NotifyIconW(NIM_ADD, &mut data) != 0 || Shell_NotifyIconW(NIM_MODIFY, &mut data) != 0
+        }
+    }
+
     /// Set the tooltip for the tray notification.
     /// Note: tip will be truncated to 127 characters
     pub fn set_tip<'a>(&self, tip: &'a str) {

@@ -9,11 +9,14 @@ use std::cell::Cell;
 use winapi::shared::minwindef::{LPARAM, UINT, WPARAM};
 use winapi::shared::windef::{HGDIOBJ, HICON, HWND};
 use winapi::um::wingdi::{BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateBitmap, CreateDIBSection, DIB_RGB_COLORS, DeleteObject};
-use winapi::um::winuser::{CreateIconIndirect, DestroyIcon, GetDC, GetSystemMetrics, ICONINFO, ReleaseDC, SM_CXSMICON, WM_HOTKEY, WM_SETTINGCHANGE};
+use winapi::um::winuser::{
+    CreateIconIndirect, DestroyIcon, GetDC, GetSystemMetrics, ICONINFO, RegisterWindowMessageW, ReleaseDC, SM_CXSMICON, WM_HOTKEY,
+    WM_SETTINGCHANGE,
+};
 
 use super::keys::{ALT_SPACE_ID, HOTKEY_TEXT};
 use super::startup::log;
-use super::{App, autostart, surface, title};
+use super::{App, autostart, shell, surface, title};
 use crate::quick::Anchor;
 use crate::settings::{FloatingMode, HotkeyOpens};
 
@@ -97,6 +100,14 @@ pub struct QuickMenu {
     tray_icon: nwg::MenuItem,
 }
 
+/// What this run knows about the tray icon beyond the saved settings.
+#[derive(Default)]
+pub struct QuickState {
+    /// Tries left to put the tray icon back after Explorer restarted and
+    /// forgot it (`TaskbarCreated`); one try per timer tick.
+    tray_restore: Cell<u8>,
+}
+
 /// Whether this run started with Windows (hidden, in the background).
 fn started_hidden() -> bool {
     std::env::args().any(|a| a == autostart::STARTUP_ARG)
@@ -171,11 +182,22 @@ impl App {
             }
         });
         let weak = std::rc::Rc::downgrade(self);
+        // Explorer tells every top-level window when it has restarted (the
+        // floating box listens for itself, see `floating_message`).
+        let name = shell::wide("TaskbarCreated");
+        let taskbar_created = unsafe { RegisterWindowMessageW(name.as_ptr()) };
         let raw = nwg::bind_raw_event_handler(
             &self.window.handle,
             RAW_ID,
             crate::crash_log::guard_raw(move |_hwnd: HWND, msg: UINT, w: WPARAM, l: LPARAM| {
                 let app = weak.upgrade()?;
+                if crate::quick::is_taskbar_created(msg, taskbar_created) {
+                    // The new taskbar has no icon of ours: `NIM_MODIFY` (all
+                    // nwg does after the build) changes nothing until it is
+                    // added again. Done from the next timer ticks.
+                    app.quick_state.tray_restore.set(crate::quick::TRAY_RESTORE_TRIES);
+                    return None;
+                }
                 match msg {
                     WM_HOTKEY if w as i32 == ALT_SPACE_ID => {
                         app.show_quick(Anchor::CenterBottom);
@@ -222,6 +244,20 @@ impl App {
         let mut icon = nwg::Icon::default();
         icon.handle = h as _;
         self.tray.set_icon(&icon);
+    }
+
+    /// Puts the tray icon back after Explorer restarted and forgot it: the
+    /// icon for the taskbar's colour, the tooltip, and shown or hidden as
+    /// the setting says. False when the shell did not take it (yet).
+    fn restore_tray_icon(&self) -> bool {
+        let h = self.mono_icons.get(surface::taskbar_dark());
+        let mut icon = nwg::Icon::default();
+        // The app icon the tray was built with, if the magnifier can't be made.
+        icon.handle = if h.is_null() { self.tray_icon.handle } else { h as _ };
+        let visible = self.state.borrow().settings.tray_icon;
+        let ok = self.tray.restore(&icon, Some(&format!("{} ({HOTKEY_TEXT})", title())), visible);
+        log(&format!("tray icon after an Explorer restart: {}", if ok { "restored" } else { "not taken yet" }));
+        ok
     }
 
     /// Ctrl+Alt+F opens the quick search (or the full window), as the
@@ -306,6 +342,11 @@ impl App {
     /// not wait for it), the catalog a few seconds later, and the one-time
     /// question once the window is on screen.
     pub(super) fn quick_tick(&self, tick: u32) {
+        let left = self.quick_state.tray_restore.get();
+        if left > 0 {
+            let ok = self.restore_tray_icon();
+            self.quick_state.tray_restore.set(crate::quick::tray_restore_left(left, ok));
+        }
         let (mode, asked, alt_space, hotkey) = {
             let s = &self.state.borrow().settings;
             (s.floating_mode, s.floating_asked, s.alt_space, s.hotkey_opens)

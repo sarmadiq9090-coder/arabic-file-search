@@ -16,6 +16,12 @@ are kept. Changes against the published crate:
   GDI handles, `GetDC` failed, `dpi()` returned 0 and `physical_to_logical`
   panicked in `muldiv` dividing by it (issue #10).
 - `src/resources/font.rs`, `Font::families()`: releases its screen DC too.
+- `src/controls/tray_notification.rs`, new `TrayNotification::restore()`:
+  adds the icon to the tray again (`NIM_ADD` with the builder's callback
+  message, icon, tooltip and visibility; `NIM_MODIFY` if it is still there).
+  Upstream only ever adds the icon in the builder and modifies it afterwards,
+  so after Explorer restarts (`TaskbarCreated`) the icon was gone for good.
+  Called from `src/ui/tray.rs`.
 
 To update: copy the new published crate over this folder and re-apply the
-changes above (search for `ReleaseDC`).
+changes above (search for `ReleaseDC` and `pub fn restore`).
