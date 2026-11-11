@@ -61,6 +61,8 @@ mod launcher;
 #[cfg(any(windows, test))]
 mod layout;
 #[cfg(any(windows, test))]
+mod leave;
+#[cfg(any(windows, test))]
 mod normalize;
 #[cfg(any(windows, test))]
 mod quick;

@@ -118,7 +118,7 @@ impl App {
             Ok(()) => {
                 // As after an update: save everything and leave at once, so
                 // the new copy gets the single-instance lock.
-                self.on_close();
+                self.close_for_restart();
                 std::process::exit(0);
             }
             Err(e) => {

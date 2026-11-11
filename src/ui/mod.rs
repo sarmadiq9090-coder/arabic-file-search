@@ -82,6 +82,7 @@ use crate::index::{Entry, Index, ScanProgress};
 use crate::search::{ContentHit, ContentProgress, Query};
 use crate::settings::Settings;
 
+use crate::leave::Leaving;
 use files::SAVES;
 use format::ARABIC_DIGITS;
 use history_menu::HistoryMenu;
@@ -509,6 +510,9 @@ impl App {
 
     fn hide_to_tray(&self) {
         self.remember_query();
+        // The program may now run for days and end with Windows itself:
+        // what was changed up to here (size, columns, options) is kept.
+        self.save_settings();
         self.window.set_visible(false);
         if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
             self.tray.show(
@@ -587,9 +591,43 @@ impl App {
     }
 
     fn on_close(&self) {
-        self.stop_watching();
-        self.remember_query();
+        self.close(Leaving::Exit);
+    }
+
+    /// Leaving to start again (after an update, a move to the permanent
+    /// place, a change of language): the new copy is already waiting.
+    fn close_for_restart(&self) {
+        self.close(Leaving::Restart);
+    }
+
+    /// Windows is shutting down or the user is signing out (WM_ENDSESSION):
+    /// save what there is and go, within the few seconds Windows allows.
+    /// Before 0.10.1 nothing answered this message, so the settings changed
+    /// since the last full close were lost and the index was never written.
+    fn session_end(&self) {
+        startup::log("session end: saving and leaving");
+        self.close(Leaving::SessionEnd);
+        std::process::exit(0);
+    }
+
+    /// Saves everything and ends the message loop, in bounded time
+    /// (`crate::leave`): the settings and the history first, then the index
+    /// with a fixed wait, and a watchdog that ends the process if any step
+    /// hangs. Before 0.10.1 the UI thread wrote the index here itself, behind
+    /// every save that was queued, for as long as that took.
+    fn close(&self, why: Leaving) {
+        let budget = why.budget();
+        crate::leave::watchdog(budget.deadline, move || {
+            startup::log(&format!("exit: not done after {} s ({why:?}); ending the process", budget.deadline.as_secs()));
+            // Hard: nothing here may wait for a thread that is stuck.
+            unsafe {
+                winapi::um::processthreadsapi::TerminateProcess(winapi::um::processthreadsapi::GetCurrentProcess(), 0);
+            }
+        });
+        // First what is small and must not be lost.
         self.save_settings();
+        self.remember_query();
+        self.stop_watching();
         self.cancel_content();
         self.stop_warm();
         if let Some(job) = &self.state.borrow().scan {
@@ -606,23 +644,19 @@ impl App {
         self.destroy_floating();
         // The index is written last, by the saving thread, with every window
         // already off the screen; this thread only waits for it, and only
-        // for `EXIT_SAVE_WAIT`. A save not done by then (a huge index, a
-        // disk that is busy or stuck) is given up, which leaves `index.bin`
-        // as the last finished save wrote it. Before 0.10.1 the UI thread
-        // wrote it here itself, behind every save that was queued, for as
-        // long as that took, with the window frozen.
+        // for the budget's `save_wait`. A save not done by then (a huge
+        // index, a disk that is busy or stuck) is given up: `index.bin`
+        // stays as the last finished save wrote it, and the marker of
+        // unsaved changes makes the next start scan again.
         self.window.set_visible(false);
         let started = std::time::Instant::now();
-        let outcome = SAVES.flush_within(EXIT_SAVE_WAIT);
+        let outcome = SAVES.flush_within(budget.save_wait);
         if outcome != crate::index_save::Flush::Nothing {
-            startup::log(&format!("exit: last index save {outcome:?} after {} ms", started.elapsed().as_millis()));
+            startup::log(&format!("exit: last index save {outcome:?} after {} ms ({why:?})", started.elapsed().as_millis()));
         }
         nwg::stop_thread_dispatch();
     }
 }
-
-/// How long leaving the program waits for the index to be written.
-const EXIT_SAVE_WAIT: std::time::Duration = std::time::Duration::from_secs(3);
 
 pub fn run() {
     crate::search::init_local_utc_offset();

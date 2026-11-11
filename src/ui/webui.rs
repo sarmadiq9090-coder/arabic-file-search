@@ -838,7 +838,7 @@ mod imp {
                         // As after an update: save everything and leave at
                         // once, so the new copy gets the single-instance lock.
                         self.webui.exiting.set(true);
-                        self.on_close();
+                        self.close_for_restart();
                         std::process::exit(0);
                     }
                     Err(e) => self.webui_notice(trf!(
