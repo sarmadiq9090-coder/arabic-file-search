@@ -224,6 +224,9 @@ pub struct App {
     /// Wakes the UI thread when the drive watcher has a batch of changes.
     watch_notice: nwg::Notice,
     watch_inbox: Arc<Mutex<watching::Inbox>>,
+    /// The saved index misses changes of the last session (its marker file
+    /// was found): scan the drives again once it is loaded.
+    reconcile: Cell<bool>,
     /// Bytes downloaded / total of a running update download.
     update_progress: Arc<(AtomicU64, AtomicU64)>,
     update_busy: Cell<bool>,

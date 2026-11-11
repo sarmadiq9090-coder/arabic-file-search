@@ -23,6 +23,13 @@
 //!   an unfinished one only leaves `index.bin` a little older (it is written
 //!   to a temp file and renamed, so it is never cut off).
 //!
+//! A save that never happens (the program is killed, the PC loses power,
+//! leaving gives up on a slow disk) loses the changes that were only in
+//! memory, and nothing else would ever notice: the file on disk is whole,
+//! just older. So while changes are unsaved a marker file exists
+//! (`index.dirty`, see [`marker_path`]); a start that finds it scans the
+//! drives again, and only that scan's own save removes it.
+//!
 //! Free of Win32, so it is tested on every platform.
 
 use std::io;
@@ -73,6 +80,14 @@ pub struct Edited {
 
 type Writer = dyn Fn(&Index) -> io::Result<()> + Send + Sync;
 type Logger = dyn Fn(&str) + Send + Sync;
+/// Creates (`true`) or removes (`false`) the marker file.
+type Marker = dyn Fn(bool) + Send + Sync;
+
+/// The marker file next to the index file `index`: it exists while the
+/// index in memory has changes that are not on disk yet.
+pub fn marker_path(index: &std::path::Path) -> std::path::PathBuf {
+    index.with_extension("dirty")
+}
 
 struct Inner {
     /// The newest index waiting to be written, and its number.
@@ -93,6 +108,11 @@ struct Inner {
     leaving: bool,
     /// Saves that failed since the last one that worked.
     failures: u32,
+    /// The marker file was created for the changes now unsaved.
+    marked: bool,
+    /// The last session ended with unsaved changes: the marker stays until
+    /// a scan's own save (`save_now`) has put a complete index on disk.
+    scan_owed: bool,
 }
 
 /// The single place index saves go through.
@@ -101,7 +121,11 @@ pub struct SaveQueue {
     wake: Condvar,
     /// One write at a time, whoever asks.
     turn: Mutex<()>,
+    /// One change of the marker at a time, so the file always says what
+    /// `Inner::marked` says.
+    marking: Mutex<()>,
     writer: Box<Writer>,
+    marker: Box<Marker>,
     log: Box<Logger>,
     /// Run first on the saving thread (lowers its priority in the program).
     thread_init: fn(),
@@ -117,7 +141,14 @@ pub struct SaveQueue {
 const SLOW_SAVE: Duration = Duration::from_secs(2);
 
 impl SaveQueue {
-    pub fn new(writer: Box<Writer>, log: Box<Logger>, thread_init: fn(), gap_factor: u32, retry: Duration) -> Arc<SaveQueue> {
+    pub fn new(
+        writer: Box<Writer>,
+        marker: Box<Marker>,
+        log: Box<Logger>,
+        thread_init: fn(),
+        gap_factor: u32,
+        retry: Duration,
+    ) -> Arc<SaveQueue> {
         Arc::new(SaveQueue {
             inner: Mutex::new(Inner {
                 pending: None,
@@ -129,10 +160,14 @@ impl SaveQueue {
                 written_seq: 0,
                 leaving: false,
                 failures: 0,
+                marked: false,
+                scan_owed: false,
             }),
             wake: Condvar::new(),
             turn: Mutex::new(()),
+            marking: Mutex::new(()),
             writer,
+            marker,
             log,
             thread_init,
             gap_factor,
@@ -175,6 +210,39 @@ impl SaveQueue {
         inner.due = None;
     }
 
+    /// The marker file was there at start: the last session's changes were
+    /// not all saved. It now stays until a scan has been saved (`save_now`).
+    pub fn scan_owed(&self) {
+        self.lock().scan_owed = true;
+    }
+
+    /// Creates the marker file once there are unsaved changes (called on
+    /// the saving thread, never on the UI thread).
+    fn mark_unsaved(&self) {
+        let _one = self.marking.lock().unwrap_or_else(|e| e.into_inner());
+        let mut inner = self.lock();
+        if inner.pending.is_some() && !inner.marked {
+            inner.marked = true;
+            drop(inner);
+            (self.marker)(true);
+        }
+    }
+
+    /// Removes the marker file after a write, when nothing newer waits and
+    /// no scan is owed (`after_scan`: this write was a scan's).
+    fn mark_saved(&self, after_scan: bool) {
+        let _one = self.marking.lock().unwrap_or_else(|e| e.into_inner());
+        let mut inner = self.lock();
+        if after_scan {
+            inner.scan_owed = false;
+        }
+        if inner.pending.is_none() && !inner.scan_owed {
+            inner.marked = false;
+            drop(inner);
+            (self.marker)(false);
+        }
+    }
+
     /// Whether `index` is the one waiting to be written.
     pub fn is_pending(&self, index: &Arc<Index>) -> bool {
         self.lock().pending.as_ref().is_some_and(|(p, _)| Arc::ptr_eq(p, index))
@@ -198,7 +266,10 @@ impl SaveQueue {
         };
         // Counted down again however the write ends.
         let _running = Running(self);
-        self.write(index, seq).map(drop)
+        if self.write(index, seq)? {
+            self.mark_saved(true);
+        }
+        Ok(())
     }
 
     /// Waits up to `budget` for the write under way to end. True when none
@@ -272,6 +343,13 @@ impl SaveQueue {
                 alive.ended = true;
                 return;
             };
+            if !inner.marked {
+                // First of all, on disk: there are changes only memory has.
+                drop(inner);
+                self.mark_unsaved();
+                inner = self.lock();
+                continue;
+            }
             let start = if inner.leaving { due } else { inner.not_before.map_or(due, |n| n.max(due)) };
             let wait = start.saturating_duration_since(Instant::now());
             if !wait.is_zero() {
@@ -304,6 +382,9 @@ impl SaveQueue {
                                 if more > 0 { format!("; {more} more slow saves since the last line") } else { String::new() }
                             ));
                         }
+                    }
+                    if written {
+                        self.mark_saved(false);
                     }
                     let mut inner = self.lock();
                     inner.failures = 0;
@@ -536,7 +617,7 @@ mod tests {
     }
 
     fn queue_with(writer: Box<Writer>) -> Arc<SaveQueue> {
-        SaveQueue::new(writer, Box::new(|_| {}), || {}, 0, Duration::ZERO)
+        SaveQueue::new(writer, Box::new(|_| {}), Box::new(|_| {}), || {}, 0, Duration::ZERO)
     }
 
     fn queue_on(disk: &Arc<Disk>) -> Arc<SaveQueue> {
@@ -880,6 +961,7 @@ mod tests {
                 w.store(i.entries[0].size as usize, Ordering::SeqCst);
                 Ok(())
             }),
+            Box::new(|_| {}),
             Box::new(move |s| l.lock().unwrap().push(s.to_string())),
             || {},
             0,
@@ -971,6 +1053,7 @@ mod tests {
                 w.store(i.entries[0].size as usize, Ordering::SeqCst);
                 Err(io::Error::other("no"))
             }),
+            Box::new(|_| {}),
             // The logger panics once, on the saving thread.
             Box::new(move |_| {
                 if f.fetch_add(1, Ordering::SeqCst) == 0 {
@@ -990,6 +1073,78 @@ mod tests {
         edit(&queue, &mut index, |idx| { idx.entries[0].size = 6; true }, Some(Duration::ZERO));
         assert!(queue.lock().worker);
         assert_eq!(queue.flush_within(Duration::from_millis(30)), Flush::TimedOut, "its retry is an hour away");
+    }
+
+    /// The marker file: there while memory has changes the disk has not,
+    /// gone once they are written; still there if the program dies first.
+    #[test]
+    fn the_marker_follows_unsaved_changes() {
+        let dir = std::env::temp_dir().join(format!("bahth_save_marker_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("index.bin");
+        let marker = marker_path(&file);
+        assert_eq!(marker.file_name().unwrap(), "index.dirty");
+        let disk = Arc::new(Disk::default());
+        let queue_for = |disk: &Arc<Disk>| {
+            let (d, m) = (disk.clone(), marker.clone());
+            SaveQueue::new(
+                Box::new(move |i| d.write(i)),
+                Box::new(move |on| {
+                    if on {
+                        std::fs::write(&m, b"").unwrap();
+                    } else {
+                        let _ = std::fs::remove_file(&m);
+                    }
+                }),
+                Box::new(|_| {}),
+                || {},
+                0,
+                Duration::ZERO,
+            )
+        };
+        let queue = queue_for(&disk);
+        let mut index = Arc::new(index_of(5));
+        assert!(!marker.exists());
+        // A change: marked before its save has even been let through.
+        edit(&queue, &mut index, |idx| { idx.entries[0].size = 2; true }, Some(Duration::ZERO));
+        until("the marker", || marker.exists());
+        until("the save to start", || disk.started.load(Ordering::SeqCst) == 1);
+        // Another change while that save is stuck: one save ending is not enough.
+        edit(&queue, &mut index, |idx| { idx.entries[0].size = 3; true }, Some(Duration::ZERO));
+        disk.allow(1);
+        until("the first save to end", || disk.finished.load(Ordering::SeqCst) == 1);
+        until("the second save to start", || disk.started.load(Ordering::SeqCst) == 2);
+        assert!(marker.exists(), "the newer change is not on disk yet");
+        disk.allow(1);
+        until("the marker to go", || !marker.exists());
+        until("rest", || at_rest(&queue));
+        assert_eq!(disk.last_written.load(Ordering::SeqCst), 3);
+
+        // The program dies with a change unsaved (its save never ends): the
+        // marker is what the next start finds.
+        edit(&queue, &mut index, |idx| { idx.entries[0].size = 4; true }, Some(Duration::ZERO));
+        until("the marker", || marker.exists());
+        assert_eq!(queue.flush_within(Duration::from_millis(20)), Flush::TimedOut);
+        assert!(marker.exists());
+
+        // The next start: a scan is owed. Saving edits does not clear the
+        // marker; only the scan's own save does.
+        let disk = Arc::new(Disk::default());
+        disk.open();
+        let queue = queue_for(&disk);
+        queue.scan_owed();
+        edit(&queue, &mut index, |idx| { idx.entries[0].size = 5; true }, Some(Duration::ZERO));
+        until("the edit's save", || disk.last_written.load(Ordering::SeqCst) == 5);
+        until("rest", || at_rest(&queue));
+        assert!(marker.exists(), "an edit's save is not a reconciliation");
+        queue.save_now(&index_of(6)).unwrap();
+        assert!(!marker.exists());
+        // From then on the marker follows the edits again.
+        edit(&queue, &mut index, |idx| { idx.entries[0].size = 6; true }, Some(Duration::ZERO));
+        until("rest", || at_rest(&queue));
+        until("the marker to go", || !marker.exists());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

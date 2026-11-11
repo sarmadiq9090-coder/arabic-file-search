@@ -236,6 +236,17 @@ pub(super) const EDIT_SAVE: Duration = Duration::from_millis(500);
 pub(super) static SAVES: LazyLock<Arc<SaveQueue>> = LazyLock::new(|| {
     SaveQueue::new(
         Box::new(|idx| idx.save(&index::cache_path())),
+        // `index.dirty`: there while changes are only in memory (see
+        // `index_save`); a start that finds it scans the drives again.
+        Box::new(|unsaved| {
+            let marker = index_save::marker_path(&index::cache_path());
+            let done = if unsaved { std::fs::write(&marker, b"") } else { std::fs::remove_file(&marker) };
+            if let Err(e) = done
+                && (unsaved || e.kind() != std::io::ErrorKind::NotFound)
+            {
+                log(&format!("index marker: could not {} {}: {e}", if unsaved { "create" } else { "remove" }, marker.display()));
+            }
+        }),
         Box::new(log),
         // At normal priority: below it, on a PC with every core busy, a
         // save could take minutes, and the snapshot it holds with it.

@@ -34,6 +34,13 @@ impl App {
 
     /// Reads the cached index on a background thread so the window appears at once.
     pub(super) fn start(&self) {
+        // The last session ended with changes it could not save (it was
+        // killed, or gave up on a slow disk): the saved index is whole but
+        // misses them, so the drives are scanned again once it is loaded.
+        if crate::index_save::marker_path(&index::cache_path()).exists() {
+            SAVES.scan_owed();
+            self.reconcile.set(true);
+        }
         let slot: LoadJob = Arc::new(Mutex::new(None));
         let s = slot.clone();
         let started_thread = crate::crash_log::spawn_named("index-load", move || {
@@ -79,6 +86,10 @@ impl App {
                     self.show_recent_files();
                 } else {
                     self.search_names();
+                }
+                if self.reconcile.take() {
+                    log("start: the last session ended with index changes it had not saved; scanning the drives again");
+                    self.start_scan();
                 }
             }
             None => {
