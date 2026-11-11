@@ -2,15 +2,16 @@
 //! index in the background.
 
 use native_windows_gui as nwg;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
+use std::time::{Duration, Instant};
 
 use winapi::um::winuser::SendMessageW;
 
 use super::shell;
-use super::startup::background_priority;
+use super::startup::log;
 use super::{App, Row, State, title};
 use crate::index::{self, Index};
+use crate::index_save::{self, RateLog, SaveQueue};
 
 impl App {
     // ---------------------------------------------------------------- rename & delete
@@ -164,11 +165,11 @@ impl App {
     }
 
     /// True when an edit would have to copy the whole index, because a
-    /// holder other than the window's own (rows, a waiting save) shares it.
+    /// holder other than the window's own (rows, the save waiting its turn)
+    /// shares it: a save being written, a search, the phone page.
     pub(super) fn index_shared(&self, st: &State) -> bool {
         let rows = usize::from(Arc::ptr_eq(&st.rows_index, &st.index));
-        let save = PENDING_SAVE.lock().map_or(0, |p| usize::from(p.as_ref().is_some_and(|p| Arc::ptr_eq(p, &st.index))));
-        Arc::strong_count(&st.index) > 1 + rows + save
+        index_save::shared(&SAVES, &st.index, rows)
     }
 
     /// `update_index` for a change that returns whether it changed anything.
@@ -184,49 +185,28 @@ impl App {
             .filter_map(|r| st.rows_index.entries.get(r.entry as usize).map(|e| (e.path.to_string(), r)))
             .collect();
         st.rows_index = Arc::default();
-        // A save still waiting holds the index too; it is about to be stale.
-        let had_pending = PENDING_SAVE.lock().map(|mut p| p.take().is_some()).unwrap_or(false);
-        let mut idx = std::mem::take(&mut st.index);
-        let inner = Arc::get_mut(&mut idx);
-        let mut owned = match inner {
-            Some(i) => std::mem::take(i),
-            None => {
-                // Something else (a search, the web server, a save) still
-                // reads this snapshot: copy it. `apply_watched` paces this.
-                st.live.last_copy = Some(std::time::Instant::now());
-                Index { entries: idx.entries.clone(), roots: idx.roots.clone(), built_at: idx.built_at }
-            }
-        };
-        let changed = change(&mut owned);
-        let idx = Arc::new(owned);
-        st.index = idx.clone();
+        // Several quick edits only need the last state written, and files
+        // change all the time: watcher edits are written half a minute
+        // later, the user's own at once. While a full scan runs nothing is
+        // queued: the scan writes its own, newer index when it ends.
+        let save_in = if st.scan.is_some() { None } else { Some(if live { LIVE_SAVE } else { EDIT_SAVE }) };
+        let started = Instant::now();
+        let done = index_save::edit(&SAVES, &mut st.index, change, save_in);
+        if done.copied {
+            // Something else (a save being written, a search, the web
+            // server) still reads the old snapshot. `apply_watched` paces this.
+            st.live.last_copy = Some(Instant::now());
+            note_copy(st.index.entries.len(), started.elapsed());
+        }
+        let idx = st.index.clone();
         st.rows_index = idx.clone();
         st.rows = row_paths
             .into_iter()
             .filter_map(|(p, row)| idx.find(&p).map(|i| Row { entry: i as u32, ..row }))
             .collect();
         drop(st);
-        // Several quick edits only need the last state written; on_close
-        // writes it at once if it is still waiting.
-        if (changed || had_pending)
-            && let Ok(mut p) = PENDING_SAVE.lock()
-        {
-            *p = Some(idx);
-        }
-        if !changed {
+        if !done.changed {
             return;
-        }
-        // Files change all the time; writing a big index after each batch
-        // would cost more than it saves, so watcher edits wait half a minute.
-        if !live || !LIVE_SAVE_QUEUED.swap(true, Ordering::Relaxed) {
-            crate::crash_log::spawn_named("index-save", move || {
-                background_priority();
-                std::thread::sleep(std::time::Duration::from_millis(if live { 30_000 } else { 500 }));
-                if live {
-                    LIVE_SAVE_QUEUED.store(false, Ordering::Relaxed);
-                }
-                flush_index_save();
-            });
         }
         if live {
             self.refresh_list();
@@ -245,15 +225,37 @@ impl App {
     }
 }
 
-/// A save of watcher edits is already scheduled.
-static LIVE_SAVE_QUEUED: AtomicBool = AtomicBool::new(false);
+/// How long after a change found on disk the index is written, and after
+/// one of the user's own (a rename, a delete).
+const LIVE_SAVE: Duration = Duration::from_secs(30);
+pub(super) const EDIT_SAVE: Duration = Duration::from_millis(500);
 
-/// The edited index waiting to be written to disk (see `update_index`).
-pub(super) static PENDING_SAVE: Mutex<Option<Arc<Index>>> = Mutex::new(None);
+/// Every save of the index goes through this queue: one at a time, the
+/// newest index only, and never a snapshot held while waiting (see
+/// `index_save`; until 0.10.0 each waiting save held one).
+pub(super) static SAVES: LazyLock<Arc<SaveQueue>> = LazyLock::new(|| {
+    SaveQueue::new(
+        Box::new(|idx| idx.save(&index::cache_path())),
+        Box::new(log),
+        // At normal priority: below it, on a PC with every core busy, a
+        // save could take minutes, and the snapshot it holds with it.
+        || {},
+        index_save::GAP_FACTOR,
+        index_save::RETRY,
+    )
+});
 
-pub(super) fn flush_index_save() {
-    let idx = PENDING_SAVE.lock().ok().and_then(|mut p| p.take());
-    if let Some(idx) = idx {
-        let _ = idx.save(&index::cache_path());
+/// A whole copy of the index is worth a line in the log (it is what makes
+/// memory use jump), but on a busy PC not one every ten seconds.
+fn note_copy(entries: usize, took: Duration) {
+    static LINES: Mutex<RateLog> = Mutex::new(RateLog::new(Duration::from_secs(10 * 60)));
+    let more = LINES.lock().unwrap_or_else(|e| e.into_inner()).due(Instant::now());
+    if let Some(more) = more {
+        log(&format!(
+            "index copy: {entries} entries copied in {} ms for a change on disk (another reader held the index; a save was {}running){}",
+            took.as_millis(),
+            if SAVES.running() { "" } else { "not " },
+            if more > 0 { format!("; {more} more copies since the last line") } else { String::new() }
+        ));
     }
 }

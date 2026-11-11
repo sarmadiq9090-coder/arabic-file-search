@@ -82,7 +82,7 @@ use crate::index::{Change, Entry, Index, ScanProgress};
 use crate::search::{ContentHit, ContentProgress, Query};
 use crate::settings::Settings;
 
-use files::flush_index_save;
+use files::SAVES;
 use format::ARABIC_DIGITS;
 use history_menu::HistoryMenu;
 use keys::HOTKEY_ID;
@@ -585,7 +585,6 @@ impl App {
 
     fn on_close(&self) {
         self.stop_watching();
-        flush_index_save();
         self.remember_query();
         self.save_settings();
         self.cancel_content();
@@ -602,9 +601,25 @@ impl App {
         self.webui_close();
         // Gone at once, not left on screen while the index is freed.
         self.destroy_floating();
+        // The index is written last, by the saving thread, with every window
+        // already off the screen; this thread only waits for it, and only
+        // for `EXIT_SAVE_WAIT`. A save not done by then (a huge index, a
+        // disk that is busy or stuck) is given up, which leaves `index.bin`
+        // as the last finished save wrote it. Before 0.10.1 the UI thread
+        // wrote it here itself, behind every save that was queued, for as
+        // long as that took, with the window frozen.
+        self.window.set_visible(false);
+        let started = std::time::Instant::now();
+        let outcome = SAVES.flush_within(EXIT_SAVE_WAIT);
+        if outcome != crate::index_save::Flush::Nothing {
+            startup::log(&format!("exit: last index save {outcome:?} after {} ms", started.elapsed().as_millis()));
+        }
         nwg::stop_thread_dispatch();
     }
 }
+
+/// How long leaving the program waits for the index to be written.
+const EXIT_SAVE_WAIT: std::time::Duration = std::time::Duration::from_secs(3);
 
 pub fn run() {
     crate::search::init_local_utc_offset();
