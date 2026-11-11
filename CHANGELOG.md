@@ -6,6 +6,7 @@
 
 ### إصلاحات
 - **النافذة الرئيسية تبقى فوق شريط المهام**: تُفتح في وسط مساحة العمل (الشاشة بلا شريط المهام) لا في وسط الشاشة كلها، فلا يختفي سطر الحالة والأزرار السفلية تحت شريط المهام في الشاشات القصيرة (1366×768، أو 1080p بتكبير 150٪). وإذا تغيّرت الشاشة والنافذة مخفية بجانب الساعة (شاشة فُصلت أو دقة أصغر) تعود كاملةً إلى داخل الشاشة عند إظهارها. / **English:** the main window opens centred in the work area and is pulled back on screen when shown, so the status line and bottom buttons are no longer under the taskbar on short screens.
+- **لا مربعات منقّطة حول المسارات**: كانت المسارات في قائمة النتائج ونافذة البحث الصغيرة والنوافذ الأخرى تظهر بين مربعين منقّطين («LRI» و«PDI») في ويندوز؛ تبقى المسارات من اليسار إلى اليمين بعلامات لا يرسمها ويندوز. / **English:** no dotted "LRI"/"PDI" boxes around paths; they stay left-to-right with marks Windows does not draw.
 
 ## 0.10.0 — 2026-11-11
 
