@@ -645,6 +645,12 @@ pub fn run() {
     }
     // Only the copy that keeps running tidies up after an update.
     crate::update::cleanup_old();
+    // Temp files of index saves that never finished (a copy closed or
+    // killed in the middle), unless written to in the last two minutes.
+    let stale = crate::index::remove_stale_tmp(&crate::index::cache_path(), std::time::Duration::from_secs(120));
+    if stale > 0 {
+        startup::log(&format!("start: removed {stale} unfinished index save file(s)"));
+    }
     autostart::apply_default();
     phase("single-instance");
     unsafe {
