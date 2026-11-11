@@ -14,6 +14,8 @@ use crate::normalize::{normalize, normalize_with_map};
 
 mod members;
 #[cfg(test)]
+mod regressions;
+#[cfg(test)]
 mod robustness;
 
 /// Most match positions collected for each alternative (or regex, or
@@ -119,10 +121,13 @@ impl PartialEq for Pattern {
 
 impl Pattern {
     /// Compiles `source`, with limits so a hostile pattern can't eat memory.
+    /// `^` and `$` match at every line of a document, whether its lines end
+    /// in `\n` or `\r\n` (most Windows text files).
     fn new(source: &str) -> Pattern {
         let re = RegexBuilder::new(source)
             .case_insensitive(true)
             .multi_line(true)
+            .crlf(true)
             .size_limit(1 << 20)
             .dfa_size_limit(4 << 20)
             .build()
