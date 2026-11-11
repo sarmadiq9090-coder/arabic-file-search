@@ -240,6 +240,9 @@ impl Near {
 /// `a|b` (or `a | b`) matches either, `!word` or `-word` excludes, `ext:pdf`,
 /// `*.pdf` or `.pdf` restricts the file type and `folder:` / `مجلد:` keeps
 /// only folders. A leading Arabic article (`ال`, `وال`, `لل`…) is optional.
+/// A name that is all extension (`.gitignore`, the folder `.ssh`) has that
+/// type, and a bare `.word` also finds names with a word starting that way
+/// (`.net framework`), see [`Query::dot_names`].
 ///
 /// Filters: `size:>10mb` / `حجم:` (size), `dm:today` / `تاريخ:` (modified
 /// date), `regex:` / `re:` (regular expression), `ww:` / `كلمة:` (whole word)
@@ -250,6 +253,12 @@ pub struct Query {
     pub terms: Vec<Term>,
     pub excludes: Vec<String>,
     pub exts: Vec<String>,
+    /// The types typed as a bare `.word` (not `ext:` or `*.`), each as the
+    /// normalised `.word`. Typed that way it may as well be the start of a
+    /// dot name, so a name with a word starting with it passes the type
+    /// filter too: `.env` finds `.env.local`, `.net framework` finds
+    /// «Microsoft .NET Framework». Every one is in `exts` as well.
+    pub dot_names: Vec<String>,
     pub dirs_only: bool,
     /// Inclusive size range in bytes from `size:`. Folders never pass it.
     pub size: Option<(u64, u64)>,
@@ -390,12 +399,28 @@ fn tokenize(input: &str) -> Vec<Token> {
     tokens
 }
 
-/// The extension list of an `ext:`, `*.` or `.ext` token.
-fn ext_filter(lower: &str) -> Option<&str> {
-    lower
-        .strip_prefix("ext:")
-        .or_else(|| lower.strip_prefix("*."))
-        .or_else(|| lower.strip_prefix('.').filter(|e| !e.is_empty() && !e.contains('.')))
+/// The extension list of an `ext:`, `*.` or `.ext` token, and whether it is
+/// the bare `.ext` form (which may also be a dot name, [`Query::dot_names`]).
+fn ext_filter(lower: &str) -> Option<(&str, bool)> {
+    let explicit = lower.strip_prefix("ext:").or_else(|| lower.strip_prefix("*."));
+    explicit.map(|list| (list, false)).or_else(|| {
+        let bare = lower.strip_prefix('.').filter(|e| !e.is_empty() && !e.contains('.'));
+        bare.map(|list| (list, true))
+    })
+}
+
+/// The extensions in the list of an `ext:`, `*.` or `.ext` token: split at
+/// `,` and `;`, without a leading `.` or `*.` (`ext:.pdf`, `ext:*.pdf`).
+/// `*` is every type, so `*.*` and `ext:*` list nothing and filter nothing.
+fn ext_items(list: &str) -> impl Iterator<Item = &str> {
+    list.split([',', ';']).map(|e| e.trim_start_matches(['*', '.'])).filter(|e| !e.is_empty())
+}
+
+/// True when a word of `name` (normalised) starts with `dot` (a normalised
+/// `.word`): at the start of the name or after a space. Not inside a word,
+/// so `.doc` is not found in `a.docx` nor `.net` in «Microsoft.NET».
+fn has_dot_word(name: &str, dot: &str) -> bool {
+    name.match_indices(dot).any(|(i, _)| i == 0 || name[..i].ends_with(char::is_whitespace))
 }
 
 /// Length of the prefix from `list` that `tok` starts with, if any.
@@ -762,9 +787,13 @@ impl Query {
                     continue;
                 }
                 let lower = tok.to_lowercase();
-                if let Some(ext) = ext_filter(&lower) {
-                    let exts = ext.split([',', ';']).filter(|e| !e.is_empty());
-                    q.exts.extend(exts.map(str::to_string));
+                if let Some((list, bare)) = ext_filter(&lower) {
+                    for ext in ext_items(list) {
+                        q.exts.push(ext.to_string());
+                        if bare {
+                            push_unique(&mut q.dot_names, normalize(&format!(".{ext}")));
+                        }
+                    }
                     // A filter between two words ends any pending `|`.
                     join = false;
                     continue;
@@ -931,6 +960,8 @@ impl Query {
                 if preset.is_empty() {
                     return;
                 }
+                // A dot name (`.env`, «.NET Framework») is none of these types.
+                self.dot_names.clear();
                 if self.exts.is_empty() {
                     self.exts = preset.iter().map(|e| e.to_string()).collect();
                 } else {
@@ -944,7 +975,20 @@ impl Query {
     }
 
     fn ext_ok(&self, e: &Entry) -> bool {
-        self.exts.is_empty() || (!e.is_dir && self.exts.contains(&e.ext()))
+        self.exts.is_empty() || (!e.is_dir && self.exts.contains(&e.ext())) || self.dot_name_ok(e)
+    }
+
+    /// The type filter for names that start with a dot. A name that is all
+    /// extension, the file `.gitignore` or the folder `.ssh`, has none for
+    /// [`Entry::ext`], yet `.gitignore`, `*.gitignore` and `ext:gitignore`
+    /// plainly mean it (as Explorer and `dir *.gitignore` do). And a bare
+    /// `.word` passes names with a word starting with it ([`Query::dot_names`]).
+    fn dot_name_ok(&self, e: &Entry) -> bool {
+        let whole = e.name().strip_prefix('.').is_some_and(|rest| {
+            let rest = rest.to_lowercase();
+            self.exts.contains(&rest)
+        });
+        whole || self.dot_names.iter().any(|d| has_dot_word(&e.norm_name, d))
     }
 
     /// Size and date filters. Folders have no size, so `size:` drops them.
