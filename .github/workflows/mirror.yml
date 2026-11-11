@@ -1,0 +1,67 @@
+# Passive daily mirror to GitLab (core/HOSTING.md rollout 2, D-041/D-044).
+# Pushes main, tags and claude/* to git@gitlab.com:fastkiwi1/<REPO>.git with --no-force and no prune.
+# Skips cleanly when the GITLAB_DEPLOY_KEY secret is not set, so the workflow can be merged before the key exists.
+name: Mirror to GitLab
+
+on:
+  schedule:
+    - cron: '17 4 * * *' # daily 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check the deploy key is configured
+        id: key
+        env:
+          KEY: ${{ secrets.GITLAB_DEPLOY_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then echo "GITLAB_DEPLOY_KEY is not set; nothing to do."; echo "ready=false" >> "$GITHUB_OUTPUT"; else echo "ready=true" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        if: steps.key.outputs.ready == 'true'
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Push to GitLab (no force, no prune)
+        if: steps.key.outputs.ready == 'true'
+        env:
+          KEY: ${{ secrets.GITLAB_DEPLOY_KEY }}
+          TARGET: git@gitlab.com:fastkiwi1/arabic-file-search.git
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          # Normalise the pasted key: strip CR; accept ONE base64 line (no dashes); rebuild line breaks if a phone paste flattened a PEM.
+          printf '%s' "$KEY" | tr -d '\r' > ~/.ssh/mirror_key.raw
+          if ! grep -q 'BEGIN OPENSSH PRIVATE KEY' ~/.ssh/mirror_key.raw; then
+            tr -d ' \n\t' < ~/.ssh/mirror_key.raw | base64 -d > ~/.ssh/mirror_key
+          elif [ "$(grep -c . ~/.ssh/mirror_key.raw)" -lt 3 ]; then
+            body=$(sed -e 's/-----BEGIN OPENSSH PRIVATE KEY-----//' -e 's/-----END OPENSSH PRIVATE KEY-----//' ~/.ssh/mirror_key.raw | tr -d ' \n\t')
+            { echo '-----BEGIN OPENSSH PRIVATE KEY-----'; echo "$body" | fold -w 70; echo '-----END OPENSSH PRIVATE KEY-----'; } > ~/.ssh/mirror_key
+          else
+            { cat ~/.ssh/mirror_key.raw; echo; } | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > ~/.ssh/mirror_key; echo >> ~/.ssh/mirror_key
+          fi
+          rm -f ~/.ssh/mirror_key.raw; chmod 600 ~/.ssh/mirror_key
+          echo "key bytes: $(wc -c < ~/.ssh/mirror_key); sha256: $(sha256sum < ~/.ssh/mirror_key | cut -c1-16)"
+          ssh-keygen -y -f ~/.ssh/mirror_key > /dev/null || { echo "::error::GITLAB_DEPLOY_KEY is not a valid private key (paste damaged). Re-add the secret."; exit 1; }
+          # GitLab.com SSH host key, pinned (https://docs.gitlab.com/user/gitlab_com/#ssh-host-keys-fingerprints)
+          printf '%s\n' 'gitlab.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf' > "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/mirror_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o HostKeyAlgorithms=ssh-ed25519"
+          git remote add gitlab "$TARGET"
+          refs="refs/heads/main:refs/heads/main refs/tags/*:refs/tags/*"
+          for b in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin/claude/ | sed 's#^origin/##'); do
+            refs="$refs refs/remotes/origin/$b:refs/heads/$b"
+          done
+          # --no-force: a diverged GitLab branch fails loudly instead of being overwritten.
+          git push --no-force gitlab $refs
