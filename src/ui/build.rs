@@ -473,7 +473,7 @@ impl NativeUi<AppUi> for App {
                     } else if handle == app.menu_hide {
                         app.hide_to_tray();
                     } else if handle == app.menu_new_ui {
-                        app.webui_enter();
+                        app.webui_menu_item();
                     } else if handle == app.tray_show {
                         app.show_window();
                     } else if handle == app.tray_exit || handle == app.menu_exit {

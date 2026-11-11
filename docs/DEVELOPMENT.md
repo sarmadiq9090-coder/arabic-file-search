@@ -74,6 +74,11 @@ The updater fails closed: it installs a release only when GitHub publishes a SHA
 | `integrations/` | Flow Launcher plugin, PowerShell, AutoHotkey and Windows Terminal examples |
 | `assets/` | Icon (`python3 assets/make_icon.py` regenerates it) and the resource script |
 
+## Known gaps
+
+- The new interface (`src/ui/webui.rs`): its window's size and maximized state are not saved; it opens with the classic window's saved size (or where the classic window was when switching).
+- The published x64 and 32-bit exes are mingw builds, which can't host the new interface, so "Try the new look" shows only in MSVC builds: today that is `bahth-arm64.exe` alone. Whether the arm64 exe should offer it is to be decided at release, and the switch (both ways, and the fallback after a WebView2 failure) is to be tested on the `windows-11-arm` runner; the `ui` job runs the mingw x64 exe and does not reach it.
+
 ## Testing on Wine
 
 The exe runs under Wine for quick checks (`LANG=C.UTF-8`, otherwise Arabic paths fail). Wine draws list items mirrored under right-to-left layout, so check list rendering on real Windows.

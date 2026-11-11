@@ -25,9 +25,10 @@ pub(super) use imp::{WebUi, available, wanted};
 mod imp {
     use native_windows_gui as nwg;
     use std::cell::{Cell, RefCell};
-    use std::rc::Rc;
+    use std::rc::{Rc, Weak};
     use std::sync::atomic::Ordering;
     use std::sync::{Arc, Mutex, OnceLock};
+    use std::time::{Duration, Instant};
 
     use winapi::shared::minwindef::{LPARAM, UINT, WPARAM};
     use winapi::shared::windef::HWND;
@@ -46,6 +47,10 @@ mod imp {
     /// Children of the window are not mirrored in Arabic (only its caption
     /// buttons are): WebView2 lays the page out right to left itself.
     const WS_EX_NOINHERITLAYOUT: u32 = 0x0010_0000;
+
+    /// A page that has not said hello this long after it was created or
+    /// reloaded is taken as failed (a blank window).
+    const PAGE_TIMEOUT: Duration = Duration::from_secs(20);
 
     /// Whether WebView2 is installed, so the new main window can be used.
     /// Asked once.
@@ -117,6 +122,19 @@ mod imp {
         /// A switch to the new window is under way (creating the page runs
         /// a message loop).
         switching: Cell<bool>,
+        /// The program, for the timer to create the page again.
+        me: RefCell<Weak<App>>,
+        /// A WebView2 process failed (true: the whole browser), seen on the
+        /// next tick (not inside WebView2's own handler).
+        failed: Cell<Option<bool>>,
+        /// Failures since the new look was started: the first is tried
+        /// again, the second goes back to the classic window for good.
+        failures: Cell<u32>,
+        /// When the page was created or reloaded, until it says hello.
+        loading_since: Cell<Option<Instant>>,
+        /// The program is restarting from the page's own message handler:
+        /// the page is left to the process exit, not dropped inside it.
+        exiting: Cell<bool>,
     }
 
     impl App {
@@ -151,7 +169,8 @@ mod imp {
             Some(handlers)
         }
 
-        /// The classic window after the new one failed to start.
+        /// The classic window after the new one failed to start (twice),
+        /// from now on: the next start must not try a page that fails.
         fn webui_fall_back(&self) {
             self.webui.active.set(false);
             self.webui.host.replace(None);
@@ -159,6 +178,8 @@ mod imp {
             if !started_hidden() {
                 self.window.set_visible(true);
             }
+            self.state.borrow_mut().settings.new_ui = false;
+            self.save_settings();
         }
 
         /// The window that holds the page, and its event handlers.
@@ -238,19 +259,38 @@ mod imp {
         /// it drops the page there was.
         fn start_webui(self: &Rc<Self>) -> Result<(), String> {
             let hwnd = self.webui.parts.window.handle.hwnd().ok_or("no window handle")?;
+            self.webui.me.replace(Rc::downgrade(self));
             self.webui.leaving.set(false);
             self.webui.ready.set(false);
+            self.webui.failed.set(None);
+            self.webui.loading_since.set(None);
             self.webui.host.replace(None);
             let token = bridge::new_token();
             self.webui.token.replace(token.clone());
             let dark = surface::apps_dark();
+            // Creating the page runs a message loop: a second launch then
+            // must not find the classic window by its title and show it too.
+            self.window.set_text(&format!("{} (classic)", title()));
             let make = || {
                 let weak = Rc::downgrade(self);
-                Host::create(hwnd as isize, crate::i18n::current(), &token, dark, move |body, source| {
+                let on_failed = {
+                    let weak = Rc::downgrade(self);
+                    move |browser_gone: bool| {
+                        if let Some(app) = weak.upgrade()
+                            && app.webui.active.get()
+                        {
+                            log(&format!("webui: a WebView2 process failed (browser: {browser_gone})"));
+                            let before = app.webui.failed.get().unwrap_or(false);
+                            app.webui.failed.set(Some(before || browser_gone));
+                        }
+                    }
+                };
+                let on_message = move |body: &str, source: &str| {
                     if let Some(app) = weak.upgrade() {
                         app.on_webui_message(body, source);
                     }
-                })
+                };
+                Host::create(hwnd as isize, crate::i18n::current(), &token, dark, on_message, on_failed)
             };
             // A WebView2 that fails to start once (its browser process
             // crashed, a busy profile) often starts the second time.
@@ -260,6 +300,7 @@ mod imp {
             })?;
             self.webui.host.replace(Some(host));
             self.webui.active.set(true);
+            self.webui.loading_since.set(Some(Instant::now()));
             self.webui_titles();
             Ok(())
         }
@@ -272,6 +313,21 @@ mod imp {
             if self.webui.parts.is_built() {
                 self.webui.parts.window.set_text(&if active { title().to_string() } else { format!("{} (new)", title()) });
             }
+            // The Options menu (the tray's "Settings…" opens it while the new
+            // look is on screen too) offers the other look.
+            set_menu_text(
+                &self.menu_new_ui,
+                if active { tr!("العودة إلى الشكل القديم", "Back to the classic look") } else { tr!("جرّب الشكل الجديد", "Try the new look") },
+            );
+        }
+
+        /// The Options menu's «جرّب الشكل الجديد» / «العودة إلى الشكل القديم».
+        pub(in super::super) fn webui_menu_item(self: &Rc<Self>) {
+            if self.webui.active.get() {
+                self.webui_leave(true);
+            } else {
+                self.webui_enter();
+            }
         }
 
         /// «جرّب الشكل الجديد» in the classic window: the new main window
@@ -281,6 +337,8 @@ mod imp {
             if self.webui.active.get() || self.webui.switching.replace(true) {
                 return;
             }
+            // Tried again by the user: earlier failures are forgiven.
+            self.webui.failures.set(0);
             let started = (|| {
                 if !available() {
                     return Err("WebView2 is not installed".to_string());
@@ -316,21 +374,71 @@ mod imp {
             }
         }
 
-        /// «العودة إلى الشكل القديم» on the page's settings: the classic
-        /// window takes its place now, and from now on. Called from the
-        /// page's message handler, so the page itself goes on the next tick.
-        fn webui_leave(&self) {
+        /// «العودة إلى الشكل القديم» (the page's settings, the Options
+        /// menu), or the new look failed twice: the classic window takes its
+        /// place now, shown when `show`, and from now on. Maybe called from
+        /// the page's message handler, so the page itself goes on the next
+        /// tick.
+        fn webui_leave(&self, show: bool) {
             log("webui: back to the classic look");
             self.webui_stop_content();
             self.webui.ready.set(false);
             self.webui.active.set(false);
             self.webui.leaving.set(true);
             self.webui_titles();
+            self.webui.loading_since.set(None);
+            self.webui.failed.set(None);
             place_like(&self.webui.parts.window, &self.window);
             self.webui.parts.window.set_visible(false);
-            self.show_window();
+            if show {
+                self.show_window();
+            }
             self.state.borrow_mut().settings.new_ui = false;
             self.save_settings();
+        }
+
+        /// A WebView2 process failed, or the page stayed blank: the first
+        /// time the page is shown again (a new one when the browser itself
+        /// is gone, else reloaded); the second time the classic window takes
+        /// over for good (`new_ui` off), with a word why. From the timer.
+        fn webui_failed(&self, browser_gone: bool, why: &str) {
+            self.webui.loading_since.set(None);
+            let n = self.webui.failures.get() + 1;
+            self.webui.failures.set(n);
+            let visible = self.webui.parts.window.visible();
+            if n == 1 {
+                log(&format!("webui: {why}; showing the page again"));
+                let again = if browser_gone {
+                    let app = self.webui.me.borrow().upgrade();
+                    match app {
+                        Some(app) if !self.webui.switching.replace(true) => {
+                            let started = app.start_webui();
+                            self.webui.switching.set(false);
+                            started.map_err(|e| log(&format!("webui: {e}"))).is_ok()
+                        }
+                        _ => false,
+                    }
+                } else {
+                    self.webui.ready.set(false);
+                    let reloaded = self.webui.host.borrow().as_ref().is_some_and(Host::reload);
+                    if reloaded {
+                        self.webui.loading_since.set(Some(Instant::now()));
+                    }
+                    reloaded
+                };
+                if again {
+                    if visible {
+                        self.webui_show();
+                    }
+                    return;
+                }
+            }
+            log(&format!("webui: {why} ({n} times); back to the classic look"));
+            self.webui_leave(visible);
+            self.set_status(tr!(
+                "توقّف الشكل الجديد عن العمل، فعاد البرنامج إلى الشكل القديم. يمكنك تجربته من جديد من «خيارات».",
+                "The new look stopped working, so the program went back to the classic look. You can try it again from Options."
+            ));
         }
 
         /// Whether the new main window is the one in use and on screen.
@@ -421,7 +529,11 @@ mod imp {
         pub(in super::super) fn webui_close(&self) {
             self.webui_stop_content();
             self.webui.ready.set(false);
-            self.webui.host.replace(None);
+            // (Not when restarting from inside the page's own handler: the
+            // process exits right after.)
+            if !self.webui.exiting.get() {
+                self.webui.host.replace(None);
+            }
         }
 
         fn webui_send(&self, msg: &Outbound) {
@@ -525,6 +637,7 @@ mod imp {
                     self.webui_stop_content();
                     self.webui.lists.borrow_mut().reset();
                     self.webui.ready.set(true);
+                    self.webui.loading_since.set(None);
                     self.webui.last_status.replace(String::new());
                     let hello = {
                         let s = &self.state.borrow().settings;
@@ -695,6 +808,7 @@ mod imp {
                     Ok(()) => {
                         // As after an update: save everything and leave at
                         // once, so the new copy gets the single-instance lock.
+                        self.webui.exiting.set(true);
                         self.on_close();
                         std::process::exit(0);
                     }
@@ -725,7 +839,7 @@ mod imp {
                     }
                 }
                 Request::Hide {} => self.webui_hide(),
-                Request::ClassicLook {} => self.webui_leave(),
+                Request::ClassicLook {} => self.webui_leave(true),
             }
         }
 
@@ -1106,6 +1220,13 @@ mod imp {
                 // Back to the classic window: its WebView2 is freed.
                 self.webui.host.replace(None);
             }
+            if self.webui.active.get() && !self.webui.switching.get() {
+                if let Some(browser_gone) = self.webui.failed.take() {
+                    self.webui_failed(browser_gone, "a WebView2 process failed");
+                } else if self.webui.loading_since.get().is_some_and(|t| t.elapsed() > PAGE_TIMEOUT) {
+                    self.webui_failed(true, "the page did not load");
+                }
+            }
             if !self.webui.active.get() || !self.webui.ready.get() {
                 return;
             }
@@ -1163,6 +1284,18 @@ mod imp {
         to.set_position(x, y);
         to.set_size(w, ht);
     }
+
+    /// Changes a menu item's text (nwg has no call for it).
+    fn set_menu_text(item: &nwg::MenuItem, text: &str) {
+        use winapi::um::winuser::{MENUITEMINFOW, MIIM_STRING, SetMenuItemInfoW};
+        let Some((menu, id)) = item.handle.hmenu_item() else { return };
+        let mut wide = shell::wide(text);
+        let mut info: MENUITEMINFOW = unsafe { std::mem::zeroed() };
+        info.cbSize = std::mem::size_of::<MENUITEMINFOW>() as u32;
+        info.fMask = MIIM_STRING;
+        info.dwTypeData = wide.as_mut_ptr();
+        unsafe { SetMenuItemInfoW(menu, id, 0, &info) };
+    }
 }
 
 /// mingw builds have no WebView2 host (see Cargo.toml): always the classic window.
@@ -1193,7 +1326,7 @@ mod imp {
         }
 
         /// Never called: the classic window offers no new look here.
-        pub(in super::super) fn webui_enter(self: &Rc<Self>) {}
+        pub(in super::super) fn webui_menu_item(self: &Rc<Self>) {}
 
         pub(in super::super) fn webui_visible(&self) -> bool {
             false
