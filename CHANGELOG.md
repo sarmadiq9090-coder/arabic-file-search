@@ -4,6 +4,9 @@
 
 ## غير منشور (Unreleased)
 
+### الرخصة
+- InstaFind أصبح برنامجاً مملوكاً (مجانياً)؛ إشعارات الأطراف الثالثة دون تغيير. / **Licence:** InstaFind is now proprietary (free); third-party notices unchanged.
+
 ### أمان
 - **calamine 0.38**: إصلاح ثغرة RUSTSEC-2026-0436 في قراءة ملفات Excel القديمة (.xls و.xlsb)، وهي ملفات يفتحها الفهرس تلقائياً.
 

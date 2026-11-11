@@ -3,13 +3,16 @@ name: build
 # CI checks and builds every push. Three exes are built, each smoke-tested on
 # real Windows, and when main gets a version (Cargo.toml) that has no tag yet,
 # the `release` job tags it and publishes those same exes:
-#   bahth.exe        x64, cross-built with mingw (x86_64-pc-windows-gnu). This
-#                    name must never change: every installed copy's updater
-#                    looks for it.
-#   bahth-x86.exe    32-bit, cross-built with mingw (i686-pc-windows-gnu).
+#   bahth.exe        x64 (x86_64-pc-windows-msvc). This name must never
+#                    change: every installed copy's updater looks for it.
+#   bahth-x86.exe    32-bit (i686-pc-windows-msvc).
 #   bahth-arm64.exe  ARM64, built natively on a Windows ARM runner
-#                    (aarch64-pc-windows-msvc, static CRT).
-# The updater in each build fetches the asset for its own CPU (src/update.rs).
+#                    (aarch64-pc-windows-msvc).
+# All three are built with MSVC and a static C runtime (.cargo/config.toml),
+# so they need no Visual C++ Redistributable; ci/check_imports.py fails the
+# build if an exe imports a C runtime DLL or any DLL that is not part of
+# Windows. The updater in each build fetches the asset for its own CPU
+# (src/update.rs).
 
 on:
   push:
@@ -113,11 +116,11 @@ jobs:
       - name: Test (32-bit)
         run: cargo test --release --target i686-pc-windows-msvc
 
-  # The x64 and x86 exes exactly as they are published: cross-built on Linux
-  # with mingw.
+  # The x64 and x86 exes exactly as they are published: MSVC with a static
+  # C runtime (.cargo/config.toml), on Windows.
   exe:
     needs: linux-test
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -125,16 +128,20 @@ jobs:
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: stable
-          targets: x86_64-pc-windows-gnu, i686-pc-windows-gnu
+          targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
       # No build cache: these are the exes that get published (a cache
       # restored from another run could poison them).
       - name: Build bahth.exe and bahth-x86.exe
+        shell: bash
         run: |
-          sudo apt-get update -q && sudo apt-get install -y -q mingw-w64
-          cargo build --release --target x86_64-pc-windows-gnu
-          cargo build --release --target i686-pc-windows-gnu
-          cp target/x86_64-pc-windows-gnu/release/bahth.exe bahth.exe
-          cp target/i686-pc-windows-gnu/release/bahth.exe bahth-x86.exe
+          cargo build --release --target x86_64-pc-windows-msvc
+          cargo build --release --target i686-pc-windows-msvc
+          cp target/x86_64-pc-windows-msvc/release/bahth.exe bahth.exe
+          cp target/i686-pc-windows-msvc/release/bahth.exe bahth-x86.exe
+      # The runners have the Visual C++ runtime installed, so the smoke test
+      # would not notice an exe that needs it: check the import tables.
+      - name: Check the imported DLLs
+        run: python ci/check_imports.py bahth.exe bahth-x86.exe
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bahth-exe
@@ -165,6 +172,8 @@ jobs:
         run: |
           cargo build --release --target aarch64-pc-windows-msvc
           Copy-Item target/aarch64-pc-windows-msvc/release/bahth.exe bahth-arm64.exe
+      - name: Check the imported DLLs
+        run: python ci/check_imports.py bahth-arm64.exe
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bahth-arm64-exe
