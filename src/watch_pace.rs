@@ -101,6 +101,231 @@ impl RescanPace {
     }
 }
 
+/// Watcher changes that cannot be applied yet may wait, but not without
+/// limit: at most this many, and about this many bytes, per queue.
+pub const MAX_QUEUED_CHANGES: usize = 200_000;
+pub const MAX_QUEUED_BYTES: usize = 64 * 1024 * 1024;
+
+/// What [`ChangeQueue::take`] hands over.
+#[derive(Debug, Default)]
+pub struct Taken {
+    /// The changes in the order they came; a `Change::Rescan` for every
+    /// root in `collapsed` comes last.
+    pub changes: Vec<Change>,
+    pub stats: Stats,
+    /// Roots whose changes were dropped because the queue was full: each is
+    /// walked again instead (also in `changes`, as `Change::Rescan`).
+    pub collapsed: Vec<String>,
+    /// Changes dropped that way.
+    pub dropped: u64,
+}
+
+/// Watcher changes waiting until the index may change (a search inside
+/// documents is running, the UI thread is busy, a folder is being walked).
+///
+/// On a PC that writes files non-stop the wait can be long and the changes
+/// millions (about 150 to 300 bytes each). The changes are kept exactly as
+/// they came, in order; a queue that grows past its limits is thrown away
+/// and replaced by ONE walk of each root it was about (paced by
+/// [`RescanPace`]), which costs time but a fixed amount of memory. Until it
+/// is handed over, nothing more is kept for a root that is to be walked.
+#[derive(Debug)]
+pub struct ChangeQueue {
+    changes: Vec<Change>,
+    stats: Stats,
+    /// About how much memory `changes` and `stats` take.
+    bytes: usize,
+    /// Watched roots, to name the one a dropped change belongs to.
+    roots: Vec<String>,
+    collapsed: Vec<String>,
+    dropped: u64,
+    max_changes: usize,
+    max_bytes: usize,
+}
+
+impl Default for ChangeQueue {
+    fn default() -> Self {
+        ChangeQueue::new(MAX_QUEUED_CHANGES, MAX_QUEUED_BYTES)
+    }
+}
+
+/// What a string on the heap costs besides its bytes (rounded up).
+const STRING_COST: usize = 40;
+
+impl ChangeQueue {
+    pub fn new(max_changes: usize, max_bytes: usize) -> ChangeQueue {
+        ChangeQueue {
+            changes: Vec::new(),
+            stats: Stats::new(),
+            bytes: 0,
+            roots: Vec::new(),
+            collapsed: Vec::new(),
+            dropped: 0,
+            max_changes,
+            max_bytes,
+        }
+    }
+
+    /// A queue for changes under `roots` (the watched drives, or the one
+    /// folder being walked).
+    pub fn for_roots(roots: &[String]) -> ChangeQueue {
+        ChangeQueue { roots: roots.to_vec(), ..ChangeQueue::default() }
+    }
+
+    /// The same queue for changes under `roots` (for tests with small limits).
+    #[cfg(test)]
+    pub fn under(mut self, roots: &[String]) -> ChangeQueue {
+        self.roots = roots.to_vec();
+        self
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.changes.is_empty() && self.collapsed.is_empty()
+    }
+
+    /// Changes waiting (a collapsed root counts as one).
+    #[cfg(test)]
+    pub fn len(&self) -> usize {
+        self.changes.len() + self.collapsed.len()
+    }
+
+    /// About how many bytes the queue holds.
+    #[cfg(test)]
+    pub fn bytes(&self) -> usize {
+        self.bytes
+    }
+
+    /// Adds a batch and the stats taken for it.
+    pub fn extend(&mut self, changes: impl IntoIterator<Item = Change>, stats: impl IntoIterator<Item = (String, Stat)>) {
+        for c in changes {
+            self.push(c);
+        }
+        for (path, stat) in stats {
+            self.push_stat(path, stat);
+        }
+    }
+
+    /// Adds everything `other` held.
+    pub fn absorb(&mut self, other: Taken) {
+        self.dropped += other.dropped;
+        // Its collapsed roots stay collapsed here (their rescans, last in
+        // `changes`, are then left out and come back from `take`).
+        for root in other.collapsed {
+            self.collapse_root(root);
+        }
+        self.extend(other.changes, other.stats);
+    }
+
+    pub fn push(&mut self, change: Change) {
+        let (rescan, path): (bool, &str) = match &change {
+            Change::Added(p) | Change::Modified(p) | Change::Removed(p) => (false, p),
+            Change::Rescan(p) => (true, p),
+            Change::Renamed(_, new) => (false, new),
+        };
+        // A root that is going to be walked anyway needs nothing more.
+        if self.under_collapsed(path) || matches!(&change, Change::Renamed(old, _) if self.under_collapsed(old)) {
+            if let Change::Renamed(old, new) = &change {
+                // One end of the move is in a root that is not walked.
+                for p in [old, new] {
+                    if !self.under_collapsed(p) {
+                        let root = self.root_of(p);
+                        self.collapse_root(root);
+                    }
+                }
+            }
+            self.dropped += u64::from(!rescan);
+            return;
+        }
+        self.bytes += change_cost(&change);
+        self.changes.push(change);
+        if self.changes.len() > self.max_changes || self.bytes > self.max_bytes {
+            self.collapse();
+        }
+    }
+
+    fn push_stat(&mut self, path: String, stat: Stat) {
+        if self.under_collapsed(&path) {
+            return;
+        }
+        let cost = path.len() + STRING_COST + std::mem::size_of::<(String, Stat)>();
+        if self.stats.insert(path, stat).is_none() {
+            self.bytes += cost;
+            if self.bytes > self.max_bytes {
+                self.collapse();
+            }
+        }
+    }
+
+    fn under_collapsed(&self, path: &str) -> bool {
+        self.collapsed.iter().any(|r| within(path, r))
+    }
+
+    /// The watched root `path` is in; failing that, its drive or first folder.
+    fn root_of(&self, path: &str) -> String {
+        if let Some(r) = self.roots.iter().filter(|r| within(path, r)).max_by_key(|r| r.len()) {
+            return r.clone();
+        }
+        match path.find(['\\', '/']) {
+            Some(i) => path[..=i].to_string(),
+            None => path.to_string(),
+        }
+    }
+
+    fn collapse_root(&mut self, root: String) {
+        if !self.collapsed.contains(&root) {
+            self.collapsed.push(root);
+        }
+    }
+
+    /// Too much is waiting: forget it all, and walk the roots it was about.
+    fn collapse(&mut self) {
+        let changes = std::mem::take(&mut self.changes);
+        self.dropped += changes.len() as u64;
+        for c in &changes {
+            let paths: [Option<&str>; 2] = match c {
+                Change::Added(p) | Change::Modified(p) | Change::Removed(p) | Change::Rescan(p) => [Some(p), None],
+                Change::Renamed(a, b) => [Some(a), Some(b)],
+            };
+            for p in paths.into_iter().flatten() {
+                if !self.under_collapsed(p) {
+                    let root = self.root_of(p);
+                    self.collapse_root(root);
+                }
+            }
+        }
+        // Stats left over belong to changes already handed over or dropped.
+        self.stats = Stats::new();
+        self.bytes = 0;
+    }
+
+    /// Hands everything over and starts empty.
+    pub fn take(&mut self) -> Taken {
+        let mut changes = std::mem::take(&mut self.changes);
+        let collapsed = std::mem::take(&mut self.collapsed);
+        changes.extend(collapsed.iter().cloned().map(Change::Rescan));
+        self.bytes = 0;
+        Taken { changes, stats: std::mem::take(&mut self.stats), collapsed, dropped: std::mem::take(&mut self.dropped) }
+    }
+
+    /// Forgets everything (the watcher was stopped: a scan sees it all).
+    pub fn clear(&mut self) {
+        self.take();
+    }
+}
+
+/// `path` is `root` or inside it (`root` with or without a trailing separator).
+fn within(path: &str, root: &str) -> bool {
+    path.strip_prefix(root).is_some_and(|rest| rest.is_empty() || root.ends_with(['\\', '/']) || rest.starts_with(['\\', '/']))
+}
+
+fn change_cost(c: &Change) -> usize {
+    std::mem::size_of::<Change>()
+        + match c {
+            Change::Added(p) | Change::Modified(p) | Change::Removed(p) | Change::Rescan(p) => p.len() + STRING_COST,
+            Change::Renamed(a, b) => a.len() + b.len() + 2 * STRING_COST,
+        }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -211,5 +436,147 @@ mod tests {
         assert!(!pace.request("C:\\", t0, false));
         pace.clear();
         assert!(pace.due(t0 + Duration::from_secs(601), |_| false).is_empty());
+    }
+
+    /// The report behind 0.10.1: files rewritten for hours while the index
+    /// cannot change. However many events come, the queue holds a bounded
+    /// number of them and of bytes, and what it hands over in the end is
+    /// exactly ONE rescan of the root.
+    #[test]
+    fn a_full_queue_becomes_exactly_one_rescan() {
+        let paths: Vec<String> = (0..500).map(|i| format!(r"D:\render\shot_{:02}\frame_{i:05}.png", i % 20)).collect();
+        let mut q = ChangeQueue::for_roots(&[r"D:\".to_string()]);
+        let (mut most_bytes, mut most_len) = (0, 0);
+        for i in 0..3_000_000u64 {
+            let p = paths[(i * 7919 % 500) as usize].clone();
+            let c = match i % 3 {
+                0 => Change::Added(p.clone()),
+                1 => Change::Modified(p.clone()),
+                _ => Change::Removed(p.clone()),
+            };
+            q.extend([c], [(p, Some((i, i as i64, false)))]);
+            most_bytes = most_bytes.max(q.bytes());
+            most_len = most_len.max(q.len());
+        }
+        assert!(most_len <= MAX_QUEUED_CHANGES + 1, "{most_len} changes at the most");
+        assert!(most_bytes <= MAX_QUEUED_BYTES + 4096, "{most_bytes} bytes at the most");
+        assert!(q.bytes() < 1024, "{} bytes once collapsed", q.bytes());
+        let taken = q.take();
+        assert_eq!(taken.changes, [Change::Rescan(r"D:\".into())], "one rescan, whatever the number of events");
+        assert_eq!(taken.collapsed, [r"D:\"]);
+        assert_eq!(taken.dropped, 3_000_000);
+        assert!(taken.stats.is_empty());
+        assert!(q.is_empty() && q.bytes() == 0);
+        // That one request is one walk, however often it is asked again.
+        let mut pace = RescanPace::default();
+        let now = Instant::now();
+        let walks = taken.changes.iter().chain(&taken.changes).filter(|_| pace.request(r"D:\", now, false)).count();
+        assert_eq!(walks, 1);
+    }
+
+    /// Below the limits nothing is touched: the changes come out as they
+    /// went in, in order, repeats included (their order matters: a file
+    /// removed and made again is not the file it was).
+    #[test]
+    fn below_the_limits_the_changes_pass_unchanged() {
+        let mut q = ChangeQueue::default();
+        let stream = vec![
+            Change::Added(r"C:\a\x".into()),
+            Change::Removed(r"C:\a\x".into()),
+            Change::Added(r"C:\a\x".into()),
+            Change::Modified(r"C:\a\x".into()),
+            Change::Modified(r"C:\a\x".into()),
+            Change::Renamed(r"C:\a".into(), r"C:\b".into()),
+            Change::Rescan(r"C:\".into()),
+            Change::Modified(r"C:\c".into()),
+        ];
+        q.extend(stream.clone(), [(r"C:\a\x".to_string(), None), (r"C:\a\x".to_string(), Some((3, 4, false)))]);
+        assert_eq!(q.len(), stream.len());
+        let taken = q.take();
+        assert_eq!(taken.changes, stream);
+        assert!(taken.collapsed.is_empty() && taken.dropped == 0);
+        // Of the stats for one path, the latest.
+        assert_eq!(taken.stats.get(r"C:\a\x"), Some(&Some((3, 4, false))));
+    }
+
+    /// Millions of different files (a download, an import) on one drive:
+    /// that drive is walked; another drive's changes keep queueing.
+    #[test]
+    fn a_flood_on_one_drive_leaves_the_others_alone() {
+        let roots = [r"C:\".to_string(), r"D:\".to_string(), r"E:\".to_string()];
+        let mut q = ChangeQueue::for_roots(&roots);
+        q.push(Change::Modified(r"D:\notes\todo.txt".into()));
+        for i in 0..400_000u64 {
+            let p = format!(r"C:\steam\downloading\{:03}\chunk_{i:08}.bin", i % 512);
+            q.extend([Change::Added(p.clone())], [(p, Some((i, 1, false)))]);
+        }
+        // The two roots the dropped changes were about; nothing more is kept for them.
+        assert_eq!(q.len(), 2);
+        q.push(Change::Modified(r"E:\a.txt".into()));
+        q.push(Change::Modified(r"D:\notes\todo.txt".into()));
+        let taken = q.take();
+        assert_eq!(taken.collapsed, [r"D:\", r"C:\"]);
+        assert_eq!(taken.changes, [Change::Modified(r"E:\a.txt".into()), Change::Rescan(r"D:\".into()), Change::Rescan(r"C:\".into())]);
+        assert_eq!(taken.dropped, 400_002);
+    }
+
+    #[test]
+    fn small_limits_and_merging_queues() {
+        // The count limit.
+        let mut q = ChangeQueue::new(3, usize::MAX);
+        for i in 0..3 {
+            q.push(Change::Added(format!(r"C:\a\{i}")));
+        }
+        assert_eq!(q.len(), 3);
+        q.push(Change::Added(r"C:\a\3".into()));
+        assert_eq!(q.take().changes, [Change::Rescan(r"C:\".into())]);
+        // The byte limit, reached by the stats.
+        let mut q = ChangeQueue::new(usize::MAX, 400);
+        q.extend([Change::Added(r"/home/u/a".into())], [("/home/u/a".to_string(), None)]);
+        assert!(q.take().collapsed.is_empty());
+        q.extend((0..4).map(|i| Change::Added(format!("/home/u/{i}"))), (0..4).map(|i| (format!("/home/u/{i}"), None)));
+        assert_eq!(q.take().collapsed, ["/"]);
+
+        // A folder being walked: its own queue collapses to that folder, and
+        // a sibling with the same prefix is not taken for it.
+        let mut q = ChangeQueue::new(2, usize::MAX);
+        q.roots = vec![r"C:\proj\Library".to_string()];
+        for i in 0..3 {
+            q.push(Change::Added(format!(r"C:\proj\Library\{i}")));
+        }
+        q.push(Change::Added(r"C:\proj\Library\more".into()));
+        q.push(Change::Added(r"C:\proj\LibraryOld\x".into()));
+        let taken = q.take();
+        assert_eq!(taken.changes, [Change::Added(r"C:\proj\LibraryOld\x".into()), Change::Rescan(r"C:\proj\Library".into())]);
+
+        // The inbox hands its collapsed root on; later changes there stay out.
+        let mut inbox = ChangeQueue::new(1, usize::MAX);
+        inbox.roots = vec![r"D:\".to_string()];
+        inbox.push(Change::Added(r"D:\a".into()));
+        inbox.push(Change::Added(r"D:\b".into()));
+        let mut state = ChangeQueue::for_roots(&[r"D:\".to_string()]);
+        state.push(Change::Modified(r"D:\before".into()));
+        state.absorb(inbox.take());
+        state.push(Change::Modified(r"D:\after".into()));
+        let taken = state.take();
+        assert_eq!(taken.changes, [Change::Modified(r"D:\before".into()), Change::Rescan(r"D:\".into())]);
+        assert_eq!(taken.dropped, 3);
+
+        // A move out of a collapsed root: the other end's root is walked too.
+        let mut q = ChangeQueue::new(1, usize::MAX);
+        q.roots = vec![r"C:\".to_string(), r"D:\".to_string()];
+        q.push(Change::Added(r"C:\a".into()));
+        q.push(Change::Added(r"C:\b".into()));
+        q.push(Change::Renamed(r"C:\x".into(), r"D:\x".into()));
+        assert_eq!(q.take().collapsed, [r"C:\", r"D:\"]);
+
+        // The watcher was stopped: everything is forgotten, limits and roots kept.
+        q.push(Change::Added(r"C:\a".into()));
+        q.push(Change::Added(r"C:\b".into()));
+        q.clear();
+        assert!(q.is_empty() && q.take().changes.is_empty());
+        q.push(Change::Added(r"D:\c".into()));
+        q.push(Change::Added(r"D:\d".into()));
+        assert_eq!(q.take().collapsed, [r"D:\"]);
     }
 }

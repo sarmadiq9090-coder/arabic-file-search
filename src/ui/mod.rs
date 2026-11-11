@@ -78,7 +78,7 @@ use winapi::um::winuser::{
 };
 
 use crate::history::History;
-use crate::index::{Change, Entry, Index, ScanProgress};
+use crate::index::{Entry, Index, ScanProgress};
 use crate::search::{ContentHit, ContentProgress, Query};
 use crate::settings::Settings;
 
@@ -163,8 +163,8 @@ struct State {
     shown_query: Option<Query>,
     /// Watches the drives so the index follows changes (see `watching`).
     watcher: Option<crate::watch::Watcher>,
-    /// Watcher changes waiting until the index may change.
-    changes: Vec<Change>,
+    /// Watcher changes waiting until the index may change (limited in size).
+    changes: crate::watch_pace::ChangeQueue,
     /// Folders being walked because their contents are unknown.
     subtree_scans: Vec<SubtreeScan>,
     /// Stats from the watcher, rescan pacing and index-copy pacing.

@@ -1399,12 +1399,18 @@ mod tests {
         }
 
         let mut rng = Rng(0x0BAD_5EED);
-        for round in 0..60 {
+        // `Some(cap)`: the changes go through the watcher's bounded queue
+        // (`watch_pace::ChangeQueue`), which holds at most `cap` of them and
+        // past that asks for a walk of the root instead; and they wait there
+        // for a few batches, as while the index is busy.
+        for (round, cap) in (0..60).map(|r| (r, None)).chain((0..60).map(|r| (r, Some(1 + r % 12)))) {
             let mut disk = Disk::new();
             let mut idx = Index::default();
             let mut tick = 0i64;
             let mut prev: Vec<Change> = Vec::new();
-            for _batch in 0..25 {
+            let mut queue = cap.map(|c| crate::watch_pace::ChangeQueue::new(c, usize::MAX).under(&[ROOT.to_string()]));
+            let mut overflows = 0;
+            for batch in 0..25 {
                 let mut changes = Vec::new();
                 for _ in 0..1 + rng.below(8) {
                     tick += 1;
@@ -1474,16 +1480,29 @@ mod tests {
                         _ => {}
                     }
                 }
+                if let Some(q) = &mut queue {
+                    q.extend(changes, []);
+                    // The index is busy for up to three batches.
+                    if batch % (1 + round % 3) != 0 && batch != 24 {
+                        continue;
+                    }
+                    let taken = q.take();
+                    overflows += taken.collapsed.len();
+                    assert!(taken.collapsed.is_empty() || taken.collapsed == [ROOT], "{:?}", taken.collapsed);
+                    changes = taken.changes;
+                }
                 let got = idx.apply_changes(&changes, |p| disk.get(p).copied());
                 for dir in &got.scan {
                     idx.replace_subtree(dir, scan(&disk, dir));
                 }
                 let have: Vec<(String, u64, i64, bool)> =
                     idx.entries.iter().map(|e| (e.path.to_string(), e.size, e.mtime, e.is_dir)).collect();
-                assert_eq!(have, expected(&disk, None), "round {round}, after {changes:#?}, before that {prev:#?}");
+                assert_eq!(have, expected(&disk, None), "round {round} (queue of {cap:?}), after {changes:#?}, before that {prev:#?}");
                 prev = changes;
                 assert!(idx.entries.iter().all(|e| *e.norm_name == *normalize(e.name())));
             }
+            // The small queues did overflow, so the walk path was exercised.
+            assert!(cap.is_none_or(|c| c > 6) || overflows > 0, "round {round}: a queue of {cap:?} never overflowed");
         }
     }
 }
