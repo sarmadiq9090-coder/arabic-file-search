@@ -331,12 +331,12 @@ impl NativeUi<AppUi> for App {
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.tray_menu)?;
         nwg::MenuItem::builder().text(&trf!("فتح نافذة البحث\t{HOTKEY_TEXT}", "Open quick search\t{HOTKEY_TEXT}")).parent(&app.tray_menu).build(&mut app.tray_quick)?;
         nwg::MenuItem::builder()
-            .text(tr!("إظهار المربع العائم", "Show the floating box"))
+            .text(tr!("إظهار خانة البحث العائمة", "Show the floating search box"))
             .check(settings.floating_mode != crate::settings::FloatingMode::Off)
             .parent(&app.tray_menu)
             .build(&mut app.tray_floating)?;
         nwg::MenuItem::builder().text(tr!("النافذة الكاملة", "Full window")).parent(&app.tray_menu).build(&mut app.tray_show)?;
-        nwg::MenuItem::builder().text(tr!("الإعدادات…", "Settings…")).parent(&app.tray_menu).build(&mut app.tray_settings)?;
+        nwg::MenuItem::builder().text(tr!("خيارات…", "Options…")).parent(&app.tray_menu).build(&mut app.tray_settings)?;
         nwg::MenuItem::builder().text(tr!("حول InstaFind", "About InstaFind")).parent(&app.tray_menu).build(&mut app.tray_about)?;
         app.build_rating_tray_item()?;
         nwg::MenuItem::builder().text(tr!("خروج", "Exit")).parent(&app.tray_menu).build(&mut app.tray_exit)?;

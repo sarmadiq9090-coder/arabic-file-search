@@ -374,8 +374,8 @@ impl App {
         let items: [(usize, &str); 4] = [
             (1, tr!("فتح نافذة البحث\tCtrl+Alt+F", "Open quick search\tCtrl+Alt+F")),
             (2, tr!("النافذة الكاملة", "Full window")),
-            (3, tr!("إعادة المربع إلى مكانه", "Reset position")),
-            (4, tr!("إخفاء المربع العائم", "Hide the floating box")),
+            (3, tr!("إعادة الخانة إلى مكانها", "Reset position")),
+            (4, tr!("إخفاء خانة البحث العائمة", "Hide the floating search box")),
         ];
         let menu = unsafe { CreatePopupMenu() };
         if menu.is_null() {

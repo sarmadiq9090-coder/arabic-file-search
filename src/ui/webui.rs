@@ -856,7 +856,7 @@ mod imp {
                     let text = if st.loading.is_some() {
                         tr!("انتظر حتى يكتمل تحميل الفهرس، ثم حدّثه.", "Wait until the index has loaded, then update it.")
                     } else {
-                        tr!("جاري فهرسة الملفات على كل الأقراص…", "Indexing files on all drives…")
+                        tr!("جارٍ فهرسة الملفات على كل الأقراص…", "Indexing files on all drives…")
                     };
                     drop(st);
                     self.webui_notice(text);

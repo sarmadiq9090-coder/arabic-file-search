@@ -1151,7 +1151,7 @@ pub fn content_text(s: &ContentState, lang: Lang) -> String {
     }
     let (checked, total, found) = (n(s.checked.min(s.total)), n(s.total), n(s.found));
     match lang {
-        Lang::Ar => format!("جارِ البحث داخل المستندات… تم فحص {checked} من {total} — وجدت {found}"),
+        Lang::Ar => format!("جارٍ البحث داخل المستندات… تم فحص {checked} من {total} — وجدت {found}"),
         Lang::En => format!("Searching inside documents… checked {checked} of {total} — found {found}"),
     }
 }
