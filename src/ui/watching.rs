@@ -12,7 +12,7 @@ use super::{App, State};
 use crate::index::{self, Change, Entry, Index, ScanProgress};
 use crate::index_save::RateLog;
 use crate::watch::{self, Watcher};
-use crate::watch_pace::{self, ChangeQueue, RescanPace};
+use crate::watch_pace::{self, ChangeQueue, RescanPace, Walk, WalkQueue};
 
 /// While something else holds the index, each edit copies all of it; then
 /// watcher changes are gathered for this long between edits.
@@ -38,6 +38,8 @@ pub(super) struct Live {
     pub(super) last_copy: Option<Instant>,
     /// Since when work has waited for another reader of the index to finish.
     waiting_since: Option<Instant>,
+    /// Folders waiting to be walked: a few walks run at a time.
+    walks: WalkQueue,
 }
 
 /// A folder being walked because the watcher could not say what is inside.
@@ -103,6 +105,7 @@ impl App {
         }
         st.changes.clear();
         st.live.rescans.clear();
+        st.live.walks.clear();
         st.live.waiting_since = None;
         drop(st);
         // Joins the watcher threads, which may be handing over a batch.
@@ -149,6 +152,7 @@ impl App {
     /// sets of a drive's entries.
     pub(super) fn apply_watched(&self) {
         self.start_due_rescans();
+        self.start_waiting_walks();
         if !self.index_free() {
             return;
         }
@@ -215,6 +219,41 @@ impl App {
             true,
         );
         for dir in scan {
+            self.walk_folder(dir);
+        }
+    }
+
+    /// A folder appeared with unknown contents: walk it, now or when one of
+    /// the few walks allowed at once has ended. When too many wait, their
+    /// drive is walked instead (paced like every whole-drive walk).
+    fn walk_folder(&self, dir: String) {
+        let mut st = self.state.borrow_mut();
+        if st.subtree_scans.iter().any(|j| j.dir == dir) {
+            return;
+        }
+        let running = st.subtree_scans.iter().filter(|j| !j.ready()).count();
+        let State { index, live, .. } = &mut *st;
+        let what = live.walks.ask(&dir, running, &index.roots);
+        drop(st);
+        match what {
+            Walk::Start => self.start_subtree_scan(dir),
+            Walk::Wait => {}
+            Walk::Rescan(roots) => {
+                note_too_many_walks(&roots);
+                for root in roots {
+                    self.request_rescan(root);
+                }
+            }
+        }
+    }
+
+    /// Starts waiting folder walks while fewer than the limit are running.
+    fn start_waiting_walks(&self) {
+        loop {
+            let mut st = self.state.borrow_mut();
+            let running = st.subtree_scans.iter().filter(|j| !j.ready()).count();
+            let Some(dir) = st.live.walks.next(running) else { return };
+            drop(st);
             self.start_subtree_scan(dir);
         }
     }
@@ -223,6 +262,8 @@ impl App {
     fn request_rescan(&self, root: String) {
         let mut st = self.state.borrow_mut();
         let busy = st.subtree_scans.iter().any(|j| j.dir == root) || walk_must_wait();
+        // The walk of the whole root covers the folders in it that wait.
+        st.live.walks.forget_under(&root);
         let now = st.live.rescans.request(&root, Instant::now(), busy);
         drop(st);
         // Otherwise `start_due_rescans` starts it later.
@@ -319,6 +360,20 @@ impl App {
         for dir in again {
             self.request_rescan(dir);
         }
+    }
+}
+
+/// Too many folders waited for a walk: a line in the log, at most one every
+/// ten minutes.
+fn note_too_many_walks(roots: &[String]) {
+    static LINES: Mutex<RateLog> = Mutex::new(RateLog::new(Duration::from_secs(10 * 60)));
+    let more = LINES.lock().unwrap_or_else(|e| e.into_inner()).due(Instant::now());
+    if let Some(more) = more {
+        log(&format!(
+            "watch: too many new folders waiting to be walked; walking {} instead{}",
+            roots.join(" "),
+            if more > 0 { format!("; {more} more times since the last line") } else { String::new() }
+        ));
     }
 }
 

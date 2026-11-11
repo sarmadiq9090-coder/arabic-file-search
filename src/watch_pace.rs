@@ -300,15 +300,8 @@ impl ChangeQueue {
         self.collapsed.iter().any(|r| within(path, r))
     }
 
-    /// The watched root `path` is in; failing that, its drive or first folder.
     fn root_of(&self, path: &str) -> String {
-        if let Some(r) = self.roots.iter().filter(|r| within(path, r)).max_by_key(|r| r.len()) {
-            return r.clone();
-        }
-        match path.find(['\\', '/']) {
-            Some(i) => path[..=i].to_string(),
-            None => path.to_string(),
-        }
+        root_of(&self.roots, path)
     }
 
     fn collapse_root(&mut self, root: String) {
@@ -364,6 +357,102 @@ fn change_cost(c: &Change) -> usize {
             Change::Added(p) | Change::Modified(p) | Change::Removed(p) | Change::Rescan(p) => p.len() + STRING_COST,
             Change::Renamed(a, b) => a.len() + b.len() + 2 * STRING_COST,
         }
+}
+
+/// Folder walks running at once, at the most; more wait their turn.
+pub const MAX_WALKS: usize = 4;
+/// Folders that may wait for a walk; past that their drive is walked instead.
+pub const MAX_WAITING_WALKS: usize = 500;
+
+/// What to do with a folder that needs walking (see [`WalkQueue::ask`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Walk {
+    /// Walk it now.
+    Start,
+    /// It waits; [`WalkQueue::next`] hands it out when a walk ends.
+    Wait,
+    /// Too many folders wait: none of them is walked one by one any more.
+    /// Walk these roots instead (through [`RescanPace`]).
+    Rescan(Vec<String>),
+}
+
+/// Folders waiting to be walked because their contents are unknown (they
+/// appeared, or were moved in). Before 0.10.1 every such folder got an
+/// operating-system thread of its own at once, without any limit: an import
+/// or an unpacked archive that makes thousands of folders started thousands
+/// of threads. Now a few walks run at a time, a bounded number of folders
+/// wait, and past that the drive is walked once instead.
+#[derive(Debug)]
+pub struct WalkQueue {
+    waiting: std::collections::VecDeque<String>,
+    max_running: usize,
+    max_waiting: usize,
+}
+
+impl Default for WalkQueue {
+    fn default() -> Self {
+        WalkQueue::new(MAX_WALKS, MAX_WAITING_WALKS)
+    }
+}
+
+impl WalkQueue {
+    pub fn new(max_running: usize, max_waiting: usize) -> WalkQueue {
+        WalkQueue { waiting: std::collections::VecDeque::new(), max_running, max_waiting }
+    }
+
+    /// `dir` needs a walk while `running` walks are under way. `roots` are
+    /// the watched roots (to name the one to walk when too many wait).
+    pub fn ask(&mut self, dir: &str, running: usize, roots: &[String]) -> Walk {
+        if self.waiting.iter().any(|w| w == dir) {
+            return Walk::Wait;
+        }
+        if running < self.max_running && self.waiting.is_empty() {
+            return Walk::Start;
+        }
+        if self.waiting.len() < self.max_waiting {
+            self.waiting.push_back(dir.to_string());
+            return Walk::Wait;
+        }
+        let mut walk: Vec<String> = Vec::new();
+        for d in self.waiting.drain(..).chain([dir.to_string()]) {
+            let root = root_of(roots, &d);
+            if !walk.contains(&root) {
+                walk.push(root);
+            }
+        }
+        Walk::Rescan(walk)
+    }
+
+    /// The next folder to walk, if fewer than the limit are running.
+    pub fn next(&mut self, running: usize) -> Option<String> {
+        if running < self.max_running { self.waiting.pop_front() } else { None }
+    }
+
+    /// `root` is going to be walked as a whole: the folders in it need no
+    /// walk of their own.
+    pub fn forget_under(&mut self, root: &str) {
+        self.waiting.retain(|d| !within(d, root));
+    }
+
+    pub fn clear(&mut self) {
+        self.waiting.clear();
+    }
+
+    #[cfg(test)]
+    pub fn len(&self) -> usize {
+        self.waiting.len()
+    }
+}
+
+/// The watched root `path` is in; failing that, its drive or first folder.
+fn root_of(roots: &[String], path: &str) -> String {
+    if let Some(r) = roots.iter().filter(|r| within(path, r)).max_by_key(|r| r.len()) {
+        return r.clone();
+    }
+    match path.find(['\\', '/']) {
+        Some(i) => path[..=i].to_string(),
+        None => path.to_string(),
+    }
 }
 
 #[cfg(test)]
@@ -663,5 +752,69 @@ mod tests {
         q.push(Change::Added(r"D:\c".into()));
         q.push(Change::Added(r"D:\d".into()));
         assert_eq!(q.take().collapsed, [r"D:\"]);
+    }
+
+    /// An import that makes ten thousand folders in a minute: a few walks at
+    /// a time, a bounded number waiting, and past that one walk of the drive
+    /// instead of ten thousand threads.
+    #[test]
+    fn folder_walks_are_limited_and_queued() {
+        let roots = [r"C:\".to_string(), r"D:\".to_string()];
+        let mut q = WalkQueue::default();
+        let mut running: Vec<String> = Vec::new();
+        let (mut started, mut most_running, mut most_waiting, mut drive_walks) = (0, 0, 0, Vec::new());
+        for i in 0..10_000 {
+            let dir = format!(r"D:\proj\Library\Artifacts\{i:05}");
+            match q.ask(&dir, running.len(), &roots) {
+                Walk::Start => {
+                    running.push(dir);
+                    started += 1;
+                }
+                Walk::Wait => {}
+                Walk::Rescan(walk) => drive_walks.push(walk),
+            }
+            most_running = most_running.max(running.len());
+            most_waiting = most_waiting.max(q.len());
+            // Now and then a walk ends and the next waiting folder starts.
+            if i % 7 == 0 && !running.is_empty() {
+                running.remove(0);
+                while let Some(next) = q.next(running.len()) {
+                    assert!(!running.contains(&next));
+                    running.push(next);
+                    started += 1;
+                }
+            }
+        }
+        assert_eq!(most_running, MAX_WALKS);
+        assert_eq!(most_waiting, MAX_WAITING_WALKS);
+        assert!(started < 3_000, "{started} folder walks started");
+        // Each overflow names the drive once, and empties the queue.
+        assert!(!drive_walks.is_empty());
+        assert!(drive_walks.iter().all(|w| w == &[r"D:\".to_string()]), "{drive_walks:?}");
+
+        // In order, without repeats; a folder asked twice waits once.
+        let mut q = WalkQueue::new(1, 3);
+        assert_eq!(q.ask(r"C:\a", 0, &roots), Walk::Start);
+        assert_eq!(q.ask(r"C:\b", 1, &roots), Walk::Wait);
+        assert_eq!(q.ask(r"C:\b", 1, &roots), Walk::Wait);
+        assert_eq!(q.ask(r"D:\c", 1, &roots), Walk::Wait);
+        // Nothing jumps the queue, even when a place is free.
+        assert_eq!(q.ask(r"C:\d", 0, &roots), Walk::Wait);
+        assert_eq!(q.len(), 3);
+        assert_eq!(q.next(1), None);
+        assert_eq!(q.next(0).as_deref(), Some(r"C:\b"));
+        // A drive about to be walked as a whole takes its folders with it.
+        q.forget_under(r"C:\");
+        assert_eq!(q.next(0).as_deref(), Some(r"D:\c"));
+        assert_eq!(q.next(0), None);
+        // Too many waiting, on two drives: both are walked, once each.
+        for d in [r"C:\1", r"D:\2", r"C:\3"] {
+            assert_eq!(q.ask(d, 1, &roots), Walk::Wait);
+        }
+        assert_eq!(q.ask(r"C:\4", 1, &roots), Walk::Rescan(vec![r"C:\".to_string(), r"D:\".to_string()]));
+        assert_eq!(q.len(), 0);
+        q.ask(r"C:\5", 1, &roots);
+        q.clear();
+        assert_eq!(q.next(0), None);
     }
 }
