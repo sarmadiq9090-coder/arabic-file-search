@@ -34,7 +34,7 @@ $ErrorActionPreference = 'Stop'
 $Exe = (Resolve-Path $Exe).Path
 New-Item -ItemType Directory -Force $Out | Out-Null
 
-Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+Add-Type -AssemblyName System.Windows.Forms, System.Drawing, UIAutomationClient, UIAutomationTypes
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -81,6 +81,19 @@ public static class N {
             System.Threading.Thread.Sleep(40);
         }
     }
+    [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+    static void Mouse(uint flags) {
+        var i = new INPUT { type = 0 }; i.u.mi = new MOUSEINPUT { dwFlags = flags };
+        SendInput(1, new[] { i }, Marshal.SizeOf(typeof(INPUT)));
+    }
+    // A real left click, press and release, at a screen point.
+    public static void Click(int x, int y) {
+        SetCursorPos(x, y); System.Threading.Thread.Sleep(100);
+        Mouse(2); System.Threading.Thread.Sleep(60); Mouse(4);
+    }
+    public static void MoveTo(int x, int y) { SetCursorPos(x, y); Mouse(1); }
+    public static void Down() { Mouse(2); }
+    public static void Up() { Mouse(4); }
     public static void Chord(params ushort[] vks) {
         var list = new List<INPUT>();
         foreach (var v in vks) list.Add(Key(v, 0, 0));
@@ -222,6 +235,37 @@ function Dismiss-Dialogs([int]$ProcId) {
         else { [void][N]::PostMessage($d.Handle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) }  # WM_CLOSE
     }
     return $n
+}
+# The page's elements, as Windows UI Automation sees them (WebView2 exposes
+# the page's accessibility tree): the first one of `ControlType` whose name
+# matches `Pattern`, with a non-empty rectangle on screen.
+function Find-Uia($Hwnd, $ControlType, [string]$Pattern) {
+    try { return Find-UiaIn ([Windows.Automation.AutomationElement]::FromHandle($Hwnd)) $ControlType $Pattern } catch { Say "UI Automation: $_"; return $null }
+}
+function Find-UiaIn($Root, $ControlType, [string]$Pattern) {
+    if (-not $Root) { return $null }
+    try {
+        $cond = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, $ControlType)
+        foreach ($e in $root.FindAll([Windows.Automation.TreeScope]::Descendants, $cond)) {
+            $r = $e.Current.BoundingRectangle
+            if ($e.Current.Name -match $Pattern -and -not $r.IsEmpty -and $r.Width -gt 2 -and $r.Height -gt 2) { return $e }
+        }
+    } catch { Say "UI Automation: $_" }
+    return $null
+}
+function Uia-Names($Hwnd, $ControlType) {
+    try {
+        $root = [Windows.Automation.AutomationElement]::FromHandle($Hwnd)
+        $cond = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, $ControlType)
+        return @($root.FindAll([Windows.Automation.TreeScope]::Descendants, $cond) | ForEach-Object { $_.Current.Name } | Select-Object -First 40)
+    } catch { return @("(UI Automation failed: $_)") }
+}
+function Center($El) {
+    $r = $El.Current.BoundingRectangle
+    return @([int]($r.X + $r.Width / 2), [int]($r.Y + $r.Height / 2))
+}
+function Is-Selected($El) {
+    try { return $El.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected } catch { return $null }
 }
 function Log-Text { if (Test-Path $logFile) { [IO.File]::ReadAllText($logFile, [Text.Encoding]::UTF8) } else { '' } }
 function Log-Lines([string]$Pattern) { @((Log-Text) -split "`r?`n" | Where-Object { $_ -match $Pattern }) }
@@ -407,6 +451,52 @@ try {
         } catch { Record 'probe' 'typing a search' $false "$_" }
         Alive 'after typing'
         Check-Crash 'after typing'
+
+        # A plain click on a result selects it and never starts a drag; a
+        # press that moves starts one only while the button is down (the
+        # program's own drag of the file, dropped back on its own search
+        # box, which takes nothing). Results come in while the drives are
+        # indexed: search for something every Windows has.
+        [N]::Chord($VK.CTRL, 0x4B)  # Ctrl+K: the search box, text selected
+        Start-Sleep -Milliseconds 300
+        [N]::Type('notepad')
+        $rowIn = { Find-UiaIn (Find-Uia $win.Handle ([Windows.Automation.ControlType]::List) '^(Results|النتائج)$') ([Windows.Automation.ControlType]::ListItem) '\S' }
+        $row = Wait-Until $rowIn 60
+        if (-not $row) {
+            Record 'probe' 'a result row to click (UI Automation)' $false ("list items: " + ((Uia-Names $win.Handle ([Windows.Automation.ControlType]::ListItem)) -join ' | '))
+        } else {
+            $drags = (Log-Lines 'webui: drag').Count
+            $c = Center $row
+            Say "clicking result '$($row.Current.Name)' at $($c[0]),$($c[1])"
+            [N]::Click($c[0], $c[1])
+            Start-Sleep -Seconds 1
+            Record 'core' 'a plain click on a result starts no drag' ((Log-Lines 'webui: drag').Count -eq $drags) (((Log-Lines 'webui: drag') | Select-Object -Last 2) -join ' | ')
+            $sel = Is-Selected $row
+            if ($null -eq $sel) { Record 'probe' 'the clicked result is selected (UI Automation SelectionItem)' $false 'pattern not available' }
+            else { Record 'core' 'the clicked result is selected (the click is not swallowed)' ([bool]$sel) }
+            [void](Shot-Client $win 'row-clicked')
+            # A real drag, onto the page's own search box.
+            $box = Find-Uia $win.Handle ([Windows.Automation.ControlType]::ComboBox) '.'
+            $row = & $rowIn
+            if ($row -and $box) {
+                $c = Center $row; $b = Center $box
+                [N]::MoveTo($c[0], $c[1]); Start-Sleep -Milliseconds 200
+                [N]::Down(); Start-Sleep -Milliseconds 200
+                for ($k = 1; $k -le 5; $k++) { [N]::MoveTo($c[0] + 4 * $k, $c[1] + 2 * $k); Start-Sleep -Milliseconds 80 }
+                Start-Sleep -Milliseconds 600
+                for ($k = 1; $k -le 8; $k++) { [N]::MoveTo([int]($c[0] + ($b[0] - $c[0]) * $k / 8), [int]($c[1] + ($b[1] - $c[1]) * $k / 8)); Start-Sleep -Milliseconds 80 }
+                Start-Sleep -Milliseconds 300
+                [N]::Up()
+                Start-Sleep -Seconds 2
+                $started = @(Log-Lines 'webui: drag started').Count -gt 0
+                Record 'probe' 'dragging a result starts the program''s drag' $started (((Log-Lines 'webui: drag') | Select-Object -Last 2) -join ' | ')
+                Alive 'after a drag'
+                Check-Crash 'after a drag'
+                [void](Shot-Client $win 'after-drag')
+            } else {
+                Record 'probe' 'a result and the search box to drag between (UI Automation)' $false
+            }
+        }
     } else {
         Full-Shot 'newlook-screen'
     }
@@ -487,21 +577,27 @@ try {
     Record 'core' 'the one-time switch is saved (new_ui=1, new_ui_default=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_default') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default')")
     $clicked = $false
     if ($win) {
-        # Let the page load, then: Ctrl+, opens its settings with the focus
-        # on "Back to search"; Tab goes to العربية, English, the digits
-        # switch, then "Back to the classic look".
+        # Let the page load, open its settings (the gear button, found with
+        # UI Automation, else Ctrl+,), then click "Back to the classic look"
+        # with the mouse where UI Automation says it is.
         Start-Sleep -Seconds 8
         Focus-Window $win.Handle
         [void][N]::PostMessage($win.Handle, 0x001F, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CANCELMODE (the Alt tap)
         Start-Sleep -Milliseconds 300
-        [N]::Chord($VK.CTRL, $VK.COMMA)
-        Start-Sleep -Seconds 1
-        for ($i = 0; $i -lt 4; $i++) { [N]::Chord($VK.TAB); Start-Sleep -Milliseconds 200 }
-        [void](Shot-Client $win 'back-button-focused')
-        [N]::Chord($VK.ENTER)
+        $gear = Find-Uia $win.Handle ([Windows.Automation.ControlType]::Button) '^(Settings|الإعدادات)'
+        if ($gear) { $c = Center $gear; [N]::Click($c[0], $c[1]) } else { Say 'no Settings button in UI Automation; pressing Ctrl+,'; [N]::Chord($VK.CTRL, $VK.COMMA) }
+        $back = Wait-Until { Find-Uia $win.Handle ([Windows.Automation.ControlType]::Button) '^(Back to the classic look|العودة إلى الشكل القديم)$' } 10
+        if (-not $back) { Say ("buttons UI Automation sees: " + ((Uia-Names $win.Handle ([Windows.Automation.ControlType]::Button)) -join ' | ')) }
+        Record 'core' 'the "Back to the classic look" button is on the settings page' ($null -ne $back)
+        [void](Shot-Client $win 'settings-page')
+        if ($back) {
+            $c = Center $back
+            Say "clicking 'Back to the classic look' at $($c[0]),$($c[1])"
+            [N]::Click($c[0], $c[1])
+        }
         $cw = Wait-Until { Classic $script:proc.Id } 10
         $clicked = $null -ne $cw
-        Record 'probe' '"Back to the classic look" by keyboard brings the classic window' $clicked
+        Record 'core' 'clicking "Back to the classic look" brings the classic window' $clicked
         if ($clicked) {
             Start-Sleep -Seconds 2
             $s = Read-Settings
@@ -514,7 +610,8 @@ try {
     Check-Crash '0.10.0 settings'
     Stop-Program
     if (-not $clicked) {
-        Say 'the keys missed the button: writing what it saves (new_ui=0, new_ui_default=1)'
+        # (Already a failure above; the restart check still runs on what
+        # the button saves.)
         Write-Settings 0
     }
     # A restart: the user's choice sticks, the one-time switch is not made again.

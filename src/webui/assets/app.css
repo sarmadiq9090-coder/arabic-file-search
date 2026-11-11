@@ -90,6 +90,8 @@ html[dir="rtl"] .field input:placeholder-shown { direction: rtl; unicode-bidi: i
 
 /* ---------- chips ---------- */
 .chips { display: flex; gap: 8px; padding: 12px 20px; align-items: center; flex-wrap: wrap; }
+.apps { display: flex; gap: 8px; padding: 0 20px 10px; flex-wrap: wrap; }
+.apps .btn { unicode-bidi: plaintext; }
 .chipwrap { position: relative; }
 .chip { height: 32px; display: inline-flex; align-items: center; gap: 7px; padding-inline: 12px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
 .chip svg.i { width: 16px; height: 16px; color: var(--muted); }

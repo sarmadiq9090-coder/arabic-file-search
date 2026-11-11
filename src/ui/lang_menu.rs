@@ -50,7 +50,7 @@ impl App {
             buttons: nwg::MessageButtons::YesNo,
             icons: nwg::MessageIcons::Question,
         };
-        if nwg::modal_message(&self.window, &params) != nwg::MessageChoice::Yes {
+        if self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) != nwg::MessageChoice::Yes {
             self.set_status(lang.pick(
                 "ستظهر الواجهة بالعربية عند تشغيل البرنامج في المرة القادمة.",
                 "The interface will be in English the next time the program starts.",

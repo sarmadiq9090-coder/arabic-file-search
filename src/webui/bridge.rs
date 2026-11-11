@@ -246,6 +246,8 @@ pub enum Request {
     /// Go back to the classic window, now and from the next start («العودة
     /// إلى الشكل القديم» in the settings).
     ClassicLook {},
+    /// Start app `id` of those offered for search `seq` ([`Outbound::Apps`]).
+    App { seq: u64, id: u32 },
     /// Open the program's Options menu (the classic window's, with its
     /// tools, support, updates and quick-search settings) at the pointer.
     OptionsMenu {},
@@ -502,6 +504,12 @@ pub enum Outbound {
     /// A short message for the status bar.
     Notice {
         text: String,
+    },
+    /// The apps search `seq`'s text names strongly (as the classic window's
+    /// app buttons), by title; the page asks for one by its place.
+    Apps {
+        seq: u64,
+        apps: Vec<String>,
     },
 }
 
@@ -861,6 +869,17 @@ pub struct Found {
     pub lines: Vec<(u32, String)>,
 }
 
+/// A row as "Export results" writes it (the classic window's CSV columns).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportRow {
+    pub path: String,
+    /// `None` for a folder.
+    pub size: Option<u64>,
+    pub mtime: i64,
+    /// The matching text, for a search inside documents.
+    pub snippet: String,
+}
+
 /// The rows a search found, kept to answer the page's later requests.
 pub struct Shown {
     pub seq: u64,
@@ -952,6 +971,20 @@ impl Shown {
         }
         let i = *self.hits.get(id as usize)?;
         self.index.entries.get(i as usize).map(|e| &*e.path)
+    }
+
+    /// Every row as "Export results" writes it, in the order shown;
+    /// renamed rows with their new path, rows moved to the Recycle Bin left out.
+    pub fn export_rows(&self) -> Vec<ExportRow> {
+        (0..self.hits.len() as u32)
+            .filter_map(|id| {
+                let path = self.path(id)?.to_string();
+                let hit = *self.hits.get(id as usize)?;
+                let e = self.index.entries.get(hit as usize)?;
+                let snippet = self.found.get(&hit).map(|f| f.snippet.clone()).unwrap_or_default();
+                Some(ExportRow { path, size: (!e.is_dir).then_some(e.size), mtime: e.mtime, snippet })
+            })
+            .collect()
     }
 
     /// Whether row `id` is a folder.
@@ -1271,6 +1304,9 @@ mod tests {
         assert_eq!(req(r#""op":"restart""#), Ok(Request::Restart {}));
         assert_eq!(req(r#""op":"classic_look""#), Ok(Request::ClassicLook {}));
         assert_eq!(req(r#""op":"options_menu""#), Ok(Request::OptionsMenu {}));
+        assert_eq!(req(r#""op":"app","seq":4,"id":0"#), Ok(Request::App { seq: 4, id: 0 }));
+        assert_eq!(req(r#""op":"app","seq":4,"id":0,"path":"C:\\x.exe""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"app","seq":4"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"drag","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::Drag { list: List::Results, seq: 2, ver: 3, id: 1 }));
         assert_eq!(req(r#""op":"drag","list":"results","seq":2,"ver":3,"id":1,"path":"C:\\x""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"options_menu","item":3"#), Err(Rejected::Malformed));
@@ -1709,6 +1745,24 @@ mod tests {
         assert_eq!(lists.used_search(List::Recent), None);
         lists.shown.as_mut().unwrap().params.text = "  ".into();
         assert_eq!(lists.used_search(List::Results), None);
+    }
+
+    #[test]
+    fn export_rows_follow_the_list() {
+        let idx = index();
+        let mut shown = Shown::documents(idx.clone(), Query::parse("تقرير"), Params { seq: 1, ver: 1, text: "تقرير".into(), content: true, ..Params::default() });
+        shown.absorb(vec![
+            hit(&idx, "C:\\Users\\Sara\\Documents\\تقرير المبيعات 2026.xlsx", "مبيعات الربع", 2),
+            hit(&idx, "D:\\Projects\\تقرير الصيانة", "", 1),
+            hit(&idx, "C:\\Users\\Sara\\Desktop\\notes.txt", "تقرير", 1),
+        ]);
+        // Renamed and recycled rows since they were listed.
+        shown.changed.insert(0, Some("C:\\Users\\Sara\\Documents\\تقرير نهائي.xlsx".into()));
+        shown.changed.insert(2, None);
+        let rows = shown.export_rows();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0], ExportRow { path: "C:\\Users\\Sara\\Documents\\تقرير نهائي.xlsx".into(), size: Some(48_000), mtime: rows[0].mtime, snippet: "مبيعات الربع".into() });
+        assert_eq!((rows[1].path.as_str(), rows[1].size), ("D:\\Projects\\تقرير الصيانة", None));
     }
 
     #[test]

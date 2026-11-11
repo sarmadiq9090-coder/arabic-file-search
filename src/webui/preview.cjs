@@ -92,7 +92,7 @@ function fakeProgram(cfg) {
     hello: [], search: ["seq", "q", "kind", "size", "date", "content", "sort", "desc"], more: ["seq", "ver", "from"], sort: ["seq", "sort", "desc"], stop: ["seq"],
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id"],
-    save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], classic_look: [], options_menu: [], drag: ["list", "seq", "ver", "id"],
+    save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], classic_look: [], options_menu: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
@@ -166,6 +166,8 @@ function fakeProgram(cfg) {
         }, 40);
       }, 40);
     } else if (m.op === "search") {
+      // The apps the text names (the program's catalog, faked).
+      send({ type: "apps", seq: m.seq, apps: /chrome|كروم/i.test(m.q) ? ["Google Chrome"] : [] });
       const words = m.q.trim().split(/\s+/);
       const term = words[0] === "تقرير" ? "تقرير" : words[0];
       let hits = files.filter((f) => f.name.toLowerCase().includes(term.toLowerCase()) && SIZE_OK[m.size || 0](f) && DATE_OK[m.date || 0](f));
@@ -256,6 +258,8 @@ const SHOTS = [
   // Dragging a row out asks the program to drag that file (once), naming its list version.
   ["drag-en-light", "en", "light", [["type", "report"], ["drag", "#r1"]], { expect: { drags: 1, dialog: false } }],
   ["drag-recent-ar-light", "ar", "light", [["drag", "#rr0"]], { expect: { lastSent: "drag", drags: 1 } }],
+  // A program the search names: a button above the results; a click asks for it by its place.
+  ["apps-ar-light", "ar", "light", [["type", "كروم"], ["wait", 100], ["click", "#apps [data-app=\"0\"]"], ["wait", 50]], { expect: { apps: 1, lastSent: "app" } }],
   // «فتح قائمة الخيارات…»: the program's Options menu (tools, support, updates).
   ["options-menu-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#options-menu"], ["wait", 50]], { expect: { settings: true, lastSent: "options_menu" } }],
   // A name split into base and extension keeps its matches marked, in the extension too.
@@ -359,6 +363,7 @@ const SHOTS = [
         stale: window.__stale.length, q: document.querySelector("#q").value, focus: document.activeElement && document.activeElement.id,
         lastSent: window.__sent.length ? window.__sent[window.__sent.length - 1].op : null,
         drags: window.__sent.filter((m) => m.op === "drag").length,
+        apps: document.querySelectorAll("#apps:not([hidden]) button").length,
       };
     }, lang);
     for (const b of check.bad) errors.push(`${name}: ${b}`);

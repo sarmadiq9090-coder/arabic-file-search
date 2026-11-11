@@ -81,16 +81,14 @@ The updater fails closed: it installs a release only when GitHub publishes a SHA
 
 The new look (`src/ui/webui.rs`) is the default since 0.10.1 where it can run (MSVC build and the WebView2 runtime; otherwise the classic window, silently). `Settings::make_new_look_default` turns `new_ui` on once per settings file (marker `new_ui_default`), so "Back to the classic look" and the fallback after two failed starts stick. What the classic main window has and the new look lacks or does differently (sizes: S small, M medium):
 
-- Thumbnail view (Ctrl+T) and adjustable column widths: classic only (M, S).
-- App buttons above the results when the search names a program: classic only; the Ctrl+Alt+F popup has them (M).
-- Export results to CSV: classic only; the new look has "Copy paths of all results" (S).
+- Thumbnail view (Ctrl+T): classic only; its Options item is greyed out while the new look is in use. Bringing it to the page (thumbnails served by the `instafind://` protocol, a grid with keyboard moves) is more than a day's work (M/L).
+- Adjustable column widths: classic only (S).
 - The Store rating row (Store copies) and its file-open count: classic only (S).
-- Status-bar messages of Options items (e.g. "Checking for updates…", the update download percentage) show only in the classic status bar; message boxes do show over the new look (S).
-- The Options menu (tools, support, updates, Alt+Space, the floating box's modes) is reached from Settings › More › "Open the Options menu…" or the tray's "Settings…", not as native pages (S each).
-- Dragging a result out: asked by the page and done by the program (`Request::Drag`); not yet seen working on real Windows.
-- Screen readers and high contrast: ARIA roles and a `forced-colors` style exist; not tested with Narrator/NVDA.
+- The Options menu (tools, support, updates, Alt+Space, the floating box's modes) opens over the new window from Settings › More › "Open the Options menu…" or the tray's "Settings…" (`webui_options_menu`: owned by the new window, the chosen item passed to the classic window's handlers). Items that work on the main window act on the new look while it is in use: export (the page's results), duplicates (the page's results), folder sizes (the page's folder), hide to the tray; the thumbnail item is greyed out; status-bar messages (update download %, "Exported N results"…) show as the page's notice; switches refresh the page's settings.
+- Dragging a result out (`Request::Drag`): the program drags the file only while the left button is still down over the window (else it logs "drag skipped").
+- Screen readers and high contrast: ARIA roles and a `forced-colors` style exist; the CI test drives the page through UI Automation, but nobody has used it with Narrator/NVDA.
 
-CI: the `ui` job tests the classic window (its settings say `new_ui=0`, `new_ui_default=1`); the `newlook` job ([`ci/newlook-test.ps1`](../ci/newlook-test.ps1), x64 exe on `windows-latest`, `release` waits for it) checks a new user (no settings) gets the new look, its page loads and is painted, `new_ui=0` gives the classic window with "Try the new look", 0.10.0 settings get the new look once, and "Back to the classic look" sticks after a restart (by keyboard; if the keys miss the button, a probe warns and the test writes what it saves). Not exercised: the fallback after a WebView2 crash; the x86 and arm64 exes with the new look. Screenshots and diagnostics are in the `newlook-test` artifact.
+CI: the `ui` job tests the classic window (its settings say `new_ui=0`, `new_ui_default=1`); the `newlook` job ([`ci/newlook-test.ps1`](../ci/newlook-test.ps1), x64 exe on `windows-latest`, `release` waits for it) checks a new user (no settings) gets the new look, its page loads and is painted, `new_ui=0` gives the classic window with "Try the new look", 0.10.0 settings get the new look once, and clicking "Back to the classic look" (found with UI Automation, clicked with the mouse) brings the classic window, which stays after a restart; a plain click on a result selects it and starts no drag, and a real drag onto the page's own search box is a probe. Not exercised: the fallback after a WebView2 crash; the x86 and arm64 exes with the new look. Screenshots and diagnostics are in the `newlook-test` artifact.
 
 ## Testing on Wine
 

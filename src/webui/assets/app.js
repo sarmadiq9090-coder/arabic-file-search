@@ -63,6 +63,7 @@
       sLang: "اللغة", sLangNote: "ستظهر الواجهة باللغة المختارة بعد إعادة تشغيل البرنامج.", restart: "إعادة التشغيل الآن",
       sDisplay: "العرض", sDigits: "عرض الأرقام بالعربية (٠١٢٣)",
       sLook: "الشكل الجديد", sLookSub: "هذا هو الشكل الجديد للبرنامج. يمكنك العودة إلى الشكل القديم متى شئت، والرجوع منه إلى الجديد من «خيارات ← جرّب الشكل الجديد».", classicLook: "العودة إلى الشكل القديم",
+      app: "تطبيق", appsLabel: "برامج بهذا الاسم",
       sMore: "المزيد", sMoreRow: "خيارات أخرى", sMoreSub: "التحقق من التحديثات، الدعم والملاحظات، أدوات مثل الملفات المكررة وأحجام المجلدات، وإعدادات البحث من أي مكان", moreBtn: "فتح قائمة الخيارات…",
       sSearch: "البحث والفهرسة", sHideSystem: "إخفاء ملفات النظام", sHideSystemSub: "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
       sContentIndex: "فهرسة محتوى المستندات في الخلفية", sContentIndexSub: "بحث أسرع داخل الملفات، ويشمل النص في الصور والملفات الممسوحة",
@@ -117,6 +118,7 @@
       sLang: "Language", sLangNote: "The interface changes language after the program restarts.", restart: "Restart now",
       sDisplay: "Display", sDigits: "Show Arabic-Indic digits (٠١٢٣)",
       sLook: "New look", sLookSub: "This is the program's new look. You can go back to the classic look at any time, and come back from Options › Try the new look.", classicLook: "Back to the classic look",
+      app: "App", appsLabel: "Programs by this name",
       sMore: "More", sMoreRow: "More options", sMoreSub: "Check for updates, support and feedback, tools such as duplicate files and folder sizes, and search-from-anywhere settings", moreBtn: "Open the Options menu…",
       sSearch: "Search and indexing", sHideSystem: "Hide system files", sHideSystemSub: "The Windows folder, temporary and cache files",
       sContentIndex: "Index document contents in the background", sContentIndexSub: "Faster search inside files, text in pictures and scans included",
@@ -136,7 +138,7 @@
     rows: [], total: 0, ms: 0, done: true, sel: 0, asked: 0, running: false, isContent: false, contentFor: null,
     progress: "", warnings: [], files: 0, state: "ready", stateText: "",
     recent: [], sugg: [], ssel: 0, view: "empty", note: "", notice: "", resultsScope: "",
-    matches: null, history: { recent: [], saved: [] }, settings: null,
+    matches: null, history: { recent: [], saved: [] }, settings: null, apps: { seq: -1, apps: [] },
   };
 
   const $ = (id) => document.getElementById(id);
@@ -410,6 +412,7 @@
     },
     query(m) { closeSettings(); q.value = m.q; onInput(); },
     focus() { q.focus(); },
+    apps(m) { S.apps = { seq: m.seq, apps: m.apps || [] }; renderApps(); },
     notice(m) {
       S.notice = m.text; renderStatus();
       clearTimeout(handlers.noticeTimer);
@@ -481,7 +484,16 @@
     if (S.view === "nores") renderNoResults();
     renderPreview();
     renderStatus(); renderStop();
-    renderBanner();
+    renderBanner(); renderApps();
+  }
+  // Programs the search names (as the classic window's app buttons): a
+  // click starts one; the page names it by its place in the list sent.
+  function renderApps() {
+    const box = $("apps");
+    const show = S.apps.seq === S.seq && S.apps.apps.length > 0 && S.q.trim() && !S.content && (S.view === "results" || S.view === "nores");
+    box.hidden = !show;
+    if (!show) { box.replaceChildren(); return; }
+    box.replaceChildren(...S.apps.apps.map((title, id) => btn("app", I.open, `${T.app}: ${title}`, () => send({ op: "app", seq: S.apps.seq, id }), { "data-app": String(id) })));
   }
   function rowEl(r, i, listName) {
     const name = plainName(r);

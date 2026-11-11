@@ -137,11 +137,15 @@ mod imp {
         loading_since: Cell<Option<Instant>>,
         /// When the page last said hello, until it fails.
         ready_since: Cell<Option<Instant>>,
+        /// The apps offered for a search: (its seq, its text, the apps).
+        apps: RefCell<(u64, String, Vec<crate::launcher::Item>)>,
         /// The file a drag the page started is for, until the drag starts.
         drag: RefCell<Option<String>>,
         /// The page asked for the Options menu: opened on the next tick, not
         /// inside WebView2's handler (the menu runs a message loop).
         options_pending: Cell<bool>,
+        /// An Options item may have changed a setting the page shows.
+        settings_stale: Cell<bool>,
         /// The program is restarting from the page's own message handler:
         /// the page is left to the process exit, not dropped inside it.
         exiting: Cell<bool>,
@@ -229,6 +233,10 @@ mod imp {
                     match evt {
                         nwg::Event::OnNotice if h == parts.notice => app.on_webui_found(),
                         nwg::Event::OnNotice if h == parts.drag_notice => app.webui_drag(),
+                        // An item of the Options menu opened over this window
+                        // (`webui_options_menu`): it acts in the classic
+                        // window's handlers, where every item is wired.
+                        nwg::Event::OnMenuItemSelected => app.webui_forward_menu(h),
                         nwg::Event::OnWindowClose if h == parts.window => {
                             if let nwg::EventData::OnWindowClose(d) = &data {
                                 d.close(false);
@@ -333,6 +341,8 @@ mod imp {
             }
             // The Options menu (the tray's "Settings…" opens it while the new
             // look is on screen too) offers the other look.
+            // The thumbnail view is the classic list's.
+            self.enable_thumbs_item(!active);
             set_menu_text(
                 &self.menu_new_ui,
                 if active { tr!("العودة إلى الشكل القديم", "Back to the classic look") } else { tr!("جرّب الشكل الجديد", "Try the new look") },
@@ -713,6 +723,11 @@ mod imp {
                         s.sort_col = sort.column();
                         s.sort_desc = desc;
                     }
+                    // The apps the text names, as the classic window's buttons.
+                    let apps = if content { Vec::new() } else { self.app_matches_for(&q) };
+                    let titles = apps.iter().map(|a| a.title.clone()).collect();
+                    self.webui.apps.replace((seq, q.clone(), apps));
+                    self.webui_send(&Outbound::Apps { seq, apps: titles });
                     let params = self.webui_params(Params { seq, text: q, kind, size, date, content, sort, desc, ..Params::default() });
                     if content {
                         self.webui_content(params);
@@ -885,6 +900,18 @@ mod imp {
                 Request::Hide {} => self.webui_hide(),
                 Request::ClassicLook {} => self.webui_leave(true),
                 Request::OptionsMenu {} => self.webui.options_pending.set(true),
+                Request::App { seq, id } => {
+                    let found = {
+                        let apps = self.webui.apps.borrow();
+                        (apps.0 == seq).then(|| apps.2.get(id as usize).cloned().map(|item| (item, apps.1.clone()))).flatten()
+                    };
+                    if let Some((item, text)) = found
+                        && !self.launch_app_item(&item, &text)
+                    {
+                        self.webui_notice(trf!("تعذر فتح: {}", "Could not open: {}", item.title));
+                    }
+                    self.webui_send_history();
+                }
                 Request::Drag { list, seq, ver, id } => {
                     // Started right after this handler returns (the drag
                     // runs its own message loop, not inside WebView2's).
@@ -1029,14 +1056,93 @@ mod imp {
             self.webui_notice(tr!("نُقل الملف إلى سلة المحذوفات.", "The file was moved to the Recycle Bin."));
         }
 
+        /// The program's Options menu over the new window, at the pointer
+        /// (the page's "Open the Options menu…", the tray's "Settings…"):
+        /// owned by the window on screen, so the keyboard comes back to the
+        /// page when it closes; the chosen item is passed to the classic
+        /// window's handlers (`webui_forward_menu`), which act on the new
+        /// look while it is in use. False when the new look is not in use.
+        pub(in super::super) fn webui_options_menu(&self) -> bool {
+            use winapi::shared::windef::POINT;
+            use winapi::um::winuser::{GetCursorPos, TrackPopupMenu};
+            if !self.webui.active.get() {
+                return false;
+            }
+            let (Some(owner), Some((_, menu))) = (self.webui.parts.window.handle.hwnd(), self.options_menu.handle.pop_hmenu()) else { return false };
+            let mut pt = POINT { x: 0, y: 0 };
+            unsafe {
+                GetCursorPos(&mut pt);
+                SetForegroundWindow(owner);
+                TrackPopupMenu(menu, 0, pt.x, pt.y, 0, owner, std::ptr::null());
+            }
+            self.webui.settings_stale.set(true);
+            if let Ok(host) = self.webui.host.try_borrow()
+                && let Some(host) = &*host
+            {
+                host.focus();
+            }
+            true
+        }
+
+        /// Passes an item chosen in the Options menu over the new window to
+        /// the classic window, as if chosen there (nwg's WM_MENUCOMMAND).
+        fn webui_forward_menu(&self, item: nwg::ControlHandle) {
+            use winapi::um::winuser::{GetMenuItemCount, GetMenuItemID, PostMessageW, WM_MENUCOMMAND};
+            let (Some((menu, id)), Some(classic)) = (item.hmenu_item(), self.window.handle.hwnd()) else { return };
+            let n = unsafe { GetMenuItemCount(menu) };
+            if let Some(pos) = (0..n.max(0)).find(|&i| unsafe { GetMenuItemID(menu, i) } == id) {
+                unsafe { PostMessageW(classic, WM_MENUCOMMAND, pos as WPARAM, menu as LPARAM) };
+            }
+        }
+
+        /// The new look's results, while it is in use, for the Options
+        /// items that work on "the results" (export, duplicates).
+        pub(in super::super) fn webui_results(&self) -> Option<Vec<bridge::ExportRow>> {
+            self.webui.active.get().then(|| self.webui.lists.borrow().shown.as_ref().map(|s| s.export_rows()).unwrap_or_default())
+        }
+
+        /// The folder the new look searches ("" for all drives), while it is in use.
+        pub(in super::super) fn webui_scope(&self) -> Option<String> {
+            self.webui.active.get().then(|| self.webui.scope.borrow().clone())
+        }
+
+        /// "Hide to the taskbar tray" while the new look is in use.
+        pub(in super::super) fn webui_hide_main(&self) -> bool {
+            if !self.webui.active.get() {
+                return false;
+            }
+            self.webui_hide();
+            true
+        }
+
+        /// A status-bar message of the classic window (from an Options item,
+        /// an update…) shown in the new look while it is on screen.
+        pub(in super::super) fn webui_status_text(&self, text: &str) {
+            if self.webui_visible() && !text.trim().is_empty() {
+                self.webui_notice(text);
+            }
+        }
+
         /// Drags the file the page asked for (`Request::Drag`), as the
         /// classic list does; nothing happens when the mouse button was
         /// already released.
         fn webui_drag(&self) {
+            use winapi::shared::windef::POINT;
+            use winapi::um::winuser::{GA_ROOT, GetAncestor, GetAsyncKeyState, GetCursorPos, VK_LBUTTON, WindowFromPoint};
             let Some(path) = self.webui.drag.take() else { return };
-            if let Some(h) = self.webui.parts.window.handle.hwnd() {
-                crate::dragdrop::drag_files_from(h, std::slice::from_ref(&path));
+            let Some(h) = self.webui.parts.window.handle.hwnd() else { return };
+            // Only while the left button is still down and the pointer still
+            // over this window: a drag started after the button came up
+            // would drop the file at once wherever the pointer is.
+            let down = unsafe { GetAsyncKeyState(VK_LBUTTON) } as u16 & 0x8000 != 0;
+            let mut pt = POINT { x: 0, y: 0 };
+            let over = unsafe { GetCursorPos(&mut pt) != 0 && GetAncestor(WindowFromPoint(pt), GA_ROOT) == h };
+            if !down || !over {
+                log(&format!("webui: drag skipped (button down: {down}, over the window: {over})"));
+                return;
             }
+            log("webui: drag started");
+            crate::dragdrop::drag_files_from(h, std::slice::from_ref(&path));
         }
 
         /// Windows' folder dialog; the chosen folder becomes the one searched.
@@ -1284,7 +1390,7 @@ mod imp {
                 self.webui.host.replace(None);
             }
             if self.webui.options_pending.replace(false) && self.webui_visible() {
-                self.show_menu(&self.options_menu);
+                self.webui_options_menu();
             }
             if self.webui.active.get() && !self.webui.switching.get() {
                 if let Some(browser_gone) = self.webui.failed.take() {
@@ -1297,6 +1403,9 @@ mod imp {
             }
             if !self.webui.active.get() || !self.webui.ready.get() {
                 return;
+            }
+            if self.webui.settings_stale.replace(false) {
+                self.webui_send_settings();
             }
             self.webui_poll_content();
             if !tick.is_multiple_of(5) {
@@ -1403,6 +1512,24 @@ mod imp {
         pub(in super::super) fn webui_window(&self) -> Option<&nwg::Window> {
             None
         }
+
+        pub(in super::super) fn webui_options_menu(&self) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_results(&self) -> Option<Vec<crate::webui::bridge::ExportRow>> {
+            None
+        }
+
+        pub(in super::super) fn webui_scope(&self) -> Option<String> {
+            None
+        }
+
+        pub(in super::super) fn webui_hide_main(&self) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_status_text(&self, _text: &str) {}
 
         pub(in super::super) fn with_modal_owner<R>(&self, f: impl FnOnce(winapi::shared::windef::HWND) -> R) -> R {
             f(self.window.handle.hwnd().unwrap_or(std::ptr::null_mut()))

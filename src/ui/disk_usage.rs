@@ -224,7 +224,8 @@ impl App {
             let Some(app) = weak.upgrade() else { return };
             match evt {
                 nwg::Event::OnMenuItemSelected if handle == app.disk.menu_options => {
-                    let scope = app.state.borrow().scope.clone();
+                    // (The new look's folder while it is the main window.)
+                    let scope = app.webui_scope().unwrap_or_else(|| app.state.borrow().scope.clone());
                     app.show_disk_usage(scope);
                 }
                 nwg::Event::OnMenuItemSelected if handle == app.disk.menu_row => {

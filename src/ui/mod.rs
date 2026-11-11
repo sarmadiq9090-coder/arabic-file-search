@@ -500,11 +500,17 @@ impl App {
 
     fn set_status(&self, text: &str) {
         self.status.set_text(0, text);
+        // (Seen in the new look too while it is the main window.)
+        self.webui_status_text(text);
     }
 
     // ---------------------------------------------------------------- tray & options
 
     fn hide_to_tray(&self) {
+        // "Hide to the taskbar tray" while the new look is the main window.
+        if self.webui_hide_main() {
+            return;
+        }
         self.remember_query();
         self.window.set_visible(false);
         if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {

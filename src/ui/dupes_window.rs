@@ -402,21 +402,27 @@ impl App {
     fn open_dupes(&self) {
         let d = &self.dupes;
         if d.job.borrow().is_none() {
-            let st = self.state.borrow();
-            let has_results = !self.query.text().trim().is_empty() && !st.rows.is_empty();
-            if has_results {
-                let paths: Vec<String> =
-                    st.rows.iter().filter_map(|r| st.rows_index.entries.get(r.entry as usize)).map(|e| e.path.to_string()).collect();
+            // The results on screen: the new look's while it is the main window.
+            let paths: Vec<String> = match self.webui_results() {
+                Some(rows) => rows.into_iter().map(|r| r.path).collect(),
+                None => {
+                    let st = self.state.borrow();
+                    if self.query.text().trim().is_empty() {
+                        Vec::new()
+                    } else {
+                        st.rows.iter().filter_map(|r| st.rows_index.entries.get(r.entry as usize)).map(|e| e.path.to_string()).collect()
+                    }
+                }
+            };
+            if !paths.is_empty() {
                 let n = paths.len();
                 *d.scope.borrow_mut() = Some(Scope::Paths(Arc::new(paths)));
-                drop(st);
                 d.scope_label.set_text(&trf!(
                     "النطاق: نتائج البحث الحالية ({} نتيجة)",
                     "Scope: the current search results ({} results)",
                     fmt_num(n)
                 ));
             } else {
-                drop(st);
                 if !self.pick_dupes_folder() {
                     return;
                 }
