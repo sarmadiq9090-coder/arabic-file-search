@@ -16,6 +16,9 @@ pub type Stats = HashMap<String, Stat>;
 
 /// At most one walk of the same root this often; more requests wait.
 pub const RESCAN_GAP: Duration = Duration::from_secs(10 * 60);
+/// A root that needs walking again and again (a disk written to non-stop
+/// overflows the watch for hours) is walked at growing intervals, up to this.
+pub const MAX_RESCAN_GAP: Duration = Duration::from_secs(2 * 60 * 60);
 
 /// Every path whose entry `Index::apply_changes` will check on disk.
 pub fn stat_paths(changes: &[Change]) -> impl Iterator<Item = &str> {
@@ -44,13 +47,30 @@ pub fn lookup(stats: &Stats, path: &str, fallback: impl Fn(&str) -> Stat) -> Sta
 /// Paces whole-root walks: a busy disk can overflow the watch buffer every
 /// few seconds, and each overflow asks for a walk of the whole drive.
 /// Requests are never dropped, only postponed, so the index catches up.
+///
+/// The pause after a walk counts from its END ([`finished`](Self::finished))
+/// and grows when the root keeps asking: a walk holds a second set of that
+/// drive's entries in memory and reads the whole drive, so on a PC whose
+/// disks never rest a fixed ten minutes meant walking every drive six times
+/// an hour for ever. Each walk that follows the one before within three of
+/// its pauses doubles the pause (10, 20, 40, 80 minutes, then two hours); a
+/// root left alone for longer starts again at the short one.
 #[derive(Debug)]
 pub struct RescanPace {
     gap: Duration,
-    /// When each root's last walk started.
-    last: HashMap<String, Instant>,
+    max_gap: Duration,
+    /// Each root's last walk.
+    last: HashMap<String, Walked>,
     /// Roots asked for while too soon or already being walked.
     deferred: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Walked {
+    /// When it started, or ended once that is known.
+    at: Instant,
+    /// The pause before the next walk of this root.
+    gap: Duration,
 }
 
 impl Default for RescanPace {
@@ -61,23 +81,43 @@ impl Default for RescanPace {
 
 impl RescanPace {
     pub fn new(gap: Duration) -> Self {
-        RescanPace { gap, last: HashMap::new(), deferred: Vec::new() }
+        RescanPace { gap, max_gap: MAX_RESCAN_GAP.max(gap), last: HashMap::new(), deferred: Vec::new() }
     }
 
     /// True when `root` should be walked now. `busy` means a walk of it is
     /// already running; then, or when the last one started too recently,
     /// the request is kept and comes back from [`due`](Self::due).
     pub fn request(&mut self, root: &str, now: Instant, busy: bool) -> bool {
-        let recent = self.last.get(root).is_some_and(|&t| now.saturating_duration_since(t) < self.gap);
+        let last = self.last.get(root).copied();
+        let recent = last.is_some_and(|w| now.saturating_duration_since(w.at) < w.gap);
         if busy || recent {
             if !self.deferred.iter().any(|r| r == root) {
                 self.deferred.push(root.to_string());
             }
             return false;
         }
-        self.last.insert(root.to_string(), now);
+        // Needed again soon after the last one: the next pause is longer.
+        let gap = match last {
+            Some(w) if now.saturating_duration_since(w.at) < w.gap.saturating_mul(3) => w.gap.saturating_mul(2).min(self.max_gap),
+            _ => self.gap,
+        };
+        self.last.insert(root.to_string(), Walked { at: now, gap });
         self.deferred.retain(|r| r != root);
         true
+    }
+
+    /// The walk of `root` has ended: its pause counts from now. (Counted
+    /// from the start, a walk slower than the pause, on a big busy drive,
+    /// was followed by the next at once.)
+    pub fn finished(&mut self, root: &str, now: Instant) {
+        if let Some(w) = self.last.get_mut(root) {
+            w.at = now;
+        }
+    }
+
+    /// The pause now in force for `root` (for the log).
+    pub fn pause_of(&self, root: &str) -> Duration {
+        self.last.get(root).map_or(self.gap, |w| w.gap)
     }
 
     /// Postponed roots whose turn has come; the others stay postponed.
@@ -423,9 +463,54 @@ mod tests {
         assert!(pace.due(t0 + gap, |_| true).is_empty());
         assert_eq!(pace.due(t0 + gap + Duration::from_secs(1), |_| false), ["C:\\"]);
         assert!(pace.due(t0 + gap + Duration::from_secs(2), |_| false).is_empty(), "only once");
-        // The next request counts from that walk.
+        // The next request counts from that walk, and, coming so soon
+        // after it, waits twice as long.
         assert!(!pace.request("C:\\", t0 + gap + Duration::from_secs(10), false));
-        assert_eq!(pace.due(t0 + gap * 2 + Duration::from_secs(1), |_| false), ["C:\\"]);
+        assert!(pace.due(t0 + gap * 2 + Duration::from_secs(2), |_| false).is_empty());
+        assert_eq!(pace.due(t0 + gap * 3 + Duration::from_secs(1), |_| false), ["C:\\"]);
+    }
+
+    /// A drive that overflows the watch all day: one walk per pause, the
+    /// pause counted from the walk's end and doubling up to two hours; a
+    /// drive that then stays quiet starts again at ten minutes.
+    #[test]
+    fn a_root_that_keeps_asking_is_walked_less_and_less_often() {
+        let base = Duration::from_secs(600);
+        let mut pace = RescanPace::new(base);
+        let walk_takes = Duration::from_secs(240);
+        let mut now = Instant::now();
+        let t0 = now;
+        let mut starts = Vec::new();
+        let mut running_until: Option<Instant> = None;
+        // An overflow every 5 seconds for 12 hours.
+        for _ in 0..(12 * 3600 / 5) {
+            now += Duration::from_secs(5);
+            if running_until.is_some_and(|t| now >= t) {
+                running_until = None;
+                pace.finished("C:\\", now);
+            }
+            let busy = running_until.is_some();
+            let mut started = pace.request("C:\\", now, busy);
+            started |= !pace.due(now, |_| busy).is_empty();
+            if started {
+                assert!(!busy, "two walks of one root at once");
+                starts.push(now.duration_since(t0).as_secs());
+                running_until = Some(now + walk_takes);
+            }
+        }
+        // Pauses between the end of one walk and the start of the next.
+        let pauses: Vec<u64> = starts.windows(2).map(|w| w[1] - w[0] - walk_takes.as_secs()).collect();
+        assert_eq!(&pauses[..5], [600, 1200, 2400, 4800, 7200], "{pauses:?}");
+        assert!(pauses[5..].iter().all(|&p| p == 7200), "{pauses:?}");
+        assert!(starts.len() <= 9, "{} walks in 12 hours (72 with a fixed ten minutes)", starts.len());
+        assert_eq!(pace.pause_of("C:\\"), MAX_RESCAN_GAP);
+        // Quiet for a day, then one overflow: walked at once, short pause again.
+        now += Duration::from_secs(24 * 3600);
+        assert!(pace.request("C:\\", now, false));
+        assert_eq!(pace.pause_of("C:\\"), base);
+        // Another root was never slowed down.
+        assert!(pace.request("D:\\", now, false));
+        assert_eq!(pace.pause_of("D:\\"), base);
     }
 
     #[test]

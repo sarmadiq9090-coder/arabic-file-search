@@ -6,8 +6,9 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use super::{App, State};
+use super::files::SAVES;
 use super::startup::{background_priority, log};
+use super::{App, State};
 use crate::index::{self, Change, Entry, Index, ScanProgress};
 use crate::index_save::RateLog;
 use crate::watch::{self, Watcher};
@@ -16,6 +17,12 @@ use crate::watch_pace::{self, ChangeQueue, RescanPace};
 /// While something else holds the index, each edit copies all of it; then
 /// watcher changes are gathered for this long between edits.
 const COPY_GAP: Duration = Duration::from_secs(10);
+
+/// While a whole drive is being walked again (or its result waits), an edit
+/// that would copy the index makes a third set of that drive's entries: it
+/// waits for the other reader (usually a save being written) instead. Not
+/// longer than this, so that a walk's result is always put in in the end.
+const SHARED_WAIT: Duration = Duration::from_secs(120);
 
 /// What the watcher threads hand over: changes and the stats they took.
 /// Like every queue of changes here it has a size limit, past which it asks
@@ -29,6 +36,8 @@ pub(super) struct Live {
     rescans: RescanPace,
     /// When an edit last had to copy the whole index (see `files::edit_index`).
     pub(super) last_copy: Option<Instant>,
+    /// Since when work has waited for another reader of the index to finish.
+    waiting_since: Option<Instant>,
 }
 
 /// A folder being walked because the watcher could not say what is inside.
@@ -42,6 +51,18 @@ pub(super) struct SubtreeScan {
     /// missed them, so they are applied again on top of its result. Past its
     /// size limit they are dropped and `dir` is walked once more.
     replay: ChangeQueue,
+}
+
+impl SubtreeScan {
+    /// A walk of a whole watched root (`C:\`), as after lost events.
+    fn whole_root(&self) -> bool {
+        self.dir.ends_with('\\')
+    }
+
+    /// The walk has ended and its result waits to be put into the index.
+    fn ready(&self) -> bool {
+        self.result.lock().is_ok_and(|r| r.is_some())
+    }
 }
 
 impl App {
@@ -82,6 +103,7 @@ impl App {
         }
         st.changes.clear();
         st.live.rescans.clear();
+        st.live.waiting_since = None;
         drop(st);
         // Joins the watcher threads, which may be handing over a batch.
         drop(watcher);
@@ -116,19 +138,50 @@ impl App {
 
     /// Applies queued changes and finished folder walks. Also called on every
     /// tick, so work queued while the index was busy runs once it is free.
+    ///
+    /// At most two sets of entries are in memory at any time: when another
+    /// reader holds the index (a save being written, mostly), an edit has to
+    /// copy it, so edits are spaced out (`COPY_GAP`), and while a whole
+    /// drive's second set already exists (its walk running, or done and
+    /// waiting) they wait for that reader to finish (`SHARED_WAIT` at the
+    /// most, so the walk's result always gets in). Before 0.10.1 a walk's
+    /// result was put in at once, copying the index if it was shared: three
+    /// sets of a drive's entries.
     pub(super) fn apply_watched(&self) {
         self.start_due_rescans();
         if !self.index_free() {
             return;
         }
+        {
+            let mut st = self.state.borrow_mut();
+            if st.changes.is_empty() && !st.subtree_scans.iter().any(SubtreeScan::ready) {
+                st.live.waiting_since = None;
+                return;
+            }
+            if self.index_shared(&st) {
+                // Copying a big index for every one-second batch would keep
+                // the UI thread busy; gather them instead (the tick brings
+                // us back).
+                if st.live.last_copy.is_some_and(|t| t.elapsed() < COPY_GAP) {
+                    return;
+                }
+                let now = Instant::now();
+                let since = *st.live.waiting_since.get_or_insert(now);
+                if st.subtree_scans.iter().any(SubtreeScan::whole_root) && now.duration_since(since) < SHARED_WAIT {
+                    return;
+                }
+            }
+            st.live.waiting_since = None;
+        }
         self.finish_subtree_scans();
-        let mut st = self.state.borrow_mut();
-        if st.changes.is_empty() {
+        // Putting a walk's result in may have started a new search of the
+        // list, which reads the index: the changes wait for it (the timer
+        // brings us back) rather than copy the index under it.
+        if !self.index_free() {
             return;
         }
-        // Copying a big index for every one-second batch would keep the UI
-        // thread busy; gather them instead (the tick brings us back).
-        if self.index_shared(&st) && st.live.last_copy.is_some_and(|t| t.elapsed() < COPY_GAP) {
+        let mut st = self.state.borrow_mut();
+        if st.changes.is_empty() {
             return;
         }
         let taken = st.changes.take();
@@ -169,7 +222,7 @@ impl App {
     /// A walk of a whole root after lost events, paced by `RescanPace`.
     fn request_rescan(&self, root: String) {
         let mut st = self.state.borrow_mut();
-        let busy = st.subtree_scans.iter().any(|j| j.dir == root);
+        let busy = st.subtree_scans.iter().any(|j| j.dir == root) || walk_must_wait();
         let now = st.live.rescans.request(&root, Instant::now(), busy);
         drop(st);
         // Otherwise `start_due_rescans` starts it later.
@@ -181,8 +234,9 @@ impl App {
     /// Starts the postponed root walks whose turn has come.
     fn start_due_rescans(&self) {
         let mut st = self.state.borrow_mut();
+        let wait = walk_must_wait();
         let State { subtree_scans, live, .. } = &mut *st;
-        let due = live.rescans.due(Instant::now(), |r| subtree_scans.iter().any(|j| j.dir == r));
+        let due = live.rescans.due(Instant::now(), |r| wait || subtree_scans.iter().any(|j| j.dir == r));
         drop(st);
         for root in due {
             self.start_subtree_scan(root);
@@ -220,15 +274,24 @@ impl App {
 
     fn finish_subtree_scans(&self) {
         let mut done = Vec::new();
-        self.state.borrow_mut().subtree_scans.retain_mut(|j| match j.result.lock().ok().and_then(|mut r| r.take()) {
-            // The walk failed: forget it; a later change can ask again.
-            Some(None) => false,
-            Some(Some(found)) => {
-                done.push((std::mem::take(&mut j.dir), found, j.replay.take()));
+        {
+            let now = Instant::now();
+            let mut st = self.state.borrow_mut();
+            let State { subtree_scans, live, .. } = &mut *st;
+            subtree_scans.retain_mut(|j| {
+                let Some(found) = j.result.lock().ok().and_then(|mut r| r.take()) else { return true };
+                // The pause before the next walk of this folder counts from now.
+                live.rescans.finished(&j.dir, now);
+                if j.whole_root() {
+                    log(&format!("rescan {}: done; the next one waits at least {} min", j.dir, live.rescans.pause_of(&j.dir).as_secs() / 60));
+                }
+                // (`None`: the walk failed. Forget it; a later change can ask again.)
+                if let Some(found) = found {
+                    done.push((std::mem::take(&mut j.dir), found, j.replay.take()));
+                }
                 false
-            }
-            None => true,
-        });
+            });
+        }
         if done.is_empty() {
             return;
         }
@@ -257,6 +320,14 @@ impl App {
             self.request_rescan(dir);
         }
     }
+}
+
+/// A new walk waits while a save is being written: the save holds one set
+/// of entries, and the window may already have had to copy the index because
+/// of it; the walk would add a third. (`RescanPace` keeps the request and
+/// the timer asks again.)
+fn walk_must_wait() -> bool {
+    SAVES.running()
 }
 
 /// Queued changes were dropped because there were too many: a line in the
