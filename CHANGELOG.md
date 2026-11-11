@@ -11,6 +11,7 @@
 - **«أسماء الملفات جاهزة»**: بعد اكتمال قائمة الأسماء وأثناء قراءة محتويات المستندات يقول شريط الحالة ونافذة البحث الصغيرة «أسماء الملفات جاهزة · تُقرأ محتويات المستندات: 36,000 من 432,000» بدل «جارِ الفهرسة…» التي توحي بأن البحث بالاسم غير جاهز. / **English:** once names are indexed the status reads "File names ready · reading inside documents: N of M" instead of a bare "Indexing…".
 - **رسالة إخفاء النافذة أوضح**: عند إغلاق النافذة بـ X لأول مرة تقول الرسالة «بحث سريع ما زال يعمل. افتحه بـ Ctrl+Alt+F. للإغلاق نهائياً: خيارات ← خروج من البرنامج.» بدل «ما زال يعمل هنا» عن أيقونة قد تكون مخفية. / **English:** the one-time balloon after X now says how to open InstaFind again (Ctrl+Alt+F) and how to exit (Options ▸ Exit the program).
 - **سؤال أول تشغيل**: «هل تريد خانة بحث صغيرة فوق شريط المهام؟ يمكنك تغيير ذلك لاحقاً من «خيارات».» (كان يقول «من الإعدادات» والزر اسمه «خيارات»). / **English:** the first-run question now reads "Show a small search box just above the taskbar? You can change this later in Options."
+- **«إخفاء بجانب الساعة»** بدل «إخفاء إلى شريط المهام» في قائمة «خيارات»: النافذة تختفي إلى الأيقونة بجانب الساعة لا إلى شريط المهام. / **English:** the Options item "Hide to the taskbar tray" is now "Hide next to the clock".
 
 ## 0.10.0 — 2026-11-11
 

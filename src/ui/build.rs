@@ -294,7 +294,7 @@ impl NativeUi<AppUi> for App {
             .parent(&app.options_menu)
             .build(&mut app.menu_hide_system)?;
         nwg::MenuItem::builder().text(tr!("تصدير النتائج إلى Excel (CSV)", "Export results to Excel (CSV)")).parent(&app.options_menu).build(&mut app.menu_export)?;
-        nwg::MenuItem::builder().text(tr!("إخفاء إلى شريط المهام\tEsc", "Hide to the taskbar tray\tEsc")).parent(&app.options_menu).build(&mut app.menu_hide)?;
+        nwg::MenuItem::builder().text(tr!("إخفاء بجانب الساعة\tEsc", "Hide next to the clock\tEsc")).parent(&app.options_menu).build(&mut app.menu_hide)?;
         nwg::MenuItem::builder().text(tr!("خروج من البرنامج", "Exit the program")).parent(&app.options_menu).build(&mut app.menu_exit)?;
         nwg::MenuItem::builder()
             .text(&trf!("إظهار البرنامج من أي مكان\t{HOTKEY_TEXT}", "Show the program from anywhere\t{HOTKEY_TEXT}"))
