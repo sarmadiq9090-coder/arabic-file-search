@@ -57,7 +57,7 @@ cargo build --release                       # on Windows: target\release\bahth.e
 # Published exes, as CI builds them on Windows (MSVC, static CRT via .cargo/config.toml):
 cargo build --release --target x86_64-pc-windows-msvc   # bahth.exe
 cargo build --release --target i686-pc-windows-msvc     # bahth-x86.exe
-python ci/check_imports.py bahth.exe                    # no VCRUNTIME / non-system DLL imports
+python ci/check_imports.py bahth.exe                    # no VCRUNTIME / non-system DLL imports, DLLs from System32 only
 # From Linux, a quick mingw check build only: cargo build --release --target x86_64-pc-windows-gnu
 ```
 

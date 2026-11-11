@@ -16,6 +16,10 @@ are kept. Changes against the published crate:
   GDI handles, `GetDC` failed, `dpi()` returned 0 and `physical_to_logical`
   panicked in `muldiv` dividing by it (issue #10).
 - `src/resources/font.rs`, `Font::families()`: releases its screen DC too.
+- `src/win32/mod.rs`, `init_common_controls()`: `Msftedit.dll` (only with the
+  `rich-textbox` feature, which InstaFind does not enable) is loaded with
+  `LoadLibraryExW(..., LOAD_LIBRARY_SEARCH_SYSTEM32)` instead of
+  `LoadLibraryW`, so never from the program's own folder.
 
 To update: copy the new published crate over this folder and re-apply the
-changes above (search for `ReleaseDC`).
+changes above (search for `ReleaseDC` and `LOAD_LIBRARY_SEARCH_SYSTEM32`).

@@ -2,6 +2,11 @@
 
 # سجل التغييرات
 
+## غير منشور (Unreleased)
+
+### أمان
+- **ملفات DLL مزروعة بجانب البرنامج**: كان ويندوز يبحث عن بعض مكتبات النظام (مثل `version.dll`) في مجلد البرنامج أولاً، فلو وُضع ملف بهذا الاسم بجانب `bahth.exe` في «التنزيلات» لعمل مع كل تشغيل. الآن تُحمَّل مكتبات النظام من مجلد System32 فقط، عند بدء التشغيل وأثناء العمل، وفحص البناء يرفض أي نسخة تفقد هذه الحماية. / **DLL planting:** system DLLs now load from System32 only (`/DEPENDENTLOADFLAG:0x800` and `SetDefaultDllDirectories`), never from the exe's folder; CI fails an exe without the flag.
+
 ## 0.10.0 — 2026-11-11
 
 ### الرخصة
