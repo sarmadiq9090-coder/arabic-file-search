@@ -80,7 +80,7 @@ The updater fails closed: it installs a release only when GitHub publishes a SHA
 ## Known gaps
 
 - The new interface (`src/ui/webui.rs`): its window's size and maximized state are not saved; it opens with the classic window's saved size (or where the classic window was when switching).
-- The published x64 and 32-bit exes are mingw builds, which can't host the new interface, so "Try the new look" shows only in MSVC builds: today that is `bahth-arm64.exe` alone. Whether the arm64 exe should offer it is to be decided at release, and the switch (both ways, and the fallback after a WebView2 failure) is to be tested on the `windows-11-arm` runner; the `ui` job runs the mingw x64 exe and does not reach it.
+- All three published exes are MSVC builds and offer "Try the new look". The `ui` job tests the classic window only; the new look is checked by the `newlook` job ([`ci/newlook-test.ps1`](../ci/newlook-test.ps1), x64 exe on `windows-latest`, `release` waits for it): with `new_ui=1` the new window opens, its page loads (no WebView2 failure or blank-page fallback in `log.txt` after the 20 s watchdog), `settings.txt` keeps `new_ui=1` without `new_ui_failed=1`, nothing crashes and the window is painted; with `new_ui=0` the classic window opens and its Options menu starts with "Try the new look". Choosing it (switching without a restart) is only a probe there, and neither the way back nor the fallback after a WebView2 crash is exercised; the x86 and arm64 exes are not run with the new look. Screenshots and diagnostics are in the `newlook-test` artifact.
 
 ## Testing on Wine
 

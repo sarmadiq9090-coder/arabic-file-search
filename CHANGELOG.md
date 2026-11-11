@@ -2,7 +2,7 @@
 
 # سجل التغييرات
 
-## غير منشور (Unreleased)
+## 0.10.0 — 2026-11-11
 
 ### الرخصة
 - InstaFind أصبح برنامجاً مملوكاً (مجانياً)؛ إشعارات الأطراف الثالثة دون تغيير. / **Licence:** InstaFind is now proprietary (free); third-party notices unchanged.
