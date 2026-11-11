@@ -1,10 +1,23 @@
+# The published exes are built with MSVC (build.yml, jobs `exe` and
+# `exe-arm64`): bahth.exe (x86_64), bahth-x86.exe (i686) and bahth-arm64.exe
+# (aarch64). Link the C runtime statically so the single exe runs on PCs
+# without the Visual C++ Redistributable (no VCRUNTIME140*.dll, MSVCP*.dll or
+# api-ms-win-crt-*.dll imports). CI checks every exe's imports with
+# ci/check_imports.py.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.i686-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+# mingw cross-builds from Linux, for local checks only (nothing published is
+# built this way any more; the screenshot workflows media.yml and
+# quick-shots.yml still use it).
 [target.x86_64-pc-windows-gnu]
 linker = "x86_64-w64-mingw32-gcc"
 
 [target.i686-pc-windows-gnu]
 linker = "i686-w64-mingw32-gcc"
-
-# The ARM64 exe is built with MSVC (build.yml); link the C runtime statically
-# so the single exe runs without the Visual C++ redistributable.
-[target.aarch64-pc-windows-msvc]
-rustflags = ["-C", "target-feature=+crt-static"]

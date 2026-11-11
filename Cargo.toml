@@ -3,6 +3,8 @@ name = "bahth"
 version = "0.9.1"
 edition = "2024"
 description = "بحث سريع - برنامج بحث سريع عن الملفات وداخل المستندات لويندوز"
+license-file = "LICENSE"
+publish = false
 
 [dependencies]
 bincode = "1.3"
