@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
 
 PackageIdentifier: Sarmad.InstaFind
-PackageVersion: 0.9.1
+PackageVersion: 0.10.0
 PackageLocale: en-US
 Publisher: Sarmad
 PublisherUrl: https://github.com/sarmadiq9090-coder
@@ -10,9 +10,9 @@ PublisherSupportUrl: https://github.com/sarmadiq9090-coder/arabic-file-search/is
 Author: Sarmad
 PackageName: InstaFind
 PackageUrl: https://github.com/sarmadiq9090-coder/arabic-file-search
-License: MIT
+License: Proprietary (free)
 LicenseUrl: https://github.com/sarmadiq9090-coder/arabic-file-search/blob/main/LICENSE
-Copyright: "Copyright (c) 2026 Saif Second"
+Copyright: "Copyright (c) 2026 Sarmad. All rights reserved."
 ShortDescription: "Instant file search for Windows, in Arabic and English, even inside documents."
 Description: |-
   InstaFind (بحث سريع) indexes all your drives once and shows results while you type, even with millions of files.
@@ -32,7 +32,7 @@ Tags:
 - desktop-search
 - portable
 - rust
-ReleaseNotesUrl: https://github.com/sarmadiq9090-coder/arabic-file-search/releases/tag/v0.9.1
+ReleaseNotesUrl: https://github.com/sarmadiq9090-coder/arabic-file-search/releases/tag/v0.10.0
 Documentations:
 - DocumentLabel: README
   DocumentUrl: https://github.com/sarmadiq9090-coder/arabic-file-search#english

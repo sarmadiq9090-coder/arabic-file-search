@@ -3,7 +3,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>instafind</id>
-    <version>0.9.1</version>
+    <version>0.10.0</version>
     <packageSourceUrl>https://github.com/sarmadiq9090-coder/arabic-file-search/tree/main/packaging/chocolatey</packageSourceUrl>
     <owners>Sarmad</owners>
     <title>InstaFind — بحث سريع</title>
@@ -29,7 +29,7 @@ Single portable exe, no installer. Data lives in %LOCALAPPDATA%\BahthSari. The i
 - Use `choco upgrade instafind` to update. The app's own update prompt cannot replace the exe in the Chocolatey folder without administrator rights.
 - Uninstalling leaves the user data in `%LOCALAPPDATA%\BahthSari` and `HKCU\Software\BahthSari`.
 ]]></description>
-    <releaseNotes>https://github.com/sarmadiq9090-coder/arabic-file-search/releases/tag/v0.9.1</releaseNotes>
+    <releaseNotes>https://github.com/sarmadiq9090-coder/arabic-file-search/releases/tag/v0.10.0</releaseNotes>
   </metadata>
   <files>
     <file src="tools\**" target="tools" />
