@@ -497,11 +497,15 @@ impl App {
             st.content = None;
         }
         drop(st);
-        if done {
-            self.sort_rows_in_place();
-        }
+        // The end of the search puts the rows in order: the selection goes
+        // with its file, so Enter or Delete never acts on the file that took
+        // its row number.
+        let moved = done.then(|| self.sort_rows_in_place(self.list.selected_item()));
         if changed || done {
             self.refresh_list();
+        }
+        if let Some(row) = moved {
+            self.select_row(row);
         }
         if done {
             self.stop_btn.set_enabled(false);

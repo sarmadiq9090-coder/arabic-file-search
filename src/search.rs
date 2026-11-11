@@ -1404,6 +1404,31 @@ pub fn sort_hits(entries: &[Entry], hits: &mut [u32], key: SortKey, descending: 
     hits.par_iter_mut().zip(keyed.par_iter()).for_each(|(h, &(_, i))| *h = i);
 }
 
+/// Puts the rows of a search inside documents in order `key` (path order for
+/// [`SortKey::Relevance`]: document hits have no score) and returns where the
+/// row at `selected` went. The caller moves the selection there: left on its
+/// old row number it would now be on another file, and Enter or Delete would
+/// act on that one. `entry_of` gives a row's index into `entries`.
+pub fn sort_rows<R>(
+    entries: &[Entry],
+    rows: &mut Vec<R>,
+    entry_of: impl Fn(&R) -> u32,
+    key: SortKey,
+    descending: bool,
+    selected: Option<usize>,
+) -> Option<usize> {
+    let selected = selected.and_then(|i| rows.get(i)).map(&entry_of);
+    let mut hits: Vec<u32> = rows.iter().map(&entry_of).collect();
+    if key == SortKey::Relevance {
+        hits.sort_unstable();
+    } else {
+        sort_hits(entries, &mut hits, key, descending);
+    }
+    let mut by_entry: std::collections::HashMap<u32, R> = rows.drain(..).map(|r| (entry_of(&r), r)).collect();
+    rows.extend(hits.into_iter().filter_map(|entry| by_entry.remove(&entry)));
+    selected.and_then(|entry| rows.iter().position(|r| entry_of(r) == entry))
+}
+
 /// Byte ranges `[start, end)` of `name` (the original, un-normalised name)
 /// covered by any occurrence of any alternative of any term, whole word,
 /// proximity word or regex, sorted and merged. Diacritics right after a match

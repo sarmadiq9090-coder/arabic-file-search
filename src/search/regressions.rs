@@ -140,3 +140,40 @@ fn dot_names_and_the_type_filter() {
     assert_eq!(with_kind(".ssh", KIND_FOLDERS), vec![4]);
     assert_eq!(with_kind(".pdf", 1), vec![11]);
 }
+
+// ------------------------------- the selection when document rows are sorted
+
+/// When a search inside documents ends its rows are put in order. The
+/// selection must go with its file: left on its row number, Enter or Delete
+/// acted on whichever file took that row.
+#[test]
+fn sorting_document_rows_keeps_the_selected_file() {
+    let entries = dot_entries();
+    // Rows in the order the search found them, each with its own payload.
+    let found = || vec![(5u32, "e"), (9, "j"), (0, "a"), (12, "m")];
+    let path = |rows: &[(u32, &str)], i: usize| entries[rows[i].0 as usize].path.clone();
+    for key in [SortKey::Relevance, SortKey::Name, SortKey::Path, SortKey::Size, SortKey::Date] {
+        for desc in [false, true] {
+            for selected in 0..4 {
+                let mut rows = found();
+                let before = path(&rows, selected);
+                let now = sort_rows(&entries, &mut rows, |r| r.0, key, desc, Some(selected)).unwrap();
+                assert_eq!(path(&rows, now), before, "{key:?} {desc} {selected}");
+                // Every row is still there, with its own payload.
+                let mut all = rows.clone();
+                all.sort_unstable();
+                assert_eq!(all, vec![(0, "a"), (5, "e"), (9, "j"), (12, "m")]);
+            }
+        }
+    }
+    // Path order (best match for documents): the row found second is last but one…
+    let mut rows = found();
+    assert_eq!(sort_rows(&entries, &mut rows, |r| r.0, SortKey::Relevance, false, Some(1)), Some(2));
+    assert_eq!(rows, vec![(0, "a"), (5, "e"), (9, "j"), (12, "m")]);
+    // …and its old row number now shows another file (what Enter used to open).
+    assert_ne!(rows[1], found()[1]);
+    // Nothing selected, or a row that is not there: nothing selected after.
+    assert_eq!(sort_rows(&entries, &mut found(), |r| r.0, SortKey::Name, false, None), None);
+    assert_eq!(sort_rows(&entries, &mut found(), |r| r.0, SortKey::Name, false, Some(9)), None);
+    assert_eq!(sort_rows(&entries, &mut Vec::<(u32, &str)>::new(), |r| r.0, SortKey::Name, true, Some(0)), None);
+}

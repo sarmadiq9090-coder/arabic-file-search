@@ -5,6 +5,7 @@
 ## غير منشور (Unreleased)
 
 ### إصلاحات البحث
+- **التحديد يبقى على ملفه** عند انتهاء «البحث داخل المستندات»: كانت النتائج تُرتَّب والتحديد يبقى على رقم الصف، فيفتح Enter أو يحذف Delete ملفاً آخر. / **The selection stays on its file** when a search inside documents ends and its rows are sorted; Enter or Delete could act on another file.
 - **الأسماء التي تبدأ بنقطة** تُوجد الآن: «`.gitignore`» و«`.env`» و«`.ssh`» (ملفات ومجلدات) و«`.net framework`»، وكان البرنامج يعدّ الكلمة بعد النقطة امتداداً فلا يجد شيئاً. و«`ext:.pdf`» يعمل مثل «`ext:pdf`»، و«`*.*`» يعني كل الأنواع. / **Names that start with a dot** (`.gitignore`, `.env`, `.ssh`, `.net framework`) are found; `ext:.pdf` works like `ext:pdf`, and `*.*` means every type.
 - **`regex:` ونهاية السطر**: «`regex:…$`» داخل المستندات يطابق الآن نهاية السطور المنتهية بـ `\r\n` (أغلب ملفات النصوص في ويندوز)، وكان لا يطابقها أبداً. / `regex:…$` now matches at the end of CRLF lines inside documents.
 

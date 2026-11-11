@@ -2,7 +2,6 @@
 //! virtual list's cell text, icons and match highlighting.
 
 use native_windows_gui as nwg;
-use std::collections::HashMap;
 use std::io::Write;
 
 use winapi::shared::minwindef::LPARAM;
@@ -184,7 +183,7 @@ impl App {
         }
         self.show_sort_arrow();
         if self.content_mode() || self.state.borrow().content.is_some() {
-            self.sort_rows_in_place();
+            self.sort_rows_in_place(None);
             self.clear_selection();
             self.refresh_list();
         } else {
@@ -205,19 +204,23 @@ impl App {
         }
     }
 
-    /// Sorts the current rows (used for document-search results).
-    pub(super) fn sort_rows_in_place(&self) {
+    /// Sorts the current rows (used for document-search results) and
+    /// returns where row `selected` went, for [`App::select_row`].
+    pub(super) fn sort_rows_in_place(&self, selected: Option<usize>) -> Option<usize> {
         let (key, desc) = self.sort_key();
         let mut st = self.state.borrow_mut();
-        let mut hits: Vec<u32> = st.rows.iter().map(|r| r.entry).collect();
-        if key == SortKey::Relevance {
-            // Document hits have no score; path order is the neutral order.
-            hits.sort_unstable();
-        } else {
-            search::sort_hits(&st.rows_index.entries, &mut hits, key, desc);
+        let st = &mut *st;
+        search::sort_rows(&st.rows_index.entries, &mut st.rows, |r: &Row| r.entry, key, desc, selected)
+    }
+
+    /// Moves the selection to `row` (to nothing for `None`) after the rows
+    /// were put in another order, so it stays on the same file.
+    pub(super) fn select_row(&self, row: Option<usize>) {
+        self.clear_selection();
+        if let Some(i) = row {
+            self.list.select_item(i, true);
         }
-        let mut by_entry: HashMap<u32, Row> = st.rows.drain(..).map(|r| (r.entry, r)).collect();
-        st.rows = hits.into_iter().filter_map(|entry| by_entry.remove(&entry)).collect();
+        self.show_selected_path();
     }
 
     /// Opens a window listing every matching line of the selected document.
