@@ -87,7 +87,7 @@ use crate::settings::Settings;
 use files::flush_index_save;
 use format::ARABIC_DIGITS;
 use history_menu::HistoryMenu;
-use keys::HOTKEY_ID;
+use keys::{HOTKEY_ID, HOTKEY_TEXT};
 use search_jobs::NameResult;
 use startup::{LOOP_STARTED, activate_running_copy, phase, ui_font_family};
 use updates::UpdateEvent;
@@ -511,8 +511,11 @@ impl App {
         self.remember_query();
         self.window.set_visible(false);
         if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
+            // The hotkey, unless another program has it (its menu item is
+            // greyed then).
+            let hotkey = self.menu_hotkey.enabled().then_some(HOTKEY_TEXT);
             self.tray.show(
-                tr!("البرنامج ما زال يعمل هنا. انقر الأيقونة أو شغّل البرنامج مرة أخرى لإظهاره فوراً.", "The program is still running here. Click the icon or start the program again to show it at once."),
+                &crate::quick::hidden_hint(crate::i18n::current(), hotkey),
                 Some(title()),
                 None,
                 None,

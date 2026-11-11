@@ -896,9 +896,52 @@ pub fn has_round_corners(build: u32) -> bool {
     build >= 22000
 }
 
+// ------------------------------------------------------------------ texts
+
+/// The one-time balloon when the window's close button hides it: the
+/// program is still running, how to open it again (`hotkey`, or the icon by
+/// the clock when another program has the hotkey), and how to really close
+/// it. It used to say "still running here", about an icon Windows usually
+/// tucks away.
+pub fn hidden_hint(lang: crate::i18n::Lang, hotkey: Option<&str>) -> String {
+    use crate::i18n::Lang;
+    match (lang, hotkey) {
+        (Lang::Ar, Some(key)) => format!("بحث سريع ما زال يعمل. افتحه بـ {key}. للإغلاق نهائياً: خيارات ← خروج من البرنامج."),
+        (Lang::Ar, None) => "بحث سريع ما زال يعمل. افتحه من أيقونته بجانب الساعة. للإغلاق نهائياً: خيارات ← خروج من البرنامج.".to_string(),
+        (Lang::En, Some(key)) => format!("InstaFind is still running. Open it with {key}. To close it completely: Options ▸ Exit the program."),
+        (Lang::En, None) => "InstaFind is still running. Open it from its icon next to the clock. To close it completely: Options ▸ Exit the program.".to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_hidden_window_balloon_says_how_to_open_and_how_to_exit() {
+        use crate::i18n::Lang;
+        assert_eq!(
+            hidden_hint(Lang::Ar, Some("Ctrl+Alt+F")),
+            "بحث سريع ما زال يعمل. افتحه بـ Ctrl+Alt+F. للإغلاق نهائياً: خيارات ← خروج من البرنامج."
+        );
+        assert_eq!(
+            hidden_hint(Lang::En, Some("Ctrl+Alt+F")),
+            "InstaFind is still running. Open it with Ctrl+Alt+F. To close it completely: Options ▸ Exit the program."
+        );
+        for lang in [Lang::Ar, Lang::En] {
+            // Without the hotkey (another program has it) no key is promised.
+            let t = hidden_hint(lang, None);
+            assert!(!t.contains("Ctrl") && t.contains(lang.pick("بجانب الساعة", "next to the clock")), "{t}");
+            for key in [None, Some("Ctrl+Alt+F")] {
+                let t = hidden_hint(lang, key);
+                // The Options menu's own words for leaving, and no vague "here".
+                assert!(t.contains(lang.pick("خيارات ← خروج من البرنامج", "Options ▸ Exit the program")), "{t}");
+                assert!(!t.contains("هنا") && !t.contains(" here"), "{t}");
+            }
+        }
+        // The balloon is right-to-left in Arabic: it starts with an Arabic letter.
+        assert!(hidden_hint(Lang::Ar, None).starts_with('ب'));
+    }
 
     #[test]
     fn quoted_query_keeps_its_reading_order() {

@@ -9,6 +9,7 @@
 - **لا مربعات منقّطة حول المسارات**: كانت المسارات في قائمة النتائج ونافذة البحث الصغيرة والنوافذ الأخرى تظهر بين مربعين منقّطين («LRI» و«PDI») في ويندوز؛ تبقى المسارات من اليسار إلى اليمين بعلامات لا يرسمها ويندوز. / **English:** no dotted "LRI"/"PDI" boxes around paths; they stay left-to-right with marks Windows does not draw.
 - **عنوان عمود «النص المطابق» يظهر كاملاً**: الأعمدة الافتراضية كانت أعرض من النافذة (1310 بكسل في نافذة 1100) فيُقصّ آخرها؛ الآن تتوزّع على عرض القائمة ما دمت لم تغيّر عرضها بنفسك (الحجم والتاريخ يحتفظان بعرضهما). / **English:** the default column widths fit the list, so the "Matching text" header is no longer cut; widths you set yourself are kept.
 - **«أسماء الملفات جاهزة»**: بعد اكتمال قائمة الأسماء وأثناء قراءة محتويات المستندات يقول شريط الحالة ونافذة البحث الصغيرة «أسماء الملفات جاهزة · تُقرأ محتويات المستندات: 36,000 من 432,000» بدل «جارِ الفهرسة…» التي توحي بأن البحث بالاسم غير جاهز. / **English:** once names are indexed the status reads "File names ready · reading inside documents: N of M" instead of a bare "Indexing…".
+- **رسالة إخفاء النافذة أوضح**: عند إغلاق النافذة بـ X لأول مرة تقول الرسالة «بحث سريع ما زال يعمل. افتحه بـ Ctrl+Alt+F. للإغلاق نهائياً: خيارات ← خروج من البرنامج.» بدل «ما زال يعمل هنا» عن أيقونة قد تكون مخفية. / **English:** the one-time balloon after X now says how to open InstaFind again (Ctrl+Alt+F) and how to exit (Options ▸ Exit the program).
 
 ## 0.10.0 — 2026-11-11
 
