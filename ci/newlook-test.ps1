@@ -115,10 +115,14 @@ public static class N {
     }
     // The client area in screen pixels: x, y, width, height.
     public static int[] ClientOnScreen(IntPtr h) {
+        // Both corners: in a right-to-left (mirrored) window the client
+        // origin is the top RIGHT corner on screen.
         RECT r; GetClientRect(h, out r);
-        var p = new POINT();
-        ClientToScreen(h, ref p);
-        return new[] { p.X, p.Y, r.Right - r.Left, r.Bottom - r.Top };
+        var a = new POINT(); a.X = r.Left; a.Y = r.Top;
+        var b = new POINT(); b.X = r.Right; b.Y = r.Bottom;
+        ClientToScreen(h, ref a);
+        ClientToScreen(h, ref b);
+        return new[] { Math.Min(a.X, b.X), Math.Min(a.Y, b.Y), Math.Abs(b.X - a.X), Math.Abs(b.Y - a.Y) };
     }
 }
 '@
@@ -378,12 +382,17 @@ try {
         $items = @()
         $menu = $null
         if ($options) {
-            for ($try = 1; $try -le 2 -and -not $menu; $try++) {
+            # Focus-Window's Alt tap can leave the window in menu mode, where
+            # a popup menu closes at once: leave that mode first.
+            [void][N]::PostMessage($cw.Handle, 0x001F, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CANCELMODE
+            Start-Sleep -Milliseconds 500
+            for ($try = 1; $try -le 3 -and -not $menu; $try++) {
                 [void][N]::PostMessage($options.Handle, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
                 $menu = Wait-Until { Open-Menu } 6
             }
             if ($menu) { $items = @([N]::MenuItems($menu.Handle)); Say ("Options items: " + ($items -join ' / ')) }
         }
+        if ($options -and -not $menu) { Say 'no popup menu window (#32768) after clicking Options'; Diagnostics 'options menu did not open' }
         $first = if ($items.Count) { $items[0] } else { '' }
         Record 'core' 'the Options menu offers "Try the new look"' ($first -match 'Try the new look|جرّب الشكل الجديد') $(if ($options) { "first item '$first'" } else { 'no Options button' })
         Full-Shot 'classic-options'
