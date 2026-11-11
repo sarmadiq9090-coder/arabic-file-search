@@ -52,6 +52,20 @@ impl App {
         }
         let path = self.row_path(row);
         let refuse = path.is_none();
+        // The box starts with the shown text; an Arabic name's has marks
+        // before its extension (`bidi_layout::list_name`): give it the name.
+        if let Some(path) = &path {
+            let name = path.rsplit('\\').next().unwrap_or(path);
+            if crate::bidi_layout::list_name(name, false).1.is_some()
+                && let Some(list) = self.list.handle.hwnd()
+            {
+                let edit = unsafe { SendMessageW(list, winapi::um::commctrl::LVM_GETEDITCONTROL, 0, 0) };
+                if edit != 0 {
+                    let text = shell::wide(name);
+                    unsafe { winapi::um::winuser::SetWindowTextW(edit as _, text.as_ptr()) };
+                }
+            }
+        }
         *self.renaming_path.borrow_mut() = path;
         self.renaming.set(!refuse);
         refuse
@@ -61,9 +75,10 @@ impl App {
     pub(super) fn finish_rename(&self, new_name: Option<String>) -> bool {
         self.renaming.set(false);
         let old = self.renaming_path.borrow_mut().take();
-        let Some(new_name) = new_name.map(|n| n.trim().to_string()) else { return false };
         let Some(old) = old else { return false };
         let old_name = old.rsplit('\\').next().unwrap_or(&old).to_string();
+        // (Without the marks the shown name has, should the box have kept them.)
+        let Some(new_name) = new_name.map(|n| crate::bidi_layout::typed_name(n.trim(), &old_name)) else { return false };
         if new_name.is_empty() || new_name == old_name {
             return false;
         }
@@ -91,8 +106,13 @@ impl App {
             nwg::modal_info_message(&self.window, title(), &trf!("يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد.", "Another file named “{new_name}” already exists in this folder."));
             return false;
         }
-        if let Err(e) = std::fs::rename(&old, &new) {
-            nwg::modal_error_message(&self.window, tr!("خطأ", "Error"), &trf!("تعذر تغيير الاسم:\n{e}", "Could not rename:\n{e}"));
+        // Never over a file that appeared since the check.
+        if let Err(e) = shell::rename_no_replace(&old, &new) {
+            if shell::already_exists(&e) {
+                nwg::modal_info_message(&self.window, title(), &trf!("يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد.", "Another file named “{new_name}” already exists in this folder."));
+            } else {
+                nwg::modal_error_message(&self.window, tr!("خطأ", "Error"), &trf!("تعذر تغيير الاسم:\n{e}", "Could not rename:\n{e}"));
+            }
             return false;
         }
         self.update_index(|idx| {

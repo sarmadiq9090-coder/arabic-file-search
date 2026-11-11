@@ -224,6 +224,25 @@ impl App {
         self.tray.set_icon(&icon);
     }
 
+    /// Ctrl+Alt+F opens the quick search (or the full window), as the
+    /// Options item does; for the new main window's settings.
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))] // only the new window (MSVC) uses it
+    pub(super) fn set_hotkey_quick(&self, quick: bool) {
+        self.quick_menu.hotkey_quick.set_checked(quick);
+        self.state.borrow_mut().settings.hotkey_opens = if quick { HotkeyOpens::Quick } else { HotkeyOpens::Main };
+        self.save_settings();
+    }
+
+    /// Shows or hides the icon by the clock, as the Options item does; for
+    /// the new main window's settings.
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))] // only the new window (MSVC) uses it
+    pub(super) fn set_tray_icon(&self, on: bool) {
+        self.quick_menu.tray_icon.set_checked(on);
+        self.tray.set_visibility(on);
+        self.state.borrow_mut().settings.tray_icon = on;
+        self.save_settings();
+    }
+
     /// Switches the floating box's mode, keeping the menus in step.
     pub(super) fn set_floating_mode(&self, mode: FloatingMode) {
         {
@@ -308,7 +327,7 @@ impl App {
         }
         // Not while a message box of the window is open (the crash report
         // offer, say): its modal loop keeps this tick running.
-        if !asked && tick >= 14 && self.crash_checked.get() && self.window.visible() && self.window.enabled() {
+        if !asked && tick >= 14 && self.crash_checked.get() && self.main_shown() && self.window.enabled() {
             self.ask_floating_once();
         }
     }
@@ -325,7 +344,8 @@ impl App {
             buttons: nwg::MessageButtons::YesNo,
             icons: nwg::MessageIcons::Question,
         };
-        let yes = nwg::modal_message(&self.window, &params) == nwg::MessageChoice::Yes;
+        // Over the new main window when it is the one on screen.
+        let yes = self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) == nwg::MessageChoice::Yes;
         log(&format!("first run: floating box {}", if yes { "on" } else { "off" }));
         self.set_floating_mode(if yes { FloatingMode::Fade } else { FloatingMode::Off });
         if yes {

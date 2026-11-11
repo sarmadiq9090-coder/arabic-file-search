@@ -53,6 +53,10 @@ pub struct Settings {
     pub file_opens: u32,
     /// The one-time Store rating question was shown or answered.
     pub rating_asked: bool,
+    /// Use the new main window (WebView2) instead of the classic one, when
+    /// WebView2 is there (see `crate::webui`). Off by default while it is
+    /// opt-in; `--webui` / `BAHTH_WEBUI=1` turn it on for one launch.
+    pub new_ui: bool,
 }
 
 /// How the floating search box above the clock shows itself.
@@ -141,7 +145,7 @@ impl FloatPos {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Fade, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false }
+        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Fade, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false, new_ui: false }
     }
 }
 
@@ -174,6 +178,7 @@ impl Settings {
                 "move_asked" => s.move_asked = value == "1",
                 "file_opens" => s.file_opens = value.parse().unwrap_or(0),
                 "rating_asked" => s.rating_asked = value == "1",
+                "new_ui" => s.new_ui = value == "1",
                 _ => {}
             }
         }
@@ -183,7 +188,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let cols: Vec<String> = self.columns.iter().map(i32::to_string).collect();
         format!(
-            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\n",
+            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\n",
             self.width,
             self.height,
             self.maximized as u8,
@@ -205,7 +210,8 @@ impl Settings {
             self.floating_asked as u8,
             self.move_asked as u8,
             self.file_opens,
-            self.rating_asked as u8
+            self.rating_asked as u8,
+            self.new_ui as u8
         )
     }
 
@@ -249,7 +255,7 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, file_opens: 7, rating_asked: true };
+        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, file_opens: 7, rating_asked: true, new_ui: true };
         assert_eq!(Settings::parse(&s.to_text()), s);
         for mode in [FloatingMode::Fade, FloatingMode::Hidden, FloatingMode::Off] {
             let s = Settings { floating_mode: mode, ..Settings::default() };
@@ -300,6 +306,9 @@ mod tests {
         assert_eq!((s.file_opens, s.rating_asked), (5, true));
         assert_eq!(Settings::parse("file_opens=-3\nrating_asked=yes").file_opens, 0);
         assert!(!Settings::parse("rating_asked=yes").rating_asked);
+        // The new look is opt-in: off unless explicitly turned on.
+        assert!(!d.new_ui && !Settings::parse("width=900").new_ui && !Settings::parse("new_ui=yes").new_ui && Settings::parse("new_ui=1").new_ui);
+        assert!(!Settings::parse("new_ui=1\nnew_ui=0").new_ui);
         // Positions: six numbers and a real monitor rectangle, else the default place.
         let p = FloatPos { monitor: [0, 0, 2560, 1440], x: 1800, y: 1360 };
         assert_eq!(FloatPos::parse(&p.to_text()), Some(p));

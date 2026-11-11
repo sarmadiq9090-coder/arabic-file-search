@@ -86,6 +86,8 @@ mod update;
 mod watch_pace;
 #[cfg(any(windows, test))]
 mod web;
+#[cfg(any(windows, test))]
+mod webui;
 
 #[cfg(windows)]
 fn main() {

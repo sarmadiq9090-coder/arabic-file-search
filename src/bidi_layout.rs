@@ -59,6 +59,65 @@ pub fn visual_spans(text: &str, widths: &[i32], rtl: bool) -> Option<Vec<(i32, i
     Some(spans)
 }
 
+/// Put before a right-to-left name's extension in the results list: a
+/// right-to-left mark ends the base (its digits included), and a
+/// left-to-right mark starts ".xlsx" as one left-to-right run. Plain marks,
+/// not isolates (LRI…PDI), so every Windows draws them the same.
+pub const EXT_MARKS: &str = "\u{200F}\u{200E}";
+
+/// The byte index of the dot that starts `name`'s extension, when the name
+/// has one worth setting apart: a base that is not empty or blank, and
+/// after its last dot 1 to 16 letters, digits, `_`, `-` or `~`, none of
+/// them right to left. Folders have none.
+pub fn extension_at(name: &str, is_dir: bool) -> Option<usize> {
+    let dot = name.rfind('.')?;
+    let (base, ext) = (&name[..dot], &name[dot + 1..]);
+    let ext_ok = (1..=16).contains(&ext.chars().count()) && ext.chars().all(|c| (c.is_alphanumeric() || matches!(c, '_' | '-' | '~')) && !is_rtl(c));
+    (!is_dir && !base.trim().is_empty() && ext_ok).then_some(dot)
+}
+
+/// Whether `c` is a right-to-left letter or mark (Hebrew, Arabic, Syriac,
+/// Thaana, NKo… and the Arabic presentation forms).
+fn is_rtl(c: char) -> bool {
+    matches!(c, '\u{0590}'..='\u{08FF}' | '\u{FB1D}'..='\u{FDFF}' | '\u{FE70}'..='\u{FEFF}')
+}
+
+/// A file name as the classic results list shows it. Laid out as one piece
+/// in a right-to-left line, «تقرير المبيعات ٢٠٢٦.xlsx» reads "xlsx.٢٠٢٦ …":
+/// the extension's letters at the far left and the dot between them and the
+/// number. When the base starts with a right-to-left letter, [`EXT_MARKS`]
+/// go before the dot, so ".xlsx" stays one left-to-right piece at the end
+/// of the name as it reads (on its left), apart from the number. Names that
+/// start left to right are unchanged. Returns the text and where the marks
+/// went, to move the match ranges after them ([`shift_ranges`]). Display
+/// only: never a name to rename or open.
+pub fn list_name(name: &str, is_dir: bool) -> (String, Option<usize>) {
+    let at = extension_at(name, is_dir).filter(|&dot| {
+        name[..dot].chars().find(|c| c.is_alphabetic()).is_some_and(is_rtl)
+    });
+    match at {
+        Some(dot) => (format!("{}{EXT_MARKS}{}", &name[..dot], &name[dot..]), Some(dot)),
+        None => (name.to_string(), None),
+    }
+}
+
+/// Byte ranges into a name, moved to the same characters in its
+/// [`list_name`] text (`at` is where the marks went).
+pub fn shift_ranges(ranges: Vec<(usize, usize)>, at: Option<usize>) -> Vec<(usize, usize)> {
+    let Some(at) = at else { return ranges };
+    let n = EXT_MARKS.len();
+    let shift = |b: usize| if b >= at { b + n } else { b };
+    // A range ending at the dot ends before the marks; one starting there starts after them.
+    ranges.into_iter().map(|(s, e)| (shift(s), if e > at { e + n } else { e })).collect()
+}
+
+/// The name the user typed in the list's rename box: [`EXT_MARKS`], which
+/// the box may have been given with the shown text, taken out again unless
+/// the file's own name has them.
+pub fn typed_name(typed: &str, old_name: &str) -> String {
+    if old_name.contains(EXT_MARKS) { typed.to_string() } else { typed.replace(EXT_MARKS, "") }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,5 +195,71 @@ mod tests {
         // Huge widths saturate instead of overflowing.
         let s = visual_spans("ab", &[i32::MAX, i32::MAX], false).unwrap();
         assert_eq!(s[1], (i32::MAX, i32::MAX));
+    }
+
+    #[test]
+    fn extensions_set_apart() {
+        assert_eq!(extension_at("تقرير.pdf", false), Some(10));
+        assert_eq!(extension_at("a.tar.gz", false), Some(5));
+        assert_eq!(extension_at("report.pdf", true), None);
+        for none in ["README", ".gitignore", "  .txt", "د. أحمد", "ملف.نص", "a.", "a.b c", "a.verylongextension12"] {
+            assert_eq!(extension_at(none, false), None, "{none}");
+        }
+    }
+
+    #[test]
+    fn right_to_left_names_keep_the_extension_whole() {
+        // The bug: one piece of text, the dot between "xlsx" and the number.
+        assert_eq!(order("تقرير المبيعات ٢٠٢٦.xlsx", true), "xlsx.٢٠٢٦ تاعيبملا ريرقت");
+        // With the marks: ".xlsx" whole, on the left, apart from the number.
+        let (shown, at) = list_name("تقرير المبيعات ٢٠٢٦.xlsx", false);
+        assert_eq!(at, Some("تقرير المبيعات ٢٠٢٦".len()));
+        assert_eq!(shown, "تقرير المبيعات ٢٠٢٦\u{200F}\u{200E}.xlsx");
+        let visible = |s: String| s.replace(['\u{200F}', '\u{200E}'], "");
+        assert_eq!(visible(order(&shown, true)), ".xlsx٢٠٢٦ تاعيبملا ريرقت");
+        assert_eq!(visible(order(&list_name("تقرير 2026.xlsx", false).0, true)), ".xlsx2026 ريرقت");
+        assert_eq!(visible(order(&list_name("التقرير النهائي.pdf", false).0, true)), ".pdfيئاهنلا ريرقتلا");
+        // The first letter decides, not a number before it.
+        assert_eq!(visible(order(&list_name("2026 تقرير.pdf", false).0, true)), ".pdfريرقت 2026");
+        // In the English (left-to-right) list it reads as before.
+        assert_eq!(visible(order(&list_name("تقرير.pdf", false).0, false)), "ريرقت.pdf");
+        assert_eq!(visible(order(&list_name("تقرير ٢٠٢٦.pdf", false).0, false)), order("تقرير ٢٠٢٦.pdf", false));
+    }
+
+    #[test]
+    fn other_names_unchanged() {
+        for name in ["report 2026.xlsx", "Q3 تقرير.pdf", "مجلد.2026", "README", "ملف.نص"] {
+            let is_dir = name == "مجلد.2026";
+            assert_eq!(list_name(name, is_dir), (name.to_string(), None), "{name}");
+        }
+        assert_eq!(order(&list_name("report 2026.xlsx", false).0, true), "report 2026.xlsx");
+    }
+
+    #[test]
+    fn match_ranges_follow_the_marks() {
+        let name = "تقرير 2026.xlsx";
+        let (shown, at) = list_name(name, false);
+        let dot = name.find('.').unwrap();
+        // "تقرير", "2026.x" across the dot, and "xlsx".
+        let ranges = vec![(0, "تقرير".len()), (dot - 4, dot + 2), (dot + 1, name.len())];
+        let moved = shift_ranges(ranges.clone(), at);
+        assert_eq!(&shown[moved[0].0..moved[0].1], "تقرير");
+        assert_eq!(shown[moved[1].0..moved[1].1].replace(EXT_MARKS, ""), "2026.x");
+        assert_eq!(&shown[moved[2].0..moved[2].1], "xlsx");
+        // A range ending at the dot stays before the marks.
+        assert_eq!(shift_ranges(vec![(0, dot)], at), vec![(0, dot)]);
+        assert_eq!(shift_ranges(ranges.clone(), None), ranges);
+        // Every moved range is on character boundaries of the shown text.
+        assert!(moved.iter().all(|&(s, e)| shown.is_char_boundary(s) && shown.is_char_boundary(e)));
+    }
+
+    #[test]
+    fn rename_box_text_loses_the_marks() {
+        let (shown, _) = list_name("تقرير 2026.xlsx", false);
+        assert_eq!(typed_name(&shown, "تقرير 2026.xlsx"), "تقرير 2026.xlsx");
+        assert_eq!(typed_name(&shown.replace("2026", "2027"), "تقرير 2026.xlsx"), "تقرير 2027.xlsx");
+        // A name that really has them keeps them.
+        let odd = format!("a{EXT_MARKS}.txt");
+        assert_eq!(typed_name(&odd, &odd), odd);
     }
 }

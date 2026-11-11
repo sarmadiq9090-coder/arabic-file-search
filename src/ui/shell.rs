@@ -14,6 +14,24 @@ pub fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
+/// Renames `old` to `new`, never over another file: unlike `fs::rename`
+/// (MoveFileExW with MOVEFILE_REPLACE_EXISTING), a file that appears at
+/// `new` after the caller looked makes this fail ([`already_exists`])
+/// instead of being replaced. Changing only the letter case works.
+pub fn rename_no_replace(old: &str, new: &str) -> std::io::Result<()> {
+    let (from, to) = (wide(old), wide(new));
+    if unsafe { winapi::um::winbase::MoveFileExW(from.as_ptr(), to.as_ptr(), 0) } == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
+}
+
+/// Whether `e` says the new name is taken.
+pub fn already_exists(e: &std::io::Error) -> bool {
+    use winapi::shared::winerror::{ERROR_ALREADY_EXISTS, ERROR_FILE_EXISTS};
+    matches!(e.raw_os_error(), Some(c) if c == ERROR_ALREADY_EXISTS as i32 || c == ERROR_FILE_EXISTS as i32)
+}
+
 /// Opens a file with its default program.
 pub fn open(path: &str) -> bool {
     let (verb, file) = (wide("open"), wide(path));

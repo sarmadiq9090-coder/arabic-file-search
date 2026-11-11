@@ -50,6 +50,9 @@ impl App {
             self.show_quick(crate::quick::Anchor::CenterBottom);
             return;
         }
+        if self.webui_toggle() {
+            return;
+        }
         let front = self.window.handle.hwnd().is_some_and(|h| unsafe { GetForegroundWindow() } == h);
         if front && self.window.visible() {
             self.hide_to_tray();

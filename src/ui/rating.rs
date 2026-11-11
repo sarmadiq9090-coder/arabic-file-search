@@ -94,6 +94,10 @@ impl App {
     }
 
     /// From the timer: shows the row once it is due and the moment is calm.
+    /// Classic window only: while the new look (`webui`) is the main window
+    /// this window stays hidden, so `visible` is false and nothing is asked
+    /// (the question waits, still unasked, for the classic window). Opens
+    /// from the new look are not counted yet (TODO with its rating prompt).
     pub(super) fn rating_tick(&self, tick: u32) {
         if self.rating.open.get() || !rating::is_packaged() {
             return;

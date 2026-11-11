@@ -76,15 +76,12 @@ impl App {
             ));
         } else {
             log("feedback: could not open the browser");
-            nwg::modal_info_message(
-                &self.window,
-                title(),
-                &trf!(
-                    "تعذر فتح المتصفح. يمكنك إرسال ملاحظتك من هذه الصفحة:\n{}",
-                    "Could not open the browser. You can send your feedback on this page:\n{}",
-                    format!("{}/issues", feedback::REPO_URL)
-                ),
+            let text = trf!(
+                "تعذر فتح المتصفح. يمكنك إرسال ملاحظتك من هذه الصفحة:\n{}",
+                "Could not open the browser. You can send your feedback on this page:\n{}",
+                format!("{}/issues", feedback::REPO_URL)
             );
+            self.with_modal_owner(|owner| nwg::modal_info_message(nwg::ControlHandle::Hwnd(owner), title(), &text));
         }
     }
 
@@ -115,7 +112,7 @@ impl App {
             buttons: nwg::MessageButtons::YesNo,
             icons: nwg::MessageIcons::Question,
         };
-        if nwg::modal_message(&self.window, &params) != nwg::MessageChoice::Yes {
+        if self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) != nwg::MessageChoice::Yes {
             return;
         }
         let crash = feedback::crash_text(&reports);

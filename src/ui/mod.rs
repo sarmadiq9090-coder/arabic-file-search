@@ -26,6 +26,7 @@
 //! - `tray`: the monochrome tray icon and menu, the new options, first-run question
 //! - `surface`: drawing, theme and DWM helpers of those custom-drawn windows
 //! - `format`, `shell`: text formatting and Windows shell helpers
+//! - `webui`: the new main window (WebView2), opt-in while it is built
 
 mod app_matches;
 mod autostart;
@@ -60,6 +61,7 @@ mod tray;
 mod updates;
 mod watching;
 mod web_server;
+mod webui;
 
 use native_windows_gui as nwg;
 use nwg::NativeUi;
@@ -243,6 +245,9 @@ pub struct App {
     matches_window: nwg::Window,
     matches_text: nwg::TextBox,
     options_menu: nwg::Menu,
+    /// «جرّب الشكل الجديد»: only built when WebView2 is there (MSVC builds).
+    menu_new_ui: nwg::MenuItem,
+    menu_new_ui_sep: nwg::MenuSeparator,
     menu_hotkey: nwg::MenuItem,
     menu_digits: nwg::MenuItem,
     menu_content_index: nwg::MenuItem,
@@ -321,6 +326,9 @@ pub struct App {
     thumbs: thumbs::Thumbs,
     /// Event handlers of the windows created on first use.
     lazy_handlers: lazy::LazyHandlers,
+    /// The new main window, when it replaces this one (see `webui`).
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))]
+    webui: webui::WebUi,
 }
 
 impl App {
@@ -526,7 +534,16 @@ impl App {
         self.window.close();
     }
 
+    /// Whether the main window is on screen: the classic one, or the new
+    /// one when it replaces it (the first-run offers wait for this).
+    fn main_shown(&self) -> bool {
+        self.window.visible() || self.webui_visible()
+    }
+
     fn show_window(&self) {
+        if self.webui_show() {
+            return;
+        }
         self.window.set_visible(true);
         if let Some(h) = self.window.handle.hwnd() {
             unsafe {
@@ -582,6 +599,7 @@ impl App {
         }
         self.unregister_alt_space();
         self.hide_quick();
+        self.webui_close();
         // Gone at once, not left on screen while the index is freed.
         self.destroy_floating();
         nwg::stop_thread_dispatch();

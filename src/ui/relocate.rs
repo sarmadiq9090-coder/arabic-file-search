@@ -140,8 +140,8 @@ impl App {
         let flags = flags | if crate::i18n::is_en() { 0 } else { MB_RTLREADING | MB_RIGHT };
         let caption = tr!("نقل البرنامج إلى مكان دائم", "Move the program to a permanent place");
         let (t, c) = (shell::wide(text), shell::wide(caption));
-        let owner = self.window.handle.hwnd().unwrap_or(std::ptr::null_mut());
-        unsafe { MessageBoxW(owner, t.as_ptr(), c.as_ptr(), flags) == IDYES }
+        // Over the new main window when it is the one on screen.
+        self.with_modal_owner(|owner| unsafe { MessageBoxW(owner, t.as_ptr(), c.as_ptr(), flags) == IDYES })
     }
 }
 

@@ -423,12 +423,13 @@ impl App {
         let t = self.ticks.get().wrapping_add(1);
         self.ticks.set(t);
         self.poll_indexing(t);
+        self.webui_tick(t);
         if t % 18_000 == 50 {
             self.maybe_check_for_update();
         }
         // Offer to report a crash of the last run once the window is up
         // (not while the program waits hidden in the tray).
-        if t >= 10 && !self.crash_checked.get() && self.window.visible() {
+        if t >= 10 && !self.crash_checked.get() && self.main_shown() {
             self.crash_checked.set(true);
             self.offer_crash_report();
         }
@@ -436,7 +437,7 @@ impl App {
         // before the first-run question about the floating box (tick 14 in
         // `quick_tick`, and not while this offer's message box is open), so
         // a copy that moves asks that question from its new place.
-        if t >= 12 && self.crash_checked.get() && !self.move_checked.get() && self.window.visible() && self.window.enabled() {
+        if t >= 12 && self.crash_checked.get() && !self.move_checked.get() && self.main_shown() && self.window.enabled() {
             self.move_checked.set(true);
             self.offer_move();
         }
