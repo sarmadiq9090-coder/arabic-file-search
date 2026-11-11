@@ -22,7 +22,7 @@
       asc: "تصاعدي", desc: "تنازلي",
       cName: "الاسم والمسار", cSize: "الحجم", cDate: "آخر تعديل",
       results: "النتائج", preview: "المعاينة",
-      recent: "فتحتها مؤخراً", recentNone: "الملفات التي تفتحها تظهر هنا.", tryThese: "جرّب هذه",
+      recent: "ملفات فتحتها مؤخراً", recentNone: "الملفات التي تفتحها تظهر هنا.", tryThese: "جرّب هذه",
       trust: "كل شيء يبقى على جهازك. لا نجمع أي بيانات استخدام.",
       tips: [["تقرير .pdf", "ملفات PDF فقط"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"], ['"عقد إيجار"', "العبارة كما هي"], ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["hgjrvdv", "لوحة المفاتيح الخطأ ← «التقرير»"]],
       kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد", kMenu: "إجراءات",
@@ -36,8 +36,10 @@
       noresSub: (n, kind, scope) => `بحثنا في أسماء ${num(n)} ملف ${scope ? `داخل ${scope}` : "في كل الأقراص"}${kind ? `، ضمن «${kind}» فقط` : ""}.`,
       noresSubContent: (scope) => `بحثنا داخل المستندات ${scope ? `في ${scope}` : "في كل الأقراص"}.`,
       noresIx: "الفهرسة ما زالت جارية، وقد يظهر الملف حين تنتهي.",
+      stillIx: "ما زلنا نفهرس ملفاتك…", stillIxSub: "ستظهر النتائج هنا تلقائياً.",
+      switchedText: "هذا الشكل الجديد لبحث سريع. تفضّل القديم؟", dismiss: "إخفاء", matchesPre: "كل التطابقات — ",
       tagHead: "لا شيء يضيع بصمت", tagTail: ": إذا لم نجد شيئاً نقول لك أين بحثنا وماذا تجرّب.",
-      loading: "جارِ تحميل الفهرس…", ixSub: "يمكنك البحث الآن، وقد تكون النتائج ناقصة حتى ننتهي. القائمة تتحدث وحدها.",
+      loading: "جارِ تحميل الفهرس…", ixSub: "يمكنك البحث الآن. قد تكون النتائج ناقصة إلى أن تنتهي الفهرسة، وتكتمل القائمة تلقائياً.",
       moreRows: "مرّر لعرض المزيد", searching: "جارِ البحث داخل المستندات…", pressEnter: "اضغط Enter للبحث داخل المستندات.",
       sugg: { query: "يبحث بهذا النص بدلاً مما كتبت", all_kinds: "يزيل فلتر النوع", all_drives: "يبحث خارج المجلد المختار", contents: "يقرأ نص المستندات أيضاً", web: "يفتح المتصفح، ولا يرسل شيئاً غير ما كتبته" },
       now: "الآن", minAgo: (n) => (n === 1 ? "قبل دقيقة" : n === 2 ? "قبل دقيقتين" : n <= 10 ? `قبل ${num(n)} دقائق` : `قبل ${num(n)} دقيقة`),
@@ -81,7 +83,7 @@
       asc: "ascending", desc: "descending",
       cName: "Name and path", cSize: "Size", cDate: "Modified",
       results: "Results", preview: "Preview",
-      recent: "Recently opened", recentNone: "Files you open show up here.", tryThese: "Try these",
+      recent: "Recently opened files", recentNone: "Files you open show up here.", tryThese: "Try these",
       trust: "Everything stays on your PC. No usage data is collected.",
       tips: [["report .pdf", "PDF files only"], ["size:>10mb", "Bigger than 10 MB"], ["dm:thisweek", "Changed this week"], ['"lease agreement"', "Exact phrase"], ["root: كتاب", "Arabic root: مكتبة، الكاتب"], ["احمد", "Also finds «أحمد»"]],
       kNav: "Move", kOpen: "Open", kFolder: "Folder", kMenu: "Actions",
@@ -95,6 +97,8 @@
       noresSub: (n, kind, scope) => `We searched ${num(n)} file names ${scope ? `in ${scope}` : "on all drives"}${kind ? `, “${kind}” only` : ""}.`,
       noresSubContent: (scope) => `We searched inside documents ${scope ? `in ${scope}` : "on all drives"}.`,
       noresIx: "Indexing is still running; the file may appear when it finishes.",
+      stillIx: "Still indexing your files…", stillIxSub: "Results will appear here by themselves.",
+      switchedText: "This is InstaFind's new look. Prefer the old one?", dismiss: "Dismiss", matchesPre: "All matches — ",
       tagHead: "Nothing gets lost silently", tagTail: ": when we find nothing, we tell you where we looked and what to try.",
       loading: "Loading the index…", ixSub: "You can search now; results may be incomplete until we finish. The list updates by itself.",
       moreRows: "Scroll for more", searching: "Searching inside documents…", pressEnter: "Press Enter to search inside documents.",
@@ -329,6 +333,7 @@
       S.sort = SORTS.includes(m.sort) ? m.sort : "best"; S.desc = !!m.desc;
       S.digits = !!m.digits; S.version = m.version || "";
       renderChips(); renderStatus();
+      if (m.switched) showSwitched();
     },
     results(m) {
       if (m.seq !== S.seq) return; // an older search: the user typed on
@@ -406,7 +411,11 @@
       if (hide && S.q.trim() && !S.content) runSearch();
     },
     status(m) {
+      const was = S.state;
       S.state = m.state; S.stateText = m.text || ""; S.files = m.files;
+      // Indexing ended with nothing listed: search again (the program does
+      // too when its index changes; this covers a list it never sent).
+      if (was !== "ready" && m.state === "ready" && S.view === "nores" && !S.content && S.q.trim()) runSearch();
       renderBanner(); renderStatus();
       if (S.view === "nores") renderNoResults();
     },
@@ -414,9 +423,11 @@
     focus() { q.focus(); },
     apps(m) { S.apps = { seq: m.seq, apps: m.apps || [] }; renderApps(); },
     notice(m) {
-      S.notice = m.text; renderStatus();
+      S.notice = m.text; S.noticeWarn = !!m.warn; renderStatus();
       clearTimeout(handlers.noticeTimer);
-      handlers.noticeTimer = setTimeout(() => { S.notice = ""; renderStatus(); }, 3500);
+      // A problem stays until the next key or click, and is read out.
+      if (m.warn) $("live").textContent = m.text;
+      else handlers.noticeTimer = setTimeout(() => { S.notice = ""; renderStatus(); }, 3500);
     },
   };
   Object.defineProperty(window, "__instafind", { value: Object.freeze({ recv: (m) => { const f = handlers[m && m.type]; if (f) f(m); } }) });
@@ -479,7 +490,9 @@
     if (S.view === "settings") { renderStatus(); renderBanner(); return; }
     if (!S.q.trim()) setView("empty");
     else setView(S.rows.length || S.running ? "results" : "nores");
-    $("meta").textContent = S.q.trim() && !S.running ? T.nres(S.total) : "";
+    // (Not "no results" while the first indexing may still find them.)
+    const waiting = !S.total && !S.isContent && (S.state === "names" || S.state === "loading");
+    $("meta").textContent = S.q.trim() && !S.running && !waiting ? T.nres(S.total) : "";
     if (S.view === "results") { renderCols(); renderRows(refresh); }
     if (S.view === "nores") renderNoResults();
     renderPreview();
@@ -488,6 +501,15 @@
   }
   // Programs the search names (as the classic window's app buttons): a
   // click starts one; the page names it by its place in the list sent.
+  // Once, for someone the update switched from the classic window: what
+  // happened, and the way back in one click.
+  function showSwitched() {
+    const bar = $("switched");
+    const back = btn("primary", I.back, T.classicLook, () => { bar.hidden = true; send({ op: "classic_look" }); }, { id: "switched-back" });
+    const x = btn("icon", I.x, null, () => { bar.hidden = true; q.focus(); }, { "aria-label": T.dismiss, title: T.dismiss, id: "switched-x" });
+    bar.replaceChildren(h("span", null, T.switchedText), back, x);
+    bar.hidden = false;
+  }
   function renderApps() {
     const box = $("apps");
     const show = S.apps.seq === S.seq && S.apps.apps.length > 0 && S.q.trim() && !S.content && (S.view === "results" || S.view === "nores");
@@ -598,6 +620,17 @@
   }
   const SUGG_ICON = { query: I.bulb, all_kinds: I.filter, all_drives: I.folder, contents: I.text, web: I.globe };
   function renderNoResults() {
+    // The first indexing is still under way: say so, not "nothing in 0 files".
+    // The program lists the results by itself when the index is ready.
+    const indexing = !S.isContent && (S.state === "names" || S.state === "loading");
+    $("view-nores").classList.toggle("indexing", indexing);
+    if (indexing) {
+      $("nores-h").textContent = T.stillIx;
+      $("nores-sub").textContent = T.stillIxSub;
+      $("sugg").replaceChildren();
+      q.removeAttribute("aria-activedescendant");
+      return;
+    }
     $("nores-h").textContent = T.noresH(S.q.trim());
     const scope = S.resultsScope ? S.resultsScope : "";
     let sub = S.isContent ? T.noresSubContent(scope) : T.noresSub(S.files, S.kind ? S.kindLabel : "", scope);
@@ -643,7 +676,9 @@
       if (S.warnings.length) text += ` — ${T.note}: ${S.warnings.join(LANG === "ar" ? "، " : "; ")}`;
     } else if (!S.notice && S.content && contentStale() && S.q.trim()) text = T.pressEnter;
     $("status-text").textContent = text;
+    $("status-text").classList.toggle("warn", !!(S.notice && S.noticeWarn));
   }
+  for (const ev of ["keydown", "mousedown"]) document.addEventListener(ev, () => { if (S.notice && S.noticeWarn) { S.notice = ""; S.noticeWarn = false; renderStatus(); } }, true);
   function renderStop() { $("stop").hidden = !S.running; }
   // The result count for screen readers, once typing pauses.
   let liveTimer = 0;
@@ -787,7 +822,7 @@
   function dialog(title, body, buttons, tag) {
     // (Opened from the right-click menu: back to where the focus was before it.)
     dlgFor = tag; dlgBack = document.activeElement && document.activeElement.closest("#ctx") ? ctxBack : document.activeElement;
-    $("dlg-h").textContent = title;
+    $("dlg-h").replaceChildren(...[].concat(title));
     $("dlg-body").replaceChildren(...body);
     $("dlg-btns").replaceChildren(...buttons);
     $("veil").hidden = false;
@@ -829,7 +864,7 @@
     if (m) {
       body.push(h("p", { class: "sub num" }, T.nMatches(m.count) + (m.lines.length < m.count ? " " + T.firstLines(m.lines.length) : "")), linesEl(m, 1000));
     } else body.push(h("p", { class: "sub" }, T.matchesNone));
-    dialog(T.matchesH(plainName(r)), body, [btn("", I.x, T.close, closeDialog)], "matches:" + id);
+    dialog([T.matchesPre, fileName(r.name.map(([t]) => [t, false]), r.folder, "dname")], body, [btn("", I.x, T.close, closeDialog)], "matches:" + id);
     $("dlg-btns").querySelector("button").focus();
   }
   $("veil").addEventListener("mousedown", (e) => { if (e.target === $("veil")) { closeDialog(); e.preventDefault(); } });
@@ -1002,6 +1037,9 @@
     const moves = { ArrowDown: 1, ArrowUp: -1, PageDown: page, PageUp: -page };
     if (e.key in moves && (inBox || inList)) { select(S.sel + moves[e.key]); e.preventDefault(); return; }
     if (ctrl && (e.key === "Home" || e.key === "End")) { select(e.key === "Home" ? 0 : S.rows.length - 1); e.preventDefault(); return; }
+    // Enter in the box moves to the list (as the classic window, where it
+    // searched); there Enter opens. Ctrl+Enter opens the folder from both.
+    if (e.key === "Enter" && inBox && !ctrl) { focusList(); select(S.sel); e.preventDefault(); return; }
     if (e.key === "Enter" && (inBox || inList)) { act(ctrl ? "reveal" : "open", row); e.preventDefault(); return; }
     // The keys of the classic list (in the box, only when no text is selected there).
     const noSelection = inList || q.selectionStart === q.selectionEnd;

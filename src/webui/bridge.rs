@@ -406,6 +406,9 @@ pub enum Outbound {
         /// Write numbers with Arabic-Indic digits.
         digits: bool,
         version: &'static str,
+        /// This start made the new look the default for someone who used
+        /// the classic window: say so once, with the way back.
+        switched: bool,
     },
     Results {
         seq: u64,
@@ -501,9 +504,11 @@ pub enum Outbound {
     },
     /// Put the caret in the search box.
     Focus,
-    /// A short message for the status bar.
+    /// A short message for the status bar; `warn` for a problem (shown
+    /// until the next action, in the warning colour, and read out).
     Notice {
         text: String,
+        warn: bool,
     },
     /// The apps search `seq`'s text names strongly (as the classic window's
     /// app buttons), by title; the page asks for one by its place.
@@ -539,6 +544,15 @@ pub fn status(loading: bool, ix: Indexing, files: usize, lang: Lang) -> Outbound
         _ => "ready",
     };
     Outbound::Status { state, files, text: indexing_status::progress_text(lang, ix, &indexing_status::group_digits) }
+}
+
+/// Whether a status message of the classic window reports a problem (it
+/// then shows as a warning in the new look): "could not…", "wait…", "was
+/// not…", in Arabic or English.
+pub fn looks_like_a_problem(text: &str) -> bool {
+    let t = text.trim_start();
+    ["تعذر", "تعذّر", "لم ", "انتظر", "خطأ"].iter().any(|p| t.starts_with(p))
+        || ["could not", "couldn't", "cannot", "can't", "wait ", "the file was not", "error", "failed"].iter().any(|p| t.to_lowercase().starts_with(p))
 }
 
 /// The recent and saved searches for the history menu.
@@ -1745,6 +1759,16 @@ mod tests {
         assert_eq!(lists.used_search(List::Recent), None);
         lists.shown.as_mut().unwrap().params.text = "  ".into();
         assert_eq!(lists.used_search(List::Results), None);
+    }
+
+    #[test]
+    fn problems_are_told_apart() {
+        for p in ["تعذر التحقق من التحديثات.", "لم يُحذف الملف.", "انتظر حتى تكتمل الفهرسة.", "Could not check for updates.", "Wait until indexing is complete.", "The file was not deleted."] {
+            assert!(looks_like_a_problem(p), "{p}");
+        }
+        for ok in ["تم تصدير 12 نتيجة.", "جاري التحقق من التحديثات…", "Exported 12 results.", "Checking for updates…", "Downloading the update… 40%", ""] {
+            assert!(!looks_like_a_problem(ok), "{ok}");
+        }
     }
 
     #[test]

@@ -143,7 +143,7 @@ function fakeProgram(cfg) {
       }
     }
     if (m.op === "hello") {
-      send({ type: "hello", kinds: KINDS, sizes: SIZES, dates: DATES, kind: 0, sort: "best", desc: false, digits: false, version: "0.9.1" });
+      send({ type: "hello", kinds: KINDS, sizes: SIZES, dates: DATES, kind: 0, sort: "best", desc: false, digits: false, version: "0.9.1", switched: !!cfg.switched });
       send({ type: "scope", path: cfg.scope || "", search: false });
       send(settings); send(status); send(history);
       recentVer = nextVer();
@@ -231,7 +231,20 @@ const SHOTS = [
   ["content-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 250], ["key", "ArrowDown"], ["key", "ArrowUp"], ["wait", 250]], { expect: { content: true, rows: 3 } }],
   ["content-en-dark", "en", "dark", [["click", "#chip-content"], ["type", "lease agreement"], ["key", "Enter"], ["wait", 250], ["wait", 250]], { expect: { content: true, rows: 3 } }],
   ["content-running-ar-dark", "ar", "dark", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 250]], { keepRunning: true, expect: { stop: true } }],
-  ["matches-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 300], ["key", "F4"], ["wait", 150]], { expect: { dialog: true } }],
+  ["matches-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 300], ["key", "F4"], ["wait", 150]], { expect: { dialog: true, dlgName: true } }],
+  // Enter in the box moves to the list (as the classic window); Enter there opens.
+  ["enter-en-light", "en", "light", [["type", "report"], ["key", "Enter"]], { expect: { focus: "list", opens: 0 } }],
+  ["enter-twice-en-light", "en", "light", [["type", "report"], ["key", "Enter"], ["key", "Enter"]], { expect: { opens: 1 } }],
+  // The first indexing, nothing found yet: "still indexing", not "nothing in 0 files".
+  ["indexing-nores-ar-light", "ar", "light", [["type", "zzqq"]], { indexing: true, expect: { view: "view-nores", stillIndexing: true } }],
+  // A classic user switched by the update: told once, with the way back.
+  ["switched-ar-light", "ar", "light", [], { switched: true, expect: { switched: true } }],
+  ["switched-back-en-light", "en", "light", [["click", "#switched-back"], ["wait", 50]], { switched: true, expect: { switched: false, lastSent: "classic_look" } }],
+  // A problem stays, in the warning colour, until the next key.
+  ["warn-en-dark", "en", "dark", [["eval", "window.__instafind.recv({ type: 'notice', text: 'Could not open the file: C:\\\\x.txt', warn: true })"], ["wait", 3800]], { expect: { warn: true } }],
+  ["warn-gone-en-dark", "en", "dark", [["eval", "window.__instafind.recv({ type: 'notice', text: 'Could not open the file', warn: true })"], ["key", "Shift"]], { expect: { warn: false } }],
+  // A Latin search in the Arabic interface stays at the right.
+  ["latin-query-ar-light", "ar", "light", [["type", "report"]], { expect: { qAlign: "right" } }],
   ["filters-ar-light", "ar", "light", [["chip", "size", 2], ["chip", "date", 4], ["chip", "scope", 1], ["type", "تقرير"], ["wait", 100], ["click", '.colbtn[data-sort="size"]'], ["click", '.colbtn[data-sort="size"]'], ["key", "ArrowDown"]], { expect: { chipsOn: 3 } }],
   ["filters-en-light", "en", "light", [["chip", "kind", 1], ["chip", "date", 3], ["type", "report"], ["chip", "sort", 4], ["key", "ArrowDown"]], { expect: { chipsOn: 2 } }],
   ["sort-menu-en-dark", "en", "dark", [["type", "report"], ["click", "#chip-sort"]], { expect: { menu: true } }],
@@ -283,7 +296,7 @@ const SHOTS = [
       if (!file.startsWith(ASSETS) || !fs.existsSync(file)) return route.fulfill({ status: 404, headers, body: "" });
       route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || "application/octet-stream", headers, body: fs.readFileSync(file) });
     });
-    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning });
+    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched });
     await pg.goto(ORIGIN + "/");
     await pg.waitForFunction(() => document.querySelector("#menu-kind") && document.querySelector("#menu-kind").children.length > 0);
     for (const [what, a, b] of steps) {
@@ -337,6 +350,8 @@ const SHOTS = [
         if (b.width === 0 || Math.abs(b.bottom - x.bottom) > 2) continue; // wrapped: no order on one line
         const rtl = /^[^\p{L}]*[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/u.test(base.textContent);
         if (rtl ? x.right > b.left + 1 : x.left < b.right - 1) bad.push(`extension on the wrong side (${rtl ? "rtl" : "ltr"}): ${el.textContent}`);
+        // A right-to-left base and its extension are not glued together.
+        if (rtl && b.left - x.right < 2) bad.push(`extension glued to the name: ${el.textContent}`);
       }
       // Strings that went missing.
       const text = document.body.innerText;
@@ -364,6 +379,12 @@ const SHOTS = [
         lastSent: window.__sent.length ? window.__sent[window.__sent.length - 1].op : null,
         drags: window.__sent.filter((m) => m.op === "drag").length,
         apps: document.querySelectorAll("#apps:not([hidden]) button").length,
+        opens: window.__sent.filter((m) => m.op === "open").length,
+        stillIndexing: document.getElementById("view-nores").classList.contains("indexing"),
+        switched: !document.getElementById("switched").hidden,
+        warn: document.getElementById("status-text").classList.contains("warn"),
+        qAlign: getComputedStyle(document.querySelector("#q")).textAlign,
+        dlgName: !!document.querySelector("#dlg-h .fname"),
       };
     }, lang);
     for (const b of check.bad) errors.push(`${name}: ${b}`);

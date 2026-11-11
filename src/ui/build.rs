@@ -52,11 +52,18 @@ impl Drop for AppUi {
 
 impl NativeUi<AppUi> for App {
     fn build_ui(mut app: App) -> Result<AppUi, nwg::NwgError> {
+        let had_file = Settings::exists();
         let mut settings = Settings::load();
-        // 0.10.1: the new look is the default, once (see the method).
-        if settings.make_new_look_default() {
+        // 0.10.1: the new look is the default, once (see the method); a
+        // classic user is told so once in the new look, with the way back.
+        let was_on = settings.new_ui;
+        let switched = settings.make_new_look_default();
+        if switched {
             super::startup::log("settings: the new look is now the default (once)");
             settings.save();
+        }
+        if Settings::switch_to_tell(had_file, was_on, switched) {
+            app.webui_tell_switch();
         }
         // A size saved on a bigger screen must still fit this one.
         let (max_w, max_h) = work_area();

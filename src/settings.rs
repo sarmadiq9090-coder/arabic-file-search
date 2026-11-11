@@ -172,6 +172,13 @@ impl Settings {
         true
     }
 
+    /// Whether the one-time switch just done changed the look for someone
+    /// who used the classic window (a settings file was there, the new look
+    /// was off): they are told once, with the way back. Not for a new user.
+    pub fn switch_to_tell(had_file: bool, was_on: bool, switched: bool) -> bool {
+        switched && had_file && !was_on
+    }
+
     pub fn parse(text: &str) -> Settings {
         let mut s = Settings::default();
         for line in text.lines() {
@@ -261,6 +268,12 @@ impl Settings {
     #[cfg(windows)]
     fn path() -> std::path::PathBuf {
         crate::index::cache_path().with_file_name("settings.txt")
+    }
+
+    /// Whether a settings file is there (a program run before).
+    #[cfg(windows)]
+    pub fn exists() -> bool {
+        Self::path().is_file()
     }
 
     #[cfg(windows)]
@@ -382,6 +395,15 @@ mod tests {
         assert!(once.make_new_look_default());
         assert!(once.new_ui && once.new_ui_failed);
         assert_eq!(crate::webui::after_failed_start(once.new_ui, once.new_ui_failed), (false, false));
+    }
+
+    #[test]
+    fn only_classic_users_are_told_about_the_switch() {
+        assert!(Settings::switch_to_tell(true, false, true));
+        // A new user, someone who had the new look on, no switch made.
+        assert!(!Settings::switch_to_tell(false, false, true));
+        assert!(!Settings::switch_to_tell(true, true, true));
+        assert!(!Settings::switch_to_tell(true, false, false));
     }
 
     #[test]

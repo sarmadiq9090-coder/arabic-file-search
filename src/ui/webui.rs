@@ -137,6 +137,9 @@ mod imp {
         loading_since: Cell<Option<Instant>>,
         /// When the page last said hello, until it fails.
         ready_since: Cell<Option<Instant>>,
+        /// This start made the new look the default for a classic user: the
+        /// page says so once (`Outbound::Hello`).
+        tell_switch: Cell<bool>,
         /// The apps offered for a search: (its seq, its text, the apps).
         apps: RefCell<(u64, String, Vec<crate::launcher::Item>)>,
         /// The file a drag the page started is for, until the drag starts.
@@ -489,6 +492,12 @@ mod imp {
             ));
         }
 
+        /// Called at start when the one-time switch to the new look changed
+        /// a classic user's setting (`Settings::make_new_look_default`).
+        pub(in super::super) fn webui_tell_switch(&self) {
+            self.webui.tell_switch.set(true);
+        }
+
         /// The new main window, while it is the one in use.
         pub(in super::super) fn webui_window(&self) -> Option<&nwg::Window> {
             self.webui.active.get().then_some(&self.webui.parts.window)
@@ -601,7 +610,13 @@ mod imp {
         }
 
         fn webui_notice(&self, text: impl Into<String>) {
-            self.webui_send(&Outbound::Notice { text: text.into() });
+            self.webui_send(&Outbound::Notice { text: text.into(), warn: false });
+        }
+
+        /// A problem ("could not…", "wait…"): shown in the warning colour
+        /// until the next key or click, and read out by screen readers.
+        fn webui_warn(&self, text: impl Into<String>) {
+            self.webui_send(&Outbound::Notice { text: text.into(), warn: true });
         }
 
         /// The quick popup's search, when it asked for the full window.
@@ -704,6 +719,8 @@ mod imp {
                             desc: s.sort_desc,
                             digits: s.arabic_digits,
                             version: env!("CARGO_PKG_VERSION"),
+                            // Once: a page loaded again does not say it again.
+                            switched: self.webui.tell_switch.replace(false),
                         }
                     };
                     self.webui_send(&hello);
@@ -774,7 +791,7 @@ mod imp {
                     if let Some(path) = self.webui_path(list, seq, ver, id) {
                         self.webui_note_use(list, &path);
                         if !shell::open(&path) {
-                            self.webui_notice(trf!("تعذر فتح الملف: {}", "Could not open the file: {}", path));
+                            self.webui_warn(trf!("تعذر فتح الملف: {}", "Could not open the file: {}", path));
                         }
                     }
                 }
@@ -859,7 +876,7 @@ mod imp {
                         self.menu_lang_en.set_checked(chosen == Lang::En);
                         self.webui.next_lang.set(Some(chosen));
                     } else {
-                        self.webui_notice(tr!("تعذر حفظ اللغة.", "Could not save the language."));
+                        self.webui_warn(tr!("تعذر حفظ اللغة.", "Could not save the language."));
                     }
                     self.webui_send_settings();
                 }
@@ -871,14 +888,14 @@ mod imp {
                         self.on_close();
                         std::process::exit(0);
                     }
-                    Err(e) => self.webui_notice(trf!(
+                    Err(e) => self.webui_warn(trf!(
                         "تعذرت إعادة التشغيل تلقائياً ({e}). أغلق البرنامج وافتحه من جديد.",
                         "The program could not restart itself ({e}). Close the program and open it again."
                     )),
                 },
                 Request::Reindex {} => {
                     if self.webui.content.borrow().is_some() {
-                        self.webui_notice(tr!("انتظر انتهاء البحث داخل المستندات أو أوقفه أولاً.", "Wait for the document search to finish, or stop it first."));
+                        self.webui_warn(tr!("انتظر انتهاء البحث داخل المستندات أو أوقفه أولاً.", "Wait for the document search to finish, or stop it first."));
                         return;
                     }
                     self.start_scan();
@@ -894,7 +911,7 @@ mod imp {
                 }
                 Request::Web { q } => {
                     if !shell::open(&crate::suggest::web_url(&q)) {
-                        self.webui_notice(tr!("تعذر فتح المتصفح.", "Could not open the browser."));
+                        self.webui_warn(tr!("تعذر فتح المتصفح.", "Could not open the browser."));
                     }
                 }
                 Request::Hide {} => self.webui_hide(),
@@ -908,7 +925,7 @@ mod imp {
                     if let Some((item, text)) = found
                         && !self.launch_app_item(&item, &text)
                     {
-                        self.webui_notice(trf!("تعذر فتح: {}", "Could not open: {}", item.title));
+                        self.webui_warn(trf!("تعذر فتح: {}", "Could not open: {}", item.title));
                     }
                     self.webui_send_history();
                 }
@@ -933,7 +950,7 @@ mod imp {
 
         fn webui_missed(&self, miss: Miss) {
             if let Some(text) = miss.message(i18n::current()) {
-                self.webui_notice(text);
+                self.webui_warn(text);
             }
         }
 
@@ -982,14 +999,14 @@ mod imp {
         fn webui_rename(&self, list: List, seq: u64, ver: u64, id: u32, name: &str) {
             let Some(old) = self.webui_path(list, seq, ver, id) else { return };
             if let Some(why) = self.webui_index_busy() {
-                self.webui_notice(why);
+                self.webui_warn(why);
                 return;
             }
             let new = match bridge::rename_target(&old, name) {
                 Ok(new) => new,
                 Err(bridge::BadName::Unchanged) => return,
                 Err(e) => {
-                    self.webui_notice(e.message(i18n::current()));
+                    self.webui_warn(e.message(i18n::current()));
                     return;
                 }
             };
@@ -999,11 +1016,11 @@ mod imp {
             // fail). Changing only the letter case of the same file is fine.
             let taken = || trf!("يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد.", "Another file named “{new_name}” already exists in this folder.");
             if std::path::Path::new(&new).exists() && new.to_lowercase() != old.to_lowercase() {
-                self.webui_notice(taken());
+                self.webui_warn(taken());
                 return;
             }
             if let Err(e) = shell::rename_no_replace(&old, &new) {
-                self.webui_notice(if shell::already_exists(&e) { taken() } else { trf!("تعذر تغيير الاسم: {e}", "Could not rename: {e}") });
+                self.webui_warn(if shell::already_exists(&e) { taken() } else { trf!("تعذر تغيير الاسم: {e}", "Could not rename: {e}") });
                 return;
             }
             self.update_index(|idx| {
@@ -1031,11 +1048,11 @@ mod imp {
         fn webui_recycle(&self, list: List, seq: u64, ver: u64, id: u32) {
             let Some(path) = self.webui_path(list, seq, ver, id) else { return };
             if let Some(why) = self.webui_index_busy() {
-                self.webui_notice(why);
+                self.webui_warn(why);
                 return;
             }
             if !shell::recycle(&path) {
-                self.webui_notice(tr!("لم يُحذف الملف.", "The file was not deleted."));
+                self.webui_warn(tr!("لم يُحذف الملف.", "The file was not deleted."));
                 return;
             }
             self.update_index(|idx| {
@@ -1119,7 +1136,11 @@ mod imp {
         /// an update…) shown in the new look while it is on screen.
         pub(in super::super) fn webui_status_text(&self, text: &str) {
             if self.webui_visible() && !text.trim().is_empty() {
-                self.webui_notice(text);
+                if bridge::looks_like_a_problem(text) {
+                    self.webui_warn(text);
+                } else {
+                    self.webui_notice(text);
+                }
             }
         }
 
@@ -1179,7 +1200,7 @@ mod imp {
                     if autostart::set_enabled(on) {
                         self.menu_autostart.set_checked(on);
                     } else {
-                        self.webui_notice(tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting."));
+                        self.webui_warn(tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting."));
                     }
                 }
                 Setting::ContentIndex => {
@@ -1512,6 +1533,8 @@ mod imp {
         pub(in super::super) fn webui_window(&self) -> Option<&nwg::Window> {
             None
         }
+
+        pub(in super::super) fn webui_tell_switch(&self) {}
 
         pub(in super::super) fn webui_options_menu(&self) -> bool {
             false
