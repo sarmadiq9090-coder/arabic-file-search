@@ -132,6 +132,8 @@ mod imp {
         failures: Cell<u32>,
         /// When the page was created or reloaded, until it says hello.
         loading_since: Cell<Option<Instant>>,
+        /// When the page last said hello, until it fails.
+        ready_since: Cell<Option<Instant>>,
         /// The program is restarting from the page's own message handler:
         /// the page is left to the process exit, not dropped inside it.
         exiting: Cell<bool>,
@@ -178,7 +180,12 @@ mod imp {
             if !started_hidden() {
                 self.window.set_visible(true);
             }
-            self.state.borrow_mut().settings.new_ui = false;
+            // (Off only after a second launch in a row fails: one bad start,
+            // WebView2 updating at login, keeps the new look.)
+            {
+                let s = &mut self.state.borrow_mut().settings;
+                (s.new_ui, s.new_ui_failed) = crate::webui::after_failed_start(s.new_ui, s.new_ui_failed);
+            }
             self.save_settings();
         }
 
@@ -264,6 +271,7 @@ mod imp {
             self.webui.ready.set(false);
             self.webui.failed.set(None);
             self.webui.loading_since.set(None);
+            self.webui.ready_since.set(None);
             self.webui.host.replace(None);
             let token = bridge::new_token();
             self.webui.token.replace(token.clone());
@@ -323,6 +331,11 @@ mod imp {
 
         /// The Options menu's «جرّب الشكل الجديد» / «العودة إلى الشكل القديم».
         pub(in super::super) fn webui_menu_item(self: &Rc<Self>) {
+            // (Not while a page is being created: its message loop delivers
+            // menu clicks, and the page would come back over the classic window.)
+            if self.webui.switching.get() {
+                return;
+            }
             if self.webui.active.get() {
                 self.webui_leave(true);
             } else {
@@ -397,12 +410,27 @@ mod imp {
             self.save_settings();
         }
 
+        /// A page that has worked a while (`crate::webui::STABLE`): its
+        /// earlier failures, and a failed start at the last launch, no
+        /// longer count.
+        fn webui_forgive(&self) {
+            if !crate::webui::stable(self.webui.ready_since.get().map(|t| t.elapsed())) {
+                return;
+            }
+            self.webui.failures.set(0);
+            let failed_start = std::mem::take(&mut self.state.borrow_mut().settings.new_ui_failed);
+            if failed_start {
+                self.save_settings();
+            }
+        }
+
         /// A WebView2 process failed, or the page stayed blank: the first
         /// time the page is shown again (a new one when the browser itself
         /// is gone, else reloaded); the second time the classic window takes
         /// over for good (`new_ui` off), with a word why. From the timer.
         fn webui_failed(&self, browser_gone: bool, why: &str) {
             self.webui.loading_since.set(None);
+            self.webui.ready_since.set(None);
             let n = self.webui.failures.get() + 1;
             self.webui.failures.set(n);
             let visible = self.webui.parts.window.visible();
@@ -638,6 +666,7 @@ mod imp {
                     self.webui.lists.borrow_mut().reset();
                     self.webui.ready.set(true);
                     self.webui.loading_since.set(None);
+                    self.webui.ready_since.set(Some(Instant::now()));
                     self.webui.last_status.replace(String::new());
                     let hello = {
                         let s = &self.state.borrow().settings;
@@ -1225,6 +1254,8 @@ mod imp {
                     self.webui_failed(browser_gone, "a WebView2 process failed");
                 } else if self.webui.loading_since.get().is_some_and(|t| t.elapsed() > PAGE_TIMEOUT) {
                     self.webui_failed(true, "the page did not load");
+                } else {
+                    self.webui_forgive();
                 }
             }
             if !self.webui.active.get() || !self.webui.ready.get() {
