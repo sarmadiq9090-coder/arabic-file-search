@@ -2,7 +2,10 @@
     "version": "0.9.1",
     "description": "InstaFind (بحث سريع): Instant file search for Windows, in Arabic and English, even inside documents.",
     "homepage": "https://github.com/sarmadiq9090-coder/arabic-file-search",
-    "license": "MIT",
+    "license": {
+        "identifier": "Proprietary (free)",
+        "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/blob/main/LICENSE"
+    },
     "notes": [
         "Installed with Scoop, InstaFind does not update itself (versions up to 0.9.0 still offer to):",
         "run 'scoop update instafind' to get new versions.",

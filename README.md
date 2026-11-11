@@ -10,7 +10,6 @@
 <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest"><img src="https://img.shields.io/github/v/release/sarmadiq9090-coder/arabic-file-search?label=%D8%A7%D9%84%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1&color=2f81f7" alt="الإصدار / Release"></a>
 <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/releases"><img src="https://img.shields.io/github/downloads/sarmadiq9090-coder/arabic-file-search/total?label=%D8%A7%D9%84%D8%AA%D9%86%D8%B2%D9%8A%D9%84%D8%A7%D8%AA" alt="التنزيلات / Downloads"></a>
 <a href="https://github.com/sarmadiq9090-coder/arabic-file-search/actions/workflows/build.yml"><img src="https://github.com/sarmadiq9090-coder/arabic-file-search/actions/workflows/build.yml/badge.svg" alt="CI"></a>
-<a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"></a>
 </p>
 
 <p align="center">
@@ -29,7 +28,7 @@
 
 ## العربية
 
-برنامج مجاني ومفتوح المصدر مكتوب بلغة Rust. يفهرس كل أقراصك مرة واحدة ثم يُظهر النتائج أثناء الكتابة، حتى مع أكثر من مليون ملف. يفهم العربية كما تُكتب فعلاً: «احمد» تجد «أحمد»، و«التقرير» تجد «تقرير.pdf»، و`hgjrvdv` المكتوبة بلوحة المفاتيح الخطأ تجد «التقرير».
+برنامج ويندوز مجاني مكتوب بلغة Rust. يفهرس كل أقراصك مرة واحدة ثم يُظهر النتائج أثناء الكتابة، حتى مع أكثر من مليون ملف. يفهم العربية كما تُكتب فعلاً: «احمد» تجد «أحمد»، و«التقرير» تجد «تقرير.pdf»، و`hgjrvdv` المكتوبة بلوحة المفاتيح الخطأ تجد «التقرير».
 
 ## التنزيل والتشغيل
 
@@ -192,7 +191,7 @@ bahth.exe -s عقد --json
 
 ## الرخصة
 
-[MIT](LICENSE)
+برنامج مجاني للاستخدام على أجهزتك، وهو برنامج مملوك (غير مفتوح المصدر): [LICENSE](LICENSE). الإصدارات المنشورة قبل 2026-11-09 (حتى 0.9.1) تبقى متاحة برخصة MIT التي نُشرت بها.
 
 </div>
 
@@ -202,7 +201,7 @@ bahth.exe -s عقد --json
 
 <p align="center"><img src="docs/media/demo-en.gif" width="800" alt="Demo: instant name search, then search inside documents with a text snippet"></p>
 
-InstaFind is a free, open-source file search tool for Windows, written in Rust. It indexes all your drives once and shows results while you type, even with more than 1 million files. It understands Arabic the way people actually type it: `احمد` finds `أحمد`, `التقرير` finds `تقرير.pdf`, and `hgjrvdv` typed on the wrong keyboard layout finds `التقرير`.
+InstaFind is a free file search tool for Windows, written in Rust. It indexes all your drives once and shows results while you type, even with more than 1 million files. It understands Arabic the way people actually type it: `احمد` finds `أحمد`, `التقرير` finds `تقرير.pdf`, and `hgjrvdv` typed on the wrong keyboard layout finds `التقرير`.
 
 ### Download and run
 
@@ -364,4 +363,4 @@ Building from source, the code map and the release process are in [docs/DEVELOPM
 
 ### License
 
-[MIT](LICENSE)
+Free to use on your own devices; proprietary software, see [LICENSE](LICENSE). Versions released before 2026-11-09 (up to 0.9.1) remain available under the MIT licence they were published with.

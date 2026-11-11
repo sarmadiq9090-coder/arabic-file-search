@@ -40,7 +40,7 @@ ICON_URL = "https://cdn.jsdelivr.net/gh/sarmadiq9090-coder/arabic-file-search@ma
 WINGET_ID = "Sarmad.InstaFind"
 WINGET_SCHEMA = "1.12.0"  # the version winget-pkgs currently recommends
 PUBLISHER = "Sarmad"
-COPYRIGHT = "Copyright (c) 2026 Saif Second"  # as in LICENSE
+COPYRIGHT = "Copyright (c) 2026 Sarmad. All rights reserved."  # as in LICENSE
 
 SHORT_EN = "Instant file search for Windows, in Arabic and English, even inside documents."
 SHORT_AR = "أسرع طريقة لإيجاد أي ملف على ويندوز، بالعربية والإنجليزية، وحتى داخل المستندات."
@@ -53,7 +53,7 @@ Extras: duplicate finder, folder sizes, thumbnails, find & replace in text files
 Single portable exe, no installer. Data lives in %LOCALAPPDATA%\\BahthSari. The interface is Arabic or English and follows Windows."""
 
 DESC_AR = """\
-برنامج مجاني ومفتوح المصدر يفهرس كل أقراصك مرة واحدة ثم يُظهر النتائج أثناء الكتابة، حتى مع ملايين الملفات.
+برنامج ويندوز مجاني يفهرس كل أقراصك مرة واحدة ثم يُظهر النتائج أثناء الكتابة، حتى مع ملايين الملفات.
 يفهم العربية كما تُكتب فعلاً: «احمد» تجد «أحمد»، و«التقرير» تجد «تقرير.pdf»، والكلمة المكتوبة بلوحة المفاتيح الخطأ أو بالفرانكو تُوجد أيضاً.
 يبحث داخل المستندات (docx وxlsx وpptx وpdf وodt وrtf والبريد وepub وملفات البرمجة)، وداخل الصور وملفات PDF الممسوحة ضوئياً بمحرك التعرف على النصوص في ويندوز، وداخل الملفات المضغوطة.
 ومعه: الملفات المكررة، أحجام المجلدات، المصغرات، الاستبدال في عدة ملفات، اختصار عام، سطر الأوامر، والبحث من الهاتف.
@@ -93,7 +93,7 @@ def scoop(version, shas):
         "version": version,
         "description": "InstaFind (بحث سريع): " + SHORT_EN,
         "homepage": REPO,
-        "license": "MIT",
+        "license": {"identifier": "Proprietary (free)", "url": f"{REPO}/blob/main/LICENSE"},
         "notes": SCOOP_NOTES,
         # Every CPU's exe is saved as bahth.exe (the `#/bahth.exe` suffix
         # renames the download) so bin and shortcuts are the same for all.
@@ -176,7 +176,7 @@ def winget(version, shas, date):
         + f"Author: {PUBLISHER}\n"
         + "PackageName: InstaFind\n"
         + f"PackageUrl: {REPO}\n"
-        + "License: MIT\n"
+        + "License: Proprietary (free)\n"
         + f"LicenseUrl: {REPO}/blob/main/LICENSE\n"
         + f"Copyright: {yaml_str(COPYRIGHT)}\n"
         + f"ShortDescription: {yaml_str(SHORT_EN)}\n"
@@ -199,7 +199,7 @@ def winget(version, shas, date):
         + f"Author: {PUBLISHER}\n"
         + f"PackageName: {yaml_str('InstaFind — بحث سريع')}\n"
         + f"PackageUrl: {REPO}\n"
-        + "License: MIT\n"
+        + "License: Proprietary (free)\n"
         + f"LicenseUrl: {REPO}/blob/main/LICENSE\n"
         + f"Copyright: {yaml_str(COPYRIGHT)}\n"
         + f"ShortDescription: {yaml_str(SHORT_AR)}\n"
