@@ -314,6 +314,8 @@ pub struct App {
     startup_logged: Cell<bool>,
     /// The indexing progress shown in the status bar's last part, if any.
     indexing_shown: RefCell<Option<String>>,
+    /// That part is the wider one, for the line about the documents' texts.
+    indexing_wide: Cell<bool>,
     /// The offer to move a copy out of Downloads or a temp folder was
     /// already considered this run (see `relocate`).
     move_checked: Cell<bool>,
@@ -488,13 +490,8 @@ impl App {
         // other, and while indexing runs its progress at the far end.
         if let Some(sb) = self.status.handle.hwnd() {
             let px = (w as f64 * nwg::scale_factor()) as i32;
-            if self.indexing_part_shown() {
-                let parts: [i32; 3] = [px * 9 / 20, px * 3 / 4, -1];
-                unsafe { SendMessageW(sb, SB_SETPARTS, 3, parts.as_ptr() as LPARAM) };
-            } else {
-                let parts: [i32; 2] = [px / 2, -1];
-                unsafe { SendMessageW(sb, SB_SETPARTS, 2, parts.as_ptr() as LPARAM) };
-            }
+            let parts = crate::indexing_status::status_parts(px, self.indexing_part());
+            unsafe { SendMessageW(sb, SB_SETPARTS, parts.len(), parts.as_ptr() as LPARAM) };
         }
     }
 

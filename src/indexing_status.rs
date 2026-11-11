@@ -48,9 +48,13 @@ pub fn group_digits(n: usize) -> String {
     out
 }
 
-/// "جارِ الفهرسة… 36,000 من 432,000 ملف" / "Indexing… 36,000 of 432,000
-/// files", or `None` when nothing is being indexed. `num` writes a count
-/// (thousands separators, and the digits the user chose).
+/// What is being indexed, or `None` when nothing is: "Indexing… 120,500
+/// files so far" while the drives are scanned, then, once every file name
+/// can be found and only the documents' texts are still being read, "File
+/// names ready · reading inside documents: 36,000 of 432,000" (a bare
+/// "Indexing…" there read as if searching by name was not ready yet).
+/// `num` writes a count (thousands separators, and the digits the user
+/// chose).
 pub fn progress_text(lang: Lang, state: Indexing, num: &dyn Fn(usize) -> String) -> Option<String> {
     if !state.running() {
         return None;
@@ -63,12 +67,27 @@ pub fn progress_text(lang: Lang, state: Indexing, num: &dyn Fn(usize) -> String)
         Indexing::Contents { checked, total } => {
             let (checked, total) = (num(checked.min(total)), num(total));
             match lang {
-                Lang::Ar => format!("جارِ الفهرسة… {checked} من {total} ملف"),
-                Lang::En => format!("Indexing… {checked} of {total} files"),
+                Lang::Ar => format!("أسماء الملفات جاهزة · تُقرأ محتويات المستندات: {checked} من {total}"),
+                Lang::En => format!("File names ready · reading inside documents: {checked} of {total}"),
             }
         }
         Indexing::Idle => return None,
     })
+}
+
+/// The right edges of the status bar's parts for a bar `width` pixels wide
+/// (`SB_SETPARTS`; -1 is "to the end"): messages and the selected file's
+/// path, and while indexing runs (`progress`) its progress in a third part
+/// at the end, wider when it is the longer "File names ready · reading
+/// inside documents…" line (`Some(true)`) so that line is not cut.
+pub fn status_parts(width: i32, progress: Option<bool>) -> Vec<i32> {
+    let w = width.max(0) as i64;
+    let at = |num: i64, den: i64| (w * num / den) as i32;
+    match progress {
+        None => vec![at(1, 2), -1],
+        Some(false) => vec![at(9, 20), at(3, 4), -1],
+        Some(true) => vec![at(3, 10), at(13, 25), -1],
+    }
 }
 
 /// Said instead of "no results" while indexing runs.
@@ -151,8 +170,28 @@ mod tests {
     #[test]
     fn content_progress_reads_as_in_the_user_study() {
         let s = Indexing::Contents { checked: 36_000, total: 432_000 };
-        assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("جارِ الفهرسة… 36,000 من 432,000 ملف"));
-        assert_eq!(progress_text(Lang::En, s, &num).as_deref(), Some("Indexing… 36,000 of 432,000 files"));
+        // The names are all in by now: say so, and what is still being read.
+        assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("أسماء الملفات جاهزة · تُقرأ محتويات المستندات: 36,000 من 432,000"));
+        assert_eq!(progress_text(Lang::En, s, &num).as_deref(), Some("File names ready · reading inside documents: 36,000 of 432,000"));
+        for lang in [Lang::Ar, Lang::En] {
+            let t = progress_text(lang, s, &num).unwrap();
+            assert!(!t.contains("Indexing…") && !t.contains("الفهرسة…"), "{t}");
+        }
+    }
+
+    #[test]
+    fn the_status_bar_gives_the_longer_line_more_room() {
+        assert_eq!(status_parts(1100, None), [550, -1]);
+        assert_eq!(status_parts(1100, Some(false)), [495, 825, -1]);
+        // 528 of 1100 pixels for "File names ready · reading inside documents: …".
+        assert_eq!(status_parts(1100, Some(true)), [330, 572, -1]);
+        for w in [-5, 0, 1, 640, 1920, i32::MAX] {
+            for p in [None, Some(false), Some(true)] {
+                let parts = status_parts(w, p);
+                assert_eq!(parts.last(), Some(&-1));
+                assert!(parts[..parts.len() - 1].windows(2).all(|x| x[0] <= x[1]) && parts[0] >= 0, "{w} {p:?} {parts:?}");
+            }
+        }
     }
 
     #[test]
@@ -179,7 +218,7 @@ mod tests {
     fn checked_never_shows_above_total() {
         let s = Indexing::Contents { checked: 12, total: 10 };
         assert!(!s.running());
-        assert_eq!(progress_text(Lang::En, Indexing::Contents { checked: 9, total: 10 }, &num).as_deref(), Some("Indexing… 9 of 10 files"));
+        assert_eq!(progress_text(Lang::En, Indexing::Contents { checked: 9, total: 10 }, &num).as_deref(), Some("File names ready · reading inside documents: 9 of 10"));
     }
 
     #[test]
@@ -210,7 +249,7 @@ mod tests {
         // The names are all in while the content index fills: only the progress.
         let c = Indexing::Contents { checked: 10, total: 20 };
         assert!(!c.names_incomplete() && s.names_incomplete());
-        assert_eq!(popup_note(Lang::En, c, true, &num).as_deref(), Some("Indexing… 10 of 20 files"));
+        assert_eq!(popup_note(Lang::En, c, true, &num).as_deref(), Some("File names ready · reading inside documents: 10 of 20"));
     }
 
     #[test]
@@ -218,7 +257,7 @@ mod tests {
         // The window can show Arabic-Indic digits (Options); the formatter is passed in.
         let indic = |n: usize| group_digits(n).chars().map(|c| if c.is_ascii_digit() { char::from_u32(c as u32 - 48 + 0x0660).unwrap() } else { c }).collect::<String>();
         let s = Indexing::Contents { checked: 36_000, total: 432_000 };
-        assert_eq!(progress_text(Lang::Ar, s, &indic).as_deref(), Some("جارِ الفهرسة… ٣٦,٠٠٠ من ٤٣٢,٠٠٠ ملف"));
+        assert_eq!(progress_text(Lang::Ar, s, &indic).as_deref(), Some("أسماء الملفات جاهزة · تُقرأ محتويات المستندات: ٣٦,٠٠٠ من ٤٣٢,٠٠٠"));
     }
 
     #[test]
