@@ -69,6 +69,7 @@ The updater fails closed: it installs a release only when GitHub publishes a SHA
 | `src/thumb_cache.rs`, `src/draw.rs`, `src/dragdrop.rs`, `src/icon.rs` | Thumbnail LRU, match underline, drag & drop and clipboard, icons |
 | `src/history.rs`, `src/settings.rs` | Search history, saved searches, often-opened files, quick-search launch counts and pinned favourites (all in `history.json`); window, column and quick-search settings (`settings.txt`) |
 | `src/update.rs` | Auto-update from GitHub Releases (WinHTTP, required SHA-256 check, fallback when the API is rate-limited, defers to winget/Scoop installs) |
+| `src/more_apps.rs`, `src/ui/more_apps.rs`, `data/apps.json` | Options ▸ "More from FastKiwi": the other FastKiwi apps from the site's `data/apps.json`, vendored and embedded (never fetched at runtime; the source commit and the refresh command are in `src/more_apps.rs`); opens only `https://fastkiwi.app/` pages and Microsoft Store product pages |
 | `src/crash_log.rs` | Panic hook writing `log.txt` and `crash.txt` with a backtrace |
 | `src/feedback.rs` | Prefilled GitHub issue links (Options ▸ Send feedback) and the opt-in crash report offered at the next start; nothing is sent without the user (UI in `src/ui/feedback.rs`) |
 | `src/cli.rs` | `bahth.exe -s …` |
