@@ -12,6 +12,15 @@ pub const START_URL: &str = "instafind://localhost/";
 /// The only origin whose messages the program accepts.
 pub const ORIGIN: &str = "http://instafind.localhost";
 
+/// Whether `url` is the program's own page: exactly [`ORIGIN`] (alone or
+/// followed by a path), or [`START_URL`] and its paths. A longer host
+/// (`http://instafind.localhost.evil.example/`), a port or credentials are
+/// someone else's. The messages, navigations and new windows the program
+/// allows are checked with this.
+pub fn own_url(url: &str) -> bool {
+    url.strip_prefix(ORIGIN).is_some_and(|rest| rest.is_empty() || rest.starts_with('/')) || url.starts_with(START_URL)
+}
+
 /// Scripts, styles and fonts only from the program itself; no inline script,
 /// no `eval`, no network, no plug-ins, no frames, no forms.
 pub const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; \
@@ -87,6 +96,28 @@ pub const HEADERS: &[(&str, &str)] = &[
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn only_the_programs_own_urls() {
+        for ok in ["http://instafind.localhost", "http://instafind.localhost/", "http://instafind.localhost/index.html", "instafind://localhost/", "instafind://localhost/app.js"] {
+            assert!(super::own_url(ok), "{ok}");
+        }
+        for bad in [
+            "http://instafind.localhost.evil.example/",
+            "http://instafind.localhost:8080/",
+            "http://instafind.localhost@evil.example/",
+            "http://instafind.localhostx/",
+            "https://instafind.localhost/",
+            "http://evil.example/http://instafind.localhost/",
+            "instafind://localhost.evil.example/",
+            "instafind://localhost@evil/",
+            "file:///C:/x.html",
+            "about:blank",
+            "",
+        ] {
+            assert!(!super::own_url(bad), "{bad}");
+        }
+    }
+
     use super::*;
 
     fn text(path: &str) -> String {
