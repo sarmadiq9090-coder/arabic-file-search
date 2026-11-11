@@ -1,5 +1,6 @@
-//! Fitting the main window to the screen. Platform-independent and
-//! unit-tested on Linux; the Win32 side is `ui/placement.rs`.
+//! Fitting the main window to the screen, and the result list's columns to
+//! the window. Platform-independent and unit-tested on Linux; the Win32 side
+//! is `ui/placement.rs` (the window) and `ui/build.rs` (the columns).
 
 // Only the Windows UI and the tests use this module.
 
@@ -38,9 +39,112 @@ pub fn with_hidden_frame(work: &Rect, frame: i32) -> Rect {
     Rect::new(work.left.saturating_sub(f), work.top, work.right.saturating_add(f), work.bottom.saturating_add(f))
 }
 
+/// Column widths that fill `available` pixels of list, from each column's
+/// (default width, least width). A column whose least width is its default
+/// keeps it (sizes and dates need what they need); the others share the
+/// rest in proportion to their defaults, none under its least width. When
+/// even the least widths don't fit, they are returned and the list scrolls.
+///
+/// The defaults add up to 1310 pixels, wider than the list of the default
+/// 1100-pixel window, so the last column's header was cut ("Mat…").
+pub fn fit_columns(columns: &[(i32, i32)], available: i32) -> Vec<i32> {
+    let mut out: Vec<i32> = columns.iter().map(|c| c.0).collect();
+    let mut flexible: Vec<usize> = (0..columns.len()).filter(|&i| columns[i].1 < columns[i].0).collect();
+    loop {
+        let rigid: i64 = (0..columns.len()).filter(|i| !flexible.contains(i)).map(|i| out[i] as i64).sum();
+        let room = available as i64 - rigid;
+        let total: i64 = flexible.iter().map(|&i| columns[i].0 as i64).sum();
+        if total <= 0 {
+            return out;
+        }
+        // Columns the proportional share would make too narrow keep their
+        // least width, and the others share what is left.
+        let tight: Vec<usize> = flexible.iter().copied().filter(|&i| columns[i].0 as i64 * room < columns[i].1 as i64 * total).collect();
+        if tight.is_empty() {
+            let mut used = 0;
+            for (k, &i) in flexible.iter().enumerate() {
+                // The last one takes the rounding remainder.
+                let w = if k + 1 == flexible.len() { room - used } else { columns[i].0 as i64 * room / total };
+                out[i] = w.clamp(0, i32::MAX as i64) as i32;
+                used += w;
+            }
+            return out;
+        }
+        for i in tight {
+            out[i] = columns[i].1;
+            flexible.retain(|&j| j != i);
+        }
+    }
+}
+
+/// Whether the saved column widths are not the user's own: none saved yet
+/// (a first run), or exactly the defaults (saved by a version that had
+/// only those), so the columns may be fitted to the window.
+pub fn columns_untouched(saved: &[i32], columns: &[(i32, i32)]) -> bool {
+    saved.is_empty() || saved.iter().copied().eq(columns.iter().map(|c| c.0))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Name, full path, size, date modified, matching text (`ui::COLUMNS`).
+    const COLUMNS: [(i32, i32); 5] = [(260, 160), (460, 200), (90, 90), (140, 140), (360, 160)];
+
+    #[test]
+    fn default_columns_fit_the_default_window() {
+        // The list of the 1100-pixel window, without its scroll bar.
+        let w = fit_columns(&COLUMNS, 1054);
+        assert_eq!(w.iter().sum::<i32>(), 1054);
+        assert_eq!(w, [198, 350, 90, 140, 276]);
+        // "Matching text" keeps room for its header and a snippet.
+        assert!(w[4] >= 160, "{w:?}");
+    }
+
+    #[test]
+    fn columns_fill_any_list_width_and_keep_their_least_widths() {
+        let least: i32 = COLUMNS.iter().map(|c| c.1).sum();
+        for available in (300..4000).step_by(7) {
+            let w = fit_columns(&COLUMNS, available);
+            // Size and date never change; no column goes under its least width.
+            assert_eq!((w[2], w[3]), (90, 140), "{available}");
+            for (got, (_, min)) in w.iter().zip(COLUMNS) {
+                assert!(*got >= min, "{available}: {w:?}");
+            }
+            // The list is filled exactly whenever the least widths fit.
+            assert_eq!(w.iter().sum::<i32>(), available.max(least), "{available}: {w:?}");
+        }
+    }
+
+    #[test]
+    fn narrow_and_wide_lists() {
+        // 800-pixel window: the name and the snippet are at their least
+        // widths, and the path takes the rest.
+        assert_eq!(fit_columns(&COLUMNS, 754), [160, 204, 90, 140, 160]);
+        // Too narrow for everything: least widths, and the list scrolls.
+        assert_eq!(fit_columns(&COLUMNS, 400), [160, 200, 90, 140, 160]);
+        assert_eq!(fit_columns(&COLUMNS, -50), [160, 200, 90, 140, 160]);
+        // A maximized window on a 1920-pixel screen: the text columns grow.
+        let wide = fit_columns(&COLUMNS, 1874);
+        assert_eq!(wide.iter().sum::<i32>(), 1874);
+        assert!(wide[0] > 260 && wide[1] > 460 && wide[4] > 360, "{wide:?}");
+        // The proportions of the defaults are kept (260 : 460 : 360).
+        assert!((wide[1] * 260 - wide[0] * 460).abs() < 460 * 2, "{wide:?}");
+        // Nothing to share, or nothing at all.
+        assert_eq!(fit_columns(&[(90, 90), (140, 140)], 1000), [90, 140]);
+        assert_eq!(fit_columns(&[], 1000), Vec::<i32>::new());
+    }
+
+    #[test]
+    fn only_widths_the_user_never_set_are_fitted() {
+        assert!(columns_untouched(&[], &COLUMNS));
+        // Saved by 0.10.0 and earlier on every close: the old defaults.
+        assert!(columns_untouched(&[260, 460, 90, 140, 360], &COLUMNS));
+        // The user's own widths (or ones fitted before) stay.
+        assert!(!columns_untouched(&[300, 460, 90, 140, 360], &COLUMNS));
+        assert!(!columns_untouched(&[198, 350, 90, 140, 276], &COLUMNS));
+        assert!(!columns_untouched(&[260, 460, 90, 140], &COLUMNS));
+    }
 
     /// The default window (1100×680 of content) with its frame at 100 %.
     const OUTER: (i32, i32) = (1116, 719);

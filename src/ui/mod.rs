@@ -113,6 +113,10 @@ const COL_SNIPPET: usize = 4;
 const COLUMNS: [(&str, i32); 5] =
     [("الاسم", 260), ("المسار الكامل", 460), ("الحجم", 90), ("تاريخ التعديل", 140), ("النص المطابق", 360)];
 const COLUMNS_EN: [&str; 5] = ["Name", "Full path", "Size", "Date modified", "Matching text"];
+/// The least width of each column when the default widths are fitted to
+/// the window (`crate::window_fit::fit_columns`): the size and the date keep
+/// their width, the text columns share the rest.
+const COLUMN_MIN: [i32; 5] = [160, 200, 90, 140, 160];
 
 /// A result row: an index into `State::rows_index` plus an optional snippet.
 struct Row {

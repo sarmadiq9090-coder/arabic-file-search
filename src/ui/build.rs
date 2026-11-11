@@ -177,8 +177,18 @@ impl NativeUi<AppUi> for App {
             }
         }
         phase("list");
+        // Until the user sets widths of their own, the columns share the
+        // list's width (the window's, less the margins, the list's border
+        // and its scroll bar): the defaults are wider than the default
+        // window, which cut the last header to "Mat…".
+        let defaults: Vec<(i32, i32)> = COLUMNS.iter().zip(super::COLUMN_MIN).map(|((_, w), min)| (*w, min)).collect();
+        let fitted = crate::window_fit::columns_untouched(&settings.columns, &defaults)
+            .then(|| crate::window_fit::fit_columns(&defaults, w.size().0 as i32 - 2 * style::MARGIN - 22));
         for (i, (title, width)) in COLUMNS.iter().enumerate() {
-            let width = settings.columns.get(i).copied().filter(|w| (20..3000).contains(w)).unwrap_or(*width);
+            let width = match &fitted {
+                Some(f) => f[i],
+                None => settings.columns.get(i).copied().filter(|w| (20..3000).contains(w)).unwrap_or(*width),
+            };
             app.list.insert_column(nwg::InsertListViewColumn {
                 index: Some(i as i32),
                 fmt: None,
