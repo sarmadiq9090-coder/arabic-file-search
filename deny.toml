@@ -4,10 +4,10 @@
 # duplicated crates, and where crates come from.
 
 [graph]
-# The published exes: x64 and 32-bit (mingw), ARM64 (MSVC).
+# The published exes: x64, 32-bit and ARM64, all MSVC (build.yml).
 targets = [
-    "x86_64-pc-windows-gnu",
-    "i686-pc-windows-gnu",
+    "x86_64-pc-windows-msvc",
+    "i686-pc-windows-msvc",
     "aarch64-pc-windows-msvc",
 ]
 all-features = false
