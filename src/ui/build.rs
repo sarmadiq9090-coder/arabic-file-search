@@ -73,8 +73,9 @@ impl NativeUi<AppUi> for App {
             .center(true)
             .ex_flags(crate::i18n::rtl_only(WS_EX_LAYOUTRTL))
             .flags({
-                // Started with Windows: wait in the tray until called.
-                let visible = if std::env::args().any(|a| a == autostart::STARTUP_ARG) {
+                // Started with Windows: wait in the tray until called. The
+                // new main window, when used, shows itself instead.
+                let visible = if std::env::args().any(|a| a == autostart::STARTUP_ARG) || super::webui::wanted(settings.new_ui) {
                     nwg::WindowFlags::empty()
                 } else {
                     nwg::WindowFlags::VISIBLE
@@ -249,6 +250,12 @@ impl NativeUi<AppUi> for App {
             .build(&mut app.matches_text)?;
 
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.options_menu)?;
+        // The new interface, first so it is seen; not offered without
+        // WebView2 (nor in mingw builds, which can't host it).
+        if super::webui::available() {
+            nwg::MenuItem::builder().text(tr!("جرّب الشكل الجديد", "Try the new look")).parent(&app.options_menu).build(&mut app.menu_new_ui)?;
+            nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.menu_new_ui_sep)?;
+        }
         nwg::MenuItem::builder()
             .text(tr!("عرض الأرقام بالعربية (٠١٢٣)", "Show Arabic-Indic digits (٠١٢٣)"))
             .check(settings.arabic_digits)
@@ -460,6 +467,8 @@ impl NativeUi<AppUi> for App {
                         app.export_csv();
                     } else if handle == app.menu_hide {
                         app.hide_to_tray();
+                    } else if handle == app.menu_new_ui {
+                        app.webui_menu_item();
                     } else if handle == app.tray_show {
                         app.show_window();
                     } else if handle == app.tray_exit || handle == app.menu_exit {
@@ -564,6 +573,10 @@ impl NativeUi<AppUi> for App {
         let (handler, raw) = ui.inner.setup_quick()?;
         ui.handlers.borrow_mut().push(handler);
         ui.raw_handlers.borrow_mut().push(raw);
+        if let Some((handler, raw)) = ui.inner.setup_webui() {
+            ui.handlers.borrow_mut().push(handler);
+            ui.raw_handlers.borrow_mut().push(raw);
+        }
 
         ui.register_hotkey();
         ui.show_sort_arrow();

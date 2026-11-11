@@ -71,9 +71,15 @@ The updater fails closed: it installs a release only when GitHub publishes a SHA
 | `src/update.rs` | Auto-update from GitHub Releases (WinHTTP, required SHA-256 check, fallback when the API is rate-limited, defers to winget/Scoop installs) |
 | `src/crash_log.rs` | Panic hook writing `log.txt` and `crash.txt` with a backtrace |
 | `src/feedback.rs` | Prefilled GitHub issue links (Options ▸ Send feedback) and the opt-in crash report offered at the next start; nothing is sent without the user (UI in `src/ui/feedback.rs`) |
+| `src/webui/`, `src/ui/webui.rs` | The new interface (1.0, phase 2, MSVC builds only, opt-in: Options ▸ «جرّب الشكل الجديد» / "Try the new look" in the classic window, shown only when WebView2 is installed, saves `new_ui=1` in `settings.txt` and swaps the windows without a restart; Settings ▸ "Back to the classic look" on the page (`classic_look`) undoes it; `--webui` or `BAHTH_WEBUI=1` force it on for one launch): the main window as a page in WebView2 (wry) inside a Win32 window, its files embedded in the exe and served by the `instafind://` protocol with a strict CSP (`assets.rs`, `assets/`); typed messages with a per-launch token and an id-based API (the page names rows, never paths; folders come from Windows' folder dialog), and the searches behind them, unit-tested on Linux (`bridge.rs`): file names with the type, size, date and folder filters and sorting, search inside documents with snippets and every matching line, rename and Recycle Bin checks, recent and saved searches, settings; the WebView2 host (`host.rs`). The classic window stays hidden behind it and is the fallback when WebView2 is missing or fails. `node src/webui/preview.cjs <dir>` (with Playwright) renders every screen in Arabic and English with synthetic files and checks CSP, requests, script errors, missing strings, menus on screen, the request fields the program accepts, the page direction and the left-to-right paths, and that a file name shows its extension left to right at its logical end (base and extension in separate isolates, matches still marked; the classic list does the same with marks, `bidi_layout::list_name`) |
 | `src/cli.rs` | `bahth.exe -s …` |
 | `integrations/` | Flow Launcher plugin, PowerShell, AutoHotkey and Windows Terminal examples |
 | `assets/` | Icon (`python3 assets/make_icon.py` regenerates it) and the resource script |
+
+## Known gaps
+
+- The new interface (`src/ui/webui.rs`): its window's size and maximized state are not saved; it opens with the classic window's saved size (or where the classic window was when switching).
+- The published x64 and 32-bit exes are mingw builds, which can't host the new interface, so "Try the new look" shows only in MSVC builds: today that is `bahth-arm64.exe` alone. Whether the arm64 exe should offer it is to be decided at release, and the switch (both ways, and the fallback after a WebView2 failure) is to be tested on the `windows-11-arm` runner; the `ui` job runs the mingw x64 exe and does not reach it.
 
 ## Testing on Wine
 

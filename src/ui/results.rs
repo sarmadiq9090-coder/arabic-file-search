@@ -306,7 +306,8 @@ impl App {
         let Some(r) = st.rows.get(row) else { return String::new() };
         let Some(e) = st.rows_index.entries.get(r.entry as usize) else { return String::new() };
         match col {
-            COL_NAME => e.name().to_string(),
+            // An Arabic name's extension kept whole (".xlsx") at its end.
+            COL_NAME => crate::bidi_layout::list_name(e.name(), e.is_dir).0,
             COL_PATH => ltr_path(&e.path),
             COL_SIZE => self.size_cell(&st.rows_index, r.entry, e),
             COL_DATE => shell::format_time(e.mtime, true),
@@ -337,12 +338,17 @@ impl App {
         i
     }
 
-    /// Byte ranges of the query's matches in a row's file name.
+    /// Byte ranges of the query's matches in a row's file name, as the
+    /// list shows it (`cell_text`, with the marks before an extension).
     pub(super) fn match_ranges(&self, row: usize) -> Vec<(usize, usize)> {
         let Ok(st) = self.state.try_borrow() else { return Vec::new() };
         let Some(q) = &st.shown_query else { return Vec::new() };
         let Some(e) = st.row_entry(row) else { return Vec::new() };
-        search::match_ranges(e.name(), q)
+        let ranges = search::match_ranges(e.name(), q);
+        if ranges.is_empty() {
+            return ranges;
+        }
+        crate::bidi_layout::shift_ranges(ranges, crate::bidi_layout::list_name(e.name(), e.is_dir).1)
     }
 
     pub(super) fn custom_draw(&self, l: LPARAM) -> Option<isize> {

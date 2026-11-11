@@ -40,6 +40,15 @@ winapi = { version = "0.3", features = ["winuser", "consoleapi", "wincon", "proc
 # Windows.Media.Ocr for text in images and scanned PDFs (src/ocr.rs).
 windows = { version = "0.62", features = ["Foundation", "Foundation_Collections", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage", "Storage_Streams", "Win32_System_WinRT"] }
 
+# The new interface (src/webui/): WebView2 through wry, hosted in a Win32
+# window. MSVC only: with the GNU target webview2-com links WebView2Loader.dll
+# at load time, which would break the single-exe rule (and the program would
+# not start without that DLL), so mingw builds keep the classic UI only.
+[target.'cfg(all(windows, target_env = "msvc"))'.dependencies]
+wry = { version = "0.57.1", default-features = false }
+webview2-com = "0.39.1"
+raw-window-handle = "0.6.2"
+
 [build-dependencies]
 embed-manifest = "1.5.1"
 embed-resource = "3"
