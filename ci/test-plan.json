@@ -1,0 +1,7 @@
+{
+  "mem-test": {
+    "exes": ["0.9.1", "0.10.0", "branch"],
+    "scenarios": ["A", "F", "H"],
+    "quick": ["B", "C", "E", "F", "O", "K", "M", "S", "Q"]
+  }
+}
