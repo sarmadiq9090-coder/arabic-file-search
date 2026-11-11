@@ -18,7 +18,7 @@ use winapi::um::winuser::{NMHDR, SendMessageW, WM_NOTIFY, WM_SETFONT};
 
 use super::format::{ARABIC_DIGITS, wide_to_string};
 use super::keys::{HOTKEY_ID, HOTKEY_TEXT};
-use super::{autostart, shell, style};
+use super::{autostart, placement, shell, style};
 use super::startup::{phase, ui_font_family, work_area};
 use super::{App, COLUMNS, WS_EX_LAYOUTRTL, title};
 use crate::history::History;
@@ -67,10 +67,15 @@ impl NativeUi<AppUi> for App {
         nwg::Font::builder().family(family).size_absolute(19).build(&mut app.query_font)?;
         let f = Some(&app.font);
 
+        // Centred in the work area, not on the whole screen: on a 768-pixel
+        // screen the status line and the bottom buttons were under the
+        // taskbar. Given at creation, so it is also where a window that
+        // opens maximized goes when restored.
+        let (size, position) = placement::opening(settings.width, settings.height);
         nwg::Window::builder()
             .title(title())
-            .size((settings.width as i32, settings.height as i32))
-            .center(true)
+            .size(size)
+            .position(position)
             .ex_flags(crate::i18n::rtl_only(WS_EX_LAYOUTRTL))
             .flags({
                 // Started with Windows: wait in the tray until called. The
@@ -90,6 +95,8 @@ impl NativeUi<AppUi> for App {
         let w = &app.window;
         if let Some(h) = w.handle.hwnd() {
             crate::icon::set_window_icon(h);
+            // With the real frame, on the monitor it opened on.
+            placement::keep_on_screen(h);
         }
         phase("window");
 

@@ -88,6 +88,8 @@ mod watch_pace;
 mod web;
 #[cfg(any(windows, test))]
 mod webui;
+#[cfg(any(windows, test))]
+mod window_fit;
 
 #[cfg(windows)]
 fn main() {

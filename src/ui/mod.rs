@@ -21,6 +21,7 @@
 //! - `thumbs`: the thumbnail view of the results (Ctrl+T)
 //! - `startup`: start-up timing, logging, single instance, fonts
 //! - `lazy`: secondary windows created when they first open, for a quick start
+//! - `placement`: the main window opens centred above the taskbar and stays on screen
 //! - `quick`: the quick search popup (Ctrl+Alt+F, the floating box, the tray icon)
 //! - `floating`: the small search box above the taskbar clock
 //! - `tray`: the monochrome tray icon and menu, the new options, first-run question
@@ -45,6 +46,7 @@ mod lang_menu;
 mod keys;
 mod launcher_shim; // thin glue to crate::launcher, see the file
 mod lazy;
+mod placement;
 mod quick;
 mod quickswitch;
 mod rating;
@@ -544,11 +546,18 @@ impl App {
         if self.webui_show() {
             return;
         }
+        // The screen may have changed while the window waited by the clock
+        // (a monitor unplugged, another resolution or scale): bring it back
+        // inside the work area before it shows.
+        if let Some(h) = self.window.handle.hwnd() {
+            placement::keep_on_screen(h);
+        }
         self.window.set_visible(true);
         if let Some(h) = self.window.handle.hwnd() {
             unsafe {
                 if IsIconic(h) != 0 {
                     ShowWindow(h, SW_RESTORE);
+                    placement::keep_on_screen(h);
                 }
                 SetForegroundWindow(h);
             }
