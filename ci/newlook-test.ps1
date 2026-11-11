@@ -10,6 +10,17 @@
 #      "Try the new look".
 #   C. Probe (warns, never fails): choosing that item swaps in the new window
 #      without a restart and saves new_ui=1.
+#   0. Before A (the default since 0.10.1): with no settings.txt at all the
+#      new look opens, and the one-time switch (new_ui=1, new_ui_default=1)
+#      is saved; the first-run question over it is answered No.
+#   D. After C: settings as 0.10.0 left them (new_ui=0, no new_ui_default):
+#      the new look opens once; "Back to the classic look" (keyboard: Ctrl+,
+#      then Tab to the button) brings the classic window and saves new_ui=0;
+#      after a restart the classic window stays. If the keys miss the button
+#      (a probe), the test writes what the button saves and goes on.
+#
+# Note: in a right-to-left (mirrored) window the client origin is the top
+# RIGHT corner on screen; ClientOnScreen returns the true rectangle.
 #
 # Output: <Out>\newlook.png, newlook-query.png, classic.png, switched.png,
 # diagnostics.txt (windows, settings.txt, log.txt, crash.txt), report.md.
@@ -53,6 +64,7 @@ public static class N {
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, StringBuilder l, uint flags, uint ms, out IntPtr result);
     [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+    [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr h, int id);
     [DllImport("user32.dll")] static extern int GetMenuItemCount(IntPtr m);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetMenuString(IntPtr m, uint item, StringBuilder sb, int n, uint flags);
 
@@ -129,7 +141,7 @@ public static class N {
 # Real pixels, whatever the display scale.
 [void][N]::SetProcessDPIAware()
 
-$VK = @{ ALT = 0x12; ENTER = 0x0D; ESC = 0x1B; DOWN = 0x28; CTRL = 0x11; A = 0x41 }
+$VK = @{ ALT = 0x12; ENTER = 0x0D; ESC = 0x1B; DOWN = 0x28; CTRL = 0x11; A = 0x41; TAB = 0x09; COMMA = 0xBC; SPACE = 0x20 }
 $BM_CLICK = 0x00F5
 $data = Join-Path $env:LOCALAPPDATA 'BahthSari'
 $settingsFile = Join-Path $data 'settings.txt'
@@ -187,11 +199,29 @@ function Setting([string]$Text, [string]$Key) {
 }
 # settings.txt as the program reads it (key=value, ASCII, no BOM): no
 # first-run question (box above the clock, moving the exe, Store rating).
-function Write-Settings([int]$NewUi) {
+# With -Old: as 0.10.0 wrote it, without the one-time default marker
+# (new_ui_default), so the program makes the new look the default once.
+function Write-Settings([int]$NewUi, [switch]$Old) {
     New-Item -ItemType Directory -Force $data | Out-Null
     $text = "floating_asked=1`nmove_asked=1`nrating_asked=1`nnew_ui=$NewUi`nnew_ui_failed=0`n"
+    if (-not $Old) { $text += "new_ui_default=1`n" }
     [IO.File]::WriteAllText($settingsFile, $text, (New-Object Text.ASCIIEncoding))
     Say "settings.txt written: $($text -replace "`n", ' ')"
+}
+# Answers the program's message boxes (the first-run questions) with No,
+# else Cancel, else closes them. Returns how many there were.
+function Dismiss-Dialogs([int]$ProcId) {
+    $n = 0
+    foreach ($d in @(Get-Windows $ProcId | Where-Object { $_.Visible -and $_.Class -eq '#32770' })) {
+        $n++
+        $text = (Get-Children $d.Handle | Where-Object { $_.Class -eq 'Static' -and $_.Text } | ForEach-Object Text) -join ' '
+        Say "dialog '$($d.Text)': $text"
+        $no = [N]::GetDlgItem($d.Handle, 7)
+        if ($no -eq [IntPtr]::Zero) { $no = [N]::GetDlgItem($d.Handle, 2) }
+        if ($no -ne [IntPtr]::Zero) { [void][N]::PostMessage($no, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero) }
+        else { [void][N]::PostMessage($d.Handle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) }  # WM_CLOSE
+    }
+    return $n
 }
 function Log-Text { if (Test-Path $logFile) { [IO.File]::ReadAllText($logFile, [Text.Encoding]::UTF8) } else { '' } }
 function Log-Lines([string]$Pattern) { @((Log-Text) -split "`r?`n" | Where-Object { $_ -match $Pattern }) }
@@ -307,13 +337,31 @@ if (-not $wv2) {
 }
 Say "WebView2 runtime $wv2"
 
-# A clean start, as a new user who chose the new look.
+# A clean start, as a new user.
 Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force
 Remove-Item $data -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item 'HKCU:\Software\BahthSari' -Recurse -Force -ErrorAction SilentlyContinue
-Write-Settings 1
 
 try {
+    # ------------------------------------------------------------ 0. a new user: the default
+    Say 'part 0: no settings.txt at all'
+    $t0 = Get-Date
+    Start-Program
+    $win = Wait-Until { New-Look $script:proc.Id } 40
+    Record 'core' 'a new user (no settings.txt) gets the new look' ($null -ne $win) $(if ($win) { "'$($win.Text)' after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { 'no new window' })
+    # The first-run question about the box above the clock comes over it.
+    $asked = Wait-Until { @(Get-Windows $script:proc.Id | Where-Object { $_.Visible -and $_.Class -eq '#32770' }).Count -gt 0 } 20
+    Record 'probe' 'the first-run question shows over the new look' ([bool]$asked)
+    if ($asked) { Full-Shot 'first-run-question'; [void](Dismiss-Dialogs $script:proc.Id); Start-Sleep -Seconds 2 }
+    $s = Read-Settings
+    Record 'core' 'the one-time default is saved (new_ui=1, new_ui_default=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_default') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default')")
+    Record 'core' 'the classic window stays hidden (new user)' ($null -eq (Classic $script:proc.Id))
+    Alive 'new user'
+    Check-Crash 'new user'
+    if ($results | Where-Object Result -eq 'FAIL') { Diagnostics 'new user' }
+    Stop-Program
+    Write-Settings 1
+
     # ------------------------------------------------------------ A. the new look
     $t0 = Get-Date
     Start-Program
@@ -426,6 +474,60 @@ try {
     } else {
         Full-Shot 'classic-screen'
     }
+    Stop-Program
+
+    # ------------------------------------------------------------ D. 0.10.0 settings: the new look once, then the user's choice
+    Say 'part D: settings from 0.10.0 (new_ui=0, no new_ui_default)'
+    Write-Settings 0 -Old
+    $t0 = Get-Date
+    Start-Program
+    $win = Wait-Until { New-Look $script:proc.Id } 40
+    Record 'core' '0.10.0 settings with new_ui=0: the new look opens once' ($null -ne $win) $(if ($win) { "after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { 'no new window' })
+    $s = Read-Settings
+    Record 'core' 'the one-time switch is saved (new_ui=1, new_ui_default=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_default') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default')")
+    $clicked = $false
+    if ($win) {
+        # Let the page load, then: Ctrl+, opens its settings with the focus
+        # on "Back to search"; Tab goes to العربية, English, the digits
+        # switch, then "Back to the classic look".
+        Start-Sleep -Seconds 8
+        Focus-Window $win.Handle
+        [void][N]::PostMessage($win.Handle, 0x001F, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CANCELMODE (the Alt tap)
+        Start-Sleep -Milliseconds 300
+        [N]::Chord($VK.CTRL, $VK.COMMA)
+        Start-Sleep -Seconds 1
+        for ($i = 0; $i -lt 4; $i++) { [N]::Chord($VK.TAB); Start-Sleep -Milliseconds 200 }
+        [void](Shot-Client $win 'back-button-focused')
+        [N]::Chord($VK.ENTER)
+        $cw = Wait-Until { Classic $script:proc.Id } 10
+        $clicked = $null -ne $cw
+        Record 'probe' '"Back to the classic look" by keyboard brings the classic window' $clicked
+        if ($clicked) {
+            Start-Sleep -Seconds 2
+            $s = Read-Settings
+            Record 'core' '"Back to the classic look" saves new_ui=0 (the marker kept)' (((Setting $s 'new_ui') -eq '0') -and ((Setting $s 'new_ui_default') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default')")
+            Record 'core' 'the new window is gone after going back' ($null -eq (New-Look $script:proc.Id))
+            [void](Shot-Client $cw 'back-to-classic')
+        }
+    }
+    Alive '0.10.0 settings'
+    Check-Crash '0.10.0 settings'
+    Stop-Program
+    if (-not $clicked) {
+        Say 'the keys missed the button: writing what it saves (new_ui=0, new_ui_default=1)'
+        Write-Settings 0
+    }
+    # A restart: the user's choice sticks, the one-time switch is not made again.
+    Start-Program
+    $cw = Wait-Until { Classic $script:proc.Id } 40
+    Record 'core' 'after "Back to the classic look" and a restart, the classic window opens' ($null -ne $cw)
+    Record 'core' 'and no new window' ($null -eq (New-Look $script:proc.Id))
+    Start-Sleep -Seconds 3
+    $s = Read-Settings
+    Record 'core' 'settings.txt still says new_ui=0 after the restart' ((Setting $s 'new_ui') -eq '0') ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default')")
+    if ($cw) { [void](Shot-Client $cw 'classic-after-restart') }
+    Alive 'classic after restart'
+    Check-Crash 'classic after restart'
 } catch {
     Record 'core' 'the test ran to the end' $false "$_ at line $($_.InvocationInfo.ScriptLineNumber)"
 } finally {

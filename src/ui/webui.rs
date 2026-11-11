@@ -1,8 +1,8 @@
-//! The new main window (the new interface, opt-in while it is built: «جرّب
-//! الشكل الجديد» in the classic window's Options menu, kept in the settings
-//! as `new_ui`, or `--webui` / `BAHTH_WEBUI=1` for one launch; see
-//! `crate::webui`). Its settings page has «العودة إلى الشكل القديم». Either
-//! way the windows are swapped at once, without a restart.
+//! The new main window (the new interface; the default since 0.10.1, kept in
+//! the settings as `new_ui`, or `--webui` / `BAHTH_WEBUI=1` for one launch;
+//! see `crate::webui`). Its settings page has «العودة إلى الشكل القديم» and
+//! the classic window's Options menu «جرّب الشكل الجديد»; either way the
+//! windows are swapped at once, without a restart.
 //!
 //! The program runs as always (index, drive watcher, tray icon, Ctrl+Alt+F
 //! and its quick popup, the box above the clock, updates); only the main
@@ -80,6 +80,9 @@ mod imp {
         window: nwg::Window,
         /// Wakes the UI thread when a background search finishes.
         notice: nwg::Notice,
+        /// Wakes the UI thread to start a drag the page asked for, right
+        /// after WebView2's message handler returns.
+        drag_notice: nwg::Notice,
     }
 
     /// A search inside documents running on its own threads.
@@ -134,6 +137,11 @@ mod imp {
         loading_since: Cell<Option<Instant>>,
         /// When the page last said hello, until it fails.
         ready_since: Cell<Option<Instant>>,
+        /// The file a drag the page started is for, until the drag starts.
+        drag: RefCell<Option<String>>,
+        /// The page asked for the Options menu: opened on the next tick, not
+        /// inside WebView2's handler (the menu runs a message loop).
+        options_pending: Cell<bool>,
         /// The program is restarting from the page's own message handler:
         /// the page is left to the process exit, not dropped inside it.
         exiting: Cell<bool>,
@@ -206,6 +214,7 @@ mod imp {
                 .build(&mut parts.window)
                 .map_err(|e| e.to_string())?;
             nwg::Notice::builder().parent(&parts.window).build(&mut parts.notice).map_err(|e| e.to_string())?;
+            nwg::Notice::builder().parent(&parts.window).build(&mut parts.drag_notice).map_err(|e| e.to_string())?;
             let hwnd = parts.window.handle.hwnd().ok_or("no window handle")?;
             crate::icon::set_window_icon(hwnd);
             self.webui.parts.set(parts);
@@ -219,6 +228,7 @@ mod imp {
                     let parts = &app.webui.parts;
                     match evt {
                         nwg::Event::OnNotice if h == parts.notice => app.on_webui_found(),
+                        nwg::Event::OnNotice if h == parts.drag_notice => app.webui_drag(),
                         nwg::Event::OnWindowClose if h == parts.window => {
                             if let nwg::EventData::OnWindowClose(d) = &data {
                                 d.close(false);
@@ -467,6 +477,11 @@ mod imp {
                 "توقّف الشكل الجديد عن العمل، فعاد البرنامج إلى الشكل القديم. يمكنك تجربته من جديد من «خيارات».",
                 "The new look stopped working, so the program went back to the classic look. You can try it again from Options."
             ));
+        }
+
+        /// The new main window, while it is the one in use.
+        pub(in super::super) fn webui_window(&self) -> Option<&nwg::Window> {
+            self.webui.active.get().then_some(&self.webui.parts.window)
         }
 
         /// Whether the new main window is the one in use and on screen.
@@ -869,6 +884,15 @@ mod imp {
                 }
                 Request::Hide {} => self.webui_hide(),
                 Request::ClassicLook {} => self.webui_leave(true),
+                Request::OptionsMenu {} => self.webui.options_pending.set(true),
+                Request::Drag { list, seq, ver, id } => {
+                    // Started right after this handler returns (the drag
+                    // runs its own message loop, not inside WebView2's).
+                    if let Some(path) = self.webui_path(list, seq, ver, id) {
+                        self.webui.drag.replace(Some(path));
+                        self.webui.parts.drag_notice.sender().notice();
+                    }
+                }
             }
         }
 
@@ -1003,6 +1027,16 @@ mod imp {
             self.webui_send(&Outbound::Removed { list, seq, ver, id });
             self.webui_send_recent();
             self.webui_notice(tr!("نُقل الملف إلى سلة المحذوفات.", "The file was moved to the Recycle Bin."));
+        }
+
+        /// Drags the file the page asked for (`Request::Drag`), as the
+        /// classic list does; nothing happens when the mouse button was
+        /// already released.
+        fn webui_drag(&self) {
+            let Some(path) = self.webui.drag.take() else { return };
+            if let Some(h) = self.webui.parts.window.handle.hwnd() {
+                crate::dragdrop::drag_files_from(h, std::slice::from_ref(&path));
+            }
         }
 
         /// Windows' folder dialog; the chosen folder becomes the one searched.
@@ -1249,6 +1283,9 @@ mod imp {
                 // Back to the classic window: its WebView2 is freed.
                 self.webui.host.replace(None);
             }
+            if self.webui.options_pending.replace(false) && self.webui_visible() {
+                self.show_menu(&self.options_menu);
+            }
             if self.webui.active.get() && !self.webui.switching.get() {
                 if let Some(browser_gone) = self.webui.failed.take() {
                     self.webui_failed(browser_gone, "a WebView2 process failed");
@@ -1361,6 +1398,10 @@ mod imp {
 
         pub(in super::super) fn webui_visible(&self) -> bool {
             false
+        }
+
+        pub(in super::super) fn webui_window(&self) -> Option<&nwg::Window> {
+            None
         }
 
         pub(in super::super) fn with_modal_owner<R>(&self, f: impl FnOnce(winapi::shared::windef::HWND) -> R) -> R {

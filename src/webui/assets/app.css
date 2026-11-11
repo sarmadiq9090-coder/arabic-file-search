@@ -79,6 +79,9 @@ kbd { font: 500 11.5px/1 var(--font); direction: ltr; unicode-bidi: isolate; dis
 .field svg.i { width: 22px; height: 22px; color: var(--muted); }
 .field input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: 500 20px/1.2 var(--font); unicode-bidi: plaintext; }
 .field input::placeholder { color: var(--faint); font-weight: 400; }
+/* While empty, the box (dir="auto") is left to right, and so was its hint:
+   «…ابحث باسم الملف» on the left. The hint follows the page's direction. */
+html[dir="rtl"] .field input:placeholder-shown { direction: rtl; unicode-bidi: isolate; }
 .field .meta { color: var(--muted); font-size: 12.5px; white-space: nowrap; display: flex; gap: 8px; align-items: center; }
 .hbtn { width: 54px; height: 54px; flex: none; display: grid; place-items: center; border-radius: 14px; border: 1.5px solid var(--line-2); background: var(--surface); color: var(--muted); cursor: pointer; box-shadow: var(--shadow-sm); }
 .hbtn:hover, .hbtn[aria-expanded="true"], .hbtn[aria-pressed="true"] { border-color: var(--link); color: var(--text); }

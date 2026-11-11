@@ -299,6 +299,12 @@ function Find-Controls($Main) {
 Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force
 Remove-Item $data -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item 'HKCU:\Software\BahthSari' -Recurse -Force -ErrorAction SilentlyContinue
+# This test is about the classic window. The new look is the default since
+# 0.10.1 (ci/newlook-test.ps1 tests it): settings.txt says "classic, chosen",
+# as after "Back to the classic look", and nothing else, so the first-run
+# questions still come. (key=value, ASCII, no BOM: how the program reads it.)
+New-Item -ItemType Directory -Force $data | Out-Null
+[IO.File]::WriteAllText((Join-Path $data 'settings.txt'), "new_ui=0`nnew_ui_default=1`n", (New-Object Text.ASCIIEncoding))
 $docs = Join-Path $env:USERPROFILE 'Documents\InstaFind UI test'
 New-Item -ItemType Directory -Force $docs | Out-Null
 Set-Content -LiteralPath (Join-Path $docs 'تقرير مالي ٢٠٢٦.txt') -Value 'الميزانية السنوية للشركة' -Encoding UTF8

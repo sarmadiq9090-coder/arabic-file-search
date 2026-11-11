@@ -92,11 +92,11 @@ function fakeProgram(cfg) {
     hello: [], search: ["seq", "q", "kind", "size", "date", "content", "sort", "desc"], more: ["seq", "ver", "from"], sort: ["seq", "sort", "desc"], stop: ["seq"],
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id"],
-    save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], classic_look: [],
+    save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], classic_look: [], options_menu: [], drag: ["list", "seq", "ver", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
-  const ROW_OPS = ["more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope"];
+  const ROW_OPS = ["more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope", "drag"];
   let lastVer = 0, recentVer = 0;
   const nextVer = () => ++lastVer;
   const send = (m) => setTimeout(() => window.__instafind.recv(m), 0);
@@ -253,6 +253,11 @@ const SHOTS = [
   ["settings-en-dark", "en", "dark", [["key", "Control+,"]], { expect: { settings: true } }],
   // «العودة إلى الشكل القديم»: one typed request.
   ["classic-look-ar-light", "ar", "light", [["click", "#set-btn"], ["click", "#classic-look"], ["wait", 50]], { expect: { settings: true, lastSent: "classic_look" } }],
+  // Dragging a row out asks the program to drag that file (once), naming its list version.
+  ["drag-en-light", "en", "light", [["type", "report"], ["drag", "#r1"]], { expect: { drags: 1, dialog: false } }],
+  ["drag-recent-ar-light", "ar", "light", [["drag", "#rr0"]], { expect: { lastSent: "drag", drags: 1 } }],
+  // «فتح قائمة الخيارات…»: the program's Options menu (tools, support, updates).
+  ["options-menu-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#options-menu"], ["wait", 50]], { expect: { settings: true, lastSent: "options_menu" } }],
   // A name split into base and extension keeps its matches marked, in the extension too.
   ["names-split-ar-light", "ar", "light", [["type", "xlsx"]], { expect: { marks: 2, fnames: 2 } }],
 ];
@@ -286,6 +291,14 @@ const SHOTS = [
       else if (what === "chip") { await pg.click(`#chip-${a}`); await pg.click(`#menu-${a} [data-k="${b}"]`); await pg.waitForTimeout(120); }
       else if (what === "wait") await pg.waitForTimeout(a);
       else if (what === "eval") await pg.evaluate(a);
+      else if (what === "drag") {
+        const b = await pg.locator(a).boundingBox();
+        await pg.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+        await pg.mouse.down();
+        await pg.mouse.move(b.x + b.width / 2 + 30, b.y + b.height / 2 + 12, { steps: 5 });
+        await pg.mouse.up();
+        await pg.waitForTimeout(60);
+      }
     }
     await pg.evaluate(() => document.fonts.ready);
     await pg.waitForTimeout(100);
@@ -302,8 +315,11 @@ const SHOTS = [
         const xs = [...p.querySelectorAll(":scope > bdi")].filter((b) => b.getClientRects().length).map((b) => b.getClientRects()[0]);
         for (let i = 1; i < xs.length; i++) if (xs[i].top === xs[i - 1].top && xs[i].left < xs[i - 1].left) bad.push("path segments out of order: " + p.textContent);
       }
+      // The empty search box's hint reads in the page's direction («ابحث باسم الملف…», its ellipsis at the end).
+      const box = document.querySelector("#q");
+      if (!box.value && getComputedStyle(box).direction !== (lang === "ar" ? "rtl" : "ltr")) bad.push("search hint not in the page's direction");
       // Names, snippets and matching lines pick their own direction.
-      for (const el of document.querySelectorAll(".pv-name .t, .row .n3 .sn, .lines .lt, .field input")) if (visible(el) && getComputedStyle(el).unicodeBidi !== "plaintext" && el.tagName !== "BDI" && !(el.classList.contains("fname") && el.dir)) bad.push("text without its own direction: " + el.className);
+      for (const el of document.querySelectorAll(".pv-name .t, .row .n3 .sn, .lines .lt, .field input")) if (visible(el) && getComputedStyle(el).unicodeBidi !== "plaintext" && el.tagName !== "BDI" && !(el.classList.contains("fname") && el.dir) && !el.matches(":placeholder-shown")) bad.push("text without its own direction: " + el.className);
       // File names: the extension (".xlsx") left to right, at the end of the
       // name as it reads: on the left of an Arabic name, on the right of an
       // English one.
@@ -342,6 +358,7 @@ const SHOTS = [
         sent: window.__sent.map((m) => m.op), recycles: window.__sent.filter((m) => m.op === "recycle").length,
         stale: window.__stale.length, q: document.querySelector("#q").value, focus: document.activeElement && document.activeElement.id,
         lastSent: window.__sent.length ? window.__sent[window.__sent.length - 1].op : null,
+        drags: window.__sent.filter((m) => m.op === "drag").length,
       };
     }, lang);
     for (const b of check.bad) errors.push(`${name}: ${b}`);

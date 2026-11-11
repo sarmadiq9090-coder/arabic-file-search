@@ -233,14 +233,15 @@ jobs:
           path: ${{ runner.temp }}/ui-test
 
   # The new look (WebView2 main window) on a real Windows desktop
-  # (ci/newlook-test.ps1): with new_ui=1 the page opens and loads (no WebView2
-  # failure, no blank-page fallback), the setting is kept and the window is
-  # painted; with new_ui=0 the classic window offers "Try the new look".
-  # `release` waits for it.
+  # (ci/newlook-test.ps1): a new user gets it (the default), its page opens
+  # and loads (no WebView2 failure, no blank-page fallback) and is painted;
+  # with new_ui=0 the classic window offers "Try the new look"; settings
+  # from 0.10.0 get the new look once, and "Back to the classic look" sticks
+  # after a restart. `release` waits for it.
   newlook:
     needs: exe
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:

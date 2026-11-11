@@ -565,12 +565,15 @@ impl App {
     }
 
     fn save_settings(&self) {
+        // The size of the main window in use: the new look's while it is
+        // the one (the classic window stays hidden then), else the classic.
+        let main = self.webui_window().unwrap_or(&self.window);
         let mut st = self.state.borrow_mut();
         let s = &mut st.settings;
-        if let Some(h) = self.window.handle.hwnd() {
+        if let Some(h) = main.handle.hwnd() {
             s.maximized = unsafe { IsZoomed(h) } != 0;
-            if !s.maximized && unsafe { IsIconic(h) } == 0 && self.window.visible() {
-                (s.width, s.height) = self.window.size();
+            if !s.maximized && unsafe { IsIconic(h) } == 0 && main.visible() {
+                (s.width, s.height) = main.size();
             }
         }
         // The icon view has no columns to measure.

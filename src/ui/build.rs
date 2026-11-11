@@ -53,6 +53,11 @@ impl Drop for AppUi {
 impl NativeUi<AppUi> for App {
     fn build_ui(mut app: App) -> Result<AppUi, nwg::NwgError> {
         let mut settings = Settings::load();
+        // 0.10.1: the new look is the default, once (see the method).
+        if settings.make_new_look_default() {
+            super::startup::log("settings: the new look is now the default (once)");
+            settings.save();
+        }
         // A size saved on a bigger screen must still fit this one.
         let (max_w, max_h) = work_area();
         settings.width = settings.width.min(max_w);

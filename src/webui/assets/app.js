@@ -62,7 +62,8 @@
       settings: "الإعدادات", settingsKey: "الإعدادات (Ctrl+,)", back: "رجوع إلى البحث",
       sLang: "اللغة", sLangNote: "ستظهر الواجهة باللغة المختارة بعد إعادة تشغيل البرنامج.", restart: "إعادة التشغيل الآن",
       sDisplay: "العرض", sDigits: "عرض الأرقام بالعربية (٠١٢٣)",
-      sLook: "الشكل الجديد", sLookSub: "هذا هو الشكل الجديد للبرنامج، وما زال تجريبياً. يمكنك العودة إلى الشكل القديم متى شئت.", classicLook: "العودة إلى الشكل القديم",
+      sLook: "الشكل الجديد", sLookSub: "هذا هو الشكل الجديد للبرنامج. يمكنك العودة إلى الشكل القديم متى شئت، والرجوع منه إلى الجديد من «خيارات ← جرّب الشكل الجديد».", classicLook: "العودة إلى الشكل القديم",
+      sMore: "المزيد", sMoreRow: "خيارات أخرى", sMoreSub: "التحقق من التحديثات، الدعم والملاحظات، أدوات مثل الملفات المكررة وأحجام المجلدات، وإعدادات البحث من أي مكان", moreBtn: "فتح قائمة الخيارات…",
       sSearch: "البحث والفهرسة", sHideSystem: "إخفاء ملفات النظام", sHideSystemSub: "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
       sContentIndex: "فهرسة محتوى المستندات في الخلفية", sContentIndexSub: "بحث أسرع داخل الملفات، ويشمل النص في الصور والملفات الممسوحة",
       sAutoIndex: "تحديث الفهرس تلقائياً عند تغيّر الملفات", reindex: "تحديث الفهرس الآن",
@@ -115,7 +116,8 @@
       settings: "Settings", settingsKey: "Settings (Ctrl+,)", back: "Back to search",
       sLang: "Language", sLangNote: "The interface changes language after the program restarts.", restart: "Restart now",
       sDisplay: "Display", sDigits: "Show Arabic-Indic digits (٠١٢٣)",
-      sLook: "New look", sLookSub: "This is the program's new look, still being tried out. You can go back to the classic look at any time.", classicLook: "Back to the classic look",
+      sLook: "New look", sLookSub: "This is the program's new look. You can go back to the classic look at any time, and come back from Options › Try the new look.", classicLook: "Back to the classic look",
+      sMore: "More", sMoreRow: "More options", sMoreSub: "Check for updates, support and feedback, tools such as duplicate files and folder sizes, and search-from-anywhere settings", moreBtn: "Open the Options menu…",
       sSearch: "Search and indexing", sHideSystem: "Hide system files", sHideSystemSub: "The Windows folder, temporary and cache files",
       sContentIndex: "Index document contents in the background", sContentIndexSub: "Faster search inside files, text in pictures and scans included",
       sAutoIndex: "Update the index automatically when files change", reindex: "Update the index now",
@@ -897,6 +899,7 @@
       section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
       section(T.sAnywhere, sw("hotkey_quick", T.sHotkey), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
       section(T.sStartup, sw("autostart", T.sAutostart)),
+      section(T.sMore, h("div", { class: "srow" }, h("label", { for: "options-menu" }, h("span", null, T.sMoreRow), h("small", null, T.sMoreSub)), btn("", I.dots, T.moreBtn, () => send({ op: "options_menu" }), { id: "options-menu" }))),
       section(T.sAbout, h("p", { class: "num" }, digits(T.version(st.version))), h("p", { class: "muted" }, T.trust)),
     );
   }
@@ -915,6 +918,28 @@
   list.addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) { focusList(); select(+r.dataset.i, false); openCtx(+r.dataset.i, null, "results", { left: e.clientX, top: e.clientY }); } });
   list.addEventListener("scroll", () => { if (list.scrollTop + list.clientHeight > list.scrollHeight - FIRST_PAGE_GUARD) askMore(); });
   $("recent").addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) act("open", S.recent[+r.dataset.i], "recent"); });
+  // Dragging a row out (to Explorer, a mail, a chat) is the program's own
+  // drag of the file, as in the classic list: a press on a row that moves a
+  // few pixels with the button down asks for it (once per press). (The
+  // rows' mousedown keeps the focus in the box, so the page itself never
+  // starts a drag.)
+  // The click that ends a drag opens nothing.
+  let press = null, dragged = false;
+  for (const [el, listName] of [[list, "results"], [$("recent"), "recent"]]) {
+    el.addEventListener("mousedown", (e) => {
+      const r = e.button === 0 && e.target.closest(".row");
+      press = r ? { x: e.clientX, y: e.clientY, i: +r.dataset.i, listName } : null;
+      dragged = false;
+    });
+  }
+  document.addEventListener("mousemove", (e) => {
+    if (!press || !(e.buttons & 1)) { press = null; return; }
+    if (Math.abs(e.clientX - press.x) + Math.abs(e.clientY - press.y) < 6) return;
+    const p = press; press = null; dragged = true;
+    act("drag", (p.listName === "recent" ? S.recent : S.rows)[p.i], p.listName);
+  });
+  document.addEventListener("mouseup", () => { press = null; });
+  document.addEventListener("click", (e) => { if (dragged) { dragged = false; e.stopPropagation(); e.preventDefault(); } }, true);
   $("recent").addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) openCtx(+r.dataset.i, null, "recent", { left: e.clientX, top: e.clientY }); });
   $("sugg").addEventListener("click", (e) => { const s = e.target.closest(".sg"); if (s) applySuggestion(S.sugg[+s.dataset.k]); });
   $("tips").addEventListener("click", (e) => { const c = e.target.closest("code"); if (c) { q.value = c.textContent; q.focus(); runSearch(); } });

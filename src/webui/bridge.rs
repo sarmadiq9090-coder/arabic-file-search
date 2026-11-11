@@ -208,6 +208,9 @@ pub enum Request {
     Rename { list: List, seq: u64, ver: u64, id: u32, name: String },
     /// Move the file of row `id` to the Recycle Bin (the page asked first).
     Recycle { list: List, seq: u64, ver: u64, id: u32 },
+    /// Drag the file of row `id` out of the window (to Explorer, a mail, a
+    /// chat), as the classic list does; the page saw the drag start.
+    Drag { list: List, seq: u64, ver: u64, id: u32 },
     /// Search only in the folder of row `id` (the folder itself for a folder).
     Scope { list: List, seq: u64, ver: u64, id: u32 },
     /// Choose the folder to search in with Windows' folder dialog.
@@ -243,6 +246,9 @@ pub enum Request {
     /// Go back to the classic window, now and from the next start («العودة
     /// إلى الشكل القديم» in the settings).
     ClassicLook {},
+    /// Open the program's Options menu (the classic window's, with its
+    /// tools, support, updates and quick-search settings) at the pointer.
+    OptionsMenu {},
 }
 
 /// Why a message was refused.
@@ -1264,6 +1270,10 @@ mod tests {
         assert_eq!(req(r#""op":"lang","lang":"fr""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"restart""#), Ok(Request::Restart {}));
         assert_eq!(req(r#""op":"classic_look""#), Ok(Request::ClassicLook {}));
+        assert_eq!(req(r#""op":"options_menu""#), Ok(Request::OptionsMenu {}));
+        assert_eq!(req(r#""op":"drag","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::Drag { list: List::Results, seq: 2, ver: 3, id: 1 }));
+        assert_eq!(req(r#""op":"drag","list":"results","seq":2,"ver":3,"id":1,"path":"C:\\x""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"options_menu","item":3"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"classic_look","forever":true"#), Err(Rejected::Malformed));
         assert_eq!(parse(r#"{"op":"classic_look"}"#, SRC, TOKEN), Err(Rejected::Token));
         assert_eq!(parse(&format!(r#"{{"t":"{TOKEN}","op":"classic_look"}}"#), "https://evil.example/", TOKEN), Err(Rejected::Origin));
