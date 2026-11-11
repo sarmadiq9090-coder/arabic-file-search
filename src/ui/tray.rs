@@ -338,8 +338,8 @@ impl App {
         let params = nwg::MessageParams {
             title: title(),
             content: tr!(
-                "هل تريد خانة البحث الصغيرة فوق الساعة؟ تقدر تغيّر هذا لاحقًا من الإعدادات.",
-                "Would you like the small search box above the clock? You can change this later in Options."
+                "هل تريد خانة بحث صغيرة فوق شريط المهام؟ يمكنك تغيير ذلك لاحقاً من «خيارات».",
+                "Show a small search box just above the taskbar? You can change this later in Options."
             ),
             buttons: nwg::MessageButtons::YesNo,
             icons: nwg::MessageIcons::Question,
