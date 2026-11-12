@@ -459,6 +459,17 @@ fn prefix_len(tok: &str, list: &[&str]) -> Option<usize> {
     })
 }
 
+/// True when the token `tok` is a filter rather than a word: a type
+/// (`ext:`, `*.`), folder, size, date, regex, whole-word, Arabizi, typo,
+/// root or system prefix, in any spelling [`Query::parse`] accepts. (A bare
+/// `.ext` is left to the caller: it may be a word.)
+pub(crate) fn is_filter_token(tok: &str) -> bool {
+    let modes = [&FOLDER_PREFIXES[..], &FRANCO_PREFIXES, &FUZZY_PREFIXES, &ROOT_PREFIXES, &SYSTEM_PREFIXES];
+    value_prefix(tok).is_some()
+        || modes.into_iter().any(|list| prefix_len(tok, list).is_some())
+        || ext_filter(&tok.to_lowercase()).is_some_and(|(_, bare)| !bare)
+}
+
 /// Length of the folder prefix `tok` starts with, if any.
 fn folder_prefix(tok: &str) -> Option<usize> {
     prefix_len(tok, &FOLDER_PREFIXES)

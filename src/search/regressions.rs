@@ -396,3 +396,25 @@ fn scope_with_letters_whose_lower_case_is_longer() {
     assert!(in_scope(r"C:\المستندات\a", &scope(r"C:\المستندات")));
     assert!(!in_scope(r"C:\Docs2\a.txt", r"c:\docs"));
 }
+
+// ------------------------------------- wrong keyboard layout and filters
+
+/// The wrong-layout fallback kept only `ext:`, `*.` and `folder:` as they
+/// were: `hgjrvdv size:>1mb` became `التقرير سهئث:>1ةلا` and found nothing.
+#[test]
+fn layout_fallback_keeps_every_filter() {
+    use crate::layout::convert_layout;
+    assert_eq!(convert_layout("hgjrvdv size:>1mb").as_deref(), Some("التقرير size:>1mb"));
+    assert_eq!(convert_layout("hgjrvdv dm:today ww:x").as_deref(), Some("التقرير dm:today ww:x"));
+    assert_eq!(convert_layout("hgjrvdv regex:^a sys: fuzzy: ext:pdf *.doc").as_deref(), Some("التقرير regex:^a sys: fuzzy: ext:pdf *.doc"));
+    assert_eq!(convert_layout("hgjrvdv حجم:>1م تاريخ:اليوم").as_deref(), Some("التقرير حجم:>1م تاريخ:اليوم"));
+    // The other way round: Arabic typed for Latin, filters kept.
+    assert_eq!(convert_layout("اثممخ size:>1mb").as_deref(), Some("hello size:>1mb"));
+    // A filter alone has nothing to convert; words are converted as before.
+    assert_eq!(convert_layout("size:>1mb"), None);
+    assert_eq!(convert_layout("hgjrvdv").as_deref(), Some("التقرير"));
+    // And the converted query keeps its filter when parsed.
+    let q = at(&convert_layout("hgjrvdv size:>1mb").unwrap());
+    assert_eq!(q.size, at("size:>1mb").size);
+    assert_eq!(q.terms[0].alts[0], "التقرير");
+}
