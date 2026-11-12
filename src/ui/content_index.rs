@@ -104,6 +104,9 @@ impl App {
         let job = Arc::new(Warm::default());
         st.warm = Some(job.clone());
         let index = st.index.clone();
+        // Deleted documents are forgotten only after a warm-up over a
+        // complete index: not while it loads or a scan is rebuilding it.
+        let index_settled = st.loading.is_none() && st.scan.is_none() && !index.entries.is_empty();
         drop(st);
         crate::crash_log::spawn_named("content-warm", move || {
             let finished = Finished(job.clone());
@@ -131,6 +134,14 @@ impl App {
             let started = Instant::now();
             let threads = content_cache::warm_threads();
             content_cache::warm(&docs, cache, progress, cancel, threads, &idle_priority);
+            if index_settled && !cancel.load(Ordering::Relaxed) {
+                let indexed: std::collections::HashSet<&str> = docs.iter().map(|e| &*e.path).collect();
+                let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64);
+                let gone = cache.evict_missing(&indexed, now);
+                if gone > 0 {
+                    log(&format!("content index: forgot {gone} deleted documents"));
+                }
+            }
             let s = cache.stats();
             log(&format!(
                 "content index warm: {} of {} new documents in {} ms on {threads} threads{}; stored {} ({} with text), {} KB{}",

@@ -65,6 +65,31 @@ const SIGNATURE: &str = "extractor.txt";
 /// before: their "no text" entries are then dropped once.
 #[cfg_attr(not(windows), allow(dead_code))] // read by the Windows UI
 pub const EXTRACTOR_VERSION: u32 = 2;
+/// When the store last forgot deleted files (unix seconds), see
+/// [`ContentCache::evict_missing`].
+const EVICTED: &str = "evicted.txt";
+/// Deleted files are forgotten at most this often (seconds).
+const EVICT_EVERY: i64 = 24 * 3600;
+/// One pass forgets at most this many entries, or a quarter of the store
+/// if that is more: a glitch can never empty it at once.
+const EVICT_MIN_BATCH: usize = 1000;
+
+/// The root a path lives under, as the OS reaches it: `C:\`, the share of
+/// `\\server\share\…`, or `/`. `None` when there is none to tell.
+fn root_of(path: &str) -> Option<&str> {
+    let b = path.as_bytes();
+    if b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && matches!(b[2], b'\\' | b'/') {
+        return Some(&path[..3]);
+    }
+    if let Some(rest) = path.strip_prefix("\\\\") {
+        // \\server\share\ (the share itself must be reachable).
+        let server = rest.find('\\')?;
+        let share = rest[server + 1..].find('\\').map_or(rest.len(), |s| server + 1 + s);
+        return path.get(..2 + share + 1).or(Some(path));
+    }
+    path.starts_with('/').then_some("/")
+}
+
 /// `Meta::hash` of a "no text" entry that marks a file a run died reading
 /// (unused otherwise for "no text"): kept whatever the signature says.
 const POISONED: u64 = u64::from_le_bytes(*b"POISONED");
@@ -548,6 +573,69 @@ impl ContentCache {
         dropped
     }
 
+    /// Forgets the documents that are gone: entries for paths that are not
+    /// in `indexed` (the documents of a complete, current file index) and
+    /// that the disk confirms do not exist, under a root (drive, share) that
+    /// is there right now; then drops their text from `content.dat` when
+    /// any was stored. Their text would otherwise stay on disk for good
+    /// (a privacy issue), and at the size cap no new document would be
+    /// stored. Guarded against a transient glitch wiping the store: nothing
+    /// happens when `indexed` is empty or a pass ran in the last day, an
+    /// unplugged drive or an offline share keeps its entries, and one pass
+    /// forgets at most a quarter of the store (at least 1000). `now`: unix
+    /// seconds. Returns how many entries were forgotten.
+    pub fn evict_missing(&self, indexed: &std::collections::HashSet<&str>, now: i64) -> usize {
+        if indexed.is_empty() {
+            return 0;
+        }
+        let stamp_file = self.dir.join(EVICTED);
+        let last = fs::read_to_string(&stamp_file).ok().and_then(|s| s.trim().parse::<i64>().ok());
+        if last.is_some_and(|t| now >= t && now - t < EVICT_EVERY) {
+            return 0;
+        }
+        // Who is not in the index, without holding the lock while the disk
+        // is asked.
+        let candidates: Vec<Box<str>> =
+            self.lock().map.keys().filter(|p| !indexed.contains(&***p)).cloned().collect();
+        let most = (self.documents() / 4).max(EVICT_MIN_BATCH);
+        let mut roots: HashMap<String, bool> = HashMap::new();
+        let mut gone = Vec::new();
+        for path in candidates {
+            if gone.len() >= most {
+                break;
+            }
+            let Some(root) = root_of(&path) else { continue };
+            let reachable = *roots.entry(root.to_owned()).or_insert_with(|| fs::metadata(root).is_ok_and(|m| m.is_dir()));
+            // Only "not found" counts: denied, busy or offline keeps it.
+            if reachable && fs::symlink_metadata(&*path).is_err_and(|e| e.kind() == io::ErrorKind::NotFound) {
+                gone.push(path);
+            }
+        }
+        let mut texts_gone = false;
+        {
+            let mut inner = self.lock();
+            for path in &gone {
+                if let Some(old) = inner.map.remove(path)
+                    && old.kind == Kind::Text
+                {
+                    inner.garbage += u64::from(old.len);
+                    texts_gone = true;
+                }
+            }
+            inner.full = false;
+            inner.dirty |= !gone.is_empty();
+        }
+        if self.flush().is_ok() {
+            let _ = fs::write(&stamp_file, now.to_string());
+        }
+        // The text of deleted documents must not stay on disk: compacted
+        // now (at most once a day), not only once garbage is half the file.
+        if texts_gone {
+            let _ = self.compact_with(true);
+        }
+        gone.len()
+    }
+
     /// Files a previous run died extracting (see the module docs): each is
     /// now stored as "no text" until it changes. For the log.
     pub fn recovered(&self) -> &[String] {
@@ -704,10 +792,15 @@ impl ContentCache {
     /// Rewrites `content.dat` without unused records when they are more than
     /// half of it. Returns whether it did.
     pub fn compact(&self) -> io::Result<bool> {
+        self.compact_with(false)
+    }
+
+    /// [`compact`](Self::compact); with `any`, whenever there is garbage.
+    fn compact_with(&self, any: bool) -> io::Result<bool> {
         let mut reader = self.reader.write().unwrap_or_else(|e| e.into_inner());
         let mut inner = self.lock();
         let live = inner.dat_len - HEADER_LEN - inner.garbage;
-        if inner.garbage == 0 || inner.garbage <= live {
+        if inner.garbage == 0 || (!any && inner.garbage <= live) {
             return Ok(false);
         }
         let Some(src) = reader.as_ref() else { return Ok(false) };
@@ -1849,6 +1942,62 @@ mod tests {
         let c = ContentCache::open(&dir).unwrap();
         assert_eq!(c.revalidate("v2 ocr=ar-SA,en-US"), 0);
         assert_eq!(c.get("C:\\scan.pdf", 1, 1).unwrap().unwrap(), "نص من OCR");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn roots_of_paths() {
+        assert_eq!(root_of("C:\\Users\\a.pdf"), Some("C:\\"));
+        assert_eq!(root_of("d:/x.txt"), Some("d:/"));
+        assert_eq!(root_of("\\\\server\\share\\dir\\a.pdf"), Some("\\\\server\\share\\"));
+        assert_eq!(root_of("\\\\server\\share"), Some("\\\\server\\share"));
+        assert_eq!(root_of("/home/a.txt"), Some("/"));
+        assert_eq!(root_of("relative.txt"), None);
+    }
+
+    #[test]
+    fn deleted_documents_are_forgotten_with_guards() {
+        // Nothing ever removed an entry: the text of deleted files stayed
+        // in content.dat for good, and at 4 GB no new document was stored.
+        let dir = temp_dir("evict");
+        fs::create_dir_all(&dir).unwrap();
+        let file = |n: &str| dir.join(n).to_str().unwrap().to_owned();
+        let (kept, deleted, unindexed) = (file("kept.txt"), file("deleted.txt"), file("exists-not-indexed.txt"));
+        for p in [&kept, &deleted, &unindexed] {
+            fs::write(p, "x").unwrap();
+        }
+        let store = dir.join("store");
+        let c = ContentCache::open(&store).unwrap();
+        for p in [&kept, &deleted, &unindexed] {
+            c.put(p, 1, 1, Some(&AR.repeat(100)));
+        }
+        // Not reachable now: an unplugged drive, an offline share.
+        c.put("Q:\\usb\\report.pdf", 1, 1, Some(AR));
+        c.put("\\\\offline-server\\share\\a.docx", 1, 1, None);
+        fs::remove_file(&deleted).unwrap();
+        let indexed: std::collections::HashSet<&str> = [kept.as_str()].into();
+        let now = 1_900_000_000;
+        // An empty index (still loading, or a failed scan) forgets nothing.
+        assert_eq!(c.evict_missing(&Default::default(), now), 0);
+        assert_eq!(c.evict_missing(&indexed, now), 1);
+        assert_eq!(c.get(&deleted, 1, 1), None);
+        assert!(c.get(&kept, 1, 1).is_some() && c.get(&unindexed, 1, 1).is_some());
+        assert!(c.get("Q:\\usb\\report.pdf", 1, 1).is_some());
+        assert!(c.get("\\\\offline-server\\share\\a.docx", 1, 1).is_some());
+        // Its text is gone from content.dat (compacted at once).
+        assert_eq!(c.stats().garbage, 0);
+        // At most once a day.
+        fs::remove_file(&unindexed).unwrap();
+        assert_eq!(c.evict_missing(&indexed, now + 3600), 0);
+        assert_eq!(c.evict_missing(&indexed, now + EVICT_EVERY), 1);
+        drop(c);
+        // And a quarter of the store at most per pass (at least 1000).
+        let c = ContentCache::open(&store).unwrap();
+        for i in 0..3000 {
+            c.put(&file(&format!("gone{i}.txt")), 1, 1, None);
+        }
+        assert_eq!(c.evict_missing(&indexed, now + 3 * EVICT_EVERY), 1000);
+        drop(c);
         fs::remove_dir_all(&dir).unwrap();
     }
 }
