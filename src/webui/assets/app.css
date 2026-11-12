@@ -190,7 +190,9 @@ body.compact .cols { grid-template-columns: 34px 1fr var(--w-size, 96px) var(--w
 /* Column widths: drag the edge at the start of the Size and Date headers. */
 .cols > * { position: relative; }
 .grip { position: absolute; inset-block: 4px; inset-inline-start: -6px; width: 9px; cursor: col-resize; touch-action: none; }
-.grip::after { content: ""; position: absolute; inset-block: 3px; inset-inline-start: 4px; width: 1px; background: var(--line-2); }
+/* The edge line shows only while the header is pointed at (no stray line). */
+.grip::after { content: ""; position: absolute; inset-block: 3px; inset-inline-start: 4px; width: 1px; background: transparent; }
+.cols:hover .grip::after { background: var(--line-2); }
 .grip:hover::after, .grip.on::after { background: var(--link); width: 2px; }
 body.compact .row .ft { width: 20px; height: 23px; }
 body.compact .row .nm { display: flex; gap: 12px; align-items: baseline; min-width: 0; }
