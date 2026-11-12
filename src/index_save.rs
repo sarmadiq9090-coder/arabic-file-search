@@ -145,14 +145,20 @@ pub struct SaveQueue {
     thread_init: fn(),
     gap_factor: u32,
     retry: Duration,
-    /// Slow and failed saves are worth a line in the log, but not one every
-    /// half minute (the log file is short and starts over when full).
-    slow_log: Mutex<RateLog>,
-    fail_log: Mutex<RateLog>,
+    /// Lines for log.txt, at most one per kind per [`LINE_GAP`] (the file is
+    /// short and starts over when full); failures always get one.
+    lines: Mutex<Lines>,
 }
 
-/// A save slower than this is logged.
-const SLOW_SAVE: Duration = Duration::from_secs(2);
+/// At most one line of each kind this often (failures excepted).
+pub const LINE_GAP: Duration = Duration::from_secs(60);
+
+/// The rate limits of the save queue's lines.
+struct Lines {
+    started: RateLog,
+    done: RateLog,
+    skipped: RateLog,
+}
 
 impl SaveQueue {
     pub fn new(
@@ -187,8 +193,7 @@ impl SaveQueue {
             thread_init,
             gap_factor,
             retry,
-            slow_log: Mutex::new(RateLog::new(Duration::from_secs(10 * 60))),
-            fail_log: Mutex::new(RateLog::new(Duration::from_secs(10 * 60))),
+            lines: Mutex::new(Lines { started: RateLog::new(LINE_GAP), done: RateLog::new(LINE_GAP), skipped: RateLog::new(LINE_GAP) }),
         })
     }
 
@@ -384,22 +389,18 @@ impl SaveQueue {
             // Counted down again however the write ends, before anyone is
             // told that the save is over.
             let running = Running(self);
+            self.line(|l| &mut l.started, || format!("index save: started gen {seq}"));
             let result = self.write(&index, seq);
             let took = started.elapsed();
             match result {
                 Ok(written) => {
                     // The snapshot goes first.
                     drop(index);
-                    if written && took >= SLOW_SAVE {
-                        let line = self.slow_log.lock().unwrap_or_else(|e| e.into_inner()).due(Instant::now());
-                        if let Some(more) = line {
-                            (self.log)(&format!(
-                                "index save: {entries} entries in {} ms (slow; the next one waits {} s){}",
-                                took.as_millis(),
-                                next_gap(took, self.gap_factor).as_secs(),
-                                if more > 0 { format!("; {more} more slow saves since the last line") } else { String::new() }
-                            ));
-                        }
+                    if written {
+                        let gap = next_gap(took, self.gap_factor).as_secs();
+                        self.line(|l| &mut l.done, || {
+                            format!("index save: done gen {seq} in {} ms ({entries} entries; the next one waits {gap} s)", took.as_millis())
+                        });
                     }
                     // (Also when skipped: a newer index is on disk then.)
                     self.mark_saved(false);
@@ -425,15 +426,11 @@ impl SaveQueue {
                     inner.due = Some(inner.due.map_or(at, |d| d.max(at)));
                     inner.not_before = Some(at);
                     drop(inner);
-                    let line = self.fail_log.lock().unwrap_or_else(|e| e.into_inner()).due(Instant::now());
-                    if let Some(more) = line {
-                        (self.log)(&format!(
-                            "index save failed after {} ms: {e}; trying again in {} s{}",
-                            took.as_millis(),
-                            again.as_secs(),
-                            if more > 0 { format!(" ({more} more failures since the last line)") } else { String::new() }
-                        ));
-                    }
+                    (self.log)(&format!(
+                        "index save: failed gen {seq} after {} ms: {e}; {}",
+                        took.as_millis(),
+                        if stale { "not retried (a newer index took its place)".to_string() } else { format!("trying again in {} s", again.as_secs()) }
+                    ));
                 }
             }
             drop(running);
@@ -445,8 +442,9 @@ impl SaveQueue {
     /// when it was skipped.
     fn write(&self, index: &Index, seq: u64) -> io::Result<bool> {
         let _turn = self.turn.lock().unwrap_or_else(|e| e.into_inner());
-        if self.lock().written_seq > seq {
-            (self.log)("index save: skipped, a newer index is already on disk");
+        let newest = self.lock().written_seq;
+        if newest > seq {
+            self.line(|l| &mut l.skipped, || format!("index save: skipped gen {seq} (gen {newest} is already on disk)"));
             return Ok(false);
         }
         // A panic in the writer (reported by the panic hook) is a failed save.
@@ -454,6 +452,18 @@ impl SaveQueue {
         let mut inner = self.lock();
         inner.written_seq = inner.written_seq.max(seq);
         Ok(true)
+    }
+}
+
+impl SaveQueue {
+    /// Writes a line of the kind `which` picks, unless one was written less
+    /// than [`LINE_GAP`] ago (then counted, and the count added to the next).
+    fn line(&self, which: impl FnOnce(&mut Lines) -> &mut RateLog, text: impl FnOnce() -> String) {
+        let due = which(&mut self.lines.lock().unwrap_or_else(|e| e.into_inner())).due(Instant::now());
+        if let Some(more) = due {
+            let text = text();
+            (self.log)(&if more > 0 { format!("{text} [{more} more since the last such line]") } else { text });
+        }
     }
 }
 
@@ -995,9 +1005,9 @@ mod tests {
         assert_eq!(tries.load(Ordering::SeqCst), 4, "three failures, then the one that worked");
         // The snapshot kept for the retries was the window's own: no copy.
         assert!(!shared(&queue, &index, 0));
-        // One line for the failures, not one each.
+        // A line for each failure (they are never held back).
         let lines = lines.lock().unwrap();
-        assert_eq!(lines.iter().filter(|l| l.contains("index save failed") && l.contains("disk full")).count(), 1, "{lines:?}");
+        assert_eq!(lines.iter().filter(|l| l.starts_with("index save: failed gen ") && l.contains("disk full")).count(), 3, "{lines:?}");
         drop(lines);
         // The pauses grow, up to the longest gap.
         assert_eq!(retry_in(RETRY, 1), Duration::from_secs(30));
@@ -1075,9 +1085,9 @@ mod tests {
                 Err(io::Error::other("no"))
             }),
             Box::new(|_| {}),
-            // The logger panics once, on the saving thread.
-            Box::new(move |_| {
-                if f.fetch_add(1, Ordering::SeqCst) == 0 {
+            // The logger panics once, on the saving thread, at the failure.
+            Box::new(move |line| {
+                if line.contains("failed") && f.fetch_add(1, Ordering::SeqCst) == 0 {
                     panic!("synthetic panic in the logger (expected by this test)");
                 }
             }),
@@ -1341,6 +1351,34 @@ mod tests {
         assert_eq!(next_gap(Duration::from_secs(45), GAP_FACTOR), Duration::from_secs(180));
         assert_eq!(next_gap(Duration::from_secs(3600), GAP_FACTOR), MAX_GAP);
         assert_eq!(next_gap(Duration::from_secs(45), 0), Duration::ZERO);
+    }
+
+    /// The save queue's lines in log.txt: started and done at most once a
+    /// minute each, with the count of the ones held back; failures always.
+    #[test]
+    fn save_lines_are_limited_per_kind() {
+        let lines = Arc::new(Mutex::new(Vec::<String>::new()));
+        let l = lines.clone();
+        let queue = SaveQueue::new(Box::new(|_| Ok(())), Box::new(|_| {}), Box::new(move |s| l.lock().unwrap().push(s.to_string())), || {}, 0, Duration::ZERO);
+        for _ in 0..5 {
+            queue.set_pending(Arc::new(index_of(3)), Duration::ZERO);
+            until("rest", || at_rest(&queue));
+        }
+        // An older save that comes after a newer one is skipped, said once.
+        queue.lock().written_seq = 100;
+        for _ in 0..3 {
+            queue.set_pending(Arc::new(index_of(3)), Duration::ZERO);
+            until("rest", || at_rest(&queue));
+        }
+        let lines = lines.lock().unwrap();
+        let count = |p: &str| lines.iter().filter(|l| l.starts_with(p)).count();
+        assert_eq!(count("index save: started gen 1"), 1, "{lines:?}");
+        assert_eq!(count("index save: started"), 1, "{lines:?}");
+        assert_eq!(count("index save: done gen 1 in "), 1, "{lines:?}");
+        assert_eq!(count("index save: done"), 1, "{lines:?}");
+        assert_eq!(count("index save: skipped gen 6 (gen 100 is already on disk)"), 1, "{lines:?}");
+        assert_eq!(count("index save: skipped"), 1, "{lines:?}");
+        assert!(lines.iter().any(|l| l.contains("(3 entries; the next one waits 0 s)")), "{lines:?}");
     }
 
     #[test]

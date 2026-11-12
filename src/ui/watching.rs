@@ -388,13 +388,13 @@ fn walk_must_wait() -> bool {
 /// Queued changes were dropped because there were too many: a line in the
 /// log, at most one every ten minutes (the log file is short).
 fn note_dropped(dropped: u64, roots: &[String]) {
-    static LINES: Mutex<RateLog> = Mutex::new(RateLog::new(Duration::from_secs(10 * 60)));
+    static LINES: Mutex<RateLog> = Mutex::new(RateLog::new(crate::index_save::LINE_GAP));
     let more = LINES.lock().unwrap_or_else(|e| e.into_inner()).due(Instant::now());
     if let Some(more) = more {
         log(&format!(
-            "watch: {dropped} waiting changes dropped (queue full); walking {} again instead{}",
+            "watch queue: collapsed to rescan ({dropped} events; walking {} again){}",
             roots.join(" "),
-            if more > 0 { format!("; {more} more times since the last line") } else { String::new() }
+            if more > 0 { format!(" [{more} more since the last such line]") } else { String::new() }
         ));
     }
 }

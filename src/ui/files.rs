@@ -270,14 +270,14 @@ pub(super) fn test_save_delay() -> Option<Duration> {
 /// A whole copy of the index is worth a line in the log (it is what makes
 /// memory use jump), but on a busy PC not one every ten seconds.
 fn note_copy(entries: usize, took: Duration) {
-    static LINES: Mutex<RateLog> = Mutex::new(RateLog::new(Duration::from_secs(10 * 60)));
+    static LINES: Mutex<RateLog> = Mutex::new(RateLog::new(index_save::LINE_GAP));
     let more = LINES.lock().unwrap_or_else(|e| e.into_inner()).due(Instant::now());
     if let Some(more) = more {
         log(&format!(
-            "index copy: {entries} entries copied in {} ms for a change on disk (another reader held the index; a save was {}running){}",
+            "index copy: made ({}; {entries} entries in {} ms){}",
+            if SAVES.running() { "a save was being written" } else { "another reader held the index" },
             took.as_millis(),
-            if SAVES.running() { "" } else { "not " },
-            if more > 0 { format!("; {more} more copies since the last line") } else { String::new() }
+            if more > 0 { format!(" [{more} more since the last such line]") } else { String::new() }
         ));
     }
 }
