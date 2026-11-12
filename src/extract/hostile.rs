@@ -383,7 +383,9 @@ fn pdf_parent_loop_does_not_kill_or_hang_the_process() {
     // pdf-extract looks for an inherited MediaBox up the /Parent chain with
     // no limit: a node that is its own parent never ends.
     let c = child("parent-loop-unchecked.pdf", &pdf_parent_loop(), &[UNCHECKED_PDF]);
-    assert!(!c.ok && c.stderr.contains("overflowed its stack"), "without the check: {c:?}");
+    // Debug builds overflow the stack; optimised builds may turn the recursion
+    // into a loop that never ends. Either way the unchecked read never returns.
+    assert!(!c.ok && (c.stderr.contains("overflowed its stack") || c.status == "timed out"), "without the check: {c:?}");
     for (name, pdf) in [("parent-loop.pdf", pdf_parent_loop()), ("parent-chain.pdf", pdf_parent_chain(200_000))] {
         let c = child(name, &pdf, &[]);
         assert!(c.ok, "{name}: {c:?}");
