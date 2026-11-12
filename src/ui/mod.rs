@@ -746,6 +746,11 @@ impl App {
 }
 
 pub fn run() {
+    // The language first, before anything writes to the data folder: a
+    // fresh start that saved settings.txt first (the new look's one-time
+    // switch in `build_ui`) looked like a copy from before English and came
+    // up in Arabic on English Windows.
+    let _ = crate::i18n::current();
     crate::search::init_local_utc_offset();
     let updated = std::env::args().any(|a| a == "--updated");
     let moved = std::env::args().any(|a| a == crate::relocate::MOVED_ARG);

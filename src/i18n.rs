@@ -112,13 +112,33 @@ fn detect() -> Lang {
 #[cfg(windows)]
 fn installed_before() -> bool {
     let Some(dir) = std::env::var_os("LOCALAPPDATA") else { return false };
-    let dir = std::path::Path::new(&dir).join("BahthSari");
-    ["index.bin", "settings.txt", "history.json"].iter().any(|f| dir.join(f).exists())
+    data_from_before_english(&std::path::Path::new(&dir).join("BahthSari"))
 }
 
 #[cfg(not(windows))]
 fn installed_before() -> bool {
     false
+}
+
+/// The settings key only versions with English write (0.10.1's one-time
+/// switch to the new look, `Settings::make_new_look_default`).
+const ENGLISH_ERA_KEY: &str = "new_ui_default";
+
+/// Whether `dir` holds data of a copy installed before English existed:
+/// an index, a history, or a settings file. A settings file with
+/// [`ENGLISH_ERA_KEY`] was written by a version that already saves the
+/// language it detected, so it does not count (the registry choice was
+/// removed, or the settings were written before the first detection).
+fn data_from_before_english(dir: &std::path::Path) -> bool {
+    if ["index.bin", "history.json"].iter().any(|f| dir.join(f).exists()) {
+        return true;
+    }
+    match std::fs::read(dir.join("settings.txt")) {
+        Ok(bytes) => !String::from_utf8_lossy(&bytes)
+            .lines()
+            .any(|l| l.split_once('=').is_some_and(|(k, _)| k.trim() == ENGLISH_ERA_KEY)),
+        Err(_) => false,
+    }
 }
 
 /// `tr!("نص", "text")`: the text in the current language.
@@ -254,6 +274,29 @@ mod tests {
     fn every_kind_has_an_english_name() {
         assert_eq!(KIND_LABELS_EN.len(), crate::search::KINDS.len());
         assert_eq!(KIND_LABELS_EN[crate::search::KIND_FOLDERS], "Folders");
+    }
+
+    #[test]
+    fn only_data_from_before_english_keeps_arabic() {
+        let dir = std::env::temp_dir().join(format!("bahth-i18n-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // A new user: nothing there yet.
+        assert!(!data_from_before_english(&dir));
+        // Settings written by 0.10.1 or later (the new-look marker): not old.
+        std::fs::write(dir.join("settings.txt"), "new_ui=0\nnew_ui_default=1\n").unwrap();
+        assert!(!data_from_before_english(&dir));
+        // Settings of an older version, without the marker: old.
+        std::fs::write(dir.join("settings.txt"), "width=900\nnew_ui=0\n").unwrap();
+        assert!(data_from_before_english(&dir));
+        std::fs::remove_file(dir.join("settings.txt")).unwrap();
+        // An index or a history alone: old.
+        for f in ["index.bin", "history.json"] {
+            std::fs::write(dir.join(f), b"x").unwrap();
+            assert!(data_from_before_english(&dir), "{f}");
+            std::fs::remove_file(dir.join(f)).unwrap();
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
