@@ -19,6 +19,33 @@ fn main() {
         let msvc = std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc");
         if msvc {
             println!("cargo:rustc-link-arg-bins=/STACK:8388608");
+            // The exe is one portable file, often started straight from
+            // Downloads. Without this, Windows looks for the DLLs it imports
+            // (version.dll, winhttp.dll, dbghelp.dll… all but the "known
+            // DLLs") in the exe's own folder first, so a DLL of that name
+            // planted beside it would run at every start. 0x800 is
+            // LOAD_LIBRARY_SEARCH_SYSTEM32: the loader (Windows 10 1607 and
+            // later) takes the imports from System32 only. The exe ships no
+            // DLL of its own (the WebView2 loader is linked statically), and
+            // comctl32 v6 still comes from the manifest. `main` does the same
+            // for libraries loaded at run time (SetDefaultDllDirectories), and
+            // ci/check_imports.py fails the build if the flag is missing.
+            // MSVC only: GNU ld (the local mingw builds) has no such option.
+            println!("cargo:rustc-link-arg-bins=/DEPENDENTLOADFLAG:0x800");
+            // Exploit mitigations, explicit so a linker default changing
+            // cannot drop them (ci/check_imports.py checks each in the PE
+            // header): ASLR (/DYNAMICBASE: the exe loads at a random
+            // address; it keeps its relocations for that, a few hundred KB),
+            // DEP (/NXCOMPAT: data pages never run as code; no cost) and,
+            // on 64-bit only (x64, ARM64; it means nothing for a 32-bit
+            // image), ASLR over the whole 64-bit address space
+            // (/HIGHENTROPYVA; no cost). All three are already link.exe's
+            // defaults, and ARM64 requires the first two.
+            println!("cargo:rustc-link-arg-bins=/DYNAMICBASE");
+            println!("cargo:rustc-link-arg-bins=/NXCOMPAT");
+            if std::env::var("CARGO_CFG_TARGET_POINTER_WIDTH").as_deref() == Ok("64") {
+                println!("cargo:rustc-link-arg-bins=/HIGHENTROPYVA");
+            }
         } else {
             println!("cargo:rustc-link-arg-bins=-Wl,--stack,8388608");
         }

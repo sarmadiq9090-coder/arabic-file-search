@@ -155,7 +155,7 @@ pub fn enable_visual_styles() {
 */
 pub fn init_common_controls() -> Result<(), NwgError> {
     use winapi::um::objbase::CoInitialize;
-    use winapi::um::libloaderapi::LoadLibraryW;
+    use winapi::um::libloaderapi::{LoadLibraryExW, LOAD_LIBRARY_SEARCH_SYSTEM32};
     use winapi::um::commctrl::{InitCommonControlsEx, INITCOMMONCONTROLSEX};
     use winapi::um::commctrl::{ICC_BAR_CLASSES, ICC_STANDARD_CLASSES, ICC_DATE_CLASSES, ICC_PROGRESS_CLASS,
      ICC_TAB_CLASSES, ICC_TREEVIEW_CLASSES, ICC_LISTVIEW_CLASSES};
@@ -186,7 +186,8 @@ pub fn init_common_controls() -> Result<(), NwgError> {
 
         if cfg!(feature = "rich-textbox") {
             let lib = base_helper::to_utf16("Msftedit.dll");
-            LoadLibraryW(lib.as_ptr());
+            // From System32 only, never from the program's own folder.
+            LoadLibraryExW(lib.as_ptr(), ptr::null_mut(), LOAD_LIBRARY_SEARCH_SYSTEM32);
         }
 
         let data = INITCOMMONCONTROLSEX {

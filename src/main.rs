@@ -79,6 +79,8 @@ mod replace;
 #[cfg(any(windows, test))]
 mod root;
 #[cfg(any(windows, test))]
+mod run_entry;
+#[cfg(any(windows, test))]
 mod search;
 #[cfg(any(windows, test))]
 mod suggest;
@@ -97,9 +99,27 @@ mod web;
 #[cfg(any(windows, test))]
 mod webui;
 
+/// Libraries loaded by name while the program runs (by this code, the
+/// standard library's backtrace, the WebView2 loader, wry, or Windows DLLs
+/// loading their own helpers) come from System32 only, never from the exe's
+/// folder, the current folder or `PATH`: the exe is often run from Downloads,
+/// where a DLL with a system name could have been planted. A library named by
+/// its full path (the WebView2 runtime, COM servers such as shell extensions,
+/// input methods) still loads from that path. The DLLs the exe imports are
+/// covered by `/DEPENDENTLOADFLAG` (build.rs), as they load before `main`.
+#[cfg(windows)]
+fn restrict_dll_search() {
+    use winapi::um::libloaderapi::{LOAD_LIBRARY_SEARCH_SYSTEM32, SetDefaultDllDirectories};
+    // SAFETY: a plain call with a documented flag; it changes only where
+    // later LoadLibrary calls of this process look.
+    unsafe { SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32) };
+}
+
 #[cfg(windows)]
 fn main() {
-    // First, so a panic anywhere (UI or command line) leaves a report.
+    // Before anything can load a library.
+    restrict_dll_search();
+    // Then this, so a panic anywhere (UI or command line) leaves a report.
     crash_log::install(crash_log::default_log_path());
     crash_log::name_global_pool();
     let args: Vec<String> = std::env::args().skip(1).collect();

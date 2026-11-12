@@ -216,21 +216,17 @@ fn shell_execute(verb: Option<&str>, file: &str, args: &str) -> bool {
 
 /// A classic tool named without a folder ("taskmgr", "devmgmt.msc", the
 /// settings table's non-`ms-settings:` pages) as its file in the Windows
-/// system folder, when it is there. `ShellExecute` looks in the current
-/// directory first, which for a portable copy started from Downloads is
-/// Downloads, where a program of that name could have been planted.
-fn system_tool(target: &str) -> String {
+/// system folder or the Windows folder (`regedit`); `None` when it is in
+/// neither (`gpedit.msc` on Windows Home), so it is not started at all.
+/// `ShellExecute` looks in the current directory first, which for a portable
+/// copy started from Downloads is Downloads, where a program of that name
+/// could have been planted. Full paths, `shell:` and other URIs are kept.
+fn system_tool(target: &str) -> Option<String> {
     if target.contains(['\\', '/', ':']) {
-        return target.to_string();
-    }
-    let mut buf = [0u16; 260];
-    let n = unsafe { winapi::um::sysinfoapi::GetSystemDirectoryW(buf.as_mut_ptr(), buf.len() as UINT) } as usize;
-    if n == 0 || n >= buf.len() {
-        return target.to_string();
+        return Some(target.to_string());
     }
     let name = if std::path::Path::new(target).extension().is_some() { target.to_string() } else { format!("{target}.exe") };
-    let path = std::path::PathBuf::from(String::from_utf16_lossy(&buf[..n])).join(name);
-    if path.is_file() { path.to_string_lossy().into_owned() } else { target.to_string() }
+    shell::windows_program(&name).map(|p| p.to_string_lossy().into_owned())
 }
 
 /// Whether `path` is something Windows can start as administrator.
@@ -1189,7 +1185,13 @@ impl App {
     /// default button.
     pub(super) fn run_action(&self, action: &Action, admin: bool) -> Option<bool> {
         Some(match action {
-            Action::Launch { target, args } => shell_execute(admin.then_some("runas"), &system_tool(target), args),
+            Action::Launch { target, args } => match system_tool(target) {
+                Some(file) => shell_execute(admin.then_some("runas"), &file, args),
+                None => {
+                    log(&format!("quick search: {target} is not in the Windows folders; not started"));
+                    false
+                }
+            },
             Action::OpenUri(uri) => shell::open(uri),
             Action::CopyText(text) => {
                 nwg::Clipboard::set_data_text(&self.window, text);
