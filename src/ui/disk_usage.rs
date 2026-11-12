@@ -386,7 +386,7 @@ impl App {
         let Some(sizes) = folder_sizes::cached(&index) else {
             d.list.clear();
             d.rows.borrow_mut().clear();
-            d.total_label.set_text(tr!("جاري حساب أحجام المجلدات…", "Calculating folder sizes…"));
+            d.total_label.set_text(tr!("جارٍ حساب أحجام المجلدات…", "Calculating folder sizes…"));
             self.request_sizes(index, true);
             return;
         };

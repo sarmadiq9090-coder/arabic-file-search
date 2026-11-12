@@ -100,6 +100,8 @@ mod watch_pace;
 mod web;
 #[cfg(any(windows, test))]
 mod webui;
+#[cfg(any(windows, test))]
+mod window_fit;
 
 /// Libraries loaded by name while the program runs (by this code, the
 /// standard library's backtrace, the WebView2 loader, wry, or Windows DLLs

@@ -71,6 +71,23 @@ pub fn open(path: &str) -> bool {
     r as isize > 32
 }
 
+/// Runs a shell verb of a file's own Windows menu, such as "properties"
+/// (the Properties window) or "openas" (Windows' "Open with" choice), over
+/// `owner`. True if Windows took it.
+pub fn invoke_verb(owner: Option<winapi::shared::windef::HWND>, path: &str, verb: &str) -> bool {
+    use winapi::um::shellapi::{SEE_MASK_INVOKEIDLIST, SHELLEXECUTEINFOW, ShellExecuteExW};
+    let (verb, file) = (wide(verb), wide(path));
+    let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+    info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+    // The verb comes from the item's own shell menu, as Explorer does it.
+    info.fMask = SEE_MASK_INVOKEIDLIST;
+    info.hwnd = owner.unwrap_or(std::ptr::null_mut());
+    info.lpVerb = verb.as_ptr();
+    info.lpFile = file.as_ptr();
+    info.nShow = SW_SHOWNORMAL;
+    unsafe { ShellExecuteExW(&mut info) != 0 }
+}
+
 /// Moves a file or folder to the Recycle Bin, with Windows' own
 /// confirmation. True if it is gone.
 pub fn recycle(path: &str) -> bool {

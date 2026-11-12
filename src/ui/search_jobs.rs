@@ -65,7 +65,7 @@ impl App {
             }
         }
         self.state.borrow_mut().loading = Some(slot);
-        self.set_status(tr!("جاري تحميل الفهرس…", "Loading the index…"));
+        self.set_status(tr!("جارٍ تحميل الفهرس…", "Loading the index…"));
         self.query.set_focus();
     }
 
@@ -164,7 +164,7 @@ impl App {
         st.scan = Some(ScanJob { progress, result });
         drop(st);
         self.reindex_btn.set_enabled(false);
-        self.set_status(tr!("جاري فهرسة الملفات على كل الأقراص…", "Indexing files on all drives…"));
+        self.set_status(tr!("جارٍ فهرسة الملفات على كل الأقراص…", "Indexing files on all drives…"));
     }
 
     // ---------------------------------------------------------------- search
@@ -368,7 +368,7 @@ impl App {
             return;
         }
         let tail = match (loading, busy) {
-            (true, _) => tr!(" (جاري تحميل الفهرس…)", " (loading the index…)"),
+            (true, _) => tr!(" (جارٍ تحميل الفهرس…)", " (loading the index…)"),
             (false, true) => tr!(" (الفهرسة ما زالت جارية)", " (indexing is still running)"),
             _ => "",
         };
@@ -428,7 +428,7 @@ impl App {
         self.refresh_list();
         self.stop_btn.set_enabled(true);
         let warn = warnings_text(self.state.borrow().shown_query.as_ref());
-        self.set_status(&trf!("جاري البحث داخل المستندات…{warn}", "Searching inside documents…{warn}"));
+        self.set_status(&trf!("جارٍ البحث داخل المستندات…{warn}", "Searching inside documents…{warn}"));
     }
 
     pub(super) fn cancel_content(&self) {
@@ -557,6 +557,9 @@ impl App {
         let moved = done.then(|| self.sort_rows_in_place(self.list.selected_item()));
         if changed || done {
             self.refresh_list();
+        } else if n == 0 {
+            // The empty list says how far the reading got.
+            self.list.invalidate();
         }
         if let Some(row) = moved {
             self.select_row(row);
@@ -593,7 +596,7 @@ impl App {
             self.set_status(&text);
         } else {
             self.set_status(&trf!(
-                "جاري البحث داخل المستندات… تم فحص {} من {} — وجدت {}",
+                "جارٍ البحث داخل المستندات… تم فحص {} من {} — وجدت {}",
                 "Searching inside documents… checked {} of {} — found {}",
                 fmt_num(checked),
                 fmt_num(total),

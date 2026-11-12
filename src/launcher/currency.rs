@@ -573,10 +573,10 @@ pub fn answer(query: &str, english: bool, rates: &Rates) -> Option<(String, Stri
     }
     let date = loc(&date_text(rates.updated));
     note.push(match (english, rates.is_bundled()) {
-        (true, false) => format!("rate of {date}"),
-        (true, true) => format!("approximate built-in rate ({date})"),
-        (false, false) => format!("سعر {date}"),
-        (false, true) => format!("سعر تقريبي مضمّن ({date})"),
+        (true, false) => format!("approximate rate · {date}"),
+        (true, true) => format!("approximate built-in rate · {date}"),
+        (false, false) => format!("سعر تقريبي · {date}"),
+        (false, true) => format!("سعر تقريبي مضمّن · {date}"),
     });
     Some((title, copy, note.join(" · ")))
 }
@@ -690,11 +690,11 @@ mod tests {
         let (t, copy, note) = ans("100 usd to iqd", true).unwrap();
         assert_eq!(t, "100 USD = 131,000 IQD");
         assert_eq!(copy, "131000");
-        assert_eq!(note, "approximate built-in rate (2026-10-01)");
+        assert_eq!(note, "approximate built-in rate · 2026-10-01");
         let (t, copy, note) = ans("100 دولار", false).unwrap();
         assert_eq!(t, "100 دولار = 131,000 دينار عراقي");
         assert_eq!(copy, "131000");
-        assert_eq!(note, "= 86 يورو · سعر تقريبي مضمّن (2026-10-01)");
+        assert_eq!(note, "= 86 يورو · سعر تقريبي مضمّن · 2026-10-01");
         let (t, copy, _) = ans("١٠٠ دولار", false).unwrap();
         assert_eq!(t, "١٠٠ دولار = ١٣١٬٠٠٠ دينار عراقي");
         assert_eq!(copy, "١٣١٠٠٠");
@@ -714,9 +714,9 @@ mod tests {
         let r = parse_api(body.as_bytes(), 1_793_600_000).unwrap();
         let (t, _, note) = answer("100 usd to iqd", false, &r).unwrap();
         assert_eq!(t, "100 دولار = 132,000 دينار عراقي");
-        assert_eq!(note, "سعر 2026-11-02");
+        assert_eq!(note, "سعر تقريبي · 2026-11-02");
         let (_, _, note) = answer("100 eur", true, &r).unwrap();
-        assert_eq!(note, "rate of 2026-11-02");
+        assert_eq!(note, "approximate rate · 2026-11-02");
     }
 
     #[test]

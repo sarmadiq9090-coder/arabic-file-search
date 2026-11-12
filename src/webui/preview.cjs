@@ -113,7 +113,7 @@ function fakeProgram(cfg) {
     return r;
   };
   const status = cfg.indexing
-    ? { type: "status", state: "names", files: 36000, text: ar ? "جارِ الفهرسة… 36,000 ملف حتى الآن" : "Indexing… 36,000 files so far" }
+    ? { type: "status", state: "names", files: 36000, text: ar ? "جارٍ الفهرسة… 36,000 ملف حتى الآن" : "Indexing… 36,000 files so far" }
     : { type: "status", state: "ready", files: 1204331, text: null };
   const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1" };
   const history = {
@@ -157,7 +157,7 @@ function fakeProgram(cfg) {
       send(results(m, { content: true, running: true, total: 0, rows: [] }));
       setTimeout(() => {
         shown.list = order(found, m.sort, m.desc);
-        send({ type: "progress", seq: m.seq, total: found.length, done: false, text: ar ? "جارِ البحث داخل المستندات… تم فحص 1,840 من 4,210 — وجدت 3" : "Searching inside documents… checked 1,840 of 4,210 — found 3" });
+        send({ type: "progress", seq: m.seq, total: found.length, done: false, text: ar ? "جارٍ البحث داخل المستندات… تم فحص 1,840 من 4,210 — وجدت 3" : "Searching inside documents… checked 1,840 of 4,210 — found 3" });
         setTimeout(() => {
           // Put in order at the end: a new version, as in the program.
           shown.ver = nextVer();

@@ -85,7 +85,9 @@ impl App {
         if self.floating.hwnd.get() == 0 {
             let started = Instant::now();
             let ex = WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE;
-            let Some(hwnd) = surface::create_window(KIND_FLOATING, ex, "") else {
+            // Its name is what a screen reader says for it (it draws itself).
+            let name = trf!("خانة بحث سريع — انقرها أو اضغط {}", "InstaFind search box — click it or press {}", super::keys::HOTKEY_TEXT);
+            let Some(hwnd) = surface::create_window(KIND_FLOATING, ex, &name) else {
                 log("floating box: could not create the window");
                 return;
             };
@@ -374,8 +376,8 @@ impl App {
         let items: [(usize, &str); 4] = [
             (1, tr!("فتح نافذة البحث\tCtrl+Alt+F", "Open quick search\tCtrl+Alt+F")),
             (2, tr!("النافذة الكاملة", "Full window")),
-            (3, tr!("إعادة المربع إلى مكانه", "Reset position")),
-            (4, tr!("إخفاء المربع العائم", "Hide the floating box")),
+            (3, tr!("إعادة الخانة إلى مكانها", "Reset position")),
+            (4, tr!("إخفاء خانة البحث العائمة", "Hide the floating search box")),
         ];
         let menu = unsafe { CreatePopupMenu() };
         if menu.is_null() {

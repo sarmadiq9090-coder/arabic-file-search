@@ -43,8 +43,12 @@ use crate::quick::{self, Anchor, FeedbackKind, Group, Icon, ListMetrics, Palette
 
 /// Width of the popup, logical px.
 const WIDTH: i32 = 480;
-/// The search strip at the bottom.
-const STRIP_H: i32 = 52;
+/// The search strip at the bottom: the box, then the line of key hints.
+const STRIP_H: i32 = BOX_H + KEYS_H;
+/// The part of the strip that holds the search box.
+const BOX_H: i32 = 52;
+/// The key hints under the box (`quick::key_hints`).
+const KEYS_H: i32 = 20;
 /// The indexing progress line under the results, while indexing runs.
 const NOTE_H: i32 = 26;
 /// Opacity (of 255) of the list's tint over the acrylic backdrop.
@@ -747,7 +751,8 @@ impl App {
         let x = px(48, s);
         let w = (r.width() - x - px(16, s)).max(px(40, s));
         let x = quick::mirror_x(x, w, r.width(), rtl());
-        let y = list_h + (r.height() - list_h - edit_h) / 2;
+        let box_h = (r.height() - list_h - px(KEYS_H, s)).max(edit_h);
+        let y = list_h + (box_h - edit_h) / 2;
         unsafe {
             SetWindowPos(self.popup_edit(), std::ptr::null_mut(), x, y, w, edit_h, SWP_NOZORDER | SWP_NOACTIVATE);
             InvalidateRect(hwnd, std::ptr::null(), 0);
@@ -879,13 +884,8 @@ impl App {
     }
 
     fn popup_move(&self, delta: i32) {
-        let n = self.popup.rows.borrow().len();
-        let cur = self.popup.selected.get();
-        let next = if delta.abs() > 1 {
-            cur.map(|c| (c as i64 + delta as i64).clamp(0, n as i64 - 1) as usize).or((n > 0).then_some(0))
-        } else {
-            quick::move_selection(cur, delta, n)
-        };
+        // Past the rows that are not for selecting (the rates credit).
+        let next = quick::step_selection(&self.popup.rows.borrow(), self.popup.selected.get(), delta);
         self.popup.selected.set(next);
         unsafe { InvalidateRect(self.popup_hwnd(), std::ptr::null(), 0) };
     }
@@ -1010,9 +1010,13 @@ impl App {
                     }
                 }
             }
-            // The magnifier at the start of the search strip.
-            let mag = Rect::at(ix, list_h, icon_box, h - list_h);
+            // The magnifier at the start of the search strip, beside the box.
+            let keys_h = px(KEYS_H, s).min(h - list_h);
+            let mag = Rect::at(ix, list_h, icon_box, h - list_h - keys_h);
             surface::draw_glyph(dc, &look.glyph, p.muted, quick::glyph::SEARCH, &mag);
+            // Under it, the keys the popup answers to.
+            let keys = Rect::at(quick::mirror_x(px(16, s), w - px(32, s), w, rtl), h - keys_h - px(4, s), w - px(32, s), keys_h);
+            surface::draw_text(dc, &look.small, p.muted, quick::key_hints(crate::i18n::current()), &keys, rtl, false);
         });
     }
 

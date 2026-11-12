@@ -118,9 +118,110 @@ pub fn typed_name(typed: &str, old_name: &str) -> String {
     if old_name.contains(EXT_MARKS) { typed.to_string() } else { typed.replace(EXT_MARKS, "") }
 }
 
+/// A path for display, kept left to right even when folder names are Arabic
+/// and the text around it is right to left, so «\» stays between the
+/// folders it separates: the whole path is a left-to-right embedding
+/// (LRE … PDF) with left-to-right marks around every separator.
+///
+/// Not an isolate (LRI … PDI): the lists, labels and the quick popup are
+/// drawn by GDI, which shows U+2066 and U+2069 as dotted boxes around the
+/// path. LRE, PDF and LRM are drawn as nothing by every Windows.
+///
+/// `plain_ok`: the text around the path is left to right (the English
+/// interface), so a path with no right-to-left letters is returned as it is.
+/// Display only: never a path to open or copy.
+pub fn ltr_path(path: &str, plain_ok: bool) -> String {
+    if plain_ok && !path.chars().any(is_rtl) {
+        return path.to_owned();
+    }
+    let mut s = String::with_capacity(path.len() + 24);
+    s.push_str("\u{202A}\u{200E}");
+    for c in path.chars() {
+        if c == '\\' {
+            s.push_str("\u{200E}\\\u{200E}");
+        } else {
+            s.push(c);
+        }
+    }
+    s.push_str("\u{200E}\u{202C}");
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn display_paths_have_no_isolates_for_gdi_to_draw_as_boxes() {
+        // GDI draws LRI, RLI, FSI and PDI (U+2066–U+2069) as dotted boxes.
+        let boxed = |s: &str| s.chars().any(|c| ('\u{2066}'..='\u{2069}').contains(&c));
+        for path in ["C:\\المستندات\\تقرير.pdf", "C:\\Users\\me\\report.pdf", "", "\\\\server\\مشاركة\\ملف ٢٠٢٦.xlsx", "D:\\"] {
+            for plain_ok in [false, true] {
+                let shown = ltr_path(path, plain_ok);
+                assert!(!boxed(&shown), "{shown:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn display_paths_are_left_to_right_embeddings() {
+        let shown = ltr_path("C:\\المستندات\\تقرير.pdf", false);
+        assert_eq!(shown, "\u{202A}\u{200E}C:\u{200E}\\\u{200E}المستندات\u{200E}\\\u{200E}تقرير.pdf\u{200E}\u{202C}");
+        // The embedding is closed, so it cannot reorder what follows it.
+        assert_eq!(shown.matches('\u{202A}').count(), shown.matches('\u{202C}').count());
+        // The English window: only a path with right-to-left letters needs it.
+        assert_eq!(ltr_path("C:\\Users\\me\\report.pdf", true), "C:\\Users\\me\\report.pdf");
+        assert!(ltr_path("C:\\Users\\me\\تقرير.pdf", true).starts_with('\u{202A}'));
+        assert!(ltr_path("C:\\Users\\me\\report.pdf", false).starts_with('\u{202A}'));
+    }
+
+    #[test]
+    fn display_paths_read_left_to_right_in_a_right_to_left_line() {
+        // In a right-to-left line (the Arabic window) the parts must come in
+        // order from the left: C:, «\», «المستندات», «\», the file.
+        let path = "C:\\المستندات\\تقرير.pdf";
+        // Where a piece of `text` is drawn: its leftmost and rightmost cell.
+        fn cells(text: &str, piece: &str, from: usize) -> (i32, i32) {
+            let spans = visual_spans(text, &vec![1; text.chars().count()], true).unwrap();
+            let byte = from + text[from..].find(piece).unwrap();
+            let first = text[..byte].chars().count();
+            let xs = spans[first..first + piece.chars().count()].iter().map(|s| s.0);
+            (xs.clone().min().unwrap(), xs.max().unwrap())
+        }
+        let shown = ltr_path(path, false);
+        let second = shown.rfind('\\').unwrap();
+        let order = [cells(&shown, "C:", 0), cells(&shown, "\\", 0), cells(&shown, "المستندات", 0), cells(&shown, "\\", second), cells(&shown, "تقرير.pdf", 0)];
+        for pair in order.windows(2) {
+            assert!(pair[0].1 < pair[1].0, "{order:?}");
+        }
+        // Without the marks the same line reads the other way round.
+        assert!(cells(path, "تقرير", 0).1 < cells(path, "C:", 0).0);
+    }
+
+    #[test]
+    fn display_paths_keep_their_text() {
+        const PIECES: &[&str] = &["a", "ب", "تقرير", "\u{064E}", "\u{0640}", "\u{200F}", "\u{200E}", "👨‍👩‍👧", "\\", ",", "\"", " ", "١", ".", "\u{FFFD}", "\0"];
+        let mut x = 0x1234_5678_9ABC_DEF1u64;
+        let mut next = |m: usize| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            (x % m as u64) as usize
+        };
+        for _ in 0..3000 {
+            let s: String = (0..next(10)).map(|_| PIECES[next(PIECES.len())]).collect();
+            for plain_ok in [false, true] {
+                let shown = ltr_path(&s, plain_ok);
+                if shown == s {
+                    assert!(plain_ok && !s.chars().any(is_rtl), "{s:?}");
+                    continue;
+                }
+                // Only the embedding around it and left-to-right marks are added.
+                let inner = shown.strip_prefix('\u{202A}').and_then(|t| t.strip_suffix('\u{202C}')).unwrap_or_else(|| panic!("{shown:?}"));
+                assert_eq!(inner.replace('\u{200E}', ""), s.replace('\u{200E}', ""), "{s:?}");
+            }
+        }
+    }
 
     /// One unit of width per char, so positions read as visual indices.
     fn order(text: &str, rtl: bool) -> String {

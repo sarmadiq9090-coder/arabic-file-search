@@ -18,7 +18,7 @@ use winapi::um::winuser::{NMHDR, SendMessageW, WM_NOTIFY, WM_SETFONT};
 
 use super::format::{ARABIC_DIGITS, wide_to_string};
 use super::keys::{HOTKEY_ID, HOTKEY_TEXT};
-use super::{autostart, shell, style};
+use super::{autostart, placement, shell, style};
 use super::startup::{phase, ui_font_family, work_area};
 use super::{App, COLUMNS, WS_EX_LAYOUTRTL, title};
 use crate::history::History;
@@ -67,10 +67,15 @@ impl NativeUi<AppUi> for App {
         nwg::Font::builder().family(family).size_absolute(19).build(&mut app.query_font)?;
         let f = Some(&app.font);
 
+        // Centred in the work area, not on the whole screen: on a 768-pixel
+        // screen the status line and the bottom buttons were under the
+        // taskbar. Given at creation, so it is also where a window that
+        // opens maximized goes when restored.
+        let (size, position) = placement::opening(settings.width, settings.height);
         nwg::Window::builder()
             .title(title())
-            .size((settings.width as i32, settings.height as i32))
-            .center(true)
+            .size(size)
+            .position(position)
             .ex_flags(crate::i18n::rtl_only(WS_EX_LAYOUTRTL))
             .flags({
                 // Started with Windows: wait in the tray until called. The
@@ -90,6 +95,8 @@ impl NativeUi<AppUi> for App {
         let w = &app.window;
         if let Some(h) = w.handle.hwnd() {
             crate::icon::set_window_icon(h);
+            // With the real frame, on the monitor it opened on.
+            placement::keep_on_screen(h);
         }
         phase("window");
 
@@ -103,8 +110,8 @@ impl NativeUi<AppUi> for App {
         // never seen), as the quick search's box does.
         if let Some(h) = app.query.handle.hwnd() {
             let cue = shell::wide(tr!(
-                "اكتب اسم الملف أو كلمة للبحث…   أمثلة:  تقرير ‎.pdf   ·   عقد !قديم   ·   صورة|فيديو",
-                "Type a file name or a word…   e.g.  report .pdf   ·   contract !old   ·   photo|video"
+                "اكتب اسم الملف أو جزءاً منه…   مثال: تقرير \u{200E}.pdf",
+                "Type a file name or part of it…   e.g. report .pdf"
             ));
             unsafe { SendMessageW(h, winapi::um::commctrl::EM_SETCUEBANNER, 1, cue.as_ptr() as LPARAM) };
         }
@@ -170,8 +177,18 @@ impl NativeUi<AppUi> for App {
             }
         }
         phase("list");
+        // Until the user sets widths of their own, the columns share the
+        // list's width (the window's, less the margins, the list's border
+        // and its scroll bar): the defaults are wider than the default
+        // window, which cut the last header to "Mat…".
+        let defaults: Vec<(i32, i32)> = COLUMNS.iter().zip(super::COLUMN_MIN).map(|((_, w), min)| (*w, min)).collect();
+        let fitted = crate::window_fit::columns_untouched(&settings.columns, &defaults)
+            .then(|| crate::window_fit::fit_columns(&defaults, w.size().0 as i32 - 2 * style::MARGIN - 22));
         for (i, (title, width)) in COLUMNS.iter().enumerate() {
-            let width = settings.columns.get(i).copied().filter(|w| (20..3000).contains(w)).unwrap_or(*width);
+            let width = match &fitted {
+                Some(f) => f[i],
+                None => settings.columns.get(i).copied().filter(|w| (20..3000).contains(w)).unwrap_or(*width),
+            };
             app.list.insert_column(nwg::InsertListViewColumn {
                 index: Some(i as i32),
                 fmt: None,
@@ -223,9 +240,12 @@ impl NativeUi<AppUi> for App {
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.menu)?;
         nwg::MenuItem::builder().text(tr!("فتح الملف\tEnter", "Open file\tEnter")).parent(&app.menu).build(&mut app.menu_open)?;
         nwg::MenuItem::builder().text(tr!("فتح المجلد الذي يحتويه\tCtrl+Enter", "Open containing folder\tCtrl+Enter")).parent(&app.menu).build(&mut app.menu_folder)?;
+        nwg::MenuItem::builder().text(tr!("فتح باستخدام…", "Open with…")).parent(&app.menu).build(&mut app.menu_open_with)?;
         nwg::MenuItem::builder().text(tr!("نسخ الملف\tCtrl+C", "Copy file\tCtrl+C")).parent(&app.menu).build(&mut app.menu_copy_file)?;
         nwg::MenuItem::builder().text(tr!("نسخ المسار\tCtrl+Shift+C", "Copy path\tCtrl+Shift+C")).parent(&app.menu).build(&mut app.menu_copy)?;
         nwg::MenuItem::builder().text(tr!("نسخ مسارات كل النتائج", "Copy paths of all results")).parent(&app.menu).build(&mut app.menu_copy_all)?;
+        // Here rather than in Options: a narrow window hides the Export button.
+        nwg::MenuItem::builder().text(tr!("تصدير النتائج إلى Excel (CSV)", "Export results to Excel (CSV)")).parent(&app.menu).build(&mut app.menu_export)?;
         nwg::MenuItem::builder().text(tr!("تغيير الاسم\tF2", "Rename\tF2")).parent(&app.menu).build(&mut app.menu_rename)?;
         nwg::MenuItem::builder().text(tr!("نقل إلى سلة المحذوفات\tDelete", "Move to Recycle Bin\tDelete")).parent(&app.menu).build(&mut app.menu_delete)?;
         nwg::MenuItem::builder().text(tr!("عرض كل التطابقات داخل الملف\tF4", "Show all matches in the file\tF4")).parent(&app.menu).build(&mut app.menu_matches)?;
@@ -249,52 +269,6 @@ impl NativeUi<AppUi> for App {
             .size((704, 444))
             .build(&mut app.matches_text)?;
 
-        nwg::Menu::builder().popup(true).parent(w).build(&mut app.options_menu)?;
-        // The new interface, first so it is seen; not offered without
-        // WebView2 (nor in mingw builds, which can't host it).
-        if super::webui::available() {
-            nwg::MenuItem::builder().text(tr!("جرّب الشكل الجديد", "Try the new look")).parent(&app.options_menu).build(&mut app.menu_new_ui)?;
-            nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.menu_new_ui_sep)?;
-        }
-        nwg::MenuItem::builder()
-            .text(tr!("عرض الأرقام بالعربية (٠١٢٣)", "Show Arabic-Indic digits (٠١٢٣)"))
-            .check(settings.arabic_digits)
-            .parent(&app.options_menu)
-            .build(&mut app.menu_digits)?;
-        nwg::MenuItem::builder()
-            .text(tr!("تحديث الفهرس تلقائياً عند تغيّر الملفات", "Update the index automatically when files change"))
-            .check(settings.auto_index)
-            .parent(&app.options_menu)
-            .build(&mut app.menu_auto_index)?;
-                nwg::MenuItem::builder()
-            .text(tr!("فهرسة محتوى المستندات في الخلفية (بحث أسرع داخل الملفات)", "Index document contents in the background (faster content search)"))
-            .check(settings.content_index)
-            .parent(&app.options_menu)
-            .build(&mut app.menu_content_index)?;
-        nwg::MenuItem::builder()
-            .text(tr!("إخفاء ملفات النظام", "Hide system files"))
-            .check(settings.hide_system)
-            .parent(&app.options_menu)
-            .build(&mut app.menu_hide_system)?;
-        nwg::MenuItem::builder().text(tr!("تصدير النتائج إلى Excel (CSV)", "Export results to Excel (CSV)")).parent(&app.options_menu).build(&mut app.menu_export)?;
-        nwg::MenuItem::builder().text(tr!("إخفاء إلى شريط المهام\tEsc", "Hide to the taskbar tray\tEsc")).parent(&app.options_menu).build(&mut app.menu_hide)?;
-        nwg::MenuItem::builder().text(tr!("خروج من البرنامج", "Exit the program")).parent(&app.options_menu).build(&mut app.menu_exit)?;
-        nwg::MenuItem::builder()
-            .text(&trf!("إظهار البرنامج من أي مكان\t{HOTKEY_TEXT}", "Show the program from anywhere\t{HOTKEY_TEXT}"))
-            .parent(&app.options_menu)
-            .build(&mut app.menu_hotkey)?;
-        nwg::MenuItem::builder()
-            .text(&trf!("التحقق من التحديثات (الإصدار {})", "Check for updates (version {})", env!("CARGO_PKG_VERSION")))
-            .parent(&app.options_menu)
-            .build(&mut app.menu_update)?;
-        nwg::MenuItem::builder()
-            .text(tr!("التشغيل مع ويندوز (في الخلفية)", "Start with Windows (in the background)"))
-            .check(autostart::is_enabled())
-            .parent(&app.options_menu)
-            .build(&mut app.menu_autostart)?;
-        super::lang_menu::build(&app.options_menu, &mut app.lang_menu, &mut app.menu_lang_ar, &mut app.menu_lang_en)?;
-        super::feedback::build(&app.options_menu, &mut app.feedback_menu, [&mut app.menu_feedback_bug, &mut app.menu_feedback_idea, &mut app.menu_feedback_talk])?;
-        super::feedback::build_support(&app.options_menu, &mut app.support_menu, [&mut app.menu_support_mail, &mut app.menu_support_page])?;
 
         // Tray icon, so a hidden window comes back instantly: a monochrome
         // magnifier in the taskbar's colours (the app icon if that fails).
@@ -314,26 +288,87 @@ impl NativeUi<AppUi> for App {
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.tray_menu)?;
         nwg::MenuItem::builder().text(&trf!("فتح نافذة البحث\t{HOTKEY_TEXT}", "Open quick search\t{HOTKEY_TEXT}")).parent(&app.tray_menu).build(&mut app.tray_quick)?;
         nwg::MenuItem::builder()
-            .text(tr!("إظهار المربع العائم", "Show the floating box"))
+            .text(tr!("إظهار خانة البحث العائمة", "Show the floating search box"))
             .check(settings.floating_mode != crate::settings::FloatingMode::Off)
             .parent(&app.tray_menu)
             .build(&mut app.tray_floating)?;
         nwg::MenuItem::builder().text(tr!("النافذة الكاملة", "Full window")).parent(&app.tray_menu).build(&mut app.tray_show)?;
-        nwg::MenuItem::builder().text(tr!("الإعدادات…", "Settings…")).parent(&app.tray_menu).build(&mut app.tray_settings)?;
+        nwg::MenuItem::builder().text(tr!("خيارات…", "Options…")).parent(&app.tray_menu).build(&mut app.tray_settings)?;
         nwg::MenuItem::builder().text(tr!("حول InstaFind", "About InstaFind")).parent(&app.tray_menu).build(&mut app.tray_about)?;
         app.build_rating_tray_item()?;
         nwg::MenuItem::builder().text(tr!("خروج", "Exit")).parent(&app.tray_menu).build(&mut app.tray_exit)?;
 
         phase("tray");
+        nwg::Menu::builder().popup(true).parent(&app.window).build(&mut app.options_menu)?;
+        // The new interface, first so it is seen; not offered without
+        // WebView2 (nor in mingw builds, which can't host it).
+        if super::webui::available() {
+            nwg::MenuItem::builder().text(tr!("جرّب الشكل الجديد", "Try the new look")).parent(&app.options_menu).build(&mut app.menu_new_ui)?;
+            nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.menu_new_ui_sep)?;
+        }
+        // In groups: look and display, indexing and search, shortcuts and
+        // start-up, tools, help and support; then Hide and Exit, last.
+        // Some builders below also add their item to the result menu.
+        nwg::MenuItem::builder()
+            .text(tr!("عرض الأرقام بالعربية (٠١٢٣)", "Show Arabic-Indic digits (٠١٢٣)"))
+            .check(settings.arabic_digits)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_digits)?;
+        app.build_thumbs()?;
+        super::lang_menu::build(&app.options_menu, &mut app.lang_menu, &mut app.menu_lang_ar, &mut app.menu_lang_en)?;
+        nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[0])?;
+
+        nwg::MenuItem::builder()
+            .text(tr!("تحديث الفهرس تلقائياً عند تغيّر الملفات", "Update the index automatically when files change"))
+            .check(settings.auto_index)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_auto_index)?;
+        nwg::MenuItem::builder()
+            .text(tr!("فهرسة محتوى المستندات في الخلفية (بحث أسرع داخل الملفات)", "Index document contents in the background (faster content search)"))
+            .check(settings.content_index)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_content_index)?;
+        nwg::MenuItem::builder()
+            .text(tr!("إخفاء ملفات النظام", "Hide system files"))
+            .check(settings.hide_system)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_hide_system)?;
+        nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[1])?;
+
+        nwg::MenuItem::builder()
+            .text(&trf!("إظهار البرنامج من أي مكان\t{HOTKEY_TEXT}", "Show the program from anywhere\t{HOTKEY_TEXT}"))
+            .parent(&app.options_menu)
+            .build(&mut app.menu_hotkey)?;
+        app.build_quick_menus(&settings)?;
         app.build_quick_switch_menus()?;
+        nwg::MenuItem::builder()
+            .text(tr!("التشغيل مع ويندوز (في الخلفية)", "Start with Windows (in the background)"))
+            .check(autostart::is_enabled())
+            .parent(&app.options_menu)
+            .build(&mut app.menu_autostart)?;
+        nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[2])?;
+
         app.build_dupes()?;
         app.build_replace_window()?;
         app.build_disk_usage()?;
         app.build_web_ui()?;
-        app.build_thumbs()?;
-        app.build_suggest_bar()?;
+        nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[3])?;
+
+        nwg::MenuItem::builder()
+            .text(&trf!("التحقق من التحديثات (الإصدار {})", "Check for updates (version {})", env!("CARGO_PKG_VERSION")))
+            .parent(&app.options_menu)
+            .build(&mut app.menu_update)?;
+        super::feedback::build(&app.options_menu, &mut app.feedback_menu, [&mut app.menu_feedback_bug, &mut app.menu_feedback_idea, &mut app.menu_feedback_talk])?;
+        super::feedback::build_support(&app.options_menu, &mut app.support_menu, [&mut app.menu_support_mail, &mut app.menu_support_page])?;
         app.build_rating()?;
-        app.build_quick_menus(&settings)?;
+        nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[4])?;
+
+        nwg::MenuItem::builder().text(tr!("إخفاء بجانب الساعة\tEsc", "Hide next to the clock\tEsc")).parent(&app.options_menu).build(&mut app.menu_hide)?;
+        nwg::MenuItem::builder().text(tr!("خروج من البرنامج", "Exit the program")).parent(&app.options_menu).build(&mut app.menu_exit)?;
+        // Last in the result menu, as in Explorer.
+        nwg::MenuSeparator::builder().parent(&app.menu).build(&mut app.menu_properties_sep)?;
+        nwg::MenuItem::builder().text(tr!("خصائص", "Properties")).parent(&app.menu).build(&mut app.menu_properties)?;
+        app.build_suggest_bar()?;
         app.state.get_mut().settings = settings.clone();
         app.state.get_mut().history = History::load();
         let ui = AppUi { inner: Rc::new(app), handlers: Default::default(), raw_handlers: Default::default() };
@@ -437,6 +472,10 @@ impl NativeUi<AppUi> for App {
                         app.start_rename();
                     } else if handle == app.menu_matches {
                         app.show_matches();
+                    } else if handle == app.menu_open_with {
+                        app.shell_verb_selected("openas");
+                    } else if handle == app.menu_properties {
+                        app.shell_verb_selected("properties");
                     } else if handle == app.menu_delete {
                         app.delete_selected();
                     } else if handle == app.menu_hotkey {
@@ -553,6 +592,17 @@ impl NativeUi<AppUi> for App {
                     return Some(0);
                 }
                 NM_CUSTOMDRAW => return app.custom_draw(l),
+                winapi::um::commctrl::LVN_GETEMPTYMARKUP => {
+                    // The sentence an empty list shows (the first index, a
+                    // document search still reading).
+                    use winapi::um::commctrl::{EMF_CENTERED, L_MAX_URL_LENGTH, NMLVEMPTYMARKUP};
+                    let Some(text) = app.empty_list_text() else { return Some(0) };
+                    let m = unsafe { &mut *(l as *mut NMLVEMPTYMARKUP) };
+                    let wide = crate::indexing_status::empty_markup(&text, L_MAX_URL_LENGTH);
+                    m.szMarkup[..wide.len()].copy_from_slice(&wide);
+                    m.dwFlags = EMF_CENTERED;
+                    return Some(1);
+                }
                 _ => return None,
             }
             let info = unsafe { &mut *(l as *mut NMLVDISPINFOW) };

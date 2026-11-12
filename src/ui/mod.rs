@@ -21,6 +21,7 @@
 //! - `thumbs`: the thumbnail view of the results (Ctrl+T)
 //! - `startup`: start-up timing, logging, single instance, fonts
 //! - `lazy`: secondary windows created when they first open, for a quick start
+//! - `placement`: the main window opens centred above the taskbar and stays on screen
 //! - `quick`: the quick search popup (Ctrl+Alt+F, the floating box, the tray icon)
 //! - `floating`: the small search box above the taskbar clock
 //! - `tray`: the monochrome tray icon and menu, the new options, first-run question
@@ -46,6 +47,7 @@ mod keys;
 mod launcher_shim; // thin glue to crate::launcher, see the file
 mod lazy;
 mod memory;
+mod placement;
 mod quick;
 mod quickswitch;
 mod rating;
@@ -88,7 +90,7 @@ use crate::leave::Leaving;
 use files::SAVES;
 use format::ARABIC_DIGITS;
 use history_menu::HistoryMenu;
-use keys::HOTKEY_ID;
+use keys::{HOTKEY_ID, HOTKEY_TEXT};
 use search_jobs::NameResult;
 use startup::{LOOP_STARTED, activate_running_copy, phase, ui_font_family};
 use updates::UpdateEvent;
@@ -114,6 +116,10 @@ const COL_SNIPPET: usize = 4;
 const COLUMNS: [(&str, i32); 5] =
     [("الاسم", 260), ("المسار الكامل", 460), ("الحجم", 90), ("تاريخ التعديل", 140), ("النص المطابق", 360)];
 const COLUMNS_EN: [&str; 5] = ["Name", "Full path", "Size", "Date modified", "Matching text"];
+/// The least width of each column when the default widths are fitted to
+/// the window (`crate::window_fit::fit_columns`): the size and the date keep
+/// their width, the text columns share the rest.
+const COLUMN_MIN: [i32; 5] = [160, 200, 90, 140, 160];
 
 /// A result row: an index into `State::rows_index` plus an optional snippet.
 struct Row {
@@ -259,6 +265,10 @@ pub struct App {
     menu_rename: nwg::MenuItem,
     menu_delete: nwg::MenuItem,
     menu_matches: nwg::MenuItem,
+    /// Windows' own "Open with" and Properties for the selected result.
+    menu_open_with: nwg::MenuItem,
+    menu_properties_sep: nwg::MenuSeparator,
+    menu_properties: nwg::MenuItem,
     /// Lists every matching line of one document.
     matches_window: nwg::Window,
     matches_text: nwg::TextBox,
@@ -266,6 +276,8 @@ pub struct App {
     /// «جرّب الشكل الجديد»: only built when WebView2 is there (MSVC builds).
     menu_new_ui: nwg::MenuItem,
     menu_new_ui_sep: nwg::MenuSeparator,
+    /// Between the Options menu's groups (`build.rs`).
+    options_seps: [nwg::MenuSeparator; 5],
     menu_hotkey: nwg::MenuItem,
     menu_digits: nwg::MenuItem,
     menu_content_index: nwg::MenuItem,
@@ -328,6 +340,8 @@ pub struct App {
     startup_logged: Cell<bool>,
     /// The indexing progress shown in the status bar's last part, if any.
     indexing_shown: RefCell<Option<String>>,
+    /// That part is the wider one, for the line about the documents' texts.
+    indexing_wide: Cell<bool>,
     /// The offer to move a copy out of Downloads or a temp folder was
     /// already considered this run (see `relocate`).
     move_checked: Cell<bool>,
@@ -387,7 +401,7 @@ impl App {
         // The narrowest window in which nothing overlaps: the bottom button
         // row, or the scope row when it has a row of its own.
         use style::{GAP, MARGIN};
-        // (Export, also in the Options menu, steps aside when there is no room.)
+        // (Export, also in the result menu, steps aside when there is no room.)
         let bottom = w.bottom.iter().sum::<i32>() - w.bottom[3] + w.options + 5 * GAP + 2 * MARGIN;
         let scope_row =
             w.scope_label + style::MIN_SCOPE_W + w.scope_btn + w.all_btn + w.reindex + 4 * GAP + 2 * MARGIN;
@@ -466,7 +480,7 @@ impl App {
         let status_h = self.status_height();
         let y_btn = h - status_h - GAP - CTRL_H;
         let mut x = M;
-        // Export results is also in the Options menu, so in a narrow window
+        // Export results is also in the result menu, so in a narrow window
         // it gives up its place rather than overlap Options.
         let export_fits = wd.bottom.iter().sum::<i32>() + wd.options + 6 * GAP + 2 * M <= w;
         self.export_btn.set_visible(export_fits);
@@ -502,13 +516,8 @@ impl App {
         // other, and while indexing runs its progress at the far end.
         if let Some(sb) = self.status.handle.hwnd() {
             let px = (w as f64 * nwg::scale_factor()) as i32;
-            if self.indexing_part_shown() {
-                let parts: [i32; 3] = [px * 9 / 20, px * 3 / 4, -1];
-                unsafe { SendMessageW(sb, SB_SETPARTS, 3, parts.as_ptr() as LPARAM) };
-            } else {
-                let parts: [i32; 2] = [px / 2, -1];
-                unsafe { SendMessageW(sb, SB_SETPARTS, 2, parts.as_ptr() as LPARAM) };
-            }
+            let parts = crate::indexing_status::status_parts(px, self.indexing_part());
+            unsafe { SendMessageW(sb, SB_SETPARTS, parts.len(), parts.as_ptr() as LPARAM) };
         }
     }
 
@@ -531,8 +540,11 @@ impl App {
         self.save_settings();
         self.window.set_visible(false);
         if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
+            // The hotkey, unless another program has it (its menu item is
+            // greyed then).
+            let hotkey = self.menu_hotkey.enabled().then_some(HOTKEY_TEXT);
             self.tray.show(
-                tr!("البرنامج ما زال يعمل هنا. انقر الأيقونة أو شغّل البرنامج مرة أخرى لإظهاره فوراً.", "The program is still running here. Click the icon or start the program again to show it at once."),
+                &crate::quick::hidden_hint(crate::i18n::current(), hotkey),
                 Some(title()),
                 None,
                 None,
@@ -567,11 +579,18 @@ impl App {
         if self.webui_show() {
             return;
         }
+        // The screen may have changed while the window waited by the clock
+        // (a monitor unplugged, another resolution or scale): bring it back
+        // inside the work area before it shows.
+        if let Some(h) = self.window.handle.hwnd() {
+            placement::keep_on_screen(h);
+        }
         self.window.set_visible(true);
         if let Some(h) = self.window.handle.hwnd() {
             unsafe {
                 if IsIconic(h) != 0 {
                     ShowWindow(h, SW_RESTORE);
+                    placement::keep_on_screen(h);
                 }
                 SetForegroundWindow(h);
             }

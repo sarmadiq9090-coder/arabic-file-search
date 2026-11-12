@@ -619,8 +619,8 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
 
     // The best result, unless pinned favourites already lead.
     let mut best: Option<Row> = None;
+    let starts = |r: &Row| crate::normalize::normalize(&r.title).starts_with(&nq) || strong.contains(&r.target);
     if pins.is_empty() && !query.is_empty() {
-        let starts = |r: &Row| crate::normalize::normalize(&r.title).starts_with(&nq) || strong.contains(&r.target);
         let has_app = items.iter().any(|r| r.group == Group::Apps);
         if let Some(i) = items.iter().position(|r| r.group == Group::Answers) {
             best = Some(items.remove(i));
@@ -636,10 +636,27 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
         }
     }
 
+    // Files whose names don't hold the query were found only by guessing
+    // (the other keyboard layout, Arabizi, typos): «المفكرة» found Notepad
+    // and then "mathgl", «رسام» Paint and then "vshelp.h". Behind an app
+    // or a settings page that is surely what was meant they are noise, and
+    // otherwise they come after the settings pages.
+    let loose = |r: &Row| !names_query(&r.title, &query);
+    let sure = best.as_ref().is_some_and(|b| strong.contains(&b.target) || (b.group == Group::Settings && starts(b)));
+    if sure {
+        files.retain(|r| !loose(r));
+    }
+    let files_loose = !files.is_empty() && files.iter().all(loose);
+    let order = if files_loose {
+        [Group::Windows, Group::Apps, Group::Settings, Group::Files, Group::Answers, Group::Commands, Group::Web]
+    } else {
+        [Group::Windows, Group::Apps, Group::Files, Group::Settings, Group::Answers, Group::Commands, Group::Web]
+    };
+
     let mut sections: Vec<Vec<Row>> = Vec::new();
     sections.push(pins);
     sections.push(best.into_iter().map(|r| Row { group: Group::Best, ..r }).collect());
-    for g in [Group::Windows, Group::Apps, Group::Files, Group::Settings, Group::Answers, Group::Commands, Group::Web] {
+    for g in order {
         let mut v: Vec<Row> = if g == Group::Files {
             std::mem::take(&mut files)
         } else {
@@ -702,6 +719,53 @@ pub fn reselect(rows: &[Row], previous: Option<&Target>) -> Option<usize> {
         return None;
     }
     Some(previous.and_then(|t| rows.iter().position(|r| &r.target == t)).unwrap_or(0))
+}
+
+/// Whether the arrow keys stop on `row`. The exchange-rate credit under a
+/// currency answer (an answer row that opens a web page) is a source line:
+/// it stays clickable, as the provider's terms ask, but is not a second
+/// answer to step onto.
+pub fn selectable(row: &Row) -> bool {
+    !(row.group == Group::Answers && matches!(row.target, Target::Launcher(Action::OpenUri(_))))
+}
+
+/// The row the arrow keys (`delta` ±1, wrapping) or Page Up/Down (more,
+/// stopping at the ends) move to from `current`, passing over rows that
+/// are not [`selectable`]. `None` when no row is.
+pub fn step_selection(rows: &[Row], current: Option<usize>, delta: i32) -> Option<usize> {
+    let n = rows.len();
+    if !rows.iter().any(selectable) {
+        return None;
+    }
+    let ok = |i: usize| rows.get(i).is_some_and(selectable);
+    if delta.abs() > 1 {
+        let start = current.map_or(0, |c| (c as i64 + delta as i64).clamp(0, n as i64 - 1) as usize);
+        // Onward in the same direction, else back.
+        let dir: i64 = if delta > 0 { 1 } else { -1 };
+        let mut i = start as i64;
+        while (0..n as i64).contains(&i) {
+            if ok(i as usize) {
+                return Some(i as usize);
+            }
+            i += dir;
+        }
+        let mut i = start as i64;
+        while (0..n as i64).contains(&i) {
+            if ok(i as usize) {
+                return Some(i as usize);
+            }
+            i -= dir;
+        }
+        return None;
+    }
+    let mut at = current;
+    for _ in 0..n {
+        at = move_selection(at, delta, n);
+        if at.is_some_and(ok) {
+            return at;
+        }
+    }
+    None
 }
 
 /// Moves the selection by `delta` rows, wrapping around.
@@ -957,9 +1021,71 @@ pub fn has_round_corners(build: u32) -> bool {
     build >= 22000
 }
 
+// ------------------------------------------------------------------ texts
+
+/// The one-time balloon when the window's close button hides it: the
+/// program is still running, how to open it again (`hotkey`, or the icon by
+/// the clock when another program has the hotkey), and how to really close
+/// it. It used to say "still running here", about an icon Windows usually
+/// tucks away.
+pub fn hidden_hint(lang: crate::i18n::Lang, hotkey: Option<&str>) -> String {
+    use crate::i18n::Lang;
+    match (lang, hotkey) {
+        (Lang::Ar, Some(key)) => format!("بحث سريع ما زال يعمل. افتحه بـ {key}. للإغلاق نهائياً: خيارات ← خروج من البرنامج."),
+        (Lang::Ar, None) => "بحث سريع ما زال يعمل. افتحه من أيقونته بجانب الساعة. للإغلاق نهائياً: خيارات ← خروج من البرنامج.".to_string(),
+        (Lang::En, Some(key)) => format!("InstaFind is still running. Open it with {key}. To close it completely: Options ▸ Exit the program."),
+        (Lang::En, None) => "InstaFind is still running. Open it from its icon next to the clock. To close it completely: Options ▸ Exit the program.".to_string(),
+    }
+}
+
+/// The line of key hints under the quick popup's search box.
+pub fn key_hints(lang: crate::i18n::Lang) -> &'static str {
+    lang.pick("Enter فتح · Ctrl+Enter المجلد · Tab المزيد · Esc إغلاق", "Enter open · Ctrl+Enter folder · Tab more · Esc close")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn key_hints_name_the_keys_the_popup_answers_to() {
+        use crate::i18n::Lang;
+        assert_eq!(key_hints(Lang::Ar), "Enter فتح · Ctrl+Enter المجلد · Tab المزيد · Esc إغلاق");
+        assert_eq!(key_hints(Lang::En), "Enter open · Ctrl+Enter folder · Tab more · Esc close");
+        // In the right-to-left popup each key stays next to its word: the
+        // keys and the words alternate, read from the right.
+        let t = key_hints(Lang::Ar);
+        let n = t.chars().count();
+        let spans = crate::bidi_layout::visual_spans(t, &vec![1; n], true).unwrap();
+        let x = |piece: &str| spans[t[..t.find(piece).unwrap()].chars().count()].0;
+        assert!(x("Ctrl") < x("فتح") && x("المجلد") < x("Ctrl") && x("Tab") < x("المجلد") && x("Esc") < x("المزيد"));
+    }
+
+    #[test]
+    fn the_hidden_window_balloon_says_how_to_open_and_how_to_exit() {
+        use crate::i18n::Lang;
+        assert_eq!(
+            hidden_hint(Lang::Ar, Some("Ctrl+Alt+F")),
+            "بحث سريع ما زال يعمل. افتحه بـ Ctrl+Alt+F. للإغلاق نهائياً: خيارات ← خروج من البرنامج."
+        );
+        assert_eq!(
+            hidden_hint(Lang::En, Some("Ctrl+Alt+F")),
+            "InstaFind is still running. Open it with Ctrl+Alt+F. To close it completely: Options ▸ Exit the program."
+        );
+        for lang in [Lang::Ar, Lang::En] {
+            // Without the hotkey (another program has it) no key is promised.
+            let t = hidden_hint(lang, None);
+            assert!(!t.contains("Ctrl") && t.contains(lang.pick("بجانب الساعة", "next to the clock")), "{t}");
+            for key in [None, Some("Ctrl+Alt+F")] {
+                let t = hidden_hint(lang, key);
+                // The Options menu's own words for leaving, and no vague "here".
+                assert!(t.contains(lang.pick("خيارات ← خروج من البرنامج", "Options ▸ Exit the program")), "{t}");
+                assert!(!t.contains("هنا") && !t.contains(" here"), "{t}");
+            }
+        }
+        // The balloon is right-to-left in Arabic: it starts with an Arabic letter.
+        assert!(hidden_hint(Lang::Ar, None).starts_with('ب'));
+    }
 
     #[test]
     fn quoted_query_keeps_its_reading_order() {
@@ -1121,6 +1247,60 @@ mod tests {
         Action::Launch { target: t.into(), args: String::new() }
     }
 
+    fn parts(query: &str, items: Vec<Item>, files: &[&str]) -> Parts {
+        Parts { query: query.into(), pins: vec![], items, files: files.iter().map(|f| Row::file(f, false)).collect(), files_done: true }
+    }
+
+    #[test]
+    fn guessed_files_are_dropped_behind_the_app_that_was_meant() {
+        // «المفكرة» is Notepad; the file search found nothing named so and
+        // fell back to the other keyboard layout.
+        let notepad = Item { strong: true, ..item(Kind::App, "المفكرة (Notepad)", launch("notepad.exe")) };
+        let rows = arrange(parts("المفكرة", vec![notepad], &["C:\\libs\\mathgl.dll", "C:\\x\\mathgl-2.4"]));
+        assert_eq!(rows[0].group, Group::Best);
+        assert_eq!(rows[0].target, Target::Launcher(launch("notepad.exe")));
+        assert!(rows.iter().all(|r| r.group != Group::Files), "{rows:?}");
+        let paint = Item { strong: true, ..item(Kind::App, "الرسام (Paint)", launch("mspaint.exe")) };
+        let rows = arrange(parts("رسام", vec![paint], &["C:\\VS\\include\\vshelp.h"]));
+        assert!(rows.iter().all(|r| !r.title.contains("vshelp")), "{rows:?}");
+        // A settings page named with the query does the same.
+        let display = item(Kind::Setting, "Display", Action::OpenUri("ms-settings:display".into()));
+        let rows = arrange(parts("display", vec![display], &["C:\\x\\dsiplya.txt"]));
+        assert_eq!(rows[0].target, Target::Launcher(Action::OpenUri("ms-settings:display".into())));
+        assert!(rows.iter().all(|r| r.group != Group::Files), "{rows:?}");
+    }
+
+    #[test]
+    fn files_named_with_the_query_stay_after_the_app() {
+        let notepad = Item { strong: true, ..item(Kind::App, "Notepad", launch("notepad.exe")) };
+        let rows = arrange(parts("notepad", vec![notepad], &["C:\\notes\\notepad tips.txt"]));
+        assert_eq!(rows[0].group, Group::Best);
+        assert!(rows.iter().any(|r| r.group == Group::Files && r.title == "notepad tips.txt"), "{rows:?}");
+        // An Arabic file is found and leads when no app is meant.
+        let rows = arrange(parts("تقرير مالي", vec![], &["C:\\docs\\تقرير مالي 2026.xlsx"]));
+        assert_eq!((rows[0].group, rows[0].title.as_str()), (Group::Best, "تقرير مالي 2026.xlsx"));
+    }
+
+    #[test]
+    fn settings_pages_come_before_files_that_only_resemble_the_query() {
+        // A weak app (a typo) is best; the files were found with typos too.
+        let items = vec![
+            item(Kind::App, "Notepad", launch("notepad.exe")),
+            item(Kind::Setting, "Notifications", Action::OpenUri("ms-settings:notifications".into())),
+        ];
+        let rows = arrange(parts("notepda", items, &["C:\\x\\notepad.txt"]));
+        assert_eq!(rows[0].target, Target::Launcher(launch("notepad.exe")));
+        let settings = rows.iter().position(|r| r.group == Group::Settings).expect("settings row");
+        let files = rows.iter().position(|r| r.group == Group::Files).expect("the typo'd file is kept");
+        assert!(settings < files, "{rows:?}");
+        // Files named with the query keep their place before the settings.
+        let items = vec![item(Kind::Setting, "Sound", Action::OpenUri("ms-settings:sound".into()))];
+        let rows = arrange(parts("report", items, &["C:\\a\\report.pdf", "C:\\a\\report 2.pdf"]));
+        let settings = rows.iter().position(|r| r.group == Group::Settings).unwrap();
+        let files = rows.iter().position(|r| r.group == Group::Files).unwrap();
+        assert!(files < settings, "{rows:?}");
+    }
+
     fn groups(rows: &[Row]) -> Vec<Group> {
         rows.iter().map(|r| r.group).collect()
     }
@@ -1193,7 +1373,7 @@ mod tests {
     #[test]
     fn caps_and_limit() {
         let items: Vec<Item> = (0..10).map(|i| item(Kind::App, &format!("zapp{i}"), launch(&format!("a{i}")))).chain((0..10).map(|i| item(Kind::Setting, &format!("zset{i}"), Action::OpenUri(format!("s{i}"))))).collect();
-        let files: Vec<Row> = (0..20).map(|i| Row::file(&format!(r"C:\f{i}.txt"), false)).collect();
+        let files: Vec<Row> = (0..20).map(|i| Row::file(&format!(r"C:\q{i}.txt"), false)).collect();
         let rows = arrange(Parts { query: "q".into(), pins: vec![], items, files, files_done: true });
         let n = |g| rows.iter().filter(|r| r.group == g).count();
         assert_eq!(rows.iter().filter(|r| r.group != Group::More).count(), MAX_RESULTS);
@@ -1266,6 +1446,36 @@ mod tests {
         // Other answers carry no credit.
         let rows = arrange(Parts { query: "2+2".into(), pins: vec![], items: catalog_items(&[], "2+2"), files: vec![], files_done: true });
         assert!(rows.iter().all(|r| r.title != "Rates By Exchange Rate API"));
+    }
+
+    #[test]
+    fn the_arrow_keys_pass_over_the_rates_credit() {
+        let items = catalog_items(&["Notepad"], "100 usd to iqd");
+        let mut rows = arrange(Parts { query: "100 usd to iqd".into(), pins: vec![], items, files: vec![], files_done: true });
+        rows.push(Row::file("C:\\usd.txt", false));
+        let credit = rows.iter().position(|r| r.title == "Rates By Exchange Rate API").unwrap();
+        assert!(!selectable(&rows[credit]) && selectable(&rows[0]));
+        assert_eq!(credit, 1);
+        // Down from the answer goes past the credit, and up comes back to the answer.
+        let next = step_selection(&rows, Some(0), 1).unwrap();
+        assert!(next != credit && selectable(&rows[next]));
+        assert_eq!(step_selection(&rows, Some(next), -1), Some(0));
+        // Wrapping and Page Up/Down never land on it either.
+        for start in [None, Some(0), Some(rows.len() - 1)] {
+            for delta in [1, -1, 4, -4, 40, -40] {
+                let at = step_selection(&rows, start, delta);
+                assert!(at.is_some_and(|i| i != credit), "{start:?} {delta} -> {at:?}");
+            }
+        }
+        assert_eq!(step_selection(&rows, Some(0), -4), Some(0));
+        // Only the credit (or nothing): nothing to select.
+        assert_eq!(step_selection(&rows[credit..credit + 1], None, 1), None);
+        assert_eq!(step_selection(&[], Some(3), 1), None);
+        // Elsewhere the steps are the plain ones.
+        let files: Vec<Row> = (0..5).map(|i| Row::file(&format!("C:\\f{i}.txt"), false)).collect();
+        assert_eq!(step_selection(&files, Some(4), 1), Some(0));
+        assert_eq!(step_selection(&files, None, -1), Some(4));
+        assert_eq!(step_selection(&files, Some(1), 4), Some(4));
     }
 
     #[test]

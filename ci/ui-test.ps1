@@ -349,7 +349,7 @@ while (-not (Test-Path $index) -and -not $p.HasExited -and ((Get-Date) - $t1).To
         $m = Main-Window $p.Id
         $bar = if ($m) { Get-Children $m.Handle | Where-Object Class -eq 'msctls_statusbar32' | Select-Object -First 1 }
         $part = if ($bar) { [U]::StatusText($bar.Handle, 2) } else { '' }
-        if ($part -match 'Indexing…|جارِ الفهرسة') { $progressSeen = $part }
+        if ($part -match 'Indexing…|جارٍ الفهرسة') { $progressSeen = $part }
     }
     if ((Get-Date) -ge $next) {
         $next = (Get-Date).AddSeconds(60)
