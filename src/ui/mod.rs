@@ -247,6 +247,10 @@ pub struct App {
     menu_rename: nwg::MenuItem,
     menu_delete: nwg::MenuItem,
     menu_matches: nwg::MenuItem,
+    /// Windows' own "Open with" and Properties for the selected result.
+    menu_open_with: nwg::MenuItem,
+    menu_properties_sep: nwg::MenuSeparator,
+    menu_properties: nwg::MenuItem,
     /// Lists every matching line of one document.
     matches_window: nwg::Window,
     matches_text: nwg::TextBox,

@@ -108,6 +108,19 @@ impl App {
         }
     }
 
+    /// Windows' Properties window ("properties") or "Open with" choice
+    /// ("openas") for the selected result.
+    pub(super) fn shell_verb_selected(&self, verb: &str) {
+        match self.selected_path() {
+            Some(p) => {
+                if !shell::invoke_verb(self.window.handle.hwnd(), &p, verb) {
+                    self.set_status(&trf!("تعذّر تنفيذ ذلك على: {}", "Windows could not do that for: {}", ltr_path(&p)));
+                }
+            }
+            None => self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first.")),
+        }
+    }
+
     pub(super) fn copy_path(&self) {
         match self.selected_path() {
             Some(p) => {

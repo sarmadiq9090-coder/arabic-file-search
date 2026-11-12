@@ -240,12 +240,15 @@ impl NativeUi<AppUi> for App {
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.menu)?;
         nwg::MenuItem::builder().text(tr!("فتح الملف\tEnter", "Open file\tEnter")).parent(&app.menu).build(&mut app.menu_open)?;
         nwg::MenuItem::builder().text(tr!("فتح المجلد الذي يحتويه\tCtrl+Enter", "Open containing folder\tCtrl+Enter")).parent(&app.menu).build(&mut app.menu_folder)?;
+        nwg::MenuItem::builder().text(tr!("فتح باستخدام…", "Open with…")).parent(&app.menu).build(&mut app.menu_open_with)?;
         nwg::MenuItem::builder().text(tr!("نسخ الملف\tCtrl+C", "Copy file\tCtrl+C")).parent(&app.menu).build(&mut app.menu_copy_file)?;
         nwg::MenuItem::builder().text(tr!("نسخ المسار\tCtrl+Shift+C", "Copy path\tCtrl+Shift+C")).parent(&app.menu).build(&mut app.menu_copy)?;
         nwg::MenuItem::builder().text(tr!("نسخ مسارات كل النتائج", "Copy paths of all results")).parent(&app.menu).build(&mut app.menu_copy_all)?;
         nwg::MenuItem::builder().text(tr!("تغيير الاسم\tF2", "Rename\tF2")).parent(&app.menu).build(&mut app.menu_rename)?;
         nwg::MenuItem::builder().text(tr!("نقل إلى سلة المحذوفات\tDelete", "Move to Recycle Bin\tDelete")).parent(&app.menu).build(&mut app.menu_delete)?;
         nwg::MenuItem::builder().text(tr!("عرض كل التطابقات داخل الملف\tF4", "Show all matches in the file\tF4")).parent(&app.menu).build(&mut app.menu_matches)?;
+        nwg::MenuSeparator::builder().parent(&app.menu).build(&mut app.menu_properties_sep)?;
+        nwg::MenuItem::builder().text(tr!("خصائص", "Properties")).parent(&app.menu).build(&mut app.menu_properties)?;
 
         // Window with every matching line of one document (hidden until used).
         nwg::Window::builder()
@@ -454,6 +457,10 @@ impl NativeUi<AppUi> for App {
                         app.start_rename();
                     } else if handle == app.menu_matches {
                         app.show_matches();
+                    } else if handle == app.menu_open_with {
+                        app.shell_verb_selected("openas");
+                    } else if handle == app.menu_properties {
+                        app.shell_verb_selected("properties");
                     } else if handle == app.menu_delete {
                         app.delete_selected();
                     } else if handle == app.menu_hotkey {
