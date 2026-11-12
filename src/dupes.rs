@@ -65,11 +65,47 @@ impl Progress {
     }
 }
 
+/// Which file a path leads to: the volume serial number and file ID on
+/// Windows, the device and inode elsewhere. Two paths with the same ID are
+/// one file (hard links, a junction or symbolic link to a folder, a `subst`
+/// drive), however different the paths look.
+pub type FileId = (u64, u64);
+
+/// The [`FileId`] of the file at `path`; `None` when it can't be opened.
+pub fn file_id(path: &str) -> Option<FileId> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawHandle;
+        use winapi::um::fileapi::{BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle};
+        let f = File::open(path).ok()?;
+        // SAFETY: an all-zero BY_HANDLE_FILE_INFORMATION is valid; the
+        // handle stays open for the call and `info` is a valid out pointer.
+        let mut info: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
+        let ok = unsafe { GetFileInformationByHandle(f.as_raw_handle().cast(), &mut info) };
+        (ok != 0).then(|| {
+            (u64::from(info.dwVolumeSerialNumber), (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow))
+        })
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let m = std::fs::metadata(path).ok()?;
+        Some((m.dev(), m.ino()))
+    }
+    #[cfg(not(any(windows, unix)))]
+    {
+        let _ = path;
+        None
+    }
+}
+
 /// One file of a duplicate group.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DupFile {
     pub path: String,
     pub mtime: i64,
+    /// `None` when it could not be read; such a file counts as its own copy.
+    pub id: Option<FileId>,
 }
 
 /// Files with the same content (or name and size in the quick mode).
@@ -80,10 +116,24 @@ pub struct Group {
 }
 
 impl Group {
-    /// Space freed by keeping only one copy.
+    /// The file listed before file `f` that is the very same file (another
+    /// path to it), if any.
+    pub fn same_file_as(&self, f: usize) -> Option<usize> {
+        let id = self.files.get(f)?.id?;
+        self.files[..f].iter().position(|o| o.id == Some(id))
+    }
+
+    /// How many different files the group has: paths to the same file
+    /// count once.
+    pub fn copies(&self) -> usize {
+        (0..self.files.len()).filter(|&f| self.same_file_as(f).is_none()).count()
+    }
+
+    /// Space freed by keeping only one copy. Another path to the same file
+    /// takes no space.
     pub fn wasted(&self) -> u64 {
         // Saturating: sizes come from the index cache, which may be damaged.
-        self.size.saturating_mul(self.files.len().saturating_sub(1) as u64)
+        self.size.saturating_mul(self.copies().saturating_sub(1) as u64)
     }
 }
 
@@ -293,11 +343,17 @@ pub fn find(index: &Index, scope: &Scope, mode: Mode, min_size: u64, progress: &
         .map(|g| {
             let mut files: Vec<DupFile> = g
                 .iter()
-                .map(|&i| DupFile { path: entries[i].path.to_string(), mtime: entries[i].mtime })
+                .map(|&i| {
+                    let path = entries[i].path.to_string();
+                    DupFile { id: file_id(&path), path, mtime: entries[i].mtime }
+                })
                 .collect();
             files.sort_by(|a, b| a.path.cmp(&b.path));
             Group { size: entries[g[0]].size, files }
         })
+        // Only paths to one file (hard links, a junction, a subst drive):
+        // nothing to free.
+        .filter(|g: &Group| g.copies() >= 2)
         .collect();
     groups.sort_by(|a, b| b.wasted().cmp(&a.wasted()).then_with(|| a.files[0].path.cmp(&b.files[0].path)));
     Some(Report { groups, unreadable, mode })
@@ -308,7 +364,7 @@ pub fn forget_paths(report: &mut Report, gone: &[String]) {
     for g in &mut report.groups {
         g.files.retain(|f| !gone.contains(&f.path));
     }
-    report.groups.retain(|g| g.files.len() >= 2);
+    report.groups.retain(|g| g.copies() >= 2);
 }
 
 // ---------------------------------------------------------------- deleting
@@ -320,6 +376,8 @@ pub struct Seen {
     /// SHA-256 of the whole content, read now. `None` when it was not read:
     /// the quick mode reads nothing, and a file of another size needs no hash.
     pub hash: Option<[u8; 32]>,
+    /// Which file the path leads to now ([`file_id`]).
+    pub id: Option<FileId>,
 }
 
 /// Why a selected file is left where it is.
@@ -356,7 +414,10 @@ fn still_fits(seen: &Seen, size: u64, mode: Mode) -> bool {
 /// `look` says what is at a path now (see [`look`]). A selected file goes
 /// only when a copy that is NOT selected is still on disk, with the size the
 /// search saw and, in the content mode, with the very same content as the
-/// selected file has now. Otherwise it stays, with the reason. `mode` is the
+/// selected file has now, and which is not the selected file itself under
+/// another path (a hard link, a junction, a `subst` drive: their file IDs
+/// are compared, and a copy whose ID can't be read does not count).
+/// Otherwise it stays, with the reason. `mode` is the
 /// mode the user sees; a list made in another mode is not acted on at all.
 /// Paths that are in no group are never deleted.
 ///
@@ -396,7 +457,9 @@ pub fn plan_delete(
                     let has_copy = staying.iter().zip(seen.iter_mut()).any(|(c, slot)| {
                         slot.get_or_insert_with(|| look(&c.path, g.size))
                             .as_ref()
-                            .is_some_and(|c| still_fits(c, g.size, mode) && c.hash == now.hash)
+                            .is_some_and(|c| {
+                                still_fits(c, g.size, mode) && c.hash == now.hash && c.id.is_some() && now.id.is_some() && c.id != now.id
+                            })
                     });
                     (!has_copy).then_some(Kept::NoCopyLeft)
                 }
@@ -422,7 +485,7 @@ pub fn look(path: &str, size: u64, mode: Mode, progress: &Progress) -> Option<Se
     let len = meta.len();
     let hash = if mode == Mode::Content && len == size { Some(full_hash(path, size, progress)?) } else { None };
     progress.files_done.fetch_add(1, Ordering::Relaxed);
-    Some(Seen { size: len, hash })
+    Some(Seen { size: len, hash, id: file_id(path) })
 }
 
 #[cfg(test)]
@@ -615,7 +678,7 @@ mod tests {
 
     #[test]
     fn forgetting_deleted_files_drops_single_file_groups() {
-        let f = |p: &str| DupFile { path: p.into(), mtime: 0 };
+        let f = |p: &str| DupFile { path: p.into(), mtime: 0, id: None };
         let mut r = Report {
             groups: vec![
                 Group { size: 5, files: vec![f("a"), f("b")] },
@@ -751,7 +814,8 @@ mod tests {
         let p = Progress::default();
         let got = plan(&r, Mode::NameAndSize, &d.0, &[k]);
         assert_eq!(got.delete, paths(&d.0, &[k]));
-        assert_eq!(look(&paths(&d.0, &[k])[0], 4, Mode::NameAndSize, &p), Some(Seen { size: 4, hash: None }));
+        let seen = look(&paths(&d.0, &[k])[0], 4, Mode::NameAndSize, &p).unwrap();
+        assert_eq!((seen.size, seen.hash, seen.id.is_some()), (4, None, true));
         assert_eq!(p.bytes_done.load(Ordering::Relaxed), 0);
         // The file that stays grew: not the same size any more.
         std::fs::write(d.0.join("l").join("n.txt"), b"22222").unwrap();
@@ -763,9 +827,55 @@ mod tests {
         assert_eq!(plan(&r, Mode::NameAndSize, &d.0, &[k]).kept, kept(&d.0, &[(k, Kept::NoCopyLeft)]));
     }
 
+    /// Two names of one file (a hard link here; a junction or a `subst`
+    /// drive on Windows) are one file, not two copies: deleting the "copy"
+    /// would delete the only one.
+    #[cfg(unix)]
+    #[test]
+    fn two_paths_to_one_file_are_not_duplicates() {
+        let d = temp("links");
+        let mut idx = index_of(&d.0, &[("a", b"only one".to_vec()), ("dir/x", b"one more".to_vec())]);
+        std::fs::hard_link(d.0.join("a"), d.0.join("b")).unwrap();
+        // `alias` leads to `dir`, as a junction would.
+        std::os::unix::fs::symlink(d.0.join("dir"), d.0.join("alias")).unwrap();
+        for n in ["b", "alias/x"] {
+            idx.entries.push(entry(&d.0.join(n).to_string_lossy(), 8, false));
+        }
+        idx.entries.sort_by(|a, b| a.path.cmp(&b.path));
+        for mode in [Mode::Content, Mode::NameAndSize] {
+            let r = find(&idx, &all(&idx), mode, 0, &Progress::default()).unwrap();
+            assert!(r.groups.is_empty(), "{mode:?}: {:?}", names(&r));
+        }
+        // A real copy next to them: one group, whose second name of `a`
+        // is shown as the same file and wastes nothing.
+        std::fs::write(d.0.join("c"), b"only one").unwrap();
+        idx.entries.push(entry(&d.0.join("c").to_string_lossy(), 8, false));
+        idx.entries.sort_by(|a, b| a.path.cmp(&b.path));
+        let r = find(&idx, &all(&idx), Mode::Content, 0, &Progress::default()).unwrap();
+        assert_eq!(names(&r), vec![vec!["a", "b", "c"]]);
+        let g = &r.groups[0];
+        assert_eq!((g.copies(), g.wasted(), g.same_file_as(1), g.same_file_as(2)), (2, 8, Some(0), None));
+        // Deleting `a` while only its other name `b` stays would delete the
+        // file: refused. `c` may go, as `b` (that is, `a`) stays.
+        let got = plan(&r, Mode::Content, &d.0, &["a", "c"]);
+        assert_eq!((got.delete, got.kept), (paths(&d.0, &["c"]), kept(&d.0, &[("a", Kept::NoCopyLeft)])));
+        // Deleting it while `c` stays is fine.
+        assert_eq!(plan(&r, Mode::Content, &d.0, &["a"]).delete, paths(&d.0, &["a"]));
+        // The same through the folder alias, in a report made from the
+        // list alone (as an older list would be).
+        let f = |p: &str| DupFile { path: d.0.join(p).to_string_lossy().into_owned(), mtime: 0, id: None };
+        let r = Report { groups: vec![Group { size: 8, files: vec![f("alias/x"), f("dir/x")] }], ..Default::default() };
+        let got = plan(&r, Mode::Content, &d.0, &["alias/x"]);
+        assert_eq!((got.delete.len(), got.kept), (0, kept(&d.0, &[("alias/x", Kept::NoCopyLeft)])));
+        // After the delete the group is the one file with two names: gone.
+        let mut r = find(&idx, &all(&idx), Mode::Content, 0, &Progress::default()).unwrap();
+        forget_paths(&mut r, &paths(&d.0, &["c"]));
+        assert!(r.groups.is_empty());
+    }
+
     #[test]
     fn huge_sizes_from_a_damaged_index_do_not_overflow() {
-        let f = |p: &str| DupFile { path: p.into(), mtime: 0 };
+        let f = |p: &str| DupFile { path: p.into(), mtime: 0, id: None };
         let g = Group { size: u64::MAX / 2 + 1, files: vec![f("a"), f("b"), f("c")] };
         assert_eq!(g.wasted(), u64::MAX);
         let r = Report { groups: vec![g.clone(), g], ..Default::default() };

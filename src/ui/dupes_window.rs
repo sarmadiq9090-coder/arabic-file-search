@@ -686,7 +686,7 @@ impl App {
                         "المجموعة {}: {} نسخ",
                         "Group {}: {} copies",
                         fmt_num(g + 1),
-                        fmt_num(group.files.len())
+                        fmt_num(group.copies())
                     ),
                     1 if report.mode == Mode::NameAndSize => {
                         trf!("المهدر إن تطابق المحتوى: {}", "Wasted if the contents match: {}", size_text(group.wasted()))
@@ -701,7 +701,12 @@ impl App {
                 };
                 let (name, folder) = split_path(&file.path);
                 match col {
-                    0 => format!("    {name}"),
+                    0 => match group.same_file_as(f) {
+                        // Another path to a file listed above: a hard link,
+                        // a junction or a subst drive. Not a copy.
+                        Some(_) => trf!("    {} — نفس الملف (اسم آخر له)", "    {} — the same file (another name for it)", name),
+                        None => format!("    {name}"),
+                    },
                     1 => ltr_path(folder),
                     2 => size_text(group.size),
                     3 => shell::format_time(file.mtime, true),
