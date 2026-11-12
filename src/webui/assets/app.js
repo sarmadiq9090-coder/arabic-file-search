@@ -25,9 +25,9 @@
       recent: "ملفات فتحتها مؤخراً", recentNone: "الملفات التي تفتحها تظهر هنا.", tryThese: "جرّب هذه",
       trust: "كل شيء يبقى على جهازك. لا نجمع أي بيانات استخدام.",
       tips: [["تقرير .pdf", "ملفات PDF فقط"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"], ['"عقد إيجار"', "العبارة كما هي"], ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["hgjrvdv", "لوحة المفاتيح الخطأ ← «التقرير»"]],
-      kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد", kMenu: "إجراءات",
+      kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد", kMenu: "المزيد",
       open: "فتح", openFolder: "فتح المجلد", copyPath: "نسخ المسار", more: "إجراءات أخرى",
-      fType: "النوع", fSize: "الحجم", fMod: "تاريخ التعديل", fMatches: "التطابقات", folder: "مجلد", file: "ملف",
+      fType: "النوع", fSize: "الحجم", fMod: "تاريخ التعديل", fMatches: "التطابقات", folder: "مجلد", file: "ملف", fileOf: (x) => `ملف ${x}`,
       nres: (n) => (n === 0 ? "لا نتائج" : n === 1 ? "نتيجة واحدة" : n === 2 ? "نتيجتان" : n <= 10 ? `${num(n)} نتائج` : `${num(n)} نتيجة`),
       nMatches: (n) => (n === 1 ? "تطابق واحد" : n === 2 ? "تطابقان" : n <= 10 ? `${num(n)} تطابقات` : `${num(n)} تطابقاً`),
       count: (n, ms) => (n ? `وجدت ${T.nres(n)} في ${num(ms)} ملّي ثانية` : T.nres(0)),
@@ -41,7 +41,7 @@
       tagHead: "لا شيء يضيع بصمت", tagTail: ": إذا لم نجد شيئاً نقول لك أين بحثنا وماذا تجرّب.",
       loading: "جارِ تحميل الفهرس…", ixSub: "يمكنك البحث الآن. قد تكون النتائج ناقصة إلى أن تنتهي الفهرسة، وتكتمل القائمة تلقائياً.",
       moreRows: "مرّر لعرض المزيد", searching: "جارِ البحث داخل المستندات…", pressEnter: "اضغط Enter للبحث داخل المستندات.",
-      sugg: { query: "يبحث بهذا النص بدلاً مما كتبت", all_kinds: "يزيل فلتر النوع", all_drives: "يبحث خارج المجلد المختار", contents: "يقرأ نص المستندات أيضاً", web: "يفتح المتصفح، ولا يرسل شيئاً غير ما كتبته" },
+      sugg: { query: "يبحث بهذا النص بدلاً مما كتبت", all_kinds: "يبحث في كل الأنواع", all_drives: "يبحث خارج المجلد المختار", contents: "يقرأ نص المستندات أيضاً", web: "يفتح المتصفح، ولا يرسل شيئاً غير ما كتبته" },
       now: "الآن", minAgo: (n) => (n === 1 ? "قبل دقيقة" : n === 2 ? "قبل دقيقتين" : n <= 10 ? `قبل ${num(n)} دقائق` : `قبل ${num(n)} دقيقة`),
       today: "اليوم", yesterday: "أمس",
       units: ["بايت", "كيلوبايت", "ميغابايت", "غيغابايت", "تيرابايت"],
@@ -72,7 +72,7 @@
       sSearch: "البحث والفهرسة", sHideSystem: "إخفاء ملفات النظام", sHideSystemSub: "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
       sContentIndex: "فهرسة محتوى المستندات في الخلفية", sContentIndexSub: "بحث أسرع داخل الملفات، ويشمل النص في الصور والملفات الممسوحة",
       sAutoIndex: "تحديث الفهرس تلقائياً عند تغيّر الملفات", reindex: "تحديث الفهرس الآن",
-      sAnywhere: "البحث من أي مكان", sHotkey: "Ctrl+Alt+F يفتح نافذة البحث الصغيرة (وإلا هذه النافذة)",
+      sAnywhere: "البحث من أي مكان", sHotkey: "Ctrl+Alt+F يفتح نافذة البحث الصغيرة (عند الإيقاف: هذه النافذة)",
       sFloating: "خانة بحث شفافة فوق الساعة", sTray: "أيقونة بجانب الساعة",
       sStartup: "التشغيل", sAutostart: "التشغيل مع ويندوز (في الخلفية)",
       sAbout: "حول البرنامج", version: (v) => `بحث سريع (InstaFind) — الإصدار ${v}`,
@@ -88,9 +88,9 @@
       recent: "Recently opened files", recentNone: "Files you open show up here.", tryThese: "Try these",
       trust: "Everything stays on your PC. No usage data is collected.",
       tips: [["report .pdf", "PDF files only"], ["size:>10mb", "Bigger than 10 MB"], ["dm:thisweek", "Changed this week"], ['"lease agreement"', "Exact phrase"], ["root: كتاب", "Arabic root: مكتبة، الكاتب"], ["احمد", "Also finds «أحمد»"]],
-      kNav: "Move", kOpen: "Open", kFolder: "Folder", kMenu: "Actions",
+      kNav: "Move", kOpen: "Open", kFolder: "Folder", kMenu: "More",
       open: "Open", openFolder: "Open folder", copyPath: "Copy path", more: "More actions",
-      fType: "Type", fSize: "Size", fMod: "Modified", fMatches: "Matches", folder: "Folder", file: "File",
+      fType: "Type", fSize: "Size", fMod: "Modified", fMatches: "Matches", folder: "Folder", file: "File", fileOf: (x) => `${x} file`,
       nres: (n) => (n === 0 ? "No results" : n === 1 ? "1 result" : `${num(n)} results`),
       nMatches: (n) => (n === 1 ? "1 match" : `${num(n)} matches`),
       count: (n, ms) => (n ? `Found ${T.nres(n)} in ${num(ms)} ms` : T.nres(0)),
@@ -104,7 +104,7 @@
       tagHead: "Nothing gets lost silently", tagTail: ": when we find nothing, we tell you where we looked and what to try.",
       loading: "Loading the index…", ixSub: "You can search now; results may be incomplete until we finish. The list updates by itself.",
       moreRows: "Scroll for more", searching: "Searching inside documents…", pressEnter: "Press Enter to search inside documents.",
-      sugg: { query: "Searches for this instead", all_kinds: "Removes the type filter", all_drives: "Looks outside the chosen folder", contents: "Reads the documents' text too", web: "Opens your browser with only what you typed" },
+      sugg: { query: "Searches for this instead", all_kinds: "Searches all types", all_drives: "Looks outside the chosen folder", contents: "Reads the documents' text too", web: "Opens your browser with only what you typed" },
       now: "Just now", minAgo: (n) => (n === 1 ? "1 min ago" : `${num(n)} min ago`),
       today: "Today", yesterday: "Yesterday",
       units: ["bytes", "KB", "MB", "GB", "TB"],
@@ -131,9 +131,9 @@
       sSearch: "Search and indexing", sHideSystem: "Hide system files", sHideSystemSub: "The Windows folder, temporary and cache files",
       sContentIndex: "Index document contents in the background", sContentIndexSub: "Faster search inside files, text in pictures and scans included",
       sAutoIndex: "Update the index automatically when files change", reindex: "Update the index now",
-      sAnywhere: "Search from anywhere", sHotkey: "Ctrl+Alt+F opens the quick search (otherwise this window)",
+      sAnywhere: "Search from anywhere", sHotkey: "Ctrl+Alt+F opens the quick search (when off: this window)",
       sFloating: "Search box above the clock", sTray: "Icon in the notification area",
-      sStartup: "Start-up", sAutostart: "Start with Windows (in the background)",
+      sStartup: "Startup", sAutostart: "Start with Windows (in the background)",
       sAbout: "About", version: (v) => `InstaFind — version ${v}`,
     },
   }[LANG];
@@ -647,7 +647,7 @@
     const r = S.view === "results" ? S.rows[S.sel] : null;
     renderActbar(r);
     if (!r) { pv.replaceChildren(); return; }
-    const kind = r.folder ? T.folder : r.ext ? `${r.ext.toUpperCase()} · ${T.file}` : T.file;
+    const kind = r.folder ? T.folder : r.ext ? T.fileOf(r.ext.toUpperCase()) : T.file;
     const facts = h("dl", { class: "facts" }, h("dt", null, T.fType), h("dd", null, kind));
     if (!r.folder) facts.append(h("dt", null, T.fSize), h("dd", { class: "num" }, size(r.size)));
     facts.append(h("dt", null, T.fMod), h("dd", { class: "num", title: fullDate(r.mtime) }, fullDate(r.mtime)));
