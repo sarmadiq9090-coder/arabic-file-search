@@ -23,11 +23,15 @@ configuration with the standard library only (no dumpbin needed).
    the flag Windows looks for them in the exe's own folder first, and the exe
    is often run from Downloads, where a DLL of that name could be planted.
 
+3. Exploit mitigations (build.rs passes them explicitly): the PE header must
+   mark the exe ASLR-compatible (DYNAMIC_BASE, with its relocations kept),
+   DEP-compatible (NX_COMPAT) and, for a 64-bit exe, HIGH_ENTROPY_VA.
+
 build.yml runs this on each exe it publishes (jobs `exe` and `exe-arm64`),
 without --mingw-ok. With --mingw-ok, an exe linked by GNU ld (a local mingw
 cross-build: it imports msvcrt.dll and has no DependentLoadFlags, GNU ld has
-no such option) only gets notes for those two points; every other finding
-still fails. Based on Lemon's tools/check_imports.py.
+no such option) only gets notes for those points and a missing mitigation;
+every other finding still fails. Based on Lemon's tools/check_imports.py.
 """
 import struct
 import sys
@@ -40,7 +44,7 @@ ALLOWED = {
     "dbghelp.dll", "dwmapi.dll", "dwrite.dll", "dxgi.dll", "gdi32.dll",
     "imm32.dll", "iphlpapi.dll", "kernel32.dll", "kernelbase.dll",
     "msimg32.dll", "mswsock.dll", "ncrypt.dll", "ntdll.dll", "ole32.dll",
-    "oleaut32.dll", "powrprof.dll", "propsys.dll", "rpcrt4.dll", "secur32.dll",
+    "oleaut32.dll", "powrprof.dll", "propsys.dll", "psapi.dll", "rpcrt4.dll", "secur32.dll",
     "setupapi.dll", "shcore.dll", "shell32.dll", "shlwapi.dll",
     "uiautomationcore.dll", "urlmon.dll", "user32.dll", "userenv.dll",
     "usp10.dll", "uxtheme.dll", "version.dll", "winhttp.dll", "wininet.dll", "winmm.dll",
@@ -76,10 +80,13 @@ class Pe:
         if data[pe:pe + 4] != b"PE\0\0":
             raise ValueError("not a PE file (no PE signature)")
         n_sections, = struct.unpack_from("<H", data, pe + 6)
+        # IMAGE_FILE_HEADER.Characteristics and IMAGE_OPTIONAL_HEADER.DllCharacteristics.
+        self.characteristics, = struct.unpack_from("<H", data, pe + 22)
         opt_size, = struct.unpack_from("<H", data, pe + 20)
         opt = pe + 24
         magic, = struct.unpack_from("<H", data, opt)
         self.pe32_plus = magic == 0x20B  # PE32+ (x64, ARM64) / PE32 (x86)
+        self.dll_characteristics, = struct.unpack_from("<H", data, opt + 70)
         # MajorLinkerVersion: 14 for MSVC's link.exe, 2 for GNU ld (mingw).
         self.linker_major = data[opt + 2]
         self.dirs = opt + (112 if self.pe32_plus else 96)
@@ -97,6 +104,24 @@ class Pe:
 # Offset of DependentLoadFlags (a WORD) in IMAGE_LOAD_CONFIG_DIRECTORY64 / 32.
 DEPENDENT_LOAD_FLAGS_AT = {True: 78, False: 54}
 LOAD_LIBRARY_SEARCH_SYSTEM32 = 0x800
+
+
+IMAGE_FILE_RELOCS_STRIPPED = 0x0001
+# (DllCharacteristics bit, name, what it does, 64-bit exes only)
+MITIGATIONS = (
+    (0x0040, "DYNAMIC_BASE", "ASLR: loaded at a random address (/DYNAMICBASE)", False),
+    (0x0100, "NX_COMPAT", "DEP: data never runs as code (/NXCOMPAT)", False),
+    (0x0020, "HIGH_ENTROPY_VA", "ASLR over the whole 64-bit address space (/HIGHENTROPYVA)", True),
+)
+
+
+def missing_mitigations(pe):
+    """The mitigations the PE header does not have, as (name, what) pairs."""
+    missing = [(name, what) for bit, name, what, only64 in MITIGATIONS
+               if (pe.pe32_plus or not only64) and not pe.dll_characteristics & bit]
+    if pe.characteristics & IMAGE_FILE_RELOCS_STRIPPED:
+        missing.append(("relocations", "stripped by /FIXED, so ASLR cannot move the exe"))
+    return missing
 
 
 def dependent_load_flags(pe):
@@ -175,6 +200,18 @@ def check(path, mingw_ok=False):
               "beside the exe (in Downloads, say) would be loaded. build.rs must pass "
               "/DEPENDENTLOADFLAG:0x800 to the linker. See ci/check_imports.py.")
         ok = False
+
+    missing = missing_mitigations(pe)
+    if not missing:
+        print("  Mitigations: " + ", ".join(name for bit, name, what, only64 in MITIGATIONS
+                                            if pe.pe32_plus or not only64) + ", relocations kept.")
+    for name, what in missing:
+        if mingw:
+            print(f"  {name} missing: note: mingw build (never published).")
+        else:
+            print(f"::error::{path}: the PE header lacks {name} ({what}). build.rs must pass it to the linker. "
+                  "See ci/check_imports.py.")
+            ok = False
     return ok
 
 

@@ -32,6 +32,20 @@ fn main() {
             // ci/check_imports.py fails the build if the flag is missing.
             // MSVC only: GNU ld (the local mingw builds) has no such option.
             println!("cargo:rustc-link-arg-bins=/DEPENDENTLOADFLAG:0x800");
+            // Exploit mitigations, explicit so a linker default changing
+            // cannot drop them (ci/check_imports.py checks each in the PE
+            // header): ASLR (/DYNAMICBASE: the exe loads at a random
+            // address; it keeps its relocations for that, a few hundred KB),
+            // DEP (/NXCOMPAT: data pages never run as code; no cost) and,
+            // on 64-bit only (x64, ARM64; it means nothing for a 32-bit
+            // image), ASLR over the whole 64-bit address space
+            // (/HIGHENTROPYVA; no cost). All three are already link.exe's
+            // defaults, and ARM64 requires the first two.
+            println!("cargo:rustc-link-arg-bins=/DYNAMICBASE");
+            println!("cargo:rustc-link-arg-bins=/NXCOMPAT");
+            if std::env::var("CARGO_CFG_TARGET_POINTER_WIDTH").as_deref() == Ok("64") {
+                println!("cargo:rustc-link-arg-bins=/HIGHENTROPYVA");
+            }
         } else {
             println!("cargo:rustc-link-arg-bins=-Wl,--stack,8388608");
         }
