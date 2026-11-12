@@ -543,7 +543,8 @@ impl App {
     /// Whether the main window is on screen: the classic one, or the new
     /// one when it replaces it (the first-run offers wait for this).
     fn main_shown(&self) -> bool {
-        self.window.visible() || self.webui_visible()
+        // (Not while the new look's page is being created.)
+        (self.window.visible() || self.webui_visible()) && !self.webui_busy()
     }
 
     fn show_window(&self) {

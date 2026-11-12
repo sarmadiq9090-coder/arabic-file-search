@@ -83,6 +83,9 @@ mod imp {
         /// Wakes the UI thread to start a drag the page asked for, right
         /// after WebView2's message handler returns.
         drag_notice: nwg::Notice,
+        /// «جارٍ الفتح…» while the page is created (the window shows at once).
+        opening: nwg::Label,
+        opening_font: nwg::Font,
     }
 
     /// A search inside documents running on its own threads.
@@ -137,6 +140,10 @@ mod imp {
         loading_since: Cell<Option<Instant>>,
         /// When the page last said hello, until it fails.
         ready_since: Cell<Option<Instant>>,
+        /// The window is on screen without its page: created on the next tick.
+        host_pending: Cell<bool>,
+        /// The launch-to-window time was logged.
+        shown_logged: Cell<bool>,
         /// This start made the new look the default for a classic user: the
         /// page says so once (`Outbound::Hello`).
         tell_switch: Cell<bool>,
@@ -166,33 +173,34 @@ mod imp {
                 Ok(handlers) => handlers,
                 Err(e) => {
                     log(&format!("webui: {e}; using the classic window"));
-                    self.webui_fall_back();
+                    self.webui_fall_back(!started_hidden());
                     return None;
                 }
             };
-            match self.start_webui() {
-                Ok(()) => {
-                    if !started_hidden() {
-                        self.webui_show();
-                    }
-                    log("webui: main window ready");
-                }
-                // (The window stays, hidden: "Try the new look" can use it later.)
-                Err(e) => {
-                    log(&format!("webui: {e}; using the classic window"));
-                    self.webui_fall_back();
-                }
+            // The window is the main one now; its page is created when it is
+            // first shown (`webui_show`, then the next tick): a start in the
+            // tray creates no WebView2 at all, and a start on screen shows
+            // the window with «جارٍ الفتح…» at once instead of nothing.
+            self.webui.me.replace(Rc::downgrade(self));
+            self.webui.active.set(true);
+            self.webui_titles();
+            log("webui: main window ready");
+            if started_hidden() {
+                log("webui: started in the tray; the page is created when the window is first shown");
+            } else {
+                self.webui_show();
             }
             Some(handlers)
         }
 
         /// The classic window after the new one failed to start (twice),
         /// from now on: the next start must not try a page that fails.
-        fn webui_fall_back(&self) {
+        fn webui_fall_back(&self, show: bool) {
             self.webui.active.set(false);
             self.webui.host.replace(None);
+            self.webui.parts.window.set_visible(false);
             self.webui_titles();
-            if !started_hidden() {
+            if show {
                 self.window.set_visible(true);
             }
             // (Off only after a second launch in a row fails: one bad start,
@@ -222,6 +230,18 @@ mod imp {
                 .map_err(|e| e.to_string())?;
             nwg::Notice::builder().parent(&parts.window).build(&mut parts.notice).map_err(|e| e.to_string())?;
             nwg::Notice::builder().parent(&parts.window).build(&mut parts.drag_notice).map_err(|e| e.to_string())?;
+            nwg::Font::builder().family(super::super::startup::ui_font_family()).size_absolute(20).build(&mut parts.opening_font).map_err(|e| e.to_string())?;
+            let (cw, ch) = parts.window.size();
+            nwg::Label::builder()
+                .parent(&parts.window)
+                .text(tr!("جارٍ الفتح…", "Opening…"))
+                .font(Some(&parts.opening_font))
+                .h_align(nwg::HTextAlign::Center)
+                .v_align(nwg::VTextAlign::Center)
+                .position((0, 0))
+                .size((cw as i32, ch as i32))
+                .build(&mut parts.opening)
+                .map_err(|e| e.to_string())?;
             let hwnd = parts.window.handle.hwnd().ok_or("no window handle")?;
             crate::icon::set_window_icon(hwnd);
             self.webui.parts.set(parts);
@@ -240,6 +260,10 @@ mod imp {
                         // (`webui_options_menu`): it acts in the classic
                         // window's handlers, where every item is wired.
                         nwg::Event::OnMenuItemSelected => app.webui_forward_menu(h),
+                        nwg::Event::OnResize | nwg::Event::OnWindowMaximize if h == parts.window => {
+                            let (w, ht) = parts.window.size();
+                            parts.opening.set_size(w, ht);
+                        }
                         nwg::Event::OnWindowClose if h == parts.window => {
                             if let nwg::EventData::OnWindowClose(d) = &data {
                                 d.close(false);
@@ -264,10 +288,14 @@ mod imp {
                     if msg == WM_ACTIVATE && (w & 0xFFFF) as u16 != WA_INACTIVE {
                         let app = weak.upgrade()?;
                         // (Not while the page is being created or closed.)
-                        if let Ok(host) = app.webui.host.try_borrow()
-                            && let Some(host) = &*host
-                        {
-                            host.set_idle(false);
+                        if let Ok(host) = app.webui.host.try_borrow() {
+                            match &*host {
+                                Some(host) => host.set_idle(false),
+                                // Brought to the front without a page yet
+                                // (a second launch after a start in the tray).
+                                None if app.webui.active.get() => app.webui.host_pending.set(true),
+                                None => {}
+                            }
                         }
                     }
                     None
@@ -433,6 +461,32 @@ mod imp {
             self.save_settings();
         }
 
+        /// Creates the page of the window on screen (from the timer, after
+        /// the window and «جارٍ الفتح…» were painted). When WebView2 can't
+        /// start, the classic window takes over (and the failed start counts).
+        fn webui_create_page(&self) {
+            let Some(app) = self.webui.me.borrow().upgrade() else { return };
+            let visible = self.webui.parts.window.visible();
+            self.webui.switching.set(true);
+            let started = app.start_webui();
+            self.webui.switching.set(false);
+            match started {
+                Ok(()) => {
+                    log(&format!("webui: page created {} ms after launch", super::super::startup::ms_since_process_start()));
+                    if visible {
+                        self.webui_show();
+                    }
+                }
+                Err(e) => {
+                    log(&format!("webui: {e}; using the classic window"));
+                    self.webui_fall_back(visible);
+                    if visible {
+                        self.show_window();
+                    }
+                }
+            }
+        }
+
         /// A page that has worked a while (`crate::webui::STABLE`): its
         /// earlier failures, and a failed start at the last launch, no
         /// longer count.
@@ -503,6 +557,12 @@ mod imp {
             self.webui.active.get().then_some(&self.webui.parts.window)
         }
 
+        /// A page is being created (its WebView2 runs a message loop): the
+        /// first-run questions wait.
+        pub(in super::super) fn webui_busy(&self) -> bool {
+            self.webui.switching.get()
+        }
+
         /// Whether the new main window is the one in use and on screen.
         pub(in super::super) fn webui_visible(&self) -> bool {
             self.webui.active.get() && self.webui.parts.window.visible()
@@ -544,11 +604,25 @@ mod imp {
                         ShowWindow(h, SW_RESTORE);
                     }
                     SetForegroundWindow(h);
+                    winapi::um::winuser::UpdateWindow(h);
+                }
+                if !self.webui.shown_logged.replace(true) {
+                    log(&format!("webui: window on screen {} ms after launch", super::super::startup::ms_since_process_start()));
                 }
             }
-            if let Some(host) = &*self.webui.host.borrow() {
-                host.set_idle(false);
-                host.focus();
+            let has_page = match &*self.webui.host.borrow() {
+                Some(host) => {
+                    host.set_idle(false);
+                    host.focus();
+                    true
+                }
+                None => false,
+            };
+            if !has_page {
+                // «جارٍ الفتح…» is on screen; the page comes on the next tick.
+                self.webui.parts.opening.set_visible(true);
+                self.webui.host_pending.set(true);
+                return true;
             }
             self.webui_hand_over_query();
             self.webui_send_recent();
@@ -705,6 +779,14 @@ mod imp {
                     self.webui_stop_content();
                     self.webui.lists.borrow_mut().reset();
                     self.webui.ready.set(true);
+                    if let Some(t) = self.webui.loading_since.get() {
+                        log(&format!(
+                            "webui: page said hello {} ms after launch ({} ms after it was created)",
+                            super::super::startup::ms_since_process_start(),
+                            t.elapsed().as_millis()
+                        ));
+                    }
+                    self.webui.parts.opening.set_visible(false);
                     self.webui.loading_since.set(None);
                     self.webui.ready_since.set(Some(Instant::now()));
                     self.webui.last_status.replace(String::new());
@@ -1410,6 +1492,9 @@ mod imp {
                 // Back to the classic window: its WebView2 is freed.
                 self.webui.host.replace(None);
             }
+            if self.webui.host_pending.replace(false) && self.webui.active.get() && !self.webui.switching.get() && self.webui.host.borrow().is_none() {
+                self.webui_create_page();
+            }
             if self.webui.options_pending.replace(false) && self.webui_visible() {
                 self.webui_options_menu();
             }
@@ -1535,6 +1620,10 @@ mod imp {
         }
 
         pub(in super::super) fn webui_tell_switch(&self) {}
+
+        pub(in super::super) fn webui_busy(&self) -> bool {
+            false
+        }
 
         pub(in super::super) fn webui_options_menu(&self) -> bool {
             false

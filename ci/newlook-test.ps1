@@ -339,11 +339,21 @@ function Stop-Program {
     [void](Wait-Until { -not (Get-Process msedgewebview2 -ErrorAction SilentlyContinue) } 10)
     Start-Sleep -Seconds 1
 }
-function Start-Program {
-    Say "starting $Exe"
-    $script:proc = Start-Process -FilePath $Exe -PassThru
+function Start-Program([string[]]$ArgList = @()) {
+    Say "starting $Exe $($ArgList -join ' ')"
+    $script:proc = if ($ArgList.Count) { Start-Process -FilePath $Exe -ArgumentList $ArgList -PassThru } else { Start-Process -FilePath $Exe -PassThru }
     Say "process $($script:proc.Id)"
 }
+# How long the new look took, from log.txt: launch to the window on screen,
+# and to the page's hello (the page usable). Reported, never failing.
+function Report-Timings([string]$When) {
+    $shown = (Log-Lines 'webui: window on screen \d+ ms' | Select-Object -Last 1)
+    $hello = (Log-Lines 'webui: page said hello' | Select-Object -Last 1)
+    $ws = if ($shown -match '(\d+) ms after launch') { [int]$Matches[1] } else { $null }
+    $hs = if ($hello -match 'hello (\d+) ms after launch') { [int]$Matches[1] } else { $null }
+    Record 'probe' "timing ($When): window on screen within 1 s of launch" ($null -ne $ws -and $ws -lt 1000) ("window {0} ms, page ready {1} ms after launch" -f $(if ($null -ne $ws) { $ws } else { '?' }), $(if ($null -ne $hs) { $hs } else { '?' }))
+}
+function WebView2-Count { @(Get-Process msedgewebview2 -ErrorAction SilentlyContinue).Count }
 function Check-Crash([string]$When) {
     $ok = -not (Test-Path $crash)
     $detail = ''
@@ -403,6 +413,31 @@ try {
     Alive 'new user'
     Check-Crash 'new user'
     if ($results | Where-Object Result -eq 'FAIL') { Diagnostics 'new user' }
+    Report-Timings 'new user'
+    Stop-Program
+
+    # ------------------------------------------------------------ T. a start in the tray (with Windows)
+    # No WebView2 until the window is shown; a second launch shows it and
+    # the page comes then.
+    Say 'part T: started with Windows (in the tray)'
+    Remove-Item $logFile -Force -ErrorAction SilentlyContinue   # this part's lines only
+    $before = WebView2-Count
+    Start-Program @('--startup')
+    Start-Sleep -Seconds 12
+    $after = WebView2-Count
+    Record 'core' 'a start in the tray creates no WebView2 process' ($after -le $before) ("msedgewebview2 processes: $before before, $after after")
+    Record 'core' 'no window on screen after a start in the tray' ($null -eq (New-Look $script:proc.Id) -and $null -eq (Classic $script:proc.Id))
+    $tray = $script:proc
+    $second = Start-Process -FilePath $Exe -PassThru   # brings the running copy to the front
+    [void]$second.WaitForExit(15000)
+    $script:proc = $tray
+    $win = Wait-Until { New-Look $script:proc.Id } 20
+    Record 'core' 'a second launch shows the new look' ($null -ne $win)
+    $hello = Wait-Until { (Log-Lines 'webui: page said hello').Count -gt 0 } 40
+    Record 'core' 'its page is created and loads when shown' ([bool]$hello) (((Log-Lines 'webui: (page|window)') | Select-Object -Last 3) -join ' | ')
+    if ($win) { [void](Shot-Client $win 'tray-start-shown') }
+    Alive 'tray start'
+    Check-Crash 'tray start'
     Stop-Program
     Write-Settings 1
 
@@ -432,6 +467,7 @@ try {
     if ($retried.Count) { Record 'probe' 'WebView2 started at the first try' $false ($retried -join ' | ') }
     Record 'core' 'the page loaded: no WebView2 failure or blank-page fallback in log.txt' ($bad.Count -eq 0) ($bad -join ' | ')
     Record 'core' 'log.txt says the new window is ready' ((Log-Lines 'webui: main window ready').Count -gt 0)
+    Report-Timings 'new look'
     $s = Read-Settings
     Record 'core' 'settings.txt keeps new_ui=1' ((Setting $s 'new_ui') -eq '1') ("new_ui=" + (Setting $s 'new_ui'))
     Record 'core' 'settings.txt has no new_ui_failed=1' ((Setting $s 'new_ui_failed') -ne '1') ("new_ui_failed=" + (Setting $s 'new_ui_failed'))
