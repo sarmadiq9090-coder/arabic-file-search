@@ -151,6 +151,9 @@ mod imp {
         apps: RefCell<(u64, String, Vec<crate::launcher::Item>)>,
         /// The file a drag the page started is for, until the drag starts.
         drag: RefCell<Option<String>>,
+        /// What the page searched last: given back to a page loaded again
+        /// (after a renderer failure) and to the classic window on going back.
+        page_query: RefCell<String>,
         /// A dialog runs inside the page's own message handler (the folder
         /// dialog): the timer must not drop or create the page meanwhile.
         in_page_call: Cell<bool>,
@@ -457,6 +460,11 @@ mod imp {
             self.webui.failed.set(None);
             place_like(&self.webui.parts.window, &self.window);
             self.webui.parts.window.set_visible(false);
+            // The classic window goes on with what the page searched.
+            let q = self.webui.page_query.borrow().clone();
+            if !q.trim().is_empty() && self.query.text() != q {
+                self.query.set_text(&q);
+            }
             if show {
                 self.show_window();
             }
@@ -816,10 +824,20 @@ mod imp {
                     self.webui_status(true);
                     self.webui_send_recent();
                     self.webui_send_history();
-                    self.webui.handed.replace(String::new());
-                    self.webui_hand_over_query();
+                    // A page loaded again gets back what it searched (not an
+                    // older text of the classic box); a first page gets the
+                    // classic box's text (the quick popup's search).
+                    let again = self.webui.page_query.borrow().clone();
+                    if again.trim().is_empty() {
+                        self.webui.handed.replace(String::new());
+                        self.webui_hand_over_query();
+                    } else {
+                        self.webui.handed.replace(self.query.text());
+                        self.webui_send(&Outbound::Query { q: again });
+                    }
                 }
                 Request::Search { seq, q, kind, size, date, content, sort, desc } => {
+                    self.webui.page_query.replace(q.clone());
                     {
                         let s = &mut self.state.borrow_mut().settings;
                         s.kind = kind;
