@@ -4,7 +4,9 @@
 //! (see [`crate::extract::is_plain_text`]); documents such as docx or pdf
 //! never are. Safety comes first:
 //! - The encoding is detected (UTF-8 with or without BOM, UTF-16 LE/BE with
-//!   a BOM, else windows-1256) and kept, BOM included. A file is only
+//!   a BOM, else windows-1256 when the text reads as Arabic, see
+//!   [`looks_arabic`]) and kept, BOM included. Anything else (Shift-JIS,
+//!   GBK, Big5, …) is an unknown encoding and is never changed. A file is only
 //!   edited when decoding and encoding it again gives back the very same
 //!   bytes, so nothing but the matches can change; line endings and every
 //!   other byte stay as they were.
@@ -89,8 +91,29 @@ pub fn decode(bytes: &[u8]) -> Option<(String, TextEncoding)> {
     if let Ok(s) = std::str::from_utf8(bytes) {
         return Some((s.to_owned(), TextEncoding::Utf8));
     }
+    // windows-1256 decodes any byte, so it only means something when the
+    // result reads as Arabic; multi-byte encodings whose second bytes can
+    // be ASCII would otherwise be broken by an ASCII replace.
     let text = WINDOWS_1256.decode_without_bom_handling_and_without_replacement(bytes)?;
-    Some((text.into_owned(), TextEncoding::Windows1256))
+    looks_arabic(&text).then(|| (text.into_owned(), TextEncoding::Windows1256))
+}
+
+/// Whether text decoded as windows-1256 reads as Arabic: at least 80% of
+/// its non-ASCII characters are Arabic letters or marks, or the joiners,
+/// direction marks, no-break space and «» that Arabic text uses. Text in
+/// another encoding read as windows-1256 is mostly symbols (° ± ¤ ‚ •),
+/// Latin letters (é ç î) and ASCII second bytes: about half Arabic or less. The 80% line leaves a margin on both sides.
+/// A real windows-1256 file with many symbols or French words is refused
+/// too: that leaves a file unchanged, never broken.
+fn looks_arabic(text: &str) -> bool {
+    let (mut other, mut arabic) = (0usize, 0usize);
+    for c in text.chars().filter(|c| !c.is_ascii()) {
+        match c {
+            '\u{0600}'..='\u{06FF}' | '\u{200C}'..='\u{200F}' | '\u{00A0}' | '«' | '»' => arabic += 1,
+            _ => other += 1,
+        }
+    }
+    arabic > 0 && arabic >= 4 * other
 }
 
 /// Encodes text back, BOM included. None when a character has no place in
@@ -131,6 +154,73 @@ pub struct Options {
     pub regex: bool,
 }
 
+/// The replacement rewritten so that the regex crate reads it exactly as a
+/// person means it, or Err with a message for the user.
+///
+/// The crate reads a group name as long as letters, digits and `_` follow
+/// the `$`, so `$1em` is the group "1em" — which does not exist, and an
+/// unknown group expands to nothing: the matched text would silently
+/// vanish. Here `$` and digits name the numbered group (the longest run of
+/// those digits that is a group of the pattern; what follows is text), so
+/// `$1em` is `${1}em` and `$1_new` is `${1}_new`. A name that starts with a
+/// letter or `_` must be a named group of the pattern, and `${…}` an
+/// existing group; anything else is refused. `$$` is a `$` sign, and a `$`
+/// not followed by a name stays a `$`.
+fn group_template(replace: &str, re: &Regex) -> Result<String, String> {
+    let groups = re.captures_len();
+    let named: Vec<&str> = re.capture_names().flatten().collect();
+    let exists = |g: &str| match g.parse::<usize>() {
+        Ok(n) => g.bytes().all(|b| b.is_ascii_digit()) && n < groups,
+        Err(_) => named.contains(&g),
+    };
+    let missing = |typed: &str| {
+        trf!(
+            "المجموعة «{}» غير موجودة في التعبير النمطي، فلن يُكتب مكانها شيء. صحّحها، أو اكتب «$$» لكتابة علامة $ نفسها.",
+            "The group “{}” is not in the regular expression, so nothing would be written in its place. Fix it, or write “$$” for a $ sign itself.",
+            typed
+        )
+    };
+    let is_name = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    let mut out = String::with_capacity(replace.len() + 8);
+    let mut rest = replace;
+    while let Some(i) = rest.find('$') {
+        out.push_str(&rest[..i]);
+        let after = &rest[i + 1..];
+        if let Some(tail) = after.strip_prefix('$') {
+            out.push_str("$$");
+            rest = tail;
+        } else if let Some(braced) = after.strip_prefix('{').and_then(|b| Some((b, b.find('}')?))) {
+            let (name, tail) = (&braced.0[..braced.1], &braced.0[braced.1 + 1..]);
+            if !exists(name) {
+                return Err(missing(&format!("${{{name}}}")));
+            }
+            out.push_str(&format!("${{{name}}}"));
+            rest = tail;
+        } else {
+            let end = after.find(|c: char| !is_name(c)).unwrap_or(after.len());
+            let name = &after[..end];
+            if name.is_empty() {
+                // `$` before a space, a sign or the end: the crate keeps it.
+                out.push_str("$$");
+            } else if name.starts_with(|c: char| c.is_ascii_digit()) {
+                let digits = name.find(|c: char| !c.is_ascii_digit()).unwrap_or(name.len());
+                let Some(n) = (1..=digits).rev().find(|&n| exists(&name[..n])) else {
+                    return Err(missing(&format!("${}", &name[..digits])));
+                };
+                out.push_str(&format!("${{{}}}", &name[..n]));
+                out.push_str(&name[n..]);
+            } else if exists(name) {
+                out.push_str(&format!("${{{name}}}"));
+            } else {
+                return Err(missing(&format!("${name}")));
+            }
+            rest = &after[end..];
+        }
+    }
+    out.push_str(rest);
+    Ok(out)
+}
+
 pub struct Matcher {
     re: Regex,
     replace: String,
@@ -149,7 +239,8 @@ impl Matcher {
             .case_insensitive(o.ignore_case)
             .build()
             .map_err(|e| trf!("التعبير النمطي غير صالح: {e}", "Invalid regular expression: {e}"))?;
-        Ok(Matcher { re, replace: o.replace.clone(), expand: o.regex })
+        let replace = if o.regex { group_template(&o.replace, &re)? } else { o.replace.clone() };
+        Ok(Matcher { re, replace, expand: o.regex })
     }
 
     /// Non-empty matches only: a pattern like `a*` must not insert text
@@ -197,8 +288,11 @@ pub enum Skip {
     ReadOnly,
     /// A symbolic link or something other than a regular file.
     NotRegular,
-    /// Zero bytes or malformed text: binary or an unknown encoding.
+    /// Zero bytes or malformed UTF-8 or UTF-16: binary content.
     Binary,
+    /// Neither UTF-8, UTF-16 with a BOM nor Arabic windows-1256 text
+    /// (e.g. Shift-JIS, GBK, Big5): replacing in it could break characters.
+    UnknownEncoding,
     /// Decoding and re-encoding would not give back the same bytes.
     Lossy,
     /// The replacement has characters the file's encoding can't hold.
@@ -216,6 +310,7 @@ impl Skip {
             Skip::ReadOnly => tr!("للقراءة فقط", "Read-only").into(),
             Skip::NotRegular => tr!("ليس ملفاً عادياً (اختصار أو رابط)", "Not a regular file (link)").into(),
             Skip::Binary => tr!("ترميز غير معروف أو محتوى ثنائي", "Unknown encoding or binary content").into(),
+            Skip::UnknownEncoding => tr!("ترميز غير معروف — لم يُغيَّر", "Unknown encoding — not changed").into(),
             Skip::Lossy => tr!("لا يمكن حفظه دون تغيير بايتات أخرى", "Can't be saved without changing other bytes").into(),
             Skip::Unencodable => {
                 tr!("نص الاستبدال يحوي أحرفاً لا يدعمها ترميز الملف", "The replacement has characters the file's encoding can't hold").into()
@@ -266,7 +361,10 @@ fn load(path: &Path) -> Result<Loaded, Skip> {
     if bytes.len() as u64 > MAX_FILE_SIZE {
         return Err(Skip::TooBig);
     }
-    let (text, enc) = decode(&bytes).ok_or(Skip::Binary)?;
+    let (text, enc) = decode(&bytes).ok_or_else(|| {
+        let malformed = bytes.contains(&0) || [&[0xEF, 0xBB, 0xBF][..], &[0xFF, 0xFE], &[0xFE, 0xFF]].iter().any(|b| bytes.starts_with(b));
+        if malformed { Skip::Binary } else { Skip::UnknownEncoding }
+    })?;
     if encode(&text, enc).as_deref() != Some(&bytes[..]) {
         return Err(Skip::Lossy);
     }
@@ -758,6 +856,62 @@ mod tests {
         assert_eq!(decode(&[0xEF, 0xBB, 0xBF, 0xFF]), None);
     }
 
+    /// Files in Shift-JIS, GBK, Big5 or EUC-KR are not UTF-8, and windows-1256
+    /// decodes any byte, so they were edited as if they were Arabic text. Their
+    /// second bytes can be plain ASCII (`\\` is the second byte of «表» in
+    /// Shift-JIS): an ASCII replace then broke the characters.
+    #[test]
+    fn other_multibyte_encodings_are_never_edited() {
+        use encoding_rs::{BIG5, EUC_KR, GBK, SHIFT_JIS};
+        let t = TempDir::new("cjk");
+        let cases = [
+            (SHIFT_JIS, "表示の設定\\フォルダ C:\\データ\r\nこれは日本語の文章です。\r\n"),
+            (GBK, "这是一个中文文件，包含路径 C:\\数据\\表格。\r\n"),
+            (BIG5, "這是一個中文檔案，包含路徑 C:\\資料\\許功蓋。\r\n"),
+            (EUC_KR, "이것은 한국어 문서입니다. 경로 C:\\자료\r\n"),
+        ];
+        let o = opts("\\", "/");
+        let m = matcher(&o);
+        for (i, (enc, text)) in cases.iter().enumerate() {
+            let bytes = enc.encode(text).0.into_owned();
+            assert!(std::str::from_utf8(&bytes).is_err(), "{}", enc.name());
+            let p = t.0.join(format!("{i}.txt"));
+            fs::write(&p, &bytes).unwrap();
+            let ps = p.to_string_lossy().into_owned();
+            let report = apply(std::slice::from_ref(&ps), &m, &o, &t.0.join("bk"), &|_| {}).unwrap();
+            assert_eq!(fs::read(&p).unwrap(), bytes, "{} was changed", enc.name());
+            assert_eq!(report.skipped, [(ps.clone(), Skip::UnknownEncoding)], "{}", enc.name());
+            assert!(matches!(preview_file(&p, &m), Outcome::Skipped(Skip::UnknownEncoding)));
+        }
+        // Arabic windows-1256 text, with the punctuation and marks it uses,
+        // is still read and edited.
+        let ar = "«تقرير» المبيعات، الربع الأول؛ هل انتهى؟\u{200F} نعم\u{00A0}١\r\nC:\\بيانات\\ملف\r\n";
+        let p = t.0.join("ar.txt");
+        fs::write(&p, WINDOWS_1256.encode(ar).0).unwrap();
+        assert!(matches!(preview_file(&p, &m), Outcome::Matches(FilePreview { count: 2, encoding: TextEncoding::Windows1256, .. })));
+        // A few symbols or French words among Arabic are fine; mostly not is not.
+        assert!(looks_arabic("تقرير المبيعات “السنوي” – ٢٠٢٦ café"));
+        assert!(!looks_arabic("°±²³ é è ç تقرير"));
+        assert!(!looks_arabic("ascii only"));
+    }
+
+    /// UTF-16 with a BOM keeps the BOM and every line ending, whatever they
+    /// are; only the replaced text changes.
+    #[test]
+    fn utf16_keeps_bom_and_line_endings() {
+        let t = TempDir::new("utf16");
+        let text = "قديم\r\nold\nقديم\rend قديم";
+        let o = opts("قديم", "جديد");
+        for enc in [TextEncoding::Utf16Le, TextEncoding::Utf16Be] {
+            let p = t.0.join(format!("{enc:?}.txt"));
+            fs::write(&p, encode(text, enc).unwrap()).unwrap();
+            let ps = p.to_string_lossy().into_owned();
+            let report = apply(&[ps], &matcher(&o), &o, &t.0.join("bk"), &|_| {}).unwrap();
+            assert_eq!(report.done.len(), 1);
+            assert_eq!(fs::read(&p).unwrap(), encode("جديد\r\nold\nجديد\rend جديد", enc).unwrap(), "{enc:?}");
+        }
+    }
+
     #[test]
     fn unencodable_in_1256() {
         assert_eq!(encode("😀", TextEncoding::Windows1256), None);
@@ -782,6 +936,34 @@ mod tests {
         // Arabic, unchanged when nothing matches.
         let (out, n) = matcher(&opts("قديم", "جديد")).replace_all("لا شيء");
         assert!(matches!(out, Cow::Borrowed(_)) && n == 0);
+    }
+
+    /// `$1em` was read as the group named "1em", which does not exist, so
+    /// the match was replaced by nothing: text silently deleted.
+    #[test]
+    fn group_numbers_followed_by_letters_keep_the_letters() {
+        let re = |find: &str, replace: &str| Matcher::new(&Options { regex: true, ..opts(find, replace) });
+        let run = |find: &str, replace: &str, text: &str| re(find, replace).unwrap().replace_all(text).0.into_owned();
+        assert_eq!(run(r"(\d+)px", "$1em", "12px"), "12em");
+        assert_eq!(run(r"(\w+)\.txt", "$1_new.txt", "a.txt"), "a_new.txt");
+        assert_eq!(run(r"(\w+)", "${1}x", "ab"), "abx");
+        assert_eq!(run(r"(\d)(\d)", "$2$1", "12"), "21");
+        assert_eq!(run(r"(\d)", "$10", "7"), "70");
+        assert_eq!(run(r"(\d+)", "$$$1", "5"), "$5");
+        assert_eq!(run(r"(\d+)", "$", "5"), "$");
+        assert_eq!(run(r"(\d+)", "$ and $.", "5"), "$ and $.");
+        assert_eq!(run(r"(?P<n>\d+)", "${n}em", "5"), "5em");
+        assert_eq!(run(r"(?P<n>\d+)", "$n.", "5"), "5.");
+        assert_eq!(run(r"(?P<n>\d+)", "<$0>", "5"), "<5>");
+        assert_eq!(run("ب(\\d)", "$1ت", "ب3"), "3ت");
+        // Groups that do not exist are refused with a message, never
+        // replaced by nothing.
+        for bad in ["$2", "${2}", "$nx", "${nope}", "$n_x"] {
+            let e = re(r"(?P<n>\d+)", bad).err().unwrap_or_else(|| panic!("{bad} accepted"));
+            assert!(e.contains('$'), "{bad}: {e}");
+        }
+        // Literal mode is untouched.
+        assert_eq!(matcher(&opts("x", "$1em")).replace_all("x").0, "$1em");
     }
 
     #[test]
