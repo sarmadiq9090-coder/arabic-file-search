@@ -582,6 +582,12 @@ mod imp {
             self.webui.switching.get()
         }
 
+        /// Whether the new main window is the one in use (on screen or
+        /// hidden to the tray).
+        pub(in super::super) fn webui_in_use(&self) -> bool {
+            self.webui.active.get()
+        }
+
         /// Whether the new main window is the one in use and on screen.
         pub(in super::super) fn webui_visible(&self) -> bool {
             self.webui.active.get() && self.webui.parts.window.visible()
@@ -1063,6 +1069,11 @@ mod imp {
                         ids.iter().filter_map(|&id| shown.thumb_entry(id).map(|(path, size, mtime, _)| (id, self.webui.thumbs.register(path, size, mtime)))).collect()
                     };
                     self.webui_send(&Outbound::Thumbs { seq, ver, keys });
+                }
+                Request::ReportProblem {} => {
+                    if let Some(app) = self.webui.me.borrow().upgrade() {
+                        app.show_report();
+                    }
                 }
                 // The Save dialog runs inside this handler: the timer leaves the page alone meanwhile.
                 Request::Export {} => {
@@ -1730,6 +1741,10 @@ mod imp {
         pub(in super::super) fn webui_menu_item(self: &Rc<Self>) {}
 
         pub(in super::super) fn webui_visible(&self) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_in_use(&self) -> bool {
             false
         }
 

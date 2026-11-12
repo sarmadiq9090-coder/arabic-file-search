@@ -265,6 +265,9 @@ pub enum Request {
     /// Open the program's Options menu (the classic window's, with its
     /// tools, support, updates and quick-search settings) at the pointer.
     OptionsMenu {},
+    /// Open the "Report a problem" window: it shows what would be shared
+    /// before anything happens (nothing is sent by the program).
+    ReportProblem {},
 }
 
 /// Why a message was refused.
@@ -1438,6 +1441,8 @@ mod tests {
         assert_eq!(req(&format!(r#""op":"thumbs","seq":3,"ver":4,"ids":[{}]"#, many.join(","))), Err(Rejected::Invalid));
         assert_eq!(req(r#""op":"thumbs","seq":3,"ids":[0]"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"thumbs","seq":3,"ver":4,"ids":[0],"path":"C:\\a.jpg""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"report_problem""#), Ok(Request::ReportProblem {}));
+        assert_eq!(req(r#""op":"report_problem","text":"x""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"export""#), Ok(Request::Export {}));
         assert_eq!(req(r#""op":"export","path":"C:\\x.csv""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"replace_text""#), Ok(Request::ReplaceText {}));
