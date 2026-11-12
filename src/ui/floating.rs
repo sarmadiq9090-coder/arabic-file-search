@@ -85,7 +85,9 @@ impl App {
         if self.floating.hwnd.get() == 0 {
             let started = Instant::now();
             let ex = WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE;
-            let Some(hwnd) = surface::create_window(KIND_FLOATING, ex, "") else {
+            // Its name is what a screen reader says for it (it draws itself).
+            let name = trf!("خانة بحث سريع — انقرها أو اضغط {}", "InstaFind search box — click it or press {}", super::keys::HOTKEY_TEXT);
+            let Some(hwnd) = surface::create_window(KIND_FLOATING, ex, &name) else {
                 log("floating box: could not create the window");
                 return;
             };

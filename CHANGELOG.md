@@ -20,6 +20,7 @@
 - **قائمة «خيارات» مرتّبة في مجموعات** تفصل بينها خطوط: العرض، الفهرسة والبحث، الاختصارات والتشغيل، الأدوات، المساعدة والدعم، ثم «إخفاء بجانب الساعة» و«خروج من البرنامج» في آخرها (كان «خروج» في وسط 21 عنصراً). «تصدير النتائج» انتقل إلى قائمة النقر بالزر الأيمن، و«خصائص» آخر تلك القائمة. / **English:** the Options menu is grouped with separators, Hide and Exit last; "Export results" moved to the result right-click menu.
 - **الدقائق الأولى لا تبدو متوقفة**: أثناء بناء الفهرس لأول مرة تقول القائمة الفارغة «نجهّز قائمة ملفاتك لأول مرة (دقائق قليلة). ابحث الآن، وتكتمل النتائج عند الانتهاء.»، والبحث داخل المستندات الذي لم يجد شيئاً بعد يقول كم قرأ حتى الآن، و«لا نتائج» صار جملة واضحة فوق أزرار الاقتراحات. / **English:** the empty list explains the first index build and a document search still reading, and "no results" has a plain sentence above its buttons.
 - **ترتيب نتائج نافذة البحث الصغيرة**: بعد التطبيق أو صفحة الإعدادات المقصودة لم تعد تظهر ملفات لا علاقة لها جاءت من تخمين لوحة المفاتيح («المفكرة» ثم mathgl، «رسام» ثم vshelp.h)، وصفحات الإعدادات تسبق الملفات التي تشبه البحث فقط. / **English:** quick search: no unrelated keyboard-layout-guessed files after the app or settings page that was meant; Settings pages before files that only resemble the query.
+- **قارئ الشاشة**: خانة البحث العائمة فوق الساعة لها اسم يُقرأ («خانة بحث سريع — انقرها أو اضغط Ctrl+Alt+F») بدل نافذة بلا اسم. / **English:** the floating search box has a name screen readers announce.
 
 ## 0.10.0 — 2026-11-11
 
