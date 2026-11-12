@@ -49,6 +49,8 @@ mod franco;
 #[cfg(any(windows, test))]
 mod fuzzy;
 #[cfg(any(windows, test))]
+mod handover;
+#[cfg(any(windows, test))]
 mod history;
 #[cfg(any(windows, test))]
 mod index;
