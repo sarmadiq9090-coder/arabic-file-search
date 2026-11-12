@@ -10,12 +10,32 @@ use super::startup::log;
 use crate::mem_guard::{self, Sample};
 
 /// Private bytes of this process (`PrivateUsage`), if Windows says.
+/// `K32GetProcessMemoryInfo` lives in kernel32 (Windows 7 and later), so the
+/// exe does not import PSAPI.DLL (`ci/check_imports.py` allows system DLLs only).
 fn private_bytes() -> Option<u64> {
-    use winapi::um::processthreadsapi::GetCurrentProcess;
-    use winapi::um::psapi::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX};
-    let mut pmc: PROCESS_MEMORY_COUNTERS_EX = unsafe { std::mem::zeroed() };
-    pmc.cb = std::mem::size_of::<PROCESS_MEMORY_COUNTERS_EX>() as u32;
-    let ok = unsafe { GetProcessMemoryInfo(GetCurrentProcess(), &mut pmc as *mut _ as *mut PROCESS_MEMORY_COUNTERS, pmc.cb) } != 0;
+    #[repr(C)]
+    #[allow(non_snake_case)]
+    struct Counters {
+        cb: u32,
+        PageFaultCount: u32,
+        PeakWorkingSetSize: usize,
+        WorkingSetSize: usize,
+        QuotaPeakPagedPoolUsage: usize,
+        QuotaPagedPoolUsage: usize,
+        QuotaPeakNonPagedPoolUsage: usize,
+        QuotaNonPagedPoolUsage: usize,
+        PagefileUsage: usize,
+        PeakPagefileUsage: usize,
+        PrivateUsage: usize,
+    }
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn K32GetProcessMemoryInfo(process: *mut core::ffi::c_void, counters: *mut Counters, cb: u32) -> i32;
+        fn GetCurrentProcess() -> *mut core::ffi::c_void;
+    }
+    let mut pmc: Counters = unsafe { std::mem::zeroed() };
+    pmc.cb = std::mem::size_of::<Counters>() as u32;
+    let ok = unsafe { K32GetProcessMemoryInfo(GetCurrentProcess(), &mut pmc, pmc.cb) } != 0;
     ok.then_some(pmc.PrivateUsage as u64)
 }
 
