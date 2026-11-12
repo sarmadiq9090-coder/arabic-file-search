@@ -172,6 +172,22 @@ html[dir="rtl"] .field input { text-align: right; }
 .row .n3 .sn, .snip .sn, .lines .lt { unicode-bidi: plaintext; }
 .row .cnt { flex: none; font-size: 11.5px; font-weight: 500; color: var(--link); background: var(--sky-soft); border-radius: 99px; padding: 0 8px; line-height: 20px; }
 .row.gone { opacity: .55; }
+/* Compact rows: one line each, the folder after the name (app.js compactOn). */
+body.compact .row, body.compact .row.doc { min-height: 34px; padding-block: 0; grid-template-columns: 34px 1fr 96px 128px; }
+body.compact .cols { grid-template-columns: 34px 1fr 96px 128px; }
+body.compact .row .ft { width: 20px; height: 23px; }
+body.compact .row .nm { display: flex; gap: 12px; align-items: baseline; min-width: 0; }
+body.compact .row .n1 { flex: 0 1 auto; max-width: 62%; font-size: 14px; }
+body.compact .row .n2 { flex: 1 1 0; min-width: 0; }
+body.compact .row .n3 { display: none; }
+/* The preview pane hidden: the results take the width. */
+.body.nopreview { grid-template-columns: 1fr; }
+.body.nopreview .preview { display: none; }
+.viewbtns { display: inline-flex; gap: 4px; margin-inline-start: 4px; }
+.viewbtns .btn.icon[aria-pressed="true"] { background: var(--sel); border-color: var(--sel-bar); }
+/* The indexing banner, after its first seconds: one line. */
+.banner.slim { grid-template-columns: auto 1fr; align-items: center; gap: 14px; padding: 6px 14px; }
+.banner.slim .s { display: none; }
 .row.gone .n1 .t, .row.gone .n1 .t bdi { text-decoration: line-through; }
 mark { background: var(--mark-bg); color: var(--mark-fg); border-radius: 3px; padding: 0 1px; box-decoration-break: clone; }
 .path { direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-nums; }

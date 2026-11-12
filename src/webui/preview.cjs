@@ -243,6 +243,13 @@ const SHOTS = [
   // A problem stays, in the warning colour, until the next key.
   ["warn-en-dark", "en", "dark", [["eval", "window.__instafind.recv({ type: 'notice', text: 'Could not open the file: C:\\\\x.txt', warn: true })"], ["wait", 3800]], { expect: { warn: true } }],
   ["warn-gone-en-dark", "en", "dark", [["eval", "window.__instafind.recv({ type: 'notice', text: 'Could not open the file', warn: true })"], ["key", "Shift"]], { expect: { warn: false } }],
+  // Density: compact rows by themselves in a low window (one line, ≤ 36 px), the preview pane can be hidden,
+  // and the indexing banner shrinks to one line after its first seconds.
+  ["compact-ar-light", "ar", "light", [["type", "تقرير"], ["key", "ArrowDown"]], { height: 700, expect: { compact: true, rowH: true } }],
+  ["roomy-en-light", "en", "light", [["type", "report"]], { height: 900, expect: { compact: false } }],
+  ["compact-chosen-en-dark", "en", "dark", [["type", "report"], ["click", "#view-compact"]], { height: 900, expect: { compact: true, rowH: true } }],
+  ["no-preview-ar-light", "ar", "light", [["type", "تقرير"], ["click", "#view-preview"]], { expect: { preview: false } }],
+  ["banner-slim-ar-light", "ar", "light", [["type", "تقرير"], ["wait", 6500]], { indexing: true, expect: { bannerSlim: true } }],
   // A Latin search in the Arabic interface stays at the right.
   ["latin-query-ar-light", "ar", "light", [["type", "report"]], { expect: { qAlign: "right" } }],
   ["filters-ar-light", "ar", "light", [["chip", "size", 2], ["chip", "date", 4], ["chip", "scope", 1], ["type", "تقرير"], ["wait", 100], ["click", '.colbtn[data-sort="size"]'], ["click", '.colbtn[data-sort="size"]'], ["key", "ArrowDown"]], { expect: { chipsOn: 3 } }],
@@ -283,7 +290,7 @@ const SHOTS = [
   const browser = await chromium.launch(exe ? { executablePath: exe } : {});
   const errors = [];
   for (const [name, lang, theme, steps, opts = {}] of SHOTS) {
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, colorScheme: theme, locale: lang === "ar" ? "ar" : "en-US" });
+    const ctx = await browser.newContext({ viewport: { width: opts.width || 1280, height: opts.height || 800 }, deviceScaleFactor: 2, colorScheme: theme, locale: lang === "ar" ? "ar" : "en-US" });
     const pg = await ctx.newPage();
     pg.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
     pg.on("console", (m) => (m.type() === "error" || /Content Security Policy/.test(m.text())) && errors.push(`${name}: console: ${m.text()}`));
@@ -384,6 +391,10 @@ const SHOTS = [
         switched: !document.getElementById("switched").hidden,
         warn: document.getElementById("status-text").classList.contains("warn"),
         qAlign: getComputedStyle(document.querySelector("#q")).textAlign,
+        compact: document.body.classList.contains("compact"),
+        rowH: [...document.querySelectorAll("#list .row")].every((r) => r.getBoundingClientRect().height <= 36),
+        preview: visible(document.getElementById("preview")),
+        bannerSlim: document.getElementById("banner").classList.contains("slim") && document.getElementById("banner").getBoundingClientRect().height <= 48,
         dlgName: !!document.querySelector("#dlg-h .fname"),
       };
     }, lang);

@@ -66,6 +66,7 @@
       sDisplay: "العرض", sDigits: "عرض الأرقام بالعربية (٠١٢٣)",
       sLook: "الشكل الجديد", sLookSub: "هذا هو الشكل الجديد للبرنامج. يمكنك العودة إلى الشكل القديم متى شئت، والرجوع منه إلى الجديد من «خيارات ← جرّب الشكل الجديد».", classicLook: "العودة إلى الشكل القديم",
       app: "تطبيق", appsLabel: "برامج بهذا الاسم",
+      compact: "عرض مضغوط", compactSub: "سطر واحد لكل نتيجة، فتظهر نتائج أكثر", showPreview: "إظهار المعاينة", hidePreview: "إخفاء المعاينة",
       sMore: "المزيد", sMoreRow: "خيارات أخرى", sMoreSub: "التحقق من التحديثات، الدعم والملاحظات، أدوات مثل الملفات المكررة وأحجام المجلدات، وإعدادات البحث من أي مكان", moreBtn: "فتح قائمة الخيارات…",
       sSearch: "البحث والفهرسة", sHideSystem: "إخفاء ملفات النظام", sHideSystemSub: "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
       sContentIndex: "فهرسة محتوى المستندات في الخلفية", sContentIndexSub: "بحث أسرع داخل الملفات، ويشمل النص في الصور والملفات الممسوحة",
@@ -123,6 +124,7 @@
       sDisplay: "Display", sDigits: "Show Arabic-Indic digits (٠١٢٣)",
       sLook: "New look", sLookSub: "This is the program's new look. You can go back to the classic look at any time, and come back from Options › Try the new look.", classicLook: "Back to the classic look",
       app: "App", appsLabel: "Programs by this name",
+      compact: "Compact rows", compactSub: "One line per result, so more of them fit", showPreview: "Show the preview", hidePreview: "Hide the preview",
       sMore: "More", sMoreRow: "More options", sMoreSub: "Check for updates, support and feedback, tools such as duplicate files and folder sizes, and search-from-anywhere settings", moreBtn: "Open the Options menu…",
       sSearch: "Search and indexing", sHideSystem: "Hide system files", sHideSystemSub: "The Windows folder, temporary and cache files",
       sContentIndex: "Index document contents in the background", sContentIndexSub: "Faster search inside files, text in pictures and scans included",
@@ -219,6 +221,8 @@
     trash: [["path", { d: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" }]],
     pen: [["path", { d: "M4 20h4L20 8l-4-4L4 16z" }]],
     back: [["path", { d: "M15 6l-6 6 6 6" }]],
+    rows: [["path", { d: "M4 6h16M4 10h16M4 14h16M4 18h16" }]],
+    pane: [["rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }], ["path", { d: "M14 5v14" }]],
   };
 
   // File-type badge: colour by family, the extension as its label.
@@ -510,6 +514,28 @@
     bar.replaceChildren(h("span", null, T.switchedText), back, x);
     bar.hidden = false;
   }
+  // ---------- how the results are laid out (kept in this page's storage) ----------
+  // Compact rows (one line each) unless chosen otherwise: on by itself in a
+  // window under 800 px high. The preview pane can be hidden.
+  const PREF = (() => { try { return JSON.parse(localStorage.getItem("instafind.view") || "{}") || {}; } catch { return {}; } })();
+  function savePref() { try { localStorage.setItem("instafind.view", JSON.stringify(PREF)); } catch { /* not kept */ } }
+  function compactOn() { return typeof PREF.compact === "boolean" ? PREF.compact : innerHeight < 800; }
+  function previewOn() { return PREF.preview !== false; }
+  function applyView() {
+    document.body.classList.toggle("compact", compactOn());
+    $("view-results").classList.toggle("nopreview", !previewOn());
+  }
+  function setPref(key, on) { PREF[key] = on; savePref(); applyView(); renderChips(); if (S.view === "settings") renderSettings(); }
+  function viewButtons() {
+    const b = (id, ic, on, label, click) => {
+      const el = btn("icon view", ic, null, click, { id, "aria-pressed": String(on), "aria-label": label, title: label });
+      return el;
+    };
+    return h("span", { class: "viewbtns" },
+      b("view-compact", I.rows, compactOn(), T.compact, () => setPref("compact", !compactOn())),
+      b("view-preview", I.pane, previewOn(), previewOn() ? T.hidePreview : T.showPreview, () => setPref("preview", !previewOn())));
+  }
+  window.addEventListener("resize", () => { if (typeof PREF.compact !== "boolean") { applyView(); renderChips(); } });
   function renderApps() {
     const box = $("apps");
     const show = S.apps.seq === S.seq && S.apps.apps.length > 0 && S.q.trim() && !S.content && (S.view === "results" || S.view === "nores");
@@ -654,10 +680,16 @@
     else if (s.kind === "contents") { S.content = true; renderChips(); runSearch(); }
     else if (s.kind === "web") send({ op: "web", q: S.q });
   }
+  // The indexing banner: in full for its first seconds, then one line.
+  let bannerSince = 0;
   function renderBanner() {
     const busy = S.state !== "ready";
     $("banner").hidden = !busy || S.view === "settings";
-    if (!busy) return;
+    if (!busy) { bannerSince = 0; $("banner").classList.remove("slim"); return; }
+    if (!bannerSince) {
+      bannerSince = Date.now();
+      setTimeout(() => { if (bannerSince) $("banner").classList.add("slim"); }, 6000);
+    }
     $("banner-title").textContent = S.state === "loading" ? T.loading : digits(S.stateText);
     $("banner-sub").textContent = T.ixSub;
     $("banner-bar").classList.add("busy");
@@ -724,7 +756,7 @@
       wrap.addEventListener("click", (e) => { const it = e.target.closest("[data-k]"); if (it) { closeMenus(); d.pick(+it.dataset.k); } });
       return wrap;
     });
-    $("chips").replaceChildren(...wraps);
+    $("chips").replaceChildren(...wraps, viewButtons());
     updatePlaceholder();
   }
   function updatePlaceholder() { q.placeholder = S.content ? T.phContent : T.ph; }
@@ -942,6 +974,12 @@
       h("div", { class: "shead" }, back, h("h2", null, T.settings)),
       lang,
       section(T.sDisplay, sw("digits", T.sDigits),
+        (() => {
+          const on = compactOn();
+          const b = h("button", { class: "sw", type: "button", role: "switch", "aria-checked": String(on), id: "set-compact", "aria-label": T.compact }, h("span", { class: "knob" }));
+          b.addEventListener("click", () => setPref("compact", !compactOn()));
+          return h("div", { class: "srow" }, h("label", { for: "set-compact" }, h("span", null, T.compact), h("small", null, T.compactSub)), b);
+        })(),
         h("div", { class: "srow" }, h("label", { for: "classic-look" }, h("span", null, T.sLook), h("small", null, T.sLookSub)), btn("", I.back, T.classicLook, () => send({ op: "classic_look" }), { id: "classic-look" }))),
       section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
       section(T.sAnywhere, sw("hotkey_quick", T.sHotkey), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
@@ -1033,7 +1071,8 @@
     if (inList && !ctrl && !e.altKey && (e.key.length === 1 || e.key === "Backspace")) { q.focus(); return; }
     if (inList && e.key === "ArrowUp" && S.sel === 0) { q.focus(); e.preventDefault(); return; }
     const row = S.rows[S.sel];
-    const page = Math.max(1, Math.floor(list.clientHeight / 56) - 1);
+    const rowH = (list.querySelector(".row") || { offsetHeight: 56 }).offsetHeight || 56;
+    const page = Math.max(1, Math.floor(list.clientHeight / rowH) - 1);
     const moves = { ArrowDown: 1, ArrowUp: -1, PageDown: page, PageUp: -page };
     if (e.key in moves && (inBox || inList)) { select(S.sel + moves[e.key]); e.preventDefault(); return; }
     if (ctrl && (e.key === "Home" || e.key === "End")) { select(e.key === "Home" ? 0 : S.rows.length - 1); e.preventDefault(); return; }
@@ -1059,6 +1098,7 @@
   for (const el of document.querySelectorAll("[data-i18n-title]")) el.title = T[el.dataset.i18nTitle];
   $("tips").replaceChildren(...T.tips.map(([c, s]) => h("div", { class: "tip" }, h("code", { dir: "auto" }, c), h("span", null, s))));
   setView("empty");
+  applyView();
   renderChips();
   renderRecent();
   renderStatus();
