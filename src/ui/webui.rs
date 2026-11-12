@@ -954,8 +954,14 @@ mod imp {
                 }
                 Request::PickFolder {} => self.webui_pick_folder(),
                 Request::AllDrives {} => self.webui_set_scope(String::new(), true),
-                Request::Saved { id } => {
-                    let Some(s) = self.state.borrow().history.saved.get(id as usize).cloned() else { return };
+                Request::Saved { id, name } => {
+                    // By its place, checked against its name: the page's list
+                    // may be older than the saved searches now.
+                    let Some(s) = self.state.borrow().history.saved.get(id as usize).filter(|s| s.name == name).cloned() else {
+                        self.webui_missed(bridge::Miss::Stale);
+                        self.webui_send_history();
+                        return;
+                    };
                     self.webui_set_scope(s.scope, false);
                     self.webui_send(&Outbound::Apply { q: s.query, kind: s.kind.min(KINDS.len() - 1), content: s.content });
                 }

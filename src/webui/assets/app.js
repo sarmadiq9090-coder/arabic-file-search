@@ -921,7 +921,7 @@
     const kids = [];
     if (S.history.saved.length) {
       kids.push(h("div", { class: "mh", role: "presentation" }, T.savedH));
-      for (const s of S.history.saved) kids.push(item("", I.star, s.name, [s.content ? T.savedInside : "", s.scoped ? T.savedScoped : ""].filter(Boolean).join(" · "), () => send({ op: "saved", id: s.id })));
+      for (const s of S.history.saved) kids.push(item("", I.star, s.name, [s.content ? T.savedInside : "", s.scoped ? T.savedScoped : ""].filter(Boolean).join(" · "), () => send({ op: "saved", id: s.id, name: s.name })));
       kids.push(h("div", { class: "sep", role: "separator" }));
     }
     kids.push(h("div", { class: "mh", role: "presentation" }, S.history.recent.length ? T.recentH : T.recentEmpty));

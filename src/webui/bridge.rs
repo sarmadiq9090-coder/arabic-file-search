@@ -218,7 +218,7 @@ pub enum Request {
     /// Search all drives again.
     AllDrives {},
     /// Run saved search `id` (its place in the history's saved list).
-    Saved { id: u32 },
+    Saved { id: u32, name: String },
     /// Save the current search (with the folder searched now).
     SaveSearch {
         q: String,
@@ -287,6 +287,7 @@ pub fn parse(body: &str, source: &str, token: &str) -> Result<Request, Rejected>
         Request::Search { q, kind, size, date, .. } => *kind < KINDS.len() && *size < SIZES.len() && *date < DATES.len() && text_ok(q),
         Request::SaveSearch { q, kind, .. } => *kind < KINDS.len() && !q.trim().is_empty() && text_ok(q),
         Request::Web { q } => !q.trim().is_empty() && text_ok(q),
+        Request::Saved { name, .. } => text_ok(name),
         Request::Rename { name, .. } => !name.trim().is_empty() && name.chars().count() <= MAX_NAME,
         _ => true,
     };
@@ -1319,7 +1320,8 @@ mod tests {
         );
         assert_eq!(req(r#""op":"rename","list":"results","seq":1,"ver":2,"id":0,"name":" ""#), Err(Rejected::Invalid));
         assert_eq!(req(&format!(r#""op":"rename","list":"results","seq":1,"ver":2,"id":0,"name":"{}""#, "a".repeat(MAX_NAME + 1))), Err(Rejected::Invalid));
-        assert_eq!(req(r#""op":"saved","id":2"#), Ok(Request::Saved { id: 2 }));
+        assert_eq!(req(r#""op":"saved","id":2,"name":"عقود""#), Ok(Request::Saved { id: 2, name: "عقود".into() }));
+        assert_eq!(req(r#""op":"saved","id":2"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"save_search","q":"عقد","content":true"#), Ok(Request::SaveSearch { q: "عقد".into(), kind: 0, content: true }));
         assert_eq!(req(r#""op":"save_search","q":"","content":true"#), Err(Rejected::Invalid));
         assert_eq!(req(r#""op":"save_search","q":"a","scope":"D:\\""#), Err(Rejected::Malformed));
