@@ -106,6 +106,9 @@ struct Inner {
     written_seq: u64,
     /// The program is leaving: no more waiting between saves.
     leaving: bool,
+    /// Indexes numbered up to this were given up (`discard`, or a newer
+    /// one written by `save_now`): a failed save of one is not retried.
+    dropped_seq: u64,
     /// Saves that failed since the last one that worked.
     failures: u32,
     /// The marker file was created for the changes now unsaved.
@@ -159,6 +162,7 @@ impl SaveQueue {
                 next_seq: 0,
                 written_seq: 0,
                 leaving: false,
+                dropped_seq: 0,
                 failures: 0,
                 marked: false,
                 scan_owed: false,
@@ -208,6 +212,7 @@ impl SaveQueue {
         let mut inner = self.lock();
         inner.pending = None;
         inner.due = None;
+        inner.dropped_seq = inner.next_seq;
     }
 
     /// The marker file was there at start: the last session's changes were
@@ -262,6 +267,8 @@ impl SaveQueue {
             inner.pending = None;
             inner.due = None;
             inner.running += 1;
+            // Everything numbered before is older than this index.
+            inner.dropped_seq = inner.next_seq - 1;
             inner.next_seq
         };
         // Counted down again however the write ends.
@@ -383,9 +390,8 @@ impl SaveQueue {
                             ));
                         }
                     }
-                    if written {
-                        self.mark_saved(false);
-                    }
+                    // (Also when skipped: a newer index is on disk then.)
+                    self.mark_saved(false);
                     let mut inner = self.lock();
                     inner.failures = 0;
                     inner.not_before = Some(Instant::now() + next_gap(took, self.gap_factor));
@@ -397,7 +403,11 @@ impl SaveQueue {
                     let mut inner = self.lock();
                     inner.failures += 1;
                     let again = retry_in(self.retry, inner.failures);
-                    if inner.pending.is_none() {
+                    // Not when it was given up meanwhile (a scan took over),
+                    // or something newer is on disk: putting it back would
+                    // keep an old snapshot alive beside the new index.
+                    let stale = seq <= inner.dropped_seq || seq < inner.written_seq;
+                    if inner.pending.is_none() && !stale {
                         inner.pending = Some((index, seq));
                     }
                     let at = Instant::now() + again;
@@ -1180,6 +1190,52 @@ mod tests {
         until("the retry", || written.load(Ordering::SeqCst) == 9);
         until("rest", || at_rest(&queue));
         until("the marker to go", || marked.load(Ordering::SeqCst) == 0);
+    }
+
+    /// A save that fails after a scan has taken over (`discard`) is not put
+    /// back: its snapshot is let go at once, no third copy.
+    #[test]
+    fn a_failed_save_given_up_meanwhile_is_not_retried() {
+        let disk = Arc::new(Disk::default());
+        let fail = Arc::new(AtomicUsize::new(1));
+        let (d, f) = (disk.clone(), fail.clone());
+        let queue = queue_with(Box::new(move |i| {
+            d.write(i)?;
+            if f.swap(0, Ordering::SeqCst) == 1 { Err(io::Error::other("sharing violation")) } else { Ok(()) }
+        }));
+        let old = Arc::new(index_of(5));
+        let held = Arc::downgrade(&old);
+        queue.set_pending(old, Duration::ZERO);
+        until("the save to start", || disk.started.load(Ordering::SeqCst) == 1);
+        queue.discard();
+        disk.open();
+        until("rest", || at_rest(&queue));
+        assert!(held.upgrade().is_none(), "the given-up snapshot was kept for a retry");
+        assert_eq!(disk.started.load(Ordering::SeqCst), 1);
+    }
+
+    /// A save skipped because a newer index is already on disk still clears
+    /// the marker: nothing is unsaved.
+    #[test]
+    fn a_skipped_save_clears_the_marker() {
+        let marked = Arc::new(AtomicUsize::new(0));
+        let m = marked.clone();
+        let queue = SaveQueue::new(
+            Box::new(|_| Ok(())),
+            Box::new(move |on| m.store(usize::from(on), Ordering::SeqCst)),
+            Box::new(|_| {}),
+            || {},
+            0,
+            Duration::ZERO,
+        );
+        // A newer index is already written (number 5)...
+        assert!(queue.write(&index_of(3), 5).unwrap());
+        // ...then an older one comes up (number 1): skipped.
+        queue.lock().next_seq = 0;
+        queue.set_pending(Arc::new(index_of(3)), Duration::ZERO);
+        until("rest", || at_rest(&queue));
+        until("the marker to go", || marked.load(Ordering::SeqCst) == 0);
+        assert!(!queue.lock().marked);
     }
 
     #[test]
