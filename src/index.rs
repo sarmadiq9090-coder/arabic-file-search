@@ -180,17 +180,30 @@ impl Index {
     }
 
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
-        if let Some(dir) = path.parent() {
-            fs::create_dir_all(dir)?;
-        }
         // Saves can come from several threads (scan end, rename, delete);
         // they share one temp file, so they take turns.
         static SAVE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
         let _turn = SAVE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        self.save_through(path, &tmp_path(path), &|from, to| fs::rename(from, to))
+    }
+
+    /// [`save`](Self::save) through the temp file `tmp`, put in place with
+    /// `rename` (tried a few times: on Windows a scanner or another reader
+    /// that has `index.bin` open makes it fail for a moment). When it keeps
+    /// failing the temp file is removed, the old `index.bin` stays as it
+    /// was, and the error says so.
+    fn save_through(
+        &self,
+        path: &Path,
+        tmp: &Path,
+        rename: &dyn Fn(&Path, &Path) -> std::io::Result<()>,
+    ) -> std::io::Result<()> {
+        if let Some(dir) = path.parent() {
+            fs::create_dir_all(dir)?;
+        }
         // Write to a temp file first so a crash never leaves a broken cache.
-        let tmp = path.with_extension("tmp");
         {
-            let mut f = BufWriter::new(fs::File::create(&tmp)?);
+            let mut f = BufWriter::new(fs::File::create(tmp)?);
             #[derive(Serialize)]
             struct CacheRef<'a> {
                 version: u32,
@@ -203,7 +216,21 @@ impl Index {
             // file in place of the good one.
             f.into_inner().map_err(|e| e.into_error())?.sync_all()?;
         }
-        fs::rename(tmp, path)
+        let mut tries = 0;
+        loop {
+            tries += 1;
+            match rename(tmp, path) {
+                Ok(()) => return Ok(()),
+                Err(e) if tries >= RENAME_TRIES => {
+                    let _ = fs::remove_file(tmp);
+                    return Err(std::io::Error::new(
+                        e.kind(),
+                        format!("cannot put the new index in place after {tries} tries ({e}); the last saved index is kept"),
+                    ));
+                }
+                Err(_) => std::thread::sleep(RENAME_PAUSE),
+            }
+        }
     }
 
     /// Position of the entry with exactly this path (binary search).
@@ -430,6 +457,49 @@ impl Index {
         self.entries = merge_by_path(rest, found);
         n
     }
+}
+
+/// How often putting a finished save in place is tried, and the pause between.
+const RENAME_TRIES: u32 = 5;
+const RENAME_PAUSE: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// The temp file a save of `path` is written to before it is renamed into
+/// place: `index.<process id>.tmp`. One per process, so that two copies of
+/// the program (one closing while the next starts, after an update) never
+/// write into the same file; each renames a whole file, and the last wins.
+pub fn tmp_path(path: &Path) -> PathBuf {
+    tmp_path_of(path, std::process::id())
+}
+
+fn tmp_path_of(path: &Path, pid: u32) -> PathBuf {
+    path.with_extension(format!("{pid}.tmp"))
+}
+
+/// Removes temp files left next to `path` by saves that never finished (the
+/// program was closed or killed in the middle): `index.tmp` of older
+/// versions and `index.<pid>.tmp` of other processes, when they have not
+/// been written to for `older_than` (a copy that is still closing may be in
+/// the middle of its last save). Returns how many were removed.
+pub fn remove_stale_tmp(path: &Path, older_than: std::time::Duration) -> usize {
+    let (Some(dir), Some(stem)) = (path.parent(), path.file_stem().and_then(|s| s.to_str())) else { return 0 };
+    let own = tmp_path(path);
+    let Ok(rd) = fs::read_dir(dir) else { return 0 };
+    let mut removed = 0;
+    for ent in rd.flatten() {
+        let p = ent.path();
+        let Some(name) = p.file_name().and_then(|n| n.to_str()) else { continue };
+        // `index.tmp` or `index.<digits>.tmp`, nothing else.
+        let Some(middle) = name.strip_prefix(stem).and_then(|r| r.strip_suffix(".tmp")) else { continue };
+        let ours = middle.is_empty() || middle.strip_prefix('.').is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()));
+        if !ours || p == own || !ent.file_type().is_ok_and(|t| t.is_file()) {
+            continue;
+        }
+        let idle = ent.metadata().and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok());
+        if idle.is_some_and(|d| d >= older_than) && fs::remove_file(&p).is_ok() {
+            removed += 1;
+        }
+    }
+    removed
 }
 
 /// Walks `roots` in parallel; the result is sorted with names filled in.
@@ -1084,16 +1154,136 @@ mod tests {
         fs::remove_dir_all(&d).unwrap();
     }
 
+    /// Two copies of the program saving at once (one closing while the next
+    /// starts): each writes its own temp file, so whatever the timing the
+    /// index on disk is always one whole save and always loads.
+    #[test]
+    fn two_processes_saving_at_once_leave_a_whole_file() {
+        let d = temp("twoprocs");
+        let f = d.join("index.bin");
+        index_of(TREE).save(&f).unwrap();
+        assert_ne!(tmp_path_of(&f, 100), tmp_path_of(&f, 200));
+        assert_eq!(tmp_path(&f).file_name().unwrap().to_str().unwrap(), format!("index.{}.tmp", std::process::id()));
+        let stop = std::sync::atomic::AtomicBool::new(false);
+        std::thread::scope(|s| {
+            let writers: Vec<_> = [100u32, 200]
+                .into_iter()
+                .map(|pid| {
+                    let f = &f;
+                    s.spawn(move || {
+                        // (No shared lock: these stand for two processes.)
+                        let mut saved = 0;
+                        for i in 0..150usize {
+                            let n = 1 + (pid as usize + i) % 9;
+                            let paths: Vec<String> = (0..n).map(|k| format!(r"C:\p{pid}\f{k}.txt")).collect();
+                            let idx = index_of(&paths.iter().map(String::as_str).collect::<Vec<_>>());
+                            // A save may lose to the other writer or to the
+                            // reader (Windows refuses a rename now and then):
+                            // it then leaves the file as it was.
+                            saved += usize::from(idx.save_through(f, &tmp_path_of(f, pid), &|a, b| fs::rename(a, b)).is_ok());
+                        }
+                        assert!(saved > 0, "writer {pid} never got a save through");
+                    })
+                })
+                .collect();
+            s.spawn(|| {
+                while !stop.load(Ordering::Relaxed) {
+                    let idx = Index::load(&f).expect("a whole index at all times");
+                    assert!(is_sorted(&idx) && !idx.entries.is_empty());
+                    // Never a mix of the two writers.
+                    let of = |pid: &str| idx.entries.iter().filter(|e| e.path.contains(pid)).count();
+                    assert!(of(r"\p100\") == 0 || of(r"\p200\") == 0, "{:?}", paths(&idx));
+                }
+            });
+            for w in writers {
+                w.join().unwrap();
+            }
+            stop.store(true, Ordering::Relaxed);
+        });
+        fs::remove_dir_all(&d).unwrap();
+    }
+
+    /// The program killed in the middle of a save, twenty times over: what
+    /// it leaves is a cut-off temp file; `index.bin` is the last finished
+    /// save and loads, and the leftovers are cleared away later.
+    #[test]
+    fn killed_in_the_middle_of_a_save() {
+        let d = temp("killed");
+        let f = d.join("index.bin");
+        index_of(TREE).save(&f).unwrap();
+        let whole = fs::read(&f).unwrap();
+        for kill in 0..20u32 {
+            // What a save by process `kill` had written when it died.
+            let cut = whole.len() * (kill as usize + 1) / 21;
+            fs::write(tmp_path_of(&f, 5000 + kill), &whole[..cut]).unwrap();
+            assert_eq!(Index::load(&f).unwrap().entries.len(), TREE.len(), "after kill {kill}");
+        }
+        // 0.10.0 and older left `index.tmp`.
+        fs::write(d.join("index.tmp"), b"cut off").unwrap();
+        // Other files are never touched, whatever their names.
+        for other in ["index.bin.bak", "index.x.tmp", "index.12a.tmp", "notes.tmp", "index.tmp.txt"] {
+            fs::write(d.join(other), b"keep").unwrap();
+        }
+        fs::create_dir(d.join("index.777.tmp")).unwrap();
+        // Fresh leftovers may belong to a copy that is still closing.
+        assert_eq!(remove_stale_tmp(&f, std::time::Duration::from_secs(3600)), 0);
+        assert_eq!(remove_stale_tmp(&f, std::time::Duration::ZERO), 21);
+        let mut left: Vec<String> = fs::read_dir(&d).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
+        left.sort();
+        assert_eq!(left, ["index.12a.tmp", "index.777.tmp", "index.bin", "index.bin.bak", "index.tmp.txt", "index.x.tmp", "notes.tmp"]);
+        // This process's own temp file is never removed (a save may be using it).
+        fs::write(tmp_path(&f), b"in use").unwrap();
+        assert_eq!(remove_stale_tmp(&f, std::time::Duration::ZERO), 0);
+        // The next save replaces it and leaves nothing behind.
+        index_of(&[r"C:\b.txt"]).save(&f).unwrap();
+        assert!(!tmp_path(&f).exists());
+        assert_eq!(Index::load(&f).unwrap().entries.len(), 1);
+        fs::remove_dir_all(&d).unwrap();
+    }
+
+    /// Putting the new file in place fails (a scanner holds `index.bin`): it
+    /// is tried again; when it keeps failing the old index stays, the temp
+    /// file is removed and the error is reported, not swallowed.
+    #[test]
+    fn a_rename_that_fails_is_retried_then_reported() {
+        let d = temp("rename");
+        let f = d.join("index.bin");
+        index_of(TREE).save(&f).unwrap();
+        let tmp = tmp_path_of(&f, 42);
+        // Twice refused, then it works.
+        let calls = std::cell::Cell::new(0);
+        let flaky = |a: &Path, b: &Path| {
+            calls.set(calls.get() + 1);
+            if calls.get() < 3 { Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "sharing violation")) } else { fs::rename(a, b) }
+        };
+        index_of(&[r"C:\one.txt"]).save_through(&f, &tmp, &flaky).unwrap();
+        assert_eq!((calls.get(), Index::load(&f).unwrap().entries.len()), (3, 1));
+        // Always refused.
+        calls.set(0);
+        let never = |_: &Path, _: &Path| {
+            calls.set(calls.get() + 1);
+            Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "sharing violation"))
+        };
+        let err = index_of(&[r"C:\a.txt", r"C:\b.txt"]).save_through(&f, &tmp, &never).unwrap_err();
+        assert_eq!(calls.get(), RENAME_TRIES);
+        assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+        let text = err.to_string();
+        assert!(text.contains("sharing violation") && text.contains("the last saved index is kept"), "{text}");
+        assert!(!tmp.exists(), "the temp file is not left behind");
+        assert_eq!(Index::load(&f).unwrap().entries.len(), 1, "the old index is untouched");
+        fs::remove_dir_all(&d).unwrap();
+    }
+
     #[test]
     fn a_failed_save_keeps_the_old_cache() {
         let d = temp("failsave");
         let f = d.join("index.bin");
         index_of(TREE).save(&f).unwrap();
         // The temp file can't be created: the save fails, the cache stays.
-        fs::create_dir_all(d.join("index.tmp")).unwrap();
+        fs::create_dir_all(tmp_path(&f)).unwrap();
         assert!(index_of(&[r"C:\other"]).save(&f).is_err());
         assert_eq!(Index::load(&f).unwrap().entries.len(), TREE.len());
-        fs::remove_dir_all(d.join("index.tmp")).unwrap();
+        fs::remove_dir_all(tmp_path(&f)).unwrap();
         // Saves from several threads at once: the file is always whole.
         std::thread::scope(|s| {
             for t in 0..4 {
@@ -1209,12 +1399,18 @@ mod tests {
         }
 
         let mut rng = Rng(0x0BAD_5EED);
-        for round in 0..60 {
+        // `Some(cap)`: the changes go through the watcher's bounded queue
+        // (`watch_pace::ChangeQueue`), which holds at most `cap` of them and
+        // past that asks for a walk of the root instead; and they wait there
+        // for a few batches, as while the index is busy.
+        for (round, cap) in (0..60).map(|r| (r, None)).chain((0..60).map(|r| (r, Some(1 + r % 12)))) {
             let mut disk = Disk::new();
             let mut idx = Index::default();
             let mut tick = 0i64;
             let mut prev: Vec<Change> = Vec::new();
-            for _batch in 0..25 {
+            let mut queue = cap.map(|c| crate::watch_pace::ChangeQueue::new(c, usize::MAX).under(&[ROOT.to_string()]));
+            let mut overflows = 0;
+            for batch in 0..25 {
                 let mut changes = Vec::new();
                 for _ in 0..1 + rng.below(8) {
                     tick += 1;
@@ -1284,16 +1480,29 @@ mod tests {
                         _ => {}
                     }
                 }
+                if let Some(q) = &mut queue {
+                    q.extend(changes, []);
+                    // The index is busy for up to three batches.
+                    if batch % (1 + round % 3) != 0 && batch != 24 {
+                        continue;
+                    }
+                    let taken = q.take();
+                    overflows += taken.collapsed.len();
+                    assert!(taken.collapsed.is_empty() || taken.collapsed == [ROOT], "{:?}", taken.collapsed);
+                    changes = taken.changes;
+                }
                 let got = idx.apply_changes(&changes, |p| disk.get(p).copied());
                 for dir in &got.scan {
                     idx.replace_subtree(dir, scan(&disk, dir));
                 }
                 let have: Vec<(String, u64, i64, bool)> =
                     idx.entries.iter().map(|e| (e.path.to_string(), e.size, e.mtime, e.is_dir)).collect();
-                assert_eq!(have, expected(&disk, None), "round {round}, after {changes:#?}, before that {prev:#?}");
+                assert_eq!(have, expected(&disk, None), "round {round} (queue of {cap:?}), after {changes:#?}, before that {prev:#?}");
                 prev = changes;
                 assert!(idx.entries.iter().all(|e| *e.norm_name == *normalize(e.name())));
             }
+            // The small queues did overflow, so the walk path was exercised.
+            assert!(cap.is_none_or(|c| c > 6) || overflows > 0, "round {round}: a queue of {cap:?} never overflowed");
         }
     }
 }

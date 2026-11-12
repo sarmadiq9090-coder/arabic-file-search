@@ -834,12 +834,12 @@ mod imp {
                     self.webui_send_settings();
                 }
                 Request::Restart {} => match crate::update::restart_new_version() {
-                    Ok(()) => {
-                        // As after an update: save everything and leave at
-                        // once, so the new copy gets the single-instance lock.
+                    Ok(child) => {
+                        // Leaves when the new copy runs; keeps running otherwise.
                         self.webui.exiting.set(true);
-                        self.on_close();
-                        std::process::exit(0);
+                        self.hand_over(child, "language");
+                        self.webui.exiting.set(false);
+                        self.webui_notice(tr!("تعذرت إعادة التشغيل: لم تعمل النسخة الجديدة.", "Could not restart: the new copy did not start."));
                     }
                     Err(e) => self.webui_notice(trf!(
                         "تعذرت إعادة التشغيل تلقائياً ({e}). أغلق البرنامج وافتحه من جديد.",
@@ -1282,6 +1282,21 @@ mod imp {
             }
         }
 
+        /// The window's index is about to change: a results list that
+        /// points into it keeps its own rows from here on (`Shown::detach`;
+        /// every row id still gives the same file, or nothing), so the index
+        /// has one owner and is changed in place instead of copied, also
+        /// while the window is hidden. The list then counts as out of date
+        /// and `webui_tick` searches again once the window shows.
+        pub(in super::super) fn webui_release_index(&self) {
+            let (Ok(st), Ok(mut lists)) = (self.state.try_borrow(), self.webui.lists.try_borrow_mut()) else { return };
+            if let Some(shown) = lists.shown.as_mut()
+                && Arc::ptr_eq(&shown.index, &st.index)
+            {
+                shown.detach();
+            }
+        }
+
         fn webui_status(&self, force: bool) {
             let ix = self.indexing();
             let msg = {
@@ -1378,5 +1393,7 @@ mod imp {
         pub(in super::super) fn webui_close(&self) {}
 
         pub(in super::super) fn webui_tick(&self, _tick: u32) {}
+
+        pub(in super::super) fn webui_release_index(&self) {}
     }
 }

@@ -516,6 +516,17 @@ impl NativeUi<AppUi> for App {
                 weak.upgrade()?.on_hotkey();
                 return Some(0);
             }
+            // Windows is shutting down or the user is signing out: agree,
+            // then save and leave when it is certain (`w` is true).
+            if msg == winapi::um::winuser::WM_QUERYENDSESSION {
+                return Some(1);
+            }
+            if msg == winapi::um::winuser::WM_ENDSESSION {
+                if w != 0 {
+                    weak.upgrade()?.session_end();
+                }
+                return Some(0);
+            }
             if msg != WM_NOTIFY || l == 0 {
                 return None;
             }

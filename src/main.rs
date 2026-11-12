@@ -49,15 +49,23 @@ mod franco;
 #[cfg(any(windows, test))]
 mod fuzzy;
 #[cfg(any(windows, test))]
+mod handover;
+#[cfg(any(windows, test))]
 mod history;
 #[cfg(any(windows, test))]
 mod index;
+#[cfg(any(windows, test))]
+mod index_save;
 #[cfg(any(windows, test))]
 mod indexing_status;
 #[cfg(any(windows, test))]
 mod launcher;
 #[cfg(any(windows, test))]
 mod layout;
+#[cfg(any(windows, test))]
+mod leave;
+#[cfg(any(windows, test))]
+mod mem_guard;
 #[cfg(any(windows, test))]
 mod normalize;
 #[cfg(any(windows, test))]
@@ -105,3 +113,10 @@ fn main() {
 fn main() {
     eprintln!("This program has a Windows user interface; build it for Windows.");
 }
+
+// Counts allocations for the tests that measure memory (`index_save`).
+#[cfg(test)]
+mod test_alloc;
+#[cfg(test)]
+#[global_allocator]
+static TEST_ALLOC: test_alloc::Counting = test_alloc::Counting;

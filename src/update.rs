@@ -6,7 +6,7 @@
 //! file system of the installed program is Windows-only.
 //!
 //! All Windows functions block; call them from a background thread except
-//! `cleanup_old` and `wait_for_previous_instance_exit`, which are meant for
+//! `restore_old_if_missing` and `wait_for_previous_instance_exit`, which are meant for
 //! startup.
 
 
@@ -73,6 +73,30 @@ pub fn required_sha256(rel: &Release) -> Result<&str, String> {
     rel.sha256.as_deref().ok_or_else(missing_digest_message)
 }
 
+/// Said when the checksum could not be asked for (the GitHub API refused:
+/// it limits calls per address, the web page does not). Not an error of the
+/// release: the check is tried again later, and nothing is installed meanwhile.
+pub fn verify_later_message() -> String {
+    tr!("تعذّر التحقق الآن، سنحاول لاحقاً.", "Could not verify the update right now; we will try again later.").to_string()
+}
+
+/// A release found through the web page carries no checksum; `fetched` is
+/// the API's answer for it: `Ok(Some)` the checksum, `Ok(None)` the API
+/// answered without one (a real "no checksum"), `Err` the API could not be
+/// asked. Only then is the release held back, to be checked again later.
+pub fn with_digest(mut rel: Release, fetched: impl FnOnce(&str) -> Result<Option<String>, String>) -> Result<Release, String> {
+    if rel.sha256.is_some() {
+        return Ok(rel);
+    }
+    match fetched(&rel.tag) {
+        Ok(digest) => {
+            rel.sha256 = digest;
+            Ok(rel)
+        }
+        Err(_) => Err(verify_later_message()),
+    }
+}
+
 /// Why a release without a checksum is refused, and where to get it by hand.
 pub fn missing_digest_message() -> String {
     trf!(
@@ -89,6 +113,9 @@ pub fn missing_digest_message() -> String {
 pub enum PackageManager {
     Scoop,
     Winget,
+    Chocolatey,
+    /// The Microsoft Store (an MSIX package): Windows updates it.
+    Store,
 }
 
 impl PackageManager {
@@ -96,14 +123,20 @@ impl PackageManager {
         match self {
             PackageManager::Scoop => "Scoop",
             PackageManager::Winget => "winget",
+            PackageManager::Chocolatey => "Chocolatey",
+            PackageManager::Store => "Microsoft Store",
         }
     }
 
-    /// The command that updates InstaFind (`bucket/instafind.json`, `Sarmad.InstaFind`).
-    pub fn update_command(self) -> &'static str {
+    /// The command that updates InstaFind (`bucket/instafind.json`,
+    /// `Sarmad.InstaFind`, the Chocolatey package `instafind`); none for the
+    /// Store, which updates its apps by itself.
+    pub fn update_command(self) -> Option<&'static str> {
         match self {
-            PackageManager::Scoop => "scoop update instafind",
-            PackageManager::Winget => "winget upgrade Sarmad.InstaFind",
+            PackageManager::Scoop => Some("scoop update instafind"),
+            PackageManager::Winget => Some("winget upgrade Sarmad.InstaFind"),
+            PackageManager::Chocolatey => Some("choco upgrade instafind"),
+            PackageManager::Store => None,
         }
     }
 }
@@ -115,6 +148,10 @@ impl PackageManager {
 /// - winget: `Packages\` (portable installs) or `Links\` (their command
 ///   shims) under `%LOCALAPPDATA%\Microsoft\WinGet`, and the machine-wide
 ///   `%ProgramFiles%\WinGet` / `%ProgramFiles(x86)%\WinGet`.
+/// - Chocolatey: `lib\` (packages) or `bin\` (shims) under
+///   `%ChocolateyInstall%` or `%ProgramData%\chocolatey`.
+///
+/// (A Store copy is told by its package, see `managed_by`.)
 pub fn package_manager_for(exe: &str, var: impl Fn(&str) -> Option<String>) -> Option<PackageManager> {
     fn norm(p: &str) -> String {
         let p = p.replace('/', "\\");
@@ -147,17 +184,49 @@ pub fn package_manager_for(exe: &str, var: impl Fn(&str) -> Option<String>) -> O
     if winget.iter().any(|r| below(r, "Packages") || below(r, "Links")) {
         return Some(PackageManager::Winget);
     }
+    let choco = [var("ChocolateyInstall"), var("ProgramData").map(|d| format!("{d}\\chocolatey"))];
+    if choco.iter().any(|r| below(r, "lib") || below(r, "bin")) {
+        return Some(PackageManager::Chocolatey);
+    }
     None
+}
+
+/// Whether this copy can replace its own exe: a file can be created in its
+/// folder (not in Program Files without admin rights, a read-only share...).
+/// The probe file is removed again.
+pub fn folder_writable(dir: &std::path::Path) -> bool {
+    let probe = dir.join(format!("bahth.write-test.{}", std::process::id()));
+    let ok = std::fs::OpenOptions::new().write(true).create_new(true).open(&probe).is_ok();
+    if ok {
+        let _ = std::fs::remove_file(&probe);
+    }
+    ok
+}
+
+/// What the user is told instead of a self-update when this copy's folder
+/// cannot be written to.
+pub fn read_only_message(dir: &str) -> String {
+    trf!(
+        "لا يستطيع البرنامج تحديث نفسه في مكانه الحالي ({dir}) لأن الكتابة فيه غير مسموحة.\nنزّل الإصدار الجديد من fastkiwi.app أو انقل البرنامج إلى مجلد تملكه.",
+        "The program cannot update itself where it is ({dir}): that folder cannot be written to.\nDownload the new version from fastkiwi.app, or move the program to a folder of your own."
+    )
 }
 
 /// What the user is told instead of a self-update when a package manager
 /// installed this copy.
 pub fn managed_message(pm: PackageManager) -> String {
+    let Some(command) = pm.update_command() else {
+        return tr!(
+            "هذه النسخة من متجر Microsoft، والمتجر يحدّثها تلقائياً. للتحديث الآن افتح المتجر ثم «المكتبة» واضغط «الحصول على التحديثات».",
+            "This copy is from the Microsoft Store, which updates it by itself. To update now, open the Store, go to Library and choose Get updates."
+        )
+        .to_string();
+    };
     trf!(
         "هذه النسخة مثبّتة عبر {0}، لذلك يحدّثها {0} ولا يحدّث البرنامج نفسه بنفسه.\nللتحديث، شغّل هذا الأمر في الطرفية (Terminal):\n{1}",
         "This copy was installed with {0}, so it is updated by {0}, not by the program itself.\nTo update, run this in a terminal:\n{1}",
         pm.name(),
-        pm.update_command()
+        command
     )
 }
 
@@ -402,23 +471,6 @@ fn swap_in(exe: &std::path::Path, new: &std::path::Path, old: &std::path::Path) 
     Ok(())
 }
 
-/// What is left by an update next to `exe`. The old copy is only deleted
-/// while `exe` itself is there: if an interrupted update left nothing but
-/// `bahth.exe.old`, it is the user's only working program, so it is put
-/// back instead.
-#[cfg_attr(not(windows), allow(dead_code))]
-fn cleanup_beside(exe: &std::path::Path) {
-    use std::fs;
-    let (old, new) = (sibling(exe, ".old"), sibling(exe, ".new"));
-    if !exe.exists() && old.is_file() {
-        let _ = fs::rename(&old, exe).or_else(|_| fs::copy(&old, exe).map(drop));
-    }
-    if exe.is_file() {
-        let _ = fs::remove_file(&old);
-        let _ = fs::remove_file(&new);
-    }
-}
-
 #[cfg(windows)]
 pub use win::*;
 
@@ -443,7 +495,7 @@ mod win {
     }
 
     /// Path of the installed program, captured the first time it is asked for
-    /// (at startup, through `cleanup_old`), before any rename can happen.
+    /// (at startup, through `restore_old_if_missing`), before any rename can happen.
     fn original_exe() -> Result<&'static Path, String> {
         static EXE: OnceLock<Option<PathBuf>> = OnceLock::new();
         EXE.get_or_init(|| {
@@ -638,8 +690,14 @@ mod win {
     pub fn check_latest() -> Result<Option<Release>, String> {
         match check_latest_api() {
             Ok(r) => Ok(r),
-            // The API limits calls per address; the web page does not.
-            Err(api_err) => check_latest_page().map_err(|_| api_err),
+            // The API limits calls per address; the web page does not. A
+            // release found there needs the API for its checksum: when it
+            // still refuses, the check counts as failed and is tried again
+            // at the next hourly tick, and no update is offered meanwhile.
+            Err(api_err) => match check_latest_page().map_err(|_| api_err)? {
+                Some(rel) => with_digest(rel, fetch_sha256).map(Some),
+                None => Ok(None),
+            },
         }
     }
 
@@ -667,15 +725,19 @@ mod win {
         parse_release(&text, env!("CARGO_PKG_VERSION"))
     }
 
-    /// The SHA-256 GitHub publishes for this CPU's program in release `tag`,
-    /// if the API answers (it may still be rate-limited).
-    fn fetch_sha256(tag: &str) -> Option<String> {
+    /// The SHA-256 GitHub publishes for this CPU's program in release `tag`:
+    /// `Ok(None)` when the API answered without one, `Err` when it could not
+    /// be asked (it may still be rate-limited).
+    fn fetch_sha256(tag: &str) -> Result<Option<String>, String> {
         if tag.is_empty() || !tag.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-') {
-            return None;
+            return Ok(None);
         }
-        let body = fetch_json(&format!("{RELEASE_BY_TAG_URL}{tag}"), MAX_JSON as u64).ok()?;
-        let rel = parse_release(std::str::from_utf8(&body).ok()?, env!("CARGO_PKG_VERSION")).ok()??;
-        (rel.tag == tag).then_some(rel.sha256).flatten()
+        let body = fetch_json(&format!("{RELEASE_BY_TAG_URL}{tag}"), MAX_JSON as u64)?;
+        let Ok(text) = std::str::from_utf8(&body) else { return Ok(None) };
+        Ok(match parse_release(text, env!("CARGO_PKG_VERSION")) {
+            Ok(Some(rel)) if rel.tag == tag => rel.sha256,
+            _ => None,
+        })
     }
 
     /// The package manager that installed this copy, if any (then it, not
@@ -687,11 +749,21 @@ mod win {
             let var = |k: &str| std::env::var(k).ok();
             let started = std::env::current_exe().ok();
             let resolved = original_exe().ok().map(Path::to_path_buf);
+            if crate::rating::is_packaged() {
+                return Some(PackageManager::Store);
+            }
             started
                 .into_iter()
                 .chain(resolved)
                 .find_map(|p| package_manager_for(&p.to_string_lossy(), var))
         })
+    }
+
+    /// The folder of this copy when it cannot be written to (so a
+    /// self-update cannot work there).
+    pub fn read_only_folder() -> Option<String> {
+        let dir = original_exe().ok()?.parent()?;
+        (!folder_writable(dir)).then(|| dir.display().to_string())
     }
 
     /// GETs a small JSON document of at most `max` bytes (the exchange rates
@@ -720,12 +792,12 @@ mod win {
         if let Some(pm) = managed_by() {
             return Err(managed_message(pm));
         }
+        if let Some(dir) = read_only_folder() {
+            return Err(read_only_message(&dir));
+        }
         // Found through the web page (API rate-limited): ask the API once
         // more, for this release only, for the checksum. Without it, refuse.
-        let mut rel = rel.clone();
-        if rel.sha256.is_none() {
-            rel.sha256 = fetch_sha256(&rel.tag);
-        }
+        let rel = with_digest(rel.clone(), fetch_sha256)?;
         required_sha256(&rel)?;
         let rel = &rel;
         let exe = original_exe()?.to_path_buf();
@@ -794,19 +866,30 @@ mod win {
         validate_pe(&head)
     }
 
-    /// Starts the (new) program at its original path with `--updated`. The
-    /// caller should exit right after a successful return.
-    pub fn restart_new_version() -> Result<(), String> {
+    /// Starts the (new) program at its original path with `--updated` and
+    /// this process's id (`handover::PREV_PID_ARG`), and returns it so the
+    /// caller can see that it keeps running (`handover::took_over`) before
+    /// it leaves.
+    pub fn restart_new_version() -> Result<std::process::Child, String> {
         use std::os::windows::process::CommandExt;
         const DETACHED_PROCESS: u32 = 0x0000_0008;
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
         let exe = original_exe()?;
         let mut cmd = std::process::Command::new(exe);
-        cmd.arg("--updated").creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+        cmd.arg("--updated")
+            .arg(crate::ui::this_copy_arg())
+            .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
         if let Some(dir) = exe.parent() {
             cmd.current_dir(dir);
         }
-        cmd.spawn().map(drop).map_err(|e| format!("cannot start the new version: {e}"))
+        cmd.spawn().map_err(|e| format!("cannot start the new version: {e}"))
+    }
+
+    /// The new version did not start: puts the running (old) program back
+    /// as the installed one (`handover::roll_back`).
+    pub fn roll_back_update() -> Result<(), String> {
+        let exe = original_exe()?;
+        crate::handover::roll_back(exe, &sibling(exe, ".old"))
     }
 
     /// Call at startup, before the single-instance check, when the program was
@@ -834,12 +917,19 @@ mod win {
         }
     }
 
-    /// Deletes a `bahth.exe.old` (and a stale `.new`) left by an update.
-    /// Call at every startup; errors are ignored.
-    pub fn cleanup_old() {
-        if let Ok(exe) = original_exe() {
-            cleanup_beside(exe);
-        }
+    /// At start: an interrupted update that left only `bahth.exe.old` gets
+    /// it back as `bahth.exe`. (Nothing is deleted here: see
+    /// [`remove_update_leftovers`].)
+    pub fn restore_old_if_missing() -> bool {
+        original_exe().is_ok_and(crate::handover::restore_if_missing)
+    }
+
+    /// Once this copy has shown it runs (its first timer tick): deletes
+    /// `bahth.exe.old` and `bahth.exe.new` left by an update, with a few
+    /// tries; one still locked is deleted at a later start. Blocks for a few
+    /// seconds at most; the line for the log, if there was anything.
+    pub fn remove_update_leftovers() -> Option<String> {
+        crate::handover::remove_leftovers(original_exe().ok()?, 5, Duration::from_millis(500))
     }
 }
 
@@ -995,11 +1085,76 @@ mod tests {
 
     #[test]
     fn managed_message_names_the_update_command() {
-        for (pm, cmd) in [(PackageManager::Scoop, "scoop update instafind"), (PackageManager::Winget, "winget upgrade Sarmad.InstaFind")] {
+        for (pm, cmd) in [
+            (PackageManager::Scoop, "scoop update instafind"),
+            (PackageManager::Winget, "winget upgrade Sarmad.InstaFind"),
+            (PackageManager::Chocolatey, "choco upgrade instafind"),
+        ] {
             let m = managed_message(pm);
             assert!(m.contains(pm.name()) && m.contains(cmd), "{m}");
-            assert_eq!(pm.update_command(), cmd);
+            assert_eq!(pm.update_command(), Some(cmd));
         }
+        assert_eq!(PackageManager::Store.update_command(), None);
+        let store = managed_message(PackageManager::Store);
+        assert!(store.contains("متجر Microsoft") || store.contains("Microsoft Store"), "{store}");
+    }
+
+    /// Behind a rate limit the web page finds the release and the API cannot
+    /// give its checksum: "try again later", never "no checksum", never an
+    /// install without one.
+    #[test]
+    fn a_checksum_that_cannot_be_asked_for_now_is_asked_again_later() {
+        let rel = parse_release(SAMPLE, "0.0.1").unwrap().unwrap();
+        let page = Release { sha256: None, ..rel.clone() };
+        // The API is still refused.
+        let e = with_digest(page.clone(), |_| Err("HTTP 403".into())).unwrap_err();
+        assert_eq!(e, verify_later_message());
+        assert!(!e.contains("SHA-256"), "{e}");
+        // The API answers with the checksum: offered, verifiable.
+        let got = with_digest(page.clone(), |tag| {
+            assert_eq!(tag, rel.tag);
+            Ok(Some("ab".repeat(32)))
+        })
+        .unwrap();
+        assert_eq!(required_sha256(&got).unwrap(), "ab".repeat(32));
+        // The API answers without one: the real refusal, at install time.
+        let none = with_digest(page, |_| Ok(None)).unwrap();
+        assert_eq!(required_sha256(&none).unwrap_err(), missing_digest_message());
+        // A release that has its checksum is not asked again.
+        let known = Release { sha256: Some("cd".repeat(32)), ..rel };
+        assert_eq!(with_digest(known.clone(), |_| panic!("not asked")).unwrap(), known);
+    }
+
+    #[test]
+    fn chocolatey_copies_are_recognised() {
+        let env = |k: &str| match k {
+            "ProgramData" => Some(r"C:\ProgramData".to_string()),
+            "ChocolateyInstall" => Some(r"D:\tools\choco".to_string()),
+            _ => None,
+        };
+        let pm = |exe: &str| package_manager_for(exe, env);
+        assert_eq!(pm(r"C:\ProgramData\chocolatey\lib\instafind\tools\bahth.exe"), Some(PackageManager::Chocolatey));
+        assert_eq!(pm(r"C:\ProgramData\chocolatey\bin\bahth.exe"), Some(PackageManager::Chocolatey));
+        assert_eq!(pm(r"D:\tools\choco\lib\instafind\tools\bahth.exe"), Some(PackageManager::Chocolatey));
+        assert_eq!(pm(r"C:\ProgramData\chocolatey\bahth.exe"), None);
+        assert_eq!(pm(r"C:\Users\sara\Downloads\bahth.exe"), None);
+    }
+
+    #[test]
+    fn a_folder_that_cannot_be_written_to_is_seen() {
+        let dir = std::env::temp_dir().join(format!("bahth_writable_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(folder_writable(&dir));
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0, "the probe is removed");
+        assert!(!folder_writable(&dir.join("missing")));
+        // A file in place of the folder (cannot hold a new file either).
+        let file = dir.join("file");
+        std::fs::write(&file, b"").unwrap();
+        assert!(!folder_writable(&file));
+        let m = read_only_message(r"C:\Program Files\InstaFind");
+        assert!(m.contains(r"C:\Program Files\InstaFind"), "{m}");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
@@ -1291,24 +1446,5 @@ mod tests {
         assert_eq!(std::fs::read(&exe).unwrap(), b"v2");
         assert_eq!(std::fs::read(&old).unwrap(), b"v1");
         assert!(!new.exists());
-    }
-
-    #[test]
-    fn cleanup_keeps_the_only_program() {
-        let t = TempDir::new("cleanup");
-        let exe = t.0.join("bahth.exe");
-        let (new, old) = (sibling(&exe, ".new"), sibling(&exe, ".old"));
-        // Normal start after an update: leftovers go.
-        std::fs::write(&exe, b"v2").unwrap();
-        std::fs::write(&old, b"v1").unwrap();
-        std::fs::write(&new, b"half").unwrap();
-        cleanup_beside(&exe);
-        assert!(exe.exists() && !old.exists() && !new.exists());
-        // An interrupted update left only the old copy: it is put back.
-        std::fs::remove_file(&exe).unwrap();
-        std::fs::write(&old, b"v1").unwrap();
-        cleanup_beside(&exe);
-        assert_eq!(std::fs::read(&exe).unwrap(), b"v1");
-        assert!(!old.exists());
     }
 }

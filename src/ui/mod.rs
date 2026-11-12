@@ -45,6 +45,7 @@ mod lang_menu;
 mod keys;
 mod launcher_shim; // thin glue to crate::launcher, see the file
 mod lazy;
+mod memory;
 mod quick;
 mod quickswitch;
 mod rating;
@@ -54,6 +55,7 @@ mod results;
 mod search_jobs;
 mod shell;
 mod startup;
+pub(crate) use startup::this_copy_arg;
 mod style;
 mod surface;
 mod thumbs;
@@ -78,11 +80,12 @@ use winapi::um::winuser::{
 };
 
 use crate::history::History;
-use crate::index::{Change, Entry, Index, ScanProgress};
+use crate::index::{Entry, Index, ScanProgress};
 use crate::search::{ContentHit, ContentProgress, Query};
 use crate::settings::Settings;
 
-use files::flush_index_save;
+use crate::leave::Leaving;
+use files::SAVES;
 use format::ARABIC_DIGITS;
 use history_menu::HistoryMenu;
 use keys::HOTKEY_ID;
@@ -95,8 +98,8 @@ use watching::SubtreeScan;
 const WS_EX_LAYOUTRTL: u32 = 0x0040_0000;
 
 /// The window title; also how a second copy of the program finds the first.
-const TITLE: &str = "بحث سريع";
-const TITLE_EN: &str = "InstaFind";
+pub(super) const TITLE: &str = "بحث سريع";
+pub(super) const TITLE_EN: &str = "InstaFind";
 
 /// The window title in the interface language.
 fn title() -> &'static str {
@@ -163,8 +166,8 @@ struct State {
     shown_query: Option<Query>,
     /// Watches the drives so the index follows changes (see `watching`).
     watcher: Option<crate::watch::Watcher>,
-    /// Watcher changes waiting until the index may change.
-    changes: Vec<Change>,
+    /// Watcher changes waiting until the index may change (limited in size).
+    changes: crate::watch_pace::ChangeQueue,
     /// Folders being walked because their contents are unknown.
     subtree_scans: Vec<SubtreeScan>,
     /// Stats from the watcher, rescan pacing and index-copy pacing.
@@ -182,6 +185,16 @@ impl State {
     fn row_entry(&self, row: usize) -> Option<&Entry> {
         self.rows_index.entries.get(self.rows.get(row)?.entry as usize)
     }
+}
+
+/// The memory guard's state in the window (see `memory.rs`).
+#[derive(Default)]
+struct MemoryWatch {
+    guard: RefCell<crate::mem_guard::Guard>,
+    sampled: Cell<Option<std::time::Instant>>,
+    lined: Cell<Option<std::time::Instant>>,
+    /// After shedding: when to watch the drives again.
+    resume_at: Cell<Option<std::time::Instant>>,
 }
 
 #[derive(Default)]
@@ -224,6 +237,11 @@ pub struct App {
     /// Wakes the UI thread when the drive watcher has a batch of changes.
     watch_notice: nwg::Notice,
     watch_inbox: Arc<Mutex<watching::Inbox>>,
+    /// The memory guard (`memory.rs`).
+    mem: MemoryWatch,
+    /// The saved index misses changes of the last session (its marker file
+    /// was found): scan the drives again once it is loaded.
+    reconcile: Cell<bool>,
     /// Bytes downloaded / total of a running update download.
     update_progress: Arc<(AtomicU64, AtomicU64)>,
     update_busy: Cell<bool>,
@@ -506,6 +524,9 @@ impl App {
 
     fn hide_to_tray(&self) {
         self.remember_query();
+        // The program may now run for days and end with Windows itself:
+        // what was changed up to here (size, columns, options) is kept.
+        self.save_settings();
         self.window.set_visible(false);
         if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
             self.tray.show(
@@ -584,10 +605,62 @@ impl App {
     }
 
     fn on_close(&self) {
-        self.stop_watching();
-        flush_index_save();
-        self.remember_query();
+        self.close(Leaving::Exit);
+    }
+
+    /// The new copy was started: watches it for `handover::TAKEOVER_GRACE`
+    /// and leaves if it keeps running (it ends this copy itself if this one
+    /// is slow to go). False when it ended at once: the handover failed and
+    /// this copy keeps running.
+    fn hand_over(&self, mut child: std::process::Child, what: &str) -> bool {
+        let pid = child.id();
+        match crate::handover::took_over(|| child.try_wait().ok().flatten().map(|s| s.code().unwrap_or(-1)), crate::handover::TAKEOVER_GRACE) {
+            Ok(()) => {
+                startup::log(&format!("handover ({what}): new copy (pid {pid}) is running; leaving"));
+                self.close_for_restart();
+                std::process::exit(0);
+            }
+            Err(code) => {
+                startup::log(&format!("handover ({what}): new copy (pid {pid}) ended at once with code {code}; this copy keeps running"));
+                false
+            }
+        }
+    }
+
+    /// Leaving to start again (after an update, a move to the permanent
+    /// place, a change of language): the new copy is already waiting.
+    fn close_for_restart(&self) {
+        self.close(Leaving::Restart);
+    }
+
+    /// Windows is shutting down or the user is signing out (WM_ENDSESSION):
+    /// save what there is and go, within the few seconds Windows allows.
+    /// Before 0.10.1 nothing answered this message, so the settings changed
+    /// since the last full close were lost and the index was never written.
+    fn session_end(&self) {
+        startup::log("session end: saving and leaving");
+        self.close(Leaving::SessionEnd);
+        std::process::exit(0);
+    }
+
+    /// Saves everything and ends the message loop, in bounded time
+    /// (`crate::leave`): the settings and the history first, then the index
+    /// with a fixed wait, and a watchdog that ends the process if any step
+    /// hangs. Before 0.10.1 the UI thread wrote the index here itself, behind
+    /// every save that was queued, for as long as that took.
+    fn close(&self, why: Leaving) {
+        let budget = why.budget();
+        crate::leave::watchdog(budget.deadline, move || {
+            startup::log(&format!("exit: not done after {} s ({why:?}); ending the process", budget.deadline.as_secs()));
+            // Hard: nothing here may wait for a thread that is stuck.
+            unsafe {
+                winapi::um::processthreadsapi::TerminateProcess(winapi::um::processthreadsapi::GetCurrentProcess(), 0);
+            }
+        });
+        // First what is small and must not be lost.
         self.save_settings();
+        self.remember_query();
+        self.stop_watching();
         self.cancel_content();
         self.stop_warm();
         if let Some(job) = &self.state.borrow().scan {
@@ -602,6 +675,18 @@ impl App {
         self.webui_close();
         // Gone at once, not left on screen while the index is freed.
         self.destroy_floating();
+        // The index is written last, by the saving thread, with every window
+        // already off the screen; this thread only waits for it, and only
+        // for the budget's `save_wait`. A save not done by then (a huge
+        // index, a disk that is busy or stuck) is given up: `index.bin`
+        // stays as the last finished save wrote it, and the marker of
+        // unsaved changes makes the next start scan again.
+        self.window.set_visible(false);
+        let started = std::time::Instant::now();
+        let outcome = SAVES.flush_within(budget.save_wait);
+        if outcome != crate::index_save::Flush::Nothing {
+            startup::log(&format!("exit: last index save {outcome:?} after {} ms ({why:?})", started.elapsed().as_millis()));
+        }
         nwg::stop_thread_dispatch();
     }
 }
@@ -610,26 +695,36 @@ pub fn run() {
     crate::search::init_local_utc_offset();
     let updated = std::env::args().any(|a| a == "--updated");
     let moved = std::env::args().any(|a| a == crate::relocate::MOVED_ARG);
-    if moved {
-        // Started from the new place by the copy that is now exiting.
-        for _ in 0..6 {
-            crate::update::wait_for_previous_instance_exit();
+    if moved || updated {
+        // Started by the copy that is now leaving: it goes first, ended if
+        // it does not (`handover`), and then this copy is the only one.
+        let prev = crate::handover::previous_pid(std::env::args(), std::process::id());
+        startup::end_previous_copy(prev);
+        crate::update::wait_for_previous_instance_exit();
+        if moved {
+            startup::log("start: relaunched from the permanent place");
+        } else {
+            startup::log(&format!("start: relaunched after updating to {}", env!("CARGO_PKG_VERSION")));
         }
-        startup::log("start: relaunched from the permanent place");
-    }
-    if updated {
-        // The previous version is still closing; let it go first. A big
-        // index can take a while to free, so wait up to a minute.
-        for _ in 0..6 {
-            crate::update::wait_for_previous_instance_exit();
-        }
-        startup::log(&format!("start: relaunched after updating to {}", env!("CARGO_PKG_VERSION")));
     }
     if activate_running_copy(updated || moved) {
         return;
     }
-    // Only the copy that keeps running tidies up after an update.
-    crate::update::cleanup_old();
+    if let Some(d) = files::test_save_delay() {
+        startup::log(&format!("test hook: {} set; every index save waits {} ms", crate::index_save::TEST_SAVE_DELAY_VAR, d.as_millis()));
+    }
+    // An interrupted update that left only bahth.exe.old: it is put back.
+    // The leftovers of an update are deleted once this copy has shown that it
+    // runs (`on_tick`), never before.
+    if crate::update::restore_old_if_missing() {
+        startup::log("start: put bahth.exe.old back as bahth.exe (an update had been interrupted)");
+    }
+    // Temp files of index saves that never finished (a copy closed or
+    // killed in the middle), unless written to in the last two minutes.
+    let stale = crate::index::remove_stale_tmp(&crate::index::cache_path(), std::time::Duration::from_secs(120));
+    if stale > 0 {
+        startup::log(&format!("start: removed {stale} unfinished index save file(s)"));
+    }
     autostart::apply_default();
     phase("single-instance");
     unsafe {

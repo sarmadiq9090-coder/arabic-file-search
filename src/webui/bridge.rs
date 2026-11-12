@@ -31,6 +31,9 @@ use crate::suggest::{self, Situation, Suggestion};
 pub const FIRST_PAGE: usize = 60;
 /// Rows sent for each later request.
 pub const MORE_PAGE: usize = 200;
+/// Rows a list of file names keeps once the index it was made from changes
+/// (see [`Shown::detach`]); the page shows far fewer before asking again.
+pub const DETACH_ROWS: usize = 20_000;
 /// Longer messages are refused unread.
 pub const MAX_MESSAGE: usize = 16 * 1024;
 /// Longest search text accepted, in characters.
@@ -860,7 +863,11 @@ pub struct Shown {
     pub seq: u64,
     /// This list's version: a new one for every list and every new order ([`Lists`]).
     pub ver: u64,
+    /// The index the rows point into: the snapshot searched, or after
+    /// [`detach`](Self::detach) a small one holding the listed rows only.
     pub index: Arc<Index>,
+    /// How many files and folders the searched index held.
+    pub files: usize,
     pub hits: Vec<u32>,
     /// The query whose matches are marked (a fallback's, when one found the rows).
     pub marked: Query,
@@ -878,7 +885,51 @@ pub struct Shown {
 impl Shown {
     /// An empty list for a search inside documents with `q`, filled as it runs.
     pub fn documents(index: Arc<Index>, q: Query, params: Params) -> Shown {
-        Shown { seq: params.seq, ver: params.ver, index, hits: Vec::new(), marked: q, params, found: HashMap::new(), changed: HashMap::new(), done: false }
+        let files = index.entries.len();
+        Shown { seq: params.seq, ver: params.ver, index, files, hits: Vec::new(), marked: q, params, found: HashMap::new(), changed: HashMap::new(), done: false }
+    }
+
+    /// Lets go of the index snapshot that was searched, so the window's
+    /// index can change in place: the list keeps a small index of its own
+    /// rows instead, with the same row ids, and answers the page as before.
+    /// (Holding the snapshot made every change on disk copy the whole index
+    /// while a list was on screen, and kept a second, outdated copy of it
+    /// for as long as the window sat in the tray.)
+    ///
+    /// A list of file names keeps its first [`DETACH_ROWS`] rows only: it is
+    /// searched again as soon as the window shows (the index it was made
+    /// from is gone, so it counts as out of date). A finished search inside
+    /// documents keeps every row, since it is not run again by itself.
+    /// False, and nothing changes, while such a search is still running:
+    /// its new rows are numbered by the snapshot.
+    pub fn detach(&mut self) -> bool {
+        if !self.done {
+            return false;
+        }
+        // Every row must point at an entry of the snapshot; should one not
+        // (a search never gives such a row), nothing is changed: row ids
+        // are positions, and a list that lost a row would hand the page's
+        // next request about row N to the file of row N+1.
+        if self.hits.iter().any(|&i| i as usize >= self.index.entries.len()) {
+            return false;
+        }
+        if !self.params.content && self.hits.len() > DETACH_ROWS {
+            // Rows past the kept ones become misses (`path` gives `None`).
+            self.hits.truncate(DETACH_ROWS);
+            let rows = self.hits.len() as u32;
+            self.changed.retain(|id, _| *id < rows);
+        }
+        // The rows' entries, in path order as an index keeps them; every
+        // row keeps its id and points at the same file as before.
+        let mut by_path: Vec<u32> = self.hits.clone();
+        by_path.sort_unstable();
+        by_path.dedup();
+        let entries: Vec<Entry> = by_path.iter().map(|&i| self.index.entries[i as usize].clone()).collect();
+        let place = |old: u32| by_path.binary_search(&old).map_or(u32::MAX, |i| i as u32);
+        self.hits = self.hits.iter().map(|&old| place(old)).collect();
+        self.found = std::mem::take(&mut self.found).into_iter().filter_map(|(old, f)| by_path.binary_search(&old).ok().map(|i| (i as u32, f))).collect();
+        self.index = Arc::new(Index { entries, roots: self.index.roots.clone(), built_at: self.index.built_at });
+        true
     }
 
     /// Adds what a search inside documents found since the last call.
@@ -976,7 +1027,7 @@ impl Shown {
             rows: self.page(0, FIRST_PAGE),
             note,
             suggestions,
-            files: self.index.entries.len(),
+            files: self.files,
             kind_label: if self.params.kind == 0 { String::new() } else { kinds(lang).swap_remove(self.params.kind) },
             scope: self.params.scope.clone(),
             content: self.params.content,
@@ -1070,7 +1121,8 @@ pub fn search(index: Arc<Index>, p: Params, lang: Lang) -> (Shown, Outbound) {
     };
     let suggestions = if hits.is_empty() { suggestions(&p.text, situation) } else { Vec::new() };
     let note = fallback.map(|fb| fb.status(&p.text));
-    let shown = Shown { seq: p.seq, ver: p.ver, index, hits, marked, params: p, found: HashMap::new(), changed: HashMap::new(), done: true };
+    let files = index.entries.len();
+    let shown = Shown { seq: p.seq, ver: p.ver, index, files, hits, marked, params: p, found: HashMap::new(), changed: HashMap::new(), done: true };
     let msg = shown.results(ms, note, suggestions, lang);
     (shown, msg)
 }
@@ -1445,6 +1497,105 @@ mod tests {
         // Nothing to look for in a text: no search inside documents.
         assert!(content_query(&Params { text: "size:>1mb".into(), content: true, ..Params::default() }).is_none());
         assert!(content_query(&Params { text: "  ".into(), content: true, ..Params::default() }).is_none());
+    }
+
+    /// 0.10.1: a list on screen (or in the tray) must not pin the index
+    /// snapshot it was made from. After `detach` it answers the page exactly
+    /// as before, from its own rows, and the snapshot has one owner again.
+    #[test]
+    fn a_list_lets_go_of_the_index_and_still_answers() {
+        let idx = index();
+        let p = Params { seq: 4, ver: 2, text: "تقرير".into(), sort: Sort::Path, ..Params::default() };
+        let (mut shown, first) = search(idx.clone(), p.clone(), Lang::Ar);
+        let (twin, _) = search(idx.clone(), p, Lang::Ar);
+        assert!(shown.hits.len() >= 3 && shown.hits.len() < idx.entries.len());
+        // A row renamed while listed is remembered by its place.
+        shown.changed.insert(1, Some("D:\\Projects\\جديد.docx".into()));
+        let before = (shown.page(0, 100), shown.all_paths().join("|"), shown.results(0, None, Vec::new(), Lang::Ar));
+        assert!(Arc::strong_count(&idx) >= 3);
+
+        assert!(shown.detach());
+        drop(twin);
+        assert_eq!(Arc::strong_count(&idx), 1, "the list no longer holds the snapshot");
+        assert!(!Arc::ptr_eq(&shown.index, &idx), "so it counts as out of date and is searched again");
+        assert_eq!(shown.index.entries.len(), shown.hits.len());
+        assert_eq!((shown.page(0, 100), shown.all_paths().join("|"), shown.results(0, None, Vec::new(), Lang::Ar)), before);
+        let Outbound::Results { files, total, .. } = first else { panic!() };
+        assert_eq!((files, total), (idx.entries.len(), shown.hits.len()));
+        for id in 0..shown.hits.len() as u32 {
+            assert_eq!(shown.is_dir(id), shown.path(id) == Some("D:\\Projects\\تقرير الصيانة"));
+        }
+        // Sorting again works on its own rows, and a second call is harmless.
+        shown.changed.clear();
+        shown.resort(Sort::Name, true);
+        let (mut again, _) = search(idx.clone(), Params { text: "تقرير".into(), sort: Sort::Name, desc: true, ..Params::default() }, Lang::Ar);
+        assert_eq!(shown.all_paths(), again.all_paths());
+        assert!(shown.detach() && again.detach());
+        assert_eq!(shown.all_paths(), again.all_paths());
+
+        // A search inside documents: not while it runs (its new rows are
+        // numbered by the snapshot), every row and its matches afterwards.
+        let p = Params { seq: 11, text: "عقد إيجار".into(), content: true, ..Params::default() };
+        let mut docs = Shown::documents(idx.clone(), content_query(&p).unwrap(), p);
+        let notes = "C:\\Users\\Sara\\Desktop\\notes.txt";
+        let pdf = "C:\\Users\\Sara\\Documents\\العمل\\التقرير السنوي.pdf";
+        docs.absorb(vec![hit(&idx, pdf, "بند عقد الإيجار", 1)]);
+        assert!(!docs.detach());
+        docs.absorb(vec![hit(&idx, notes, "…نص عقد الإيجار الموقّع…", 4)]);
+        docs.done = true;
+        let before = (docs.page(0, 10), docs.matches(0), docs.matches(1));
+        assert!(docs.detach());
+        assert_eq!(Arc::strong_count(&idx), 1);
+        assert_eq!((docs.page(0, 10), docs.matches(0), docs.matches(1)), before);
+        assert_eq!(docs.all_paths(), [pdf, notes]);
+        docs.resort(Sort::Best, false);
+        assert_eq!(docs.all_paths(), [notes, pdf]);
+        assert_eq!(docs.page(0, 10)[0].matches, 4);
+    }
+
+    /// Fail closed: after the index it was made from changed, every row id
+    /// gives the file it gave before, or nothing; never another file.
+    #[test]
+    fn row_ids_give_the_same_file_or_nothing_after_detach() {
+        let idx = index();
+        let p = Params { seq: 5, text: "تقرير".into(), sort: Sort::Name, desc: true, ..Params::default() };
+        let (mut shown, _) = search(idx.clone(), p, Lang::Ar);
+        let n = shown.hits.len() as u32;
+        let before: Vec<Option<String>> = (0..n + 3).map(|id| shown.path(id).map(str::to_string)).collect();
+        assert!(shown.detach());
+        // The window's index changes (a file renamed, one removed): the list
+        // no longer looks at it.
+        drop(idx);
+        for id in 0..n + 3 {
+            assert_eq!(shown.path(id).map(str::to_string), before[id as usize], "row {id}");
+        }
+        assert_eq!(shown.path(n), None);
+        assert_eq!(shown.path(u32::MAX), None);
+        // A row that does not point into the snapshot: nothing is changed.
+        let (mut odd, _) = search(index(), Params { text: "تقرير".into(), ..Params::default() }, Lang::Ar);
+        odd.hits.push(9_999);
+        let kept = odd.index.clone();
+        assert!(!odd.detach());
+        assert!(Arc::ptr_eq(&odd.index, &kept));
+    }
+
+    #[test]
+    fn a_long_list_of_names_keeps_its_first_rows() {
+        let entries: Vec<Entry> = (0..DETACH_ROWS + 500).map(|i| entry(&format!("C:\\data\\report_{i:06}.txt"), 1, 1, false)).collect();
+        let idx = Arc::new(Index { entries, ..Index::default() });
+        let (mut shown, _) = search(idx.clone(), Params { text: "report".into(), sort: Sort::Path, ..Params::default() }, Lang::Ar);
+        assert_eq!(shown.hits.len(), DETACH_ROWS + 500);
+        shown.changed.insert(3, None);
+        shown.changed.insert(DETACH_ROWS as u32 + 7, None);
+        let first = shown.page(0, 300);
+        assert!(shown.detach());
+        assert_eq!(Arc::strong_count(&idx), 1);
+        assert_eq!((shown.hits.len(), shown.index.entries.len()), (DETACH_ROWS, DETACH_ROWS));
+        assert_eq!(shown.page(0, 300), first);
+        assert_eq!(shown.changed.len(), 1);
+        // The count of files searched is still the whole index's.
+        let Outbound::Results { files, .. } = shown.results(0, None, Vec::new(), Lang::Ar) else { panic!() };
+        assert_eq!(files, DETACH_ROWS + 500);
     }
 
     #[test]

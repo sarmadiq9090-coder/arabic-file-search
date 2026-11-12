@@ -308,6 +308,13 @@ static COMPUTE: Mutex<()> = Mutex::new(());
 
 /// The sizes for this index snapshot, if already computed. Never blocks on a
 /// computation, so the UI thread can call it while drawing.
+/// Drops every cached result (the memory guard): computed again when asked.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn forget() {
+    CACHE.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    *RECENT.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
+
 pub fn cached(index: &Arc<Index>) -> Option<Arc<FolderSizes>> {
     let cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
     cache.iter().find(|(w, _)| std::ptr::eq(w.as_ptr(), Arc::as_ptr(index))).map(|(_, s)| s.clone())

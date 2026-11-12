@@ -9,9 +9,9 @@ use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
 use winapi::shared::windef::RECT;
-use winapi::um::winuser::{IsIconic, SW_RESTORE, SetForegroundWindow, ShowWindow};
+use winapi::um::winuser::{IsIconic, SW_RESTORE, SetForegroundWindow, ShowWindowAsync};
 
-use super::{shell, title};
+use super::shell;
 use crate::index;
 
 /// Set once the message loop runs, so start-up timing ends at a real tick.
@@ -125,12 +125,88 @@ pub(super) fn log(line: &str) {
     }
 }
 
+/// The window of another running copy, under either title: it keeps the
+/// language it started with, which may not be the one saved since.
+pub(super) fn other_copy_window() -> Option<winapi::shared::windef::HWND> {
+    use winapi::um::winuser::FindWindowW;
+    let class = shell::wide("NativeWindowsGuiWindow");
+    let (current, other) = if crate::i18n::is_en() { (super::TITLE_EN, super::TITLE) } else { (super::TITLE, super::TITLE_EN) };
+    crate::handover::window_titles(current, other).into_iter().find_map(|t| {
+        let t = shell::wide(t);
+        let h = unsafe { FindWindowW(class.as_ptr(), t.as_ptr()) };
+        (!h.is_null()).then_some(h)
+    })
+}
+
+/// The process of `hwnd`, if it is not this one.
+pub(super) fn window_pid(hwnd: winapi::shared::windef::HWND) -> Option<u32> {
+    let mut pid = 0u32;
+    unsafe { winapi::um::winuser::GetWindowThreadProcessId(hwnd, &mut pid) };
+    (pid != 0 && pid != std::process::id()).then_some(pid)
+}
+
+/// Started by the copy that is now leaving (`--updated`, `--moved`): waits
+/// for that process to end, at most `handover::OLD_COPY_WAIT`, and ends it
+/// if it is still there. So exactly one copy runs afterwards, and never
+/// none. The old copy comes with `--prev-pid` (id and creation time, both
+/// checked: ids are reused); a copy of 0.10.0 or older does not pass it,
+/// and is then found by its window.
+pub(super) fn end_previous_copy(prev: Option<crate::handover::PrevCopy>) {
+    use winapi::um::handleapi::CloseHandle;
+    use winapi::um::processthreadsapi::{OpenProcess, TerminateProcess};
+    use winapi::um::synchapi::WaitForSingleObject;
+    use winapi::um::winbase::WAIT_OBJECT_0;
+    use winapi::um::winnt::{PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE, SYNCHRONIZE};
+    let named = prev.map(|p| p.pid);
+    let Some(pid) = named.or_else(|| other_copy_window().and_then(window_pid)) else {
+        log("handover: no previous copy found");
+        return;
+    };
+    let h = unsafe { OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if h.is_null() {
+        log(&format!("handover: previous copy (pid {pid}) had already ended"));
+        return;
+    }
+    // Ids are reused: the process under it must be the one that was named.
+    if let Some(p) = prev
+        && !crate::handover::is_that_copy(&p, process_created(h))
+    {
+        unsafe { CloseHandle(h) };
+        log(&format!("handover: pid {pid} is now another process (the previous copy had ended); left alone"));
+        return;
+    }
+    let (_, line) = crate::handover::end_previous(
+        pid,
+        |budget| Some(unsafe { WaitForSingleObject(h, budget.as_millis() as u32) } == WAIT_OBJECT_0),
+        || unsafe { TerminateProcess(h, 1) } != 0,
+    );
+    unsafe { CloseHandle(h) };
+    log(&line);
+}
+
+/// When the process `h` was created (FILETIME), if Windows says.
+pub(super) fn process_created(h: winapi::um::winnt::HANDLE) -> Option<u64> {
+    use winapi::shared::minwindef::FILETIME;
+    let z = || FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+    let (mut created, mut exited, mut kernel, mut user) = (z(), z(), z(), z());
+    let ok = unsafe { winapi::um::processthreadsapi::GetProcessTimes(h, &mut created, &mut exited, &mut kernel, &mut user) } != 0;
+    let t = (u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime);
+    (ok && t != 0).then_some(t)
+}
+
+/// The argument naming this copy for the one it starts (`--prev-pid`).
+pub(crate) fn this_copy_arg() -> String {
+    let created = process_created(unsafe { winapi::um::processthreadsapi::GetCurrentProcess() }).unwrap_or(0);
+    crate::handover::prev_pid_arg(std::process::id(), created)
+}
+
 /// If the program is already running, brings its window forward and returns true.
+/// A copy started by the one that is leaving (`relaunched`) always runs.
 pub(super) fn activate_running_copy(updated: bool) -> bool {
     use winapi::shared::winerror::ERROR_ALREADY_EXISTS;
     use winapi::um::errhandlingapi::GetLastError;
     use winapi::um::synchapi::CreateMutexW;
-    use winapi::um::winuser::{FindWindowW, SW_SHOW};
+    use winapi::um::winuser::SW_SHOW;
 
     let name = shell::wide(crate::update::SINGLE_INSTANCE_MUTEX);
     // The mutex lives as long as this process; Windows frees it on exit.
@@ -138,25 +214,30 @@ pub(super) fn activate_running_copy(updated: bool) -> bool {
     if mutex.is_null() || unsafe { GetLastError() } != ERROR_ALREADY_EXISTS {
         return false;
     }
+    if updated {
+        // The copy that started this one was waited for and ended
+        // (`end_previous_copy`); whatever still holds the lock, this copy
+        // runs: never hand over to a copy that is leaving.
+        log("start: the lock is still held after the handover; starting anyway");
+        return false;
+    }
     // The first copy may still be creating its window; give it a few seconds.
-    let (class, title) = (shell::wide("NativeWindowsGuiWindow"), shell::wide(title()));
-    let mut hwnd = std::ptr::null_mut();
+    let mut hwnd = None;
     for _ in 0..50 {
-        hwnd = unsafe { FindWindowW(class.as_ptr(), title.as_ptr()) };
-        if !hwnd.is_null() {
+        hwnd = other_copy_window();
+        if hwnd.is_some() {
             break;
         }
         std::thread::sleep(Duration::from_millis(100));
     }
-    if hwnd.is_null() {
-        // Right after an update the old copy may hold the mutex without a
-        // window while it exits; never leave the user with no program then.
-        log(&format!("start: another copy holds the lock, no window found (updated={updated})"));
-        return !updated;
-    }
+    let Some(hwnd) = hwnd else {
+        log("start: another copy holds the lock, no window found");
+        return true;
+    };
     log("start: another copy is running; brought it to the front");
+    // Asynchronously: a copy that is busy or hung must not hang this one.
     unsafe {
-        ShowWindow(hwnd, if IsIconic(hwnd) != 0 { SW_RESTORE } else { SW_SHOW });
+        ShowWindowAsync(hwnd, if IsIconic(hwnd) != 0 { SW_RESTORE } else { SW_SHOW });
         SetForegroundWindow(hwnd);
     }
     true

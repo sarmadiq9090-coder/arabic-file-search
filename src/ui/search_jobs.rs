@@ -6,7 +6,7 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use super::content_index;
-use super::files::flush_index_save;
+use super::files::{EDIT_SAVE, SAVES};
 use super::format::fmt_num;
 use super::startup::{LOOP_STARTED, background_priority, log, log_phases, phase};
 use super::{App, ContentJob, LoadJob, Matches, Row, ScanJob};
@@ -34,6 +34,13 @@ impl App {
 
     /// Reads the cached index on a background thread so the window appears at once.
     pub(super) fn start(&self) {
+        // The last session ended with changes it could not save (it was
+        // killed, or gave up on a slow disk): the saved index is whole but
+        // misses them, so the drives are scanned again once it is loaded.
+        if crate::index_save::marker_path(&index::cache_path()).exists() {
+            SAVES.scan_owed();
+            self.reconcile.set(true);
+        }
         let slot: LoadJob = Arc::new(Mutex::new(None));
         let s = slot.clone();
         let started_thread = crate::crash_log::spawn_named("index-load", move || {
@@ -80,6 +87,10 @@ impl App {
                 } else {
                     self.search_names();
                 }
+                if self.reconcile.take() {
+                    log("start: the last session ended with index changes it had not saved; scanning the drives again");
+                    self.start_scan();
+                }
             }
             None => {
                 drop(st);
@@ -89,8 +100,6 @@ impl App {
     }
 
     pub(super) fn start_scan(&self) {
-        // An edit still waiting to be saved must not land after the new scan.
-        flush_index_save();
         // The scan sees every change; watching resumes when it is done.
         self.stop_watching();
         let mut st = self.state.borrow_mut();
@@ -102,24 +111,51 @@ impl App {
         if st.scan.is_some() {
             return;
         }
+        // An edit still waiting to be saved must not land after the new
+        // scan: it is dropped here (the scan sees its change on disk and
+        // writes a newer index, and saves are numbered, so an older one never
+        // replaces a newer file). If the scan fails it is queued again. The
+        // UI thread no longer writes it here itself.
+        SAVES.discard();
         let progress = Arc::new(ScanProgress::default());
         let result = Arc::new(Mutex::new(None));
         let (p, r) = (progress.clone(), result.clone());
         let started_thread = crate::crash_log::spawn_named("index-build", move || {
             background_priority();
+            // A save still being written holds a snapshot of the old index:
+            // let it end first, so the walk's new index is the second copy
+            // in memory and not the third. (Not for ever: a stuck disk must
+            // not keep the scan from starting.)
+            if !SAVES.wait_idle(std::time::Duration::from_secs(60)) {
+                log("index build: a save was still running after 60 s; scanning anyway");
+            }
             let started = std::time::Instant::now();
             // `None` after a panic (logged by the hook): the scan still ends,
             // keeping the index there was, instead of indexing forever.
             let idx = crate::crash_log::catch(|| Index::build(&index::list_drives(), &p));
             if let Some(idx) = &idx {
                 log(&format!("index build: {} entries in {} ms", idx.entries.len(), started.elapsed().as_millis()));
-                let _ = idx.save(&index::cache_path());
+            }
+            // A scan stopped half-way (the program is closing) has only part
+            // of the files: it must not replace the saved index.
+            if let Some(idx) = idx.as_ref().filter(|_| !p.cancel.load(Ordering::Relaxed)) {
+                let saving = std::time::Instant::now();
+                match SAVES.save_now(idx) {
+                    Ok(()) => log(&format!("index save: {} entries in {} ms (after the scan)", idx.entries.len(), saving.elapsed().as_millis())),
+                    Err(e) => {
+                        // Queued again once the window has the new index
+                        // (`poll_scan`): retried, and marked as unsaved.
+                        SCAN_SAVE_FAILED.store(true, Ordering::Relaxed);
+                        log(&format!("index save failed after the scan: {e}; it will be tried again"));
+                    }
+                }
             }
             if let Ok(mut slot) = r.lock() {
                 *slot = Some(idx);
             }
         });
         if started_thread.is_none() {
+            SAVES.set_pending(st.index.clone(), EDIT_SAVE);
             drop(st);
             self.start_watching();
             self.set_status(tr!("تعذرت فهرسة الملفات.", "Could not index the files."));
@@ -412,6 +448,12 @@ impl App {
         if LOOP_STARTED.load(Ordering::Relaxed) && !self.startup_logged.replace(true) {
             phase("first-tick");
             log_phases();
+            // This copy runs: the old program file of an update may go now.
+            crate::crash_log::spawn_named("update-leftovers", || {
+                if let Some(line) = crate::update::remove_update_leftovers() {
+                    log(&line);
+                }
+            });
         }
         self.poll_load();
         self.poll_scan();
@@ -423,6 +465,7 @@ impl App {
         let t = self.ticks.get().wrapping_add(1);
         self.ticks.set(t);
         self.poll_indexing(t);
+        self.memory_tick();
         self.webui_tick(t);
         if t % 18_000 == 50 {
             self.maybe_check_for_update();
@@ -455,6 +498,9 @@ impl App {
             None => {}
             Some(None) => {
                 st.scan = None;
+                // The index there was stays; edits to it were not queued
+                // while the scan ran.
+                SAVES.set_pending(st.index.clone(), EDIT_SAVE);
                 drop(st);
                 self.reindex_btn.set_enabled(true);
                 self.start_watching();
@@ -464,6 +510,11 @@ impl App {
                 let n = idx.entries.len();
                 st.index = Arc::new(idx);
                 st.scan = None;
+                // The scan could not write its index: the save queue takes it
+                // (tries again, and marks it unsaved until it is on disk).
+                if SCAN_SAVE_FAILED.swap(false, Ordering::Relaxed) {
+                    SAVES.set_pending(st.index.clone(), EDIT_SAVE);
+                }
                 drop(st);
                 self.start_warm();
                 self.reindex_btn.set_enabled(true);
@@ -577,6 +628,9 @@ impl App {
         }
     }
 }
+
+/// The last full scan could not save its index (see `poll_scan`).
+static SCAN_SAVE_FAILED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// " — تنبيه: …" for parts of the query that could not be understood, or "".
 fn warnings_text(q: Option<&Query>) -> String {
