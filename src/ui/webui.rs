@@ -376,7 +376,7 @@ mod imp {
             if self.webui.parts.is_built() {
                 self.webui.parts.window.set_text(&if active { title().to_string() } else { format!("{} (new)", title()) });
             }
-            // The Options menu (the tray's "Settings…" opens it while the new
+            // The Options menu (the tray's "Options…" opens it while the new
             // look is on screen too) offers the other look.
             // The thumbnail view is the classic list's.
             self.enable_thumbs_item(!active);
@@ -1204,7 +1204,7 @@ mod imp {
         }
 
         /// The program's Options menu over the new window, at the pointer
-        /// (the page's "Open the Options menu…", the tray's "Settings…"):
+        /// (the page's "Open the Options menu…", the tray's "Options…"):
         /// owned by the window on screen, so the keyboard comes back to the
         /// page when it closes; the chosen item is passed to the classic
         /// window's handlers (`webui_forward_menu`), which act on the new
@@ -1253,7 +1253,7 @@ mod imp {
             self.webui.active.get().then(|| self.webui.scope.borrow().clone())
         }
 
-        /// "Hide to the taskbar tray" while the new look is in use.
+        /// "Hide next to the clock" while the new look is in use.
         pub(in super::super) fn webui_hide_main(&self) -> bool {
             if !self.webui.active.get() {
                 return false;

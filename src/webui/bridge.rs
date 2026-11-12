@@ -1968,7 +1968,7 @@ mod tests {
         for p in ["تعذر التحقق من التحديثات.", "لم يُحذف الملف.", "انتظر حتى تكتمل الفهرسة.", "Could not check for updates.", "Wait until indexing is complete.", "The file was not deleted."] {
             assert!(looks_like_a_problem(p), "{p}");
         }
-        for ok in ["تم تصدير 12 نتيجة.", "جاري التحقق من التحديثات…", "Exported 12 results.", "Checking for updates…", "Downloading the update… 40%", ""] {
+        for ok in ["تم تصدير 12 نتيجة.", "جارٍ التحقق من التحديثات…", "Exported 12 results.", "Checking for updates…", "Downloading the update… 40%", ""] {
             assert!(!looks_like_a_problem(ok), "{ok}");
         }
     }
