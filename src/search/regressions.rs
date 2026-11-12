@@ -368,3 +368,31 @@ fn relative_dates_with_comparisons() {
     assert_eq!(at("dm:>2024-01-01").mtime, Some((day_utc(2024, 1, 2), i64::MAX)));
     assert_eq!(at("dm:<=2023").mtime, Some((i64::MIN, day_utc(2024, 1, 1))));
 }
+
+// --------------------------------------------------- folder scope and case
+
+/// The scope check cut the path at the lower-cased scope's length in bytes;
+/// lower case can change it (`İ` → `i̇`), so a folder such as
+/// `C:\Users\İbrahim` never matched its own files.
+#[test]
+fn scope_with_letters_whose_lower_case_is_longer() {
+    let scope = |s: &str| s.to_lowercase();
+    let ibrahim = scope(r"C:\Users\İbrahim");
+    assert!(in_scope(r"C:\Users\İbrahim\a.txt", &ibrahim));
+    assert!(in_scope(r"C:\Users\İbrahim", &ibrahim));
+    assert!(in_scope(r"c:\users\İBRAHIM\x\y.pdf", &ibrahim));
+    assert!(in_scope(r"C:\Users\İbrahim\a.txt", &scope(r"C:\Users\İbrahim\")));
+    assert!(!in_scope(r"C:\Users\İbrahim2\a.txt", &ibrahim));
+    assert!(!in_scope(r"C:\Users\Ibrahim\a.txt", &ibrahim), "İ is not I");
+    assert!(!in_scope(r"C:\Users\İb", &ibrahim));
+    // Other letters whose case forms differ in length, and a final sigma.
+    assert!(in_scope(r"D:\ẞTRASSE\a", &scope(r"D:\ẞtrasse")));
+    assert!(in_scope(r"D:\Ⱥ\a", &scope(r"D:\ⱥ")));
+    assert!(in_scope(r"D:\ΟΔΟΣ\a", &scope(r"D:\ΟΔΟΣ")));
+    // Name search with such a scope.
+    let entries = vec![entry(r"C:\Users\İbrahim\تقرير.pdf", false), entry(r"C:\Users\Other\تقرير.pdf", false)];
+    assert_eq!(search_names(&entries, &at("تقرير"), r"C:\Users\İbrahim"), vec![0]);
+    // Arabic and ASCII scopes as before.
+    assert!(in_scope(r"C:\المستندات\a", &scope(r"C:\المستندات")));
+    assert!(!in_scope(r"C:\Docs2\a.txt", r"c:\docs"));
+}

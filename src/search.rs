@@ -1110,16 +1110,40 @@ impl Query {
     }
 }
 
-/// Case-insensitive "is `path` inside `scope`" check. An empty scope means everything.
+/// Case-insensitive "is `path` inside `scope`" check. An empty scope means
+/// everything. `scope_lower` is the scope lower-cased.
 pub fn in_scope(path: &str, scope_lower: &str) -> bool {
     if scope_lower.is_empty() {
         return true;
     }
+    // Most paths: the scope's length in bytes, ASCII case aside.
     let n = scope_lower.len();
+    let end = if path.get(..n).is_some_and(|h| h.eq_ignore_ascii_case(scope_lower)) {
+        n
+    } else {
+        // Lower case can change the length in bytes (`İ` is 2 bytes, `i̇` 3):
+        // compare character by character, up to the end of the path's
+        // character that completes the scope.
+        let fold = |c: char| if c == 'ς' { 'σ' } else { c };
+        let want: Vec<char> = scope_lower.chars().map(fold).collect();
+        let (mut k, mut end) = (0, None);
+        for (i, c) in path.char_indices() {
+            for l in c.to_lowercase().map(fold) {
+                if want.get(k) != Some(&l) {
+                    return false;
+                }
+                k += 1;
+            }
+            if k == want.len() {
+                end = Some(i + c.len_utf8());
+                break;
+            }
+        }
+        let Some(end) = end else { return false };
+        end
+    };
     // `C:\Docs` covers `C:\Docs` and `C:\Docs\…`, not `C:\Docs2\…`.
-    let whole = scope_lower.ends_with(['\\', '/'])
-        || matches!(path.as_bytes().get(n), None | Some(b'\\') | Some(b'/'));
-    path.len() >= n && path.is_char_boundary(n) && whole && path[..n].to_lowercase() == scope_lower
+    scope_lower.ends_with(['\\', '/']) || matches!(path.as_bytes().get(end), None | Some(b'\\') | Some(b'/'))
 }
 
 /// Returns indices into `entries` whose file name matches every term and
