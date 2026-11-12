@@ -67,6 +67,7 @@
       sDisplay: "العرض", sDigits: "عرض الأرقام بالعربية (٠١٢٣)",
       sLook: "الشكل الجديد", sLookSub: "هذا هو الشكل الجديد للبرنامج. يمكنك العودة إلى الشكل القديم متى شئت، والرجوع منه إلى الجديد من «خيارات ← جرّب الشكل الجديد».", classicLook: "العودة إلى الشكل القديم",
       app: "تطبيق", appsLabel: "برامج بهذا الاسم",
+      grid: "عرض المصغرات (Ctrl+T)",
       compact: "عرض مضغوط", compactSub: "سطر واحد لكل نتيجة، فتظهر نتائج أكثر", showPreview: "إظهار المعاينة", hidePreview: "إخفاء المعاينة",
       sMore: "المزيد", sMoreRow: "خيارات أخرى", sMoreSub: "التحقق من التحديثات، الدعم والملاحظات، أدوات مثل الملفات المكررة وأحجام المجلدات، وإعدادات البحث من أي مكان", moreBtn: "فتح قائمة الخيارات…",
       sSearch: "البحث والفهرسة", sHideSystem: "إخفاء ملفات النظام", sHideSystemSub: "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
@@ -126,6 +127,7 @@
       sDisplay: "Display", sDigits: "Show Arabic-Indic digits (٠١٢٣)",
       sLook: "New look", sLookSub: "This is the program's new look. You can go back to the classic look at any time, and come back from Options › Try the new look.", classicLook: "Back to the classic look",
       app: "App", appsLabel: "Programs by this name",
+      grid: "Thumbnail view (Ctrl+T)",
       compact: "Compact rows", compactSub: "One line per result, so more of them fit", showPreview: "Show the preview", hidePreview: "Hide the preview",
       sMore: "More", sMoreRow: "More options", sMoreSub: "Check for updates, support and feedback, tools such as duplicate files and folder sizes, and search-from-anywhere settings", moreBtn: "Open the Options menu…",
       sSearch: "Search and indexing", sHideSystem: "Hide system files", sHideSystemSub: "The Windows folder, temporary and cache files",
@@ -228,6 +230,7 @@
     pen: [["path", { d: "M4 20h4L20 8l-4-4L4 16z" }]],
     back: [["path", { d: "M15 6l-6 6 6 6" }]],
     rows: [["path", { d: "M4 6h16M4 10h16M4 14h16M4 18h16" }]],
+    grid: [["rect", { x: "4", y: "4", width: "7", height: "7", rx: "1.5" }], ["rect", { x: "13", y: "4", width: "7", height: "7", rx: "1.5" }], ["rect", { x: "4", y: "13", width: "7", height: "7", rx: "1.5" }], ["rect", { x: "13", y: "13", width: "7", height: "7", rx: "1.5" }]],
     export: [["path", { d: "M12 3v12M7 10l5 5 5-5M5 21h14" }]],
     refresh: [["path", { d: "M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" }]],
     pane: [["rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }], ["path", { d: "M14 5v14" }]],
@@ -433,6 +436,14 @@
     },
     query(m) { closeSettings(); q.value = m.q; onInput(); },
     focus() { q.focus(); },
+    thumbs(m) {
+      if (m.seq !== S.shown || m.ver !== S.ver) return;
+      for (const [id, key] of m.keys || []) {
+        thumbKeys.set(`${m.seq}:${m.ver}:${id}`, key);
+        const tile = $("r" + id);
+        if (tile && tile.classList.contains("tile")) showThumb(tile, key);
+      }
+    },
     apps(m) { S.apps = { seq: m.seq, apps: m.apps || [] }; renderApps(); },
     notice(m) {
       S.notice = m.text; S.noticeWarn = !!m.warn; renderStatus();
@@ -529,8 +540,11 @@
   function savePref() { try { localStorage.setItem("instafind.view", JSON.stringify(PREF)); } catch { /* not kept */ } }
   function compactOn() { return typeof PREF.compact === "boolean" ? PREF.compact : innerHeight < 800; }
   function previewOn() { return PREF.preview !== false; }
+  function gridOn() { return PREF.grid === true; }
   function applyView() {
     document.body.classList.toggle("compact", compactOn());
+    document.body.classList.toggle("gridview", gridOn());
+    list.classList.toggle("grid", gridOn());
     $("view-results").classList.toggle("nopreview", !previewOn());
   }
   const ZOOMS = [0.8, 0.9, 1, 1.1, 1.25, 1.4, 1.6];
@@ -563,6 +577,7 @@
       btn("small", I.refresh, T.reindexBtn, () => send({ op: "reindex" }), { id: "tool-reindex" }),
     ];
     return h("span", { class: "viewbtns" }, ...tools,
+      b("view-grid", I.grid, gridOn(), T.grid, () => toggleGrid()),
       b("view-compact", I.rows, compactOn(), T.compact, () => setPref("compact", !compactOn())),
       b("view-preview", I.pane, previewOn(), previewOn() ? T.hidePreview : T.showPreview, () => setPref("preview", !previewOn())));
   }
@@ -574,7 +589,50 @@
     if (!show) { box.replaceChildren(); return; }
     box.replaceChildren(...S.apps.apps.map((title, id) => btn("app", I.open, `${T.app}: ${title}`, () => send({ op: "app", seq: S.apps.seq, id }), { "data-app": String(id) })));
   }
+  // ---------- the thumbnail view (Ctrl+T) ----------
+  // Results as tiles: the file-type badge until the program's thumbnail
+  // arrives. Only the tiles that come into view ask for one, by row (the
+  // program answers with a one-time key per row; the picture comes from
+  // its own protocol, /thumb/<key>; the page never names a path).
+  const thumbKeys = new Map(); // "seq:ver:id" -> key, or "" while asked
+  let thumbWant = [], thumbTimer = 0;
+  const thumbSeen = new IntersectionObserver((entries) => {
+    for (const en of entries) {
+      if (!en.isIntersecting) continue;
+      thumbSeen.unobserve(en.target);
+      const id = +en.target.dataset.i, k = `${S.shown}:${S.ver}:${id}`;
+      if (!thumbKeys.has(k)) { thumbKeys.set(k, ""); thumbWant.push(id); }
+    }
+    if (thumbWant.length && !thumbTimer) thumbTimer = setTimeout(askThumbs, 60);
+  }, { root: list, rootMargin: "240px 0px" });
+  function askThumbs() {
+    thumbTimer = 0;
+    if (thumbKeys.size > 4000) thumbKeys.clear();
+    while (thumbWant.length) send({ op: "thumbs", seq: S.shown, ver: S.ver, ids: thumbWant.splice(0, 64) });
+  }
+  function showThumb(tile, key) {
+    const img = tile.querySelector("img");
+    if (!img || !key) return;
+    img.addEventListener("load", () => tile.classList.add("pic"), { once: true });
+    img.src = "/thumb/" + key;
+  }
+  function tileEl(r, i) {
+    const name = plainName(r);
+    const el = h("div", { class: "row tile" + (r.gone ? " gone" : ""), role: "option", id: "r" + i, "aria-selected": String(i === S.sel), "aria-label": `${name}, ${r.dir}${r.folder ? "" : ", " + size(r.size)}, ${when(r.mtime)}${r.gone ? ", " + T.gone : ""}` });
+    el.dataset.i = i;
+    el.append(h("span", { class: "tpic" }, badge(r, "ft big"), h("img", { alt: "", draggable: "false" })), h("span", { class: "tname" }, nameEl(r)));
+    const key = thumbKeys.get(`${S.shown}:${S.ver}:${i}`);
+    if (key) showThumb(el, key);
+    else if (!r.gone) thumbSeen.observe(el);
+    return el;
+  }
+  function toggleGrid() {
+    PREF.grid = !gridOn(); savePref(); applyView(); renderChips();
+    if (S.view === "results") { renderCols(); renderRows(true); }
+  }
+
   function rowEl(r, i, listName) {
+    if (listName === "results" && gridOn()) return tileEl(r, i);
     const name = plainName(r);
     const el = h("div", { class: "row" + (r.gone ? " gone" : "") + (r.snippet ? " doc" : ""), role: "option", id: (listName === "recent" ? "rr" : "r") + i, "aria-selected": String(listName === "results" && i === S.sel), "aria-label": `${name}, ${r.dir}${r.folder ? "" : ", " + size(r.size)}, ${when(r.mtime)}${r.gone ? ", " + T.gone : ""}` });
     el.dataset.i = i;
@@ -619,6 +677,7 @@
   }
   function renderRows(refresh) {
     const top = list.scrollTop;
+    thumbSeen.disconnect();
     list.replaceChildren(...S.rows.map((r, i) => rowEl(r, i, "results")));
     if (!S.done || (S.running && !S.rows.length)) list.append(h("div", { class: "more", "aria-hidden": "true" }, S.running && !S.rows.length ? T.searching : T.moreRows));
     list.scrollTop = refresh ? top : 0;
@@ -1114,6 +1173,7 @@
     if (ctrl && (e.key === "k" || e.key === "K" || e.key === "f" || e.key === "F") || e.key === "F3") { closeSettings(); q.focus(); q.select(); e.preventDefault(); return; }
     if (ctrl && (e.key === "h" || e.key === "H")) { openHistory(); e.preventDefault(); return; }
     if (ctrl && e.key === ",") { S.view === "settings" ? closeSettings() : openSettings(); e.preventDefault(); return; }
+    if (ctrl && (e.key === "t" || e.key === "T")) { toggleGrid(); e.preventDefault(); return; }
     // Zoom (the browser's own keys are off): Ctrl and + / - / 0, kept for next time.
     if (ctrl && (e.key === "+" || e.key === "=" || e.key === "-" || e.key === "0")) { zoomBy(e.key === "0" ? 0 : e.key === "-" ? -1 : 1); e.preventDefault(); return; }
     if (e.key === "Escape") {
@@ -1144,9 +1204,16 @@
     if (inList && e.key === "ArrowUp" && S.sel === 0) { q.focus(); e.preventDefault(); return; }
     const row = S.rows[S.sel];
     const rowH = (list.querySelector(".row") || { offsetHeight: 56 }).offsetHeight || 56;
-    const page = Math.max(1, Math.floor(list.clientHeight / rowH) - 1);
-    const moves = { ArrowDown: 1, ArrowUp: -1, PageDown: page, PageUp: -page };
-    if (e.key in moves && (inBox || inList)) { select(S.sel + moves[e.key]); e.preventDefault(); return; }
+    // In the grid, Up and Down move by a row of tiles, Left and Right by one
+    // (in the list only; in the box they move the caret), in reading order.
+    const cols = gridOn() ? Math.max(1, getComputedStyle(list).gridTemplateColumns.split(" ").length) : 1;
+    const page = Math.max(1, Math.floor(list.clientHeight / rowH) - 1) * cols;
+    const moves = { ArrowDown: cols, ArrowUp: -cols, PageDown: page, PageUp: -page };
+    if (gridOn() && inList) {
+      const rtl = document.documentElement.dir === "rtl";
+      moves.ArrowRight = rtl ? -1 : 1; moves.ArrowLeft = rtl ? 1 : -1;
+    }
+    if (e.key in moves && (inBox || inList)) { select(Math.max(0, Math.min(S.rows.length - 1, S.sel + moves[e.key]))); e.preventDefault(); return; }
     if (ctrl && (e.key === "Home" || e.key === "End")) { select(e.key === "Home" ? 0 : S.rows.length - 1); e.preventDefault(); return; }
     // Enter in the box moves to the list (as the classic window, where it
     // searched); there Enter opens. Ctrl+Enter opens the folder from both.

@@ -184,6 +184,22 @@ html[dir="rtl"] .field input { text-align: right; }
 .row .n3 .sn, .snip .sn, .lines .lt { unicode-bidi: plaintext; }
 .row .cnt { flex: none; font-size: 11.5px; font-weight: 500; color: var(--link); background: var(--sky-soft); border-radius: 99px; padding: 0 8px; line-height: 20px; }
 .row.gone { opacity: .55; }
+/* The thumbnail view (Ctrl+T): tiles in reading order, the type badge until
+   the picture arrives. */
+body.gridview #cols { display: none; }
+.list.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 8px; padding: 10px 12px; align-content: start; }
+.list.grid .row.tile { display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 0; padding: 8px 6px; border-radius: 10px; }
+.list.grid .row.tile[aria-selected="true"] { box-shadow: inset 0 0 0 2px var(--sel-bar); }
+.list.grid .row.tile[aria-selected="true"]::before { display: none; }
+.list.grid .more { grid-column: 1 / -1; }
+.tile .tpic { width: 112px; height: 112px; flex: none; display: grid; place-items: center; position: relative; border-radius: 8px; background: var(--surface-2); overflow: hidden; }
+.tile .tpic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .15s; }
+.tile.pic .tpic img { opacity: 1; }
+.tile.pic .tpic .ft { visibility: hidden; }
+.ft.big { width: 48px; height: 56px; }
+.tile .tname { max-width: 100%; font-size: 12.5px; text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.tile .tname .fname { display: inline; }
+@media (forced-colors: active) { .list.grid .row.tile[aria-selected="true"] { outline: 2px solid Highlight; } }
 /* Compact rows: one line each, the folder after the name (app.js compactOn). */
 body.compact .row, body.compact .row.doc { min-height: 34px; padding-block: 0; grid-template-columns: 34px 1fr var(--w-size, 96px) var(--w-date, 128px); }
 body.compact .cols { grid-template-columns: 34px 1fr var(--w-size, 96px) var(--w-date, 128px); }

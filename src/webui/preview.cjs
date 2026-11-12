@@ -33,6 +33,19 @@ fs.mkdirSync(out, { recursive: true });
 const rs = fs.readFileSync(path.join(__dirname, "assets.rs"), "utf8");
 const CSP = rs.match(/pub const CSP: &str = "([^;]*;[\s\S]*?)";/)[1].replace(/\\\n/g, "");
 
+// A 4x4 opaque PNG, the program's thumbnails' format.
+const TEST_PNG = (() => {
+  const zlib = require("zlib");
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type), data]);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(zlib.crc32(td) >>> 0);
+    return Buffer.concat([len, td, crc]);
+  };
+  const ihdr = Buffer.from([0, 0, 0, 4, 0, 0, 0, 4, 8, 6, 0, 0, 0]);
+  const raw = Buffer.concat(Array.from({ length: 4 }, () => Buffer.from([0, ...[].concat(...Array(4).fill([47, 100, 214, 255]))])));
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+})();
 const MIME = { ".js": "text/javascript", ".css": "text/css", ".woff2": "font/woff2" };
 function page(lang) {
   return fs.readFileSync(path.join(ASSETS, "index.html"), "utf8")
@@ -92,11 +105,11 @@ function fakeProgram(cfg) {
     hello: [], search: ["seq", "q", "kind", "size", "date", "content", "sort", "desc"], more: ["seq", "ver", "from"], sort: ["seq", "sort", "desc"], stop: ["seq"],
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id", "name"],
-    save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], classic_look: [], options_menu: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
+    save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], classic_look: [], options_menu: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], thumbs: ["seq", "ver", "ids"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
-  const ROW_OPS = ["more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope", "drag", "folder_sizes"];
+  const ROW_OPS = ["thumbs", "more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope", "drag", "folder_sizes"];
   let lastVer = 0, recentVer = 0;
   const nextVer = () => ++lastVer;
   const send = (m) => setTimeout(() => window.__instafind.recv(m), 0);
@@ -138,7 +151,7 @@ function fakeProgram(cfg) {
       const current = m.list === "recent" ? m.ver === recentVer && recentVer > 0 : m.seq === shown.seq && m.ver === shown.ver;
       if (!current) {
         // As the program: "more" and "matches" of an older list are dropped, the rest refused with a word.
-        if (m.op !== "more" && m.op !== "matches") { window.__stale.push(m.op); send({ type: "notice", text: ar ? "تغيّرت القائمة للتو، فلم يُنفَّذ شيء. حاول مرة أخرى." : "The list just changed, so nothing was done. Try again." }); }
+        if (m.op !== "more" && m.op !== "matches" && m.op !== "thumbs") { window.__stale.push(m.op); send({ type: "notice", text: ar ? "تغيّرت القائمة للتو، فلم يُنفَّذ شيء. حاول مرة أخرى." : "The list just changed, so nothing was done. Try again." }); }
         return;
       }
     }
@@ -183,6 +196,11 @@ function fakeProgram(cfg) {
         { kind: "web", label: ar ? "ابحث في الويب" : "Search the web", q: "" },
       ];
       send(results(m, { total: n, suggestions: sugg }));
+    } else if (m.op === "thumbs") {
+      // One-time keys by row (even rows have a picture, odd ones none: 404).
+      if (!Array.isArray(m.ids) || !m.ids.length || m.ids.length > 64) fail("bad thumbs ids");
+      const hex = () => Array.from({ length: 31 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
+      send({ type: "thumbs", seq: m.seq, ver: m.ver, keys: m.ids.map((id) => [id, (id % 2 ? "b" : "a") + hex()]) });
     } else if (m.op === "more") {
       send({ type: "rows", seq: m.seq, ver: m.ver, from: m.from, rows: shown.list.slice(m.from, m.from + 200).map((f, i) => row(f, m.from + i, shown.term)) });
     } else if (m.op === "sort") {
@@ -267,6 +285,12 @@ const SHOTS = [
   // Column widths: the edge before the Date header drags (kept in the page's storage).
   ["col-width-en-light", "en", "light", [["type", "report"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "98px" } }],
   ["col-width-ar-light", "ar", "light", [["type", "تقرير"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "158px" } }],
+  // The thumbnail view (Ctrl+T): tiles, pictures by one-time key (never a path), keys in reading order.
+  ["grid-ar-light", "ar", "light", [["type", "تقرير"], ["key", "Control+t"], ["wait", 500]], { expect: { grid: true, pics: true } }],
+  ["grid-en-dark", "en", "dark", [["type", "report"], ["click", "#view-grid"], ["wait", 500]], { expect: { grid: true, pics: true } }],
+  ["grid-keys-ar-light", "ar", "light", [["type", "تقرير"], ["key", "Control+t"], ["wait", 200], ["click", "#r0"], ["key", "ArrowLeft"]], { expect: { active: "r1" } }],
+  ["grid-down-en-light", "en", "light", [["type", "report"], ["key", "Control+t"], ["wait", 200], ["click", "#r0"], ["key", "ArrowDown"]], { expect: { downByCols: true } }],
+  ["grid-off-en-light", "en", "light", [["type", "report"], ["key", "Control+t"], ["key", "Control+t"]], { expect: { grid: false } }],
   // A Latin search in the Arabic interface stays at the right.
   ["latin-query-ar-light", "ar", "light", [["type", "report"]], { expect: { qAlign: "right" } }],
   ["filters-ar-light", "ar", "light", [["chip", "size", 2], ["chip", "date", 4], ["chip", "scope", 1], ["type", "تقرير"], ["wait", 100], ["click", '.colbtn[data-sort="size"]'], ["click", '.colbtn[data-sort="size"]'], ["key", "ArrowDown"]], { expect: { chipsOn: 3 } }],
@@ -311,13 +335,21 @@ const SHOTS = [
   for (const [name, lang, theme, steps, opts = {}] of SHOTS) {
     const ctx = await browser.newContext({ viewport: { width: opts.width || 1280, height: opts.height || 800 }, deviceScaleFactor: 2, colorScheme: theme, locale: lang === "ar" ? "ar" : "en-US" });
     const pg = await ctx.newPage();
+    const thumbAsks = [];
     pg.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    pg.on("console", (m) => (m.type() === "error" || /Content Security Policy/.test(m.text())) && errors.push(`${name}: console: ${m.text()}`));
+    // (A thumbnail the program has none for is a 404, as it should be.)
+    pg.on("console", (m) => (m.type() === "error" || /Content Security Policy/.test(m.text())) && !(/404/.test(m.text()) && /\/thumb\/[0-9a-f]{32}$/.test((m.location() || {}).url || "")) && errors.push(`${name}: console: ${m.text()}`));
     await pg.route("**/*", (route) => {
       const url = new URL(route.request().url());
       if (url.origin !== ORIGIN) { errors.push(`${name}: request outside the program: ${url}`); return route.abort(); }
       const headers = { "Content-Security-Policy": CSP, "X-Content-Type-Options": "nosniff" };
       if (url.pathname === "/" || url.pathname === "/index.html") return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", headers, body: page(lang) });
+      // Thumbnails: only /thumb/<32 hex>, as assets::thumb_key; a picture for keys of even rows.
+      if (url.pathname.startsWith("/thumb")) {
+        thumbAsks.push(url.pathname);
+        if (!/^\/thumb\/[0-9a-f]{32}$/.test(url.pathname) || url.search) errors.push(`${name}: odd thumbnail request ${url.pathname}${url.search}`);
+        return url.pathname.startsWith("/thumb/a") ? route.fulfill({ status: 200, contentType: "image/png", headers, body: TEST_PNG }) : route.fulfill({ status: 404, headers, body: "" });
+      }
       const file = path.join(ASSETS, url.pathname);
       if (!file.startsWith(ASSETS) || !fs.existsSync(file)) return route.fulfill({ status: 404, headers, body: "" });
       route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || "application/octet-stream", headers, body: fs.readFileSync(file) });
@@ -372,6 +404,7 @@ const SHOTS = [
         fnames++;
         const base = el.querySelector(":scope > .base"), ext = el.querySelector(":scope > .ext");
         if (!base || !ext || !ext.textContent.startsWith(".") || getComputedStyle(ext).direction !== "ltr") { bad.push("file name not split: " + el.textContent); continue; }
+        if (base.getClientRects().length > 1) continue; // wrapped (a tile): no order on one line
         const b = base.getBoundingClientRect(), x = ext.getBoundingClientRect();
         if (b.width === 0 || Math.abs(b.bottom - x.bottom) > 2) continue; // wrapped: no order on one line
         const rtl = /^[^\p{L}]*[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/u.test(base.textContent);
@@ -411,6 +444,9 @@ const SHOTS = [
         warn: document.getElementById("status-text").classList.contains("warn"),
         qAlign: getComputedStyle(document.querySelector("#q")).textAlign,
         compact: document.body.classList.contains("compact"),
+        grid: document.querySelectorAll("#list .row.tile").length > 0,
+        pics: document.querySelectorAll("#list .row.tile.pic").length > 0,
+        downByCols: (() => { const l = document.getElementById("list"); const cols = getComputedStyle(l).gridTemplateColumns.split(" ").length; return cols > 1 && l.getAttribute("aria-activedescendant") === "r" + cols; })(),
         tagline: visible(document.querySelector("#view-nores .tagline")),
         dateW: document.body.style.getPropertyValue("--w-date"),
         linesTop: (() => { const l = document.querySelector(".preview .pv-lines, .preview .snip"); return !!l && l.getBoundingClientRect().top < innerHeight * 0.75; })(),
