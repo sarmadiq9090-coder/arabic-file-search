@@ -686,7 +686,7 @@
     open.append(h("kbd", null, "Enter"));
     const parts = [
       h("div", { class: "thumb" }, badge(r)),
-      h("div", null, h("div", { class: "pv-name" }, nameEl(r)), h("div", { class: "pv-path" }, pathEl(joinPath(r.dir, plainName(r)), 999))),
+      h("div", null, h("div", { class: "pv-name" }, nameEl(r)), h("div", { class: "pv-path" }, pathEl(r.dir, 999))),
     ];
     if (r.gone) parts.push(h("p", { class: "gone-note" }, T.gone));
     else parts.push(h("div", { class: "actions" }, open, btn("", I.folder, T.openFolder, () => act("reveal", S.rows[S.sel])),
@@ -947,7 +947,7 @@
     if (!r || r.gone) return;
     const name = plainName(r), [before, after] = r.folder ? T.recycleQDir : T.recycleQ;
     const ok = btn("primary", I.trash, T.recycleOk, () => { closeDialog(); act("recycle", r, at.list, at); }, { id: "recycle-ok" });
-    dialog(T.recycleH, [h("p", null, before, fileName([[name, false]], r.folder, "dname"), after), h("div", { class: "pv-path" }, pathEl(joinPath(r.dir, name), 999)), h("p", { class: "sub" }, T.recycleSub)],
+    dialog(T.recycleH, [h("p", null, before, fileName([[name, false]], r.folder, "dname"), after), h("div", { class: "pv-path" }, pathEl(r.dir, 999)), h("p", { class: "sub" }, T.recycleSub)],
       [ok, btn("", I.x, T.cancel, closeDialog)], "recycle");
     ok.focus();
   }
@@ -956,7 +956,7 @@
     if (!r || !r.snippet) return;
     const m = S.matches && S.matches.id === id ? S.matches : null;
     if (!m) send({ op: "matches", seq: Math.max(S.shown, 0), ver: S.ver, id });
-    const body = [h("div", { class: "pv-path" }, pathEl(joinPath(r.dir, plainName(r)), 999))];
+    const body = [h("div", { class: "pv-path" }, pathEl(r.dir, 999))];
     if (m) {
       body.push(h("p", { class: "sub num" }, T.nMatches(m.count) + (m.lines.length < m.count ? " " + T.firstLines(m.lines.length) : "")), linesEl(m, 1000));
     } else body.push(h("p", { class: "sub" }, T.matchesNone));
