@@ -229,6 +229,7 @@ impl App {
             self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first."));
             return;
         };
+        self.read_matches_again(row);
         let text = {
             let st = self.state.borrow();
             let (Some(r), Some(e)) = (st.rows.get(row), st.row_entry(row)) else { return };
@@ -250,6 +251,31 @@ impl App {
         self.matches_text.set_text(&text);
         self.matches_window.set_visible(true);
         self.matches_text.set_focus();
+    }
+
+    /// A search inside documents keeps the matching lines of its first
+    /// results only (`search::LINED_HITS`); for a later one they are read
+    /// again from the document (or the content index) and kept in the row.
+    fn read_matches_again(&self, row: usize) {
+        let (path, q, use_index) = {
+            let mut st = self.state.borrow_mut();
+            let Some(m) = st.rows.get(row).and_then(|r| r.matches.as_ref()) else { return };
+            if !m.lines.is_empty() || m.count == 0 {
+                return;
+            }
+            let Some(path) = st.row_entry(row).map(|e| e.path.to_string()) else { return };
+            // Taken out while the file is read (not borrowed meanwhile), put back below.
+            let Some(q) = st.shown_query.take() else { return };
+            (path, q, st.settings.content_index)
+        };
+        let cache = if use_index { super::content_index::shared() } else { None };
+        let found = search::document_matches(&path, &q, cache);
+        let mut st = self.state.borrow_mut();
+        st.shown_query = Some(q);
+        if let (Some(m), Some((count, lines))) = (st.rows.get_mut(row).and_then(|r| r.matches.as_mut()), found) {
+            m.count = count;
+            m.lines = lines;
+        }
     }
 
     /// Saves the result list as a CSV file that Excel opens with Arabic intact.

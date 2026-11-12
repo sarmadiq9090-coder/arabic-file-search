@@ -174,48 +174,60 @@ impl Near {
     }
 
     /// For each word of `hay` that contains one of the terms with a non-zero
-    /// `need`: (word number, term number, byte offset of the match), in text order.
-    fn hits(&self, hay: &str, need: &[u32]) -> Vec<(u32, usize, usize)> {
-        let mut hits = Vec::new();
-        for (n, (off, word)) in split_words(hay).enumerate() {
-            for (t, term) in self.words.iter().enumerate().filter(|&(t, _)| need[t] > 0) {
-                if let Some(p) = term.find_in(word) {
-                    hits.push((u32::try_from(n).unwrap_or(u32::MAX), t, off + p));
-                }
-            }
-        }
-        hits
+    /// `need`: (word number, term number, byte offset of the match), in text
+    /// order. Read as the text is walked, never collected whole: a document
+    /// of millions of words would take hundreds of MB.
+    fn hits<'a>(&'a self, hay: &'a str, need: &'a [u32]) -> impl Iterator<Item = (u32, usize, usize)> + 'a {
+        split_words(hay).enumerate().flat_map(move |(n, (off, word))| {
+            let n = u32::try_from(n).unwrap_or(u32::MAX);
+            let wanted = self.words.iter().enumerate().filter(move |&(t, _)| need[t] > 0);
+            wanted.filter_map(move |(t, term)| term.find_in(word).map(|p| (n, t, off + p)))
+        })
     }
 
     /// Byte offset in `hay` of the first window holding every word within
     /// `dist` words, if there is one.
     fn find(&self, hay: &str) -> Option<usize> {
+        self.find_window(hay).0
+    }
+
+    /// [`Near::find`], and the most hits it held at once (for the tests).
+    /// Only hits within `dist` words of the one being read can share a
+    /// window with it, so older ones are dropped on the way.
+    fn find_window(&self, hay: &str) -> (Option<usize>, usize) {
         let need = self.needs();
         let distinct = need.iter().filter(|&&k| k > 0).count();
-        let hits = self.hits(hay, &need);
         let mut counts = vec![0u32; self.words.len()];
-        let (mut covered, mut left) = (0, 0);
-        for &(n, t, _) in &hits {
+        let mut window: std::collections::VecDeque<(u32, usize, usize)> = std::collections::VecDeque::new();
+        let (mut covered, mut most) = (0, 0);
+        for hit in self.hits(hay, &need) {
+            let (n, t, _) = hit;
+            while let Some(&(first, ft, _)) = window.front()
+                && n - first > self.dist
+            {
+                covered -= usize::from(counts[ft] == need[ft]);
+                counts[ft] -= 1;
+                window.pop_front();
+            }
+            window.push_back(hit);
+            most = most.max(window.len());
             counts[t] += 1;
             covered += usize::from(counts[t] == need[t]);
-            while covered == distinct {
-                let (first, lt, off) = hits[left];
-                if n - first <= self.dist {
-                    return Some(off);
-                }
-                covered -= usize::from(counts[lt] == need[lt]);
-                counts[lt] -= 1;
-                left += 1;
+            if covered == distinct {
+                // Every hit left is within `dist` of this one: the first starts the window.
+                return (window.front().map(|&(_, _, off)| off), most);
             }
         }
-        None
+        (None, most)
     }
 
     /// Byte offsets of every word occurrence that has each of the other words
-    /// within `dist` words of it (exact for two words, which is the usual case).
+    /// within `dist` words of it (exact for two words, which is the usual
+    /// case). Only the first [`MAX_SPANS`] occurrences of the words are looked
+    /// at: like every count, this one stops growing there.
     fn all(&self, hay: &str) -> Vec<usize> {
         let need = self.needs();
-        let hits = self.hits(hay, &need);
+        let hits: Vec<(u32, usize, usize)> = self.hits(hay, &need).take(MAX_SPANS).collect();
         let mut by_term: Vec<Vec<u32>> = vec![Vec::new(); self.words.len()];
         for &(n, t, _) in &hits {
             by_term[t].push(n);
@@ -1088,12 +1100,49 @@ pub struct ContentHit {
     /// How many matches of the query the document holds.
     pub count: u32,
     /// Up to [`MAX_LINES`] matching lines: (1-based line number, the line
-    /// cut to about 200 characters around its first match).
+    /// cut to about 200 characters around its first match). Empty, with
+    /// `count` still set, for the results after the first [`LINED_HITS`] of
+    /// a search: [`document_matches`] reads those again when they are asked for.
     pub lines: Vec<(u32, String)>,
+}
+
+impl ContentHit {
+    /// The bytes this hit keeps in memory (its own size and its texts).
+    #[cfg_attr(not(test), allow(dead_code))] // for the tests' memory bound
+    pub fn retained_bytes(&self) -> usize {
+        std::mem::size_of::<ContentHit>()
+            + self.snippet.capacity()
+            + self.lines.capacity() * std::mem::size_of::<(u32, String)>()
+            + self.lines.iter().map(|(_, l)| l.capacity()).sum::<usize>()
+    }
 }
 
 /// Most matching lines kept per document in [`ContentHit::lines`].
 pub const MAX_LINES: usize = 50;
+
+/// How many results of one search inside documents keep their matching
+/// lines. 50 lines of 200 characters are up to 34 KB for one document, so a
+/// common word («في», `a`) found in tens of thousands of documents held
+/// gigabytes (more than the 32-bit program can have). The later results keep
+/// their snippet and count; their lines are read again on demand.
+pub const LINED_HITS: usize = 1_000;
+
+/// Most results one search inside documents lists. It stops there and sets
+/// [`ContentProgress::capped`]; the window says it shows the first ones.
+pub const MAX_CONTENT_HITS: usize = 100_000;
+
+/// The limits of one search inside documents.
+#[derive(Clone, Copy)]
+struct HitLimits {
+    /// Results that keep their matching lines.
+    lined: usize,
+    /// Results listed at all.
+    hits: usize,
+}
+
+impl HitLimits {
+    const DEFAULT: HitLimits = HitLimits { lined: LINED_HITS, hits: MAX_CONTENT_HITS };
+}
 
 #[derive(Default)]
 pub struct ContentProgress {
@@ -1103,6 +1152,9 @@ pub struct ContentProgress {
     pub done: AtomicBool,
     /// Documents whose text came from the content index instead of the file.
     pub from_cache: AtomicUsize,
+    /// The search stopped at [`MAX_CONTENT_HITS`] results: more documents
+    /// match than are listed.
+    pub capped: AtomicBool,
 }
 
 /// Searches inside every supported document in scope. Hits are pushed into
@@ -1117,6 +1169,30 @@ pub fn search_content(
     hits: &Mutex<Vec<ContentHit>>,
     cache: Option<&ContentCache>,
 ) {
+    // The background warm-up pauses while this runs.
+    let _searching = cache.map(ContentCache::begin_search);
+    // Keyed by the file on disk, not the index entry, which may be stale.
+    let text_of = |e: &Entry| content_cache::text_of(cache, &e.path);
+    search_documents(entries, q, scope, progress, hits, HitLimits::DEFAULT, &text_of);
+    if let Some(c) = cache.filter(|_| q.has_text_criteria()) {
+        let _ = c.flush();
+    }
+    progress.done.store(true, Ordering::Relaxed);
+}
+
+/// [`search_content`] over the texts `text_of` gives (a document's text, and
+/// whether it came from the content index), within `limits`: the first
+/// `limits.lined` results keep their matching lines, and the search stops
+/// at `limits.hits` results. Leaves `progress.done` to the caller.
+fn search_documents(
+    entries: &[Entry],
+    q: &Query,
+    scope: &str,
+    progress: &ContentProgress,
+    hits: &Mutex<Vec<ContentHit>>,
+    limits: HitLimits,
+    text_of: &(dyn Fn(&Entry) -> (Option<String>, bool) + Sync),
+) {
     let scope_lower = scope.to_lowercase();
     let candidates: Vec<u32> = entries
         .par_iter()
@@ -1128,33 +1204,43 @@ pub fn search_content(
     progress.total.store(candidates.len(), Ordering::Relaxed);
 
     if !q.has_text_criteria() {
-        progress.done.store(true, Ordering::Relaxed);
         return;
     }
 
-    // The background warm-up pauses while this runs.
-    let _searching = cache.map(ContentCache::begin_search);
+    // Results found so far, to hand out the places within `limits`.
+    let found = AtomicUsize::new(0);
     // A dedicated pool keeps the global one free for instant filename search.
     let threads = std::thread::available_parallelism().map_or(2, |n| n.get().saturating_sub(1).max(1));
     let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).thread_name(|i| format!("content-{i}")).build();
     let run = || {
         candidates.par_iter().for_each(|&i| {
-            if progress.cancel.load(Ordering::Relaxed) {
+            if progress.cancel.load(Ordering::Relaxed) || progress.capped.load(Ordering::Relaxed) {
                 return;
             }
-            let entry = &entries[i as usize];
-            // Keyed by the file on disk, not the index entry, which may be stale.
-            let (text, from_cache) = content_cache::text_of(cache, &entry.path);
+            let (text, from_cache) = text_of(&entries[i as usize]);
             if from_cache {
                 progress.from_cache.fetch_add(1, Ordering::Relaxed);
             }
             // A bug matching one document (reported by the panic hook)
             // skips that document instead of ending the whole search.
             if let Some(text) = text
-                && let Some(hit) = crate::crash_log::catch(|| content_hit(i, &text, q)).flatten()
-                && let Ok(mut h) = hits.lock()
+                && let Some(mut hit) = crate::crash_log::catch(|| content_hit(i, &text, q)).flatten()
             {
-                h.push(hit);
+                let place = found.fetch_add(1, Ordering::Relaxed);
+                if place >= limits.hits {
+                    // Full: this document and the rest are not listed.
+                    progress.capped.store(true, Ordering::Relaxed);
+                    return;
+                }
+                if place >= limits.lined {
+                    // Count and snippet only; `document_matches` reads the lines again.
+                    hit.lines = Vec::new();
+                }
+                // Built by joining words: often twice the size it needs.
+                hit.snippet.shrink_to_fit();
+                if let Ok(mut h) = hits.lock() {
+                    h.push(hit);
+                }
             }
             progress.checked.fetch_add(1, Ordering::Relaxed);
         })
@@ -1163,10 +1249,16 @@ pub fn search_content(
         Ok(pool) => pool.install(run),
         Err(_) => run(),
     }
-    if let Some(c) = cache {
-        let _ = c.flush();
-    }
-    progress.done.store(true, Ordering::Relaxed);
+}
+
+/// The matches of `q` in the document at `path`, read again now: how many,
+/// and up to [`MAX_LINES`] matching lines. For a result whose lines were not
+/// kept ([`LINED_HITS`]). `None` when the file can't be read any more or no
+/// longer matches.
+pub fn document_matches(path: &str, q: &Query, cache: Option<&ContentCache>) -> Option<(u32, Vec<(u32, String)>)> {
+    let text = content_cache::text_of(cache, path).0?;
+    let hit = content_hit(0, &text, q)?;
+    Some((hit.count, hit.lines))
 }
 
 /// Where `q` matches `text` (whose normalised form is `norm`, with `map`

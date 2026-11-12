@@ -5,6 +5,7 @@
 ## غير منشور (Unreleased)
 
 ### إصلاحات البحث
+- **الذاكرة في البحث داخل المستندات**: كلمة شائعة («في»، «a») في عشرات آلاف المستندات كانت تحجز لكل نتيجة حتى 50 سطراً، فتصل إلى غيغابايتات (وتنهار النسخة 32-بت). الآن تحتفظ أول 1,000 نتيجة فقط بسطورها وتُقرأ سطور الباقي عند فتح «كل التطابقات» (F4)، ويتوقف البحث عند 100,000 نتيجة مع رسالة «تُعرض أول … نتيجة فقط». / **Memory in document search**: only the first 1,000 results keep their matching lines (the rest are read again for “All matches”), and a search lists at most 100,000 results, saying so.
 - **التحديد يبقى على ملفه** عند انتهاء «البحث داخل المستندات»: كانت النتائج تُرتَّب والتحديد يبقى على رقم الصف، فيفتح Enter أو يحذف Delete ملفاً آخر. / **The selection stays on its file** when a search inside documents ends and its rows are sorted; Enter or Delete could act on another file.
 - **الأسماء التي تبدأ بنقطة** تُوجد الآن: «`.gitignore`» و«`.env`» و«`.ssh`» (ملفات ومجلدات) و«`.net framework`»، وكان البرنامج يعدّ الكلمة بعد النقطة امتداداً فلا يجد شيئاً. و«`ext:.pdf`» يعمل مثل «`ext:pdf`»، و«`*.*`» يعني كل الأنواع. / **Names that start with a dot** (`.gitignore`, `.env`, `.ssh`, `.net framework`) are found; `ext:.pdf` works like `ext:pdf`, and `*.*` means every type.
 - **`regex:` ونهاية السطر**: «`regex:…$`» داخل المستندات يطابق الآن نهاية السطور المنتهية بـ `\r\n` (أغلب ملفات النصوص في ويندوز)، وكان لا يطابقها أبداً. / `regex:…$` now matches at the end of CRLF lines inside documents.

@@ -177,3 +177,94 @@ fn sorting_document_rows_keeps_the_selected_file() {
     assert_eq!(sort_rows(&entries, &mut found(), |r| r.0, SortKey::Name, false, Some(9)), None);
     assert_eq!(sort_rows(&entries, &mut Vec::<(u32, &str)>::new(), |r| r.0, SortKey::Name, true, Some(0)), None);
 }
+
+// ------------------------------------- memory kept by a search inside documents
+
+/// Runs [`search_documents`] over `n` in-memory documents, all with `text`.
+fn search_many(n: usize, text: &str, q: &str, limits: HitLimits) -> (Vec<ContentHit>, ContentProgress) {
+    let entries: Vec<Entry> = (0..n).map(|i| Entry { size: 10, ..entry(&format!(r"C:\d\doc {i}.txt"), false) }).collect();
+    let progress = ContentProgress::default();
+    let hits = Mutex::new(Vec::new());
+    let text_of = |_: &Entry| (Some(text.to_string()), false);
+    let mut q = at(q);
+    q.show_system = true;
+    search_documents(&entries, &q, "", &progress, &hits, limits, &text_of);
+    (hits.into_inner().unwrap(), progress)
+}
+
+/// A common word («في», `a`) found in tens of thousands of documents kept 50
+/// lines of up to 200 characters for every one of them: gigabytes, more than
+/// the 32-bit program can have. Now only the first [`LINED_HITS`] results keep
+/// lines, and at most [`MAX_CONTENT_HITS`] are listed.
+#[test]
+fn document_search_memory_is_bounded() {
+    // 50,000 small documents (12 short lines each), all containing the word.
+    let small: String = (1..=12).map(|i| format!("السطر {i} فيه كلمة في الملف\n")).collect();
+    let (hits, progress) = search_many(50_000, &small, "في", HitLimits::DEFAULT);
+    let total: usize = hits.iter().map(ContentHit::retained_bytes).sum();
+    println!("50,000 small documents: {} hits keep {} bytes", hits.len(), total);
+    assert_eq!(hits.len(), 50_000);
+    assert!(!progress.capped.load(Ordering::Relaxed));
+    assert_eq!(hits.iter().filter(|h| !h.lines.is_empty()).count(), LINED_HITS);
+    assert!(hits.iter().all(|h| h.count == 24 && !h.snippet.is_empty()));
+    // Before: 70,150,000 bytes (1,403 per hit). Now about 12 MB.
+    assert!(total < 15 << 20, "{total} bytes");
+
+    // The worst case per hit: 50 long lines. Before, 34 KB for every result.
+    let long: String = (1..=80).map(|i| format!("{} في {} {i}\n", "كلمة ".repeat(30), "نص ".repeat(40))).collect();
+    let (hits, _) = search_many(40, &long, "في", HitLimits { lined: 10, hits: 1_000 });
+    let lined = hits.iter().filter(|h| !h.lines.is_empty()).map(ContentHit::retained_bytes).max().unwrap();
+    let bare = hits.iter().filter(|h| h.lines.is_empty()).map(ContentHit::retained_bytes).max().unwrap();
+    println!("one long document: {lined} bytes with its lines, {bare} without");
+    assert!(lined > 30_000 && bare < 1_000, "{lined} {bare}");
+    // So a whole search keeps at most (LINED_HITS × 40 KB) + (MAX_CONTENT_HITS × 1 KB), about 135 MB,
+    // where 50,000 such documents used to keep 1.6 GB.
+    const { assert!(LINED_HITS * 40_000 + MAX_CONTENT_HITS * 1_000 < 160 << 20) };
+}
+
+/// The search stops at the result limit and says so; the lines of a result
+/// listed without them are read again, the same as they would have been.
+#[test]
+fn document_search_caps_results_and_reads_lines_again() {
+    let text = "عقد الإيجار\nبند ثانٍ\nنهاية العقد";
+    let (hits, progress) = search_many(500, text, "عقد", HitLimits { lined: 3, hits: 10 });
+    assert_eq!(hits.len(), 10);
+    assert!(progress.capped.load(Ordering::Relaxed));
+    assert_eq!(hits.iter().filter(|h| !h.lines.is_empty()).count(), 3);
+    assert!(hits.iter().all(|h| h.count == 2));
+    let (hits, progress) = search_many(10, text, "عقد", HitLimits { lined: 3, hits: 10 });
+    assert_eq!(hits.len(), 10);
+    assert!(!progress.capped.load(Ordering::Relaxed), "exactly the limit is not more");
+
+    // What "Show all matches" gets for a result without its lines.
+    let dir = std::env::temp_dir().join(format!("bahth_rereads_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let p = dir.join("عقد.txt");
+    std::fs::write(&p, text).unwrap();
+    let path = p.to_str().unwrap();
+    let full = content_hit(0, text, &at("عقد")).unwrap();
+    assert_eq!(document_matches(path, &at("عقد"), None), Some((full.count, full.lines)));
+    assert_eq!(document_matches(path, &at("مفقود"), None), None);
+    std::fs::remove_file(&p).unwrap();
+    assert_eq!(document_matches(path, &at("عقد"), None), None, "gone since");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// `Near::hits` kept every word of the text that matched (a one-letter word
+/// in a big document: millions of entries); counting stops at MAX_SPANS like
+/// every other part of a query, and finding the first window keeps only the
+/// words within the distance.
+#[test]
+fn proximity_search_memory_is_bounded() {
+    let text = "a ".repeat(MAX_SPANS + 10);
+    let near = &at(r#""a zzz"~5"#).near[0];
+    let (found, most) = near.find_window(&text);
+    assert_eq!(found, None);
+    assert!(most <= 6, "{most}");
+    assert!(near.all(&text).is_empty());
+    let both = format!("{text} zzz");
+    assert_eq!(near.find_window(&both).0, Some(2 * (MAX_SPANS + 10 - 5)));
+    let near = &at(r#""a a"~2"#).near[0];
+    assert_eq!(near.all(&text).len(), MAX_SPANS);
+    assert_eq!(all_matches(&text, &at(r#""a a"~2"#), 1).0, MAX_SPANS as u32);
+}
