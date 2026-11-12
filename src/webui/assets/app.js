@@ -541,6 +541,17 @@
     savePref(); applyZoom();
   }
   document.addEventListener("wheel", (e) => { if (e.ctrlKey) { zoomBy(e.deltaY < 0 ? 1 : -1); e.preventDefault(); } }, { passive: false });
+  const COLW = { size: 96, date: 128 };
+  function colWidth(key) { const w = PREF.cols && PREF.cols[key]; return typeof w === "number" ? w : COLW[key]; }
+  function setColWidth(key, w, save = true) {
+    PREF.cols = Object.assign({}, PREF.cols, { [key]: Math.round(Math.max(64, Math.min(320, w))) });
+    applyCols();
+    if (save) savePref();
+  }
+  function applyCols() {
+    document.body.style.setProperty("--w-size", colWidth("size") + "px");
+    document.body.style.setProperty("--w-date", colWidth("date") + "px");
+  }
   function setPref(key, on) { PREF[key] = on; savePref(); applyView(); renderChips(); if (S.view === "settings") renderSettings(); }
   function viewButtons() {
     const b = (id, ic, on, label, click) => {
@@ -587,7 +598,24 @@
       b.dataset.sort = key;
       return b;
     };
-    $("cols").replaceChildren(h("span"), col("name", T.cName), col("size", T.cSize, "end"), col("date", T.cDate, "end"));
+    // The Size and Date columns can be made wider or narrower by dragging
+    // the edge before their header (kept for next time).
+    const grip = (key) => {
+      const g = h("span", { class: "grip", role: "separator", "aria-orientation": "vertical", "aria-label": key === "size" ? T.cSize : T.cDate });
+      g.addEventListener("pointerdown", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const start = e.clientX, w0 = colWidth(key), rtl = document.documentElement.dir === "rtl";
+        g.setPointerCapture(e.pointerId); g.classList.add("on");
+        const move = (ev) => setColWidth(key, w0 + (rtl ? ev.clientX - start : start - ev.clientX), false);
+        const up = () => { g.classList.remove("on"); g.removeEventListener("pointermove", move); savePref(); };
+        g.addEventListener("pointermove", move);
+        g.addEventListener("pointerup", up, { once: true });
+      });
+      g.addEventListener("click", (e) => e.stopPropagation());
+      return g;
+    };
+    const size = col("size", T.cSize, "end"), date = col("date", T.cDate, "end");
+    $("cols").replaceChildren(h("span"), col("name", T.cName), h("span", { class: "cwrap end" }, grip("size"), size), h("span", { class: "cwrap end" }, grip("date"), date));
   }
   function renderRows(refresh) {
     const top = list.scrollTop;
@@ -1144,6 +1172,7 @@
   setView("empty");
   applyView();
   applyZoom();
+  applyCols();
   renderChips();
   renderRecent();
   renderStatus();

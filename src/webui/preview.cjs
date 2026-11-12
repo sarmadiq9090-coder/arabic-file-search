@@ -264,6 +264,9 @@ const SHOTS = [
   // A document found by its text: its matching lines start above the fold; wide screens.
   ["content-lines-en-light", "en", "light", [["click", "#chip-content"], ["type", "lease agreement"], ["key", "Enter"], ["wait", 300]], { expect: { linesTop: true } }],
   ["wide-en-light", "en", "light", [["type", "report"]], { width: 1920, height: 1080, expect: { rows: 11 } }],
+  // Column widths: the edge before the Date header drags (kept in the page's storage).
+  ["col-width-en-light", "en", "light", [["type", "report"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "98px" } }],
+  ["col-width-ar-light", "ar", "light", [["type", "تقرير"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "158px" } }],
   // A Latin search in the Arabic interface stays at the right.
   ["latin-query-ar-light", "ar", "light", [["type", "report"]], { expect: { qAlign: "right" } }],
   ["filters-ar-light", "ar", "light", [["chip", "size", 2], ["chip", "date", 4], ["chip", "scope", 1], ["type", "تقرير"], ["wait", 100], ["click", '.colbtn[data-sort="size"]'], ["click", '.colbtn[data-sort="size"]'], ["key", "ArrowDown"]], { expect: { chipsOn: 3 } }],
@@ -408,6 +411,7 @@ const SHOTS = [
         warn: document.getElementById("status-text").classList.contains("warn"),
         qAlign: getComputedStyle(document.querySelector("#q")).textAlign,
         compact: document.body.classList.contains("compact"),
+        dateW: document.body.style.getPropertyValue("--w-date"),
         linesTop: (() => { const l = document.querySelector(".preview .pv-lines, .preview .snip"); return !!l && l.getBoundingClientRect().top < innerHeight * 0.75; })(),
         zoom: document.documentElement.style.zoom || "1",
         pathPx: [...document.querySelectorAll("#list .row .n2")].every((p) => parseFloat(getComputedStyle(p).fontSize) >= 13.5),

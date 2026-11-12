@@ -150,16 +150,17 @@ html[dir="rtl"] .field input { text-align: right; }
 .body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 372px; border-top: 1px solid var(--line); }
 @media (max-width: 860px) { .body { grid-template-columns: 1fr; } .preview { display: none !important; } }
 .results { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--surface); }
-.cols { height: 34px; flex: none; display: grid; grid-template-columns: 44px 1fr 96px 128px; align-items: center; padding-inline: 12px 16px; color: var(--muted); font-size: 12px; font-weight: 500; border-bottom: 1px solid var(--line); }
+.cols { height: 34px; flex: none; display: grid; grid-template-columns: 44px 1fr var(--w-size, 96px) var(--w-date, 128px); align-items: center; padding-inline: 12px 16px; color: var(--muted); font-size: 12px; font-weight: 500; border-bottom: 1px solid var(--line); }
 .colbtn { all: unset; display: inline-flex; gap: 4px; align-items: center; cursor: pointer; color: var(--muted); font: 500 12px/1 var(--font); padding-block: 6px; border-radius: 6px; }
 .colbtn.end { justify-self: end; }
+.cwrap { display: flex; justify-content: flex-end; align-items: center; height: 100%; min-width: 0; }
 .colbtn:hover, .colbtn.sorted { color: var(--text); }
 .colbtn:focus-visible { outline: 2px solid var(--link); }
 .colbtn .caret { width: 13px; height: 13px; }
 .list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 4px 0; }
 .list:focus { outline: none; }
 .list:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
-.row { position: relative; display: grid; grid-template-columns: 44px 1fr 96px 128px; align-items: center; min-height: 56px; padding-inline: 12px 16px; cursor: default; }
+.row { position: relative; display: grid; grid-template-columns: 44px 1fr var(--w-size, 96px) var(--w-date, 128px); align-items: center; min-height: 56px; padding-inline: 12px 16px; cursor: default; }
 .row:hover { background: var(--hover); }
 .row[aria-selected="true"] { background: var(--sel); }
 .row[aria-selected="true"]::before { content: ""; position: absolute; inset-block: 8px; inset-inline-start: 0; width: 3px; border-radius: 3px; background: var(--sel-bar); }
@@ -184,8 +185,13 @@ html[dir="rtl"] .field input { text-align: right; }
 .row .cnt { flex: none; font-size: 11.5px; font-weight: 500; color: var(--link); background: var(--sky-soft); border-radius: 99px; padding: 0 8px; line-height: 20px; }
 .row.gone { opacity: .55; }
 /* Compact rows: one line each, the folder after the name (app.js compactOn). */
-body.compact .row, body.compact .row.doc { min-height: 34px; padding-block: 0; grid-template-columns: 34px 1fr 96px 128px; }
-body.compact .cols { grid-template-columns: 34px 1fr 96px 128px; }
+body.compact .row, body.compact .row.doc { min-height: 34px; padding-block: 0; grid-template-columns: 34px 1fr var(--w-size, 96px) var(--w-date, 128px); }
+body.compact .cols { grid-template-columns: 34px 1fr var(--w-size, 96px) var(--w-date, 128px); }
+/* Column widths: drag the edge at the start of the Size and Date headers. */
+.cols > * { position: relative; }
+.grip { position: absolute; inset-block: 4px; inset-inline-start: -6px; width: 9px; cursor: col-resize; touch-action: none; }
+.grip::after { content: ""; position: absolute; inset-block: 3px; inset-inline-start: 4px; width: 1px; background: var(--line-2); }
+.grip:hover::after, .grip.on::after { background: var(--link); width: 2px; }
 body.compact .row .ft { width: 20px; height: 23px; }
 body.compact .row .nm { display: flex; gap: 12px; align-items: baseline; min-width: 0; }
 body.compact .row .n1 { flex: 0 1 auto; max-width: 62%; font-size: 14px; }
