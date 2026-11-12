@@ -90,6 +90,17 @@ html[dir="rtl"] .field input { text-align: right; }
 .hbtn { width: 54px; height: 54px; flex: none; display: grid; place-items: center; border-radius: 14px; border: 1.5px solid var(--line-2); background: var(--surface); color: var(--muted); cursor: pointer; box-shadow: var(--shadow-sm); }
 .hbtn:hover, .hbtn[aria-expanded="true"], .hbtn[aria-pressed="true"] { border-color: var(--link); color: var(--text); }
 .hbtn svg.i { width: 22px; height: 22px; }
+/* History and Settings say what they are, where there is room. */
+.hbtn:has(.hlbl) { width: auto; min-width: 54px; padding-inline: 14px; display: inline-flex; gap: 8px; align-items: center; justify-content: center; }
+.hbtn .hlbl { font: 500 13.5px/1 var(--font); color: var(--text); }
+@media (max-width: 1000px) { .hbtn .hlbl { display: none; } .hbtn:has(.hlbl) { width: 54px; padding: 0; } }
+.btn.small { height: 32px; padding-inline: 10px; font-size: 12.5px; }
+.btn.small.icon { width: 32px; padding: 0; }
+/* The selected result's actions when there is no preview pane. */
+.actbar { display: none; flex: none; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.actbar:empty { display: none !important; }
+.body.nopreview .actbar { display: flex; }
+@media (max-width: 860px) { .actbar { display: flex; } }
 .popwrap { position: relative; }
 
 /* ---------- chips ---------- */

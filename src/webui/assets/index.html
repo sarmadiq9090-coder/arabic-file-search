@@ -24,11 +24,13 @@
     <span class="popwrap">
       <button class="hbtn" id="hist-btn" type="button" aria-haspopup="menu" aria-expanded="false" data-i18n-label="history" data-i18n-title="historyKey">
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+        <span class="hlbl" data-i18n="history"></span>
       </button>
       <div class="menu pop" id="hist" role="menu" hidden></div>
     </span>
     <button class="hbtn" id="set-btn" type="button" aria-pressed="false" data-i18n-label="settings" data-i18n-title="settingsKey">
       <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      <span class="hlbl" data-i18n="settings"></span>
     </button>
   </div>
   <div class="chips" role="toolbar" id="chips" data-i18n-label="filters"></div>
@@ -45,6 +47,7 @@
     <section class="results">
       <div class="cols" id="cols"></div>
       <div class="list" id="list" role="listbox" tabindex="0" data-i18n-label="results"></div>
+      <div class="actbar" id="actbar"></div>
     </section>
     <aside class="preview" id="preview" data-i18n-label="preview"></aside>
   </div>

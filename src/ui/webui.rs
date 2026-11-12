@@ -1027,6 +1027,26 @@ mod imp {
                 Request::Hide {} => self.webui_hide(),
                 Request::ClassicLook {} => self.webui_leave(true),
                 Request::OptionsMenu {} => self.webui.options_pending.set(true),
+                // The Save dialog runs inside this handler: the timer leaves the page alone meanwhile.
+                Request::Export {} => {
+                    self.webui.in_page_call.set(true);
+                    self.export_csv();
+                    self.webui.in_page_call.set(false);
+                }
+                Request::ReplaceText {} => {
+                    if let Some(app) = self.webui.me.borrow().upgrade()
+                        && app.ensure_replace()
+                    {
+                        app.open_replace();
+                    }
+                }
+                Request::FolderSizes { list, seq, ver, id } => {
+                    let Some(path) = self.webui_path(list, seq, ver, id) else { return };
+                    let folder = if std::path::Path::new(&path).is_dir() { path } else { bridge::parent(&path).to_string() };
+                    if let Some(app) = self.webui.me.borrow().upgrade() {
+                        app.show_disk_usage(folder);
+                    }
+                }
                 Request::App { seq, id } => {
                     let found = {
                         let apps = self.webui.apps.borrow();

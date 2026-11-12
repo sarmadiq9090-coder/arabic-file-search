@@ -214,7 +214,7 @@ impl App {
     }
 
     /// Builds the (hidden) window and binds its events, once.
-    fn ensure_replace(self: &Rc<Self>) -> bool {
+    pub(super) fn ensure_replace(self: &Rc<Self>) -> bool {
         self.replace.ui.is_built() || self.build_lazily("replace", |app| {
             app.build_replace_controls()?;
             Ok((vec![app.bind_replace_window()], Vec::new()))
@@ -336,21 +336,28 @@ impl App {
         }))
     }
 
-    /// Opens the window on the plain-text files of the current results.
-    fn open_replace(&self) {
+    /// Opens the window on the plain-text files of the current results (the
+    /// new look's while it is the main window).
+    pub(super) fn open_replace(&self) {
         let r = &self.replace;
         if !r.state.borrow().busy {
             let (files, others) = {
-                let st = self.state.borrow();
+                let results: Vec<(String, bool)> = match self.webui_results() {
+                    Some(rows) => rows.into_iter().map(|r| (r.path, r.size.is_none())).collect(),
+                    None => {
+                        let st = self.state.borrow();
+                        st.rows.iter().filter_map(|row| st.rows_index.entries.get(row.entry as usize)).map(|e| (e.path.to_string(), e.is_dir)).collect()
+                    }
+                };
                 let mut files = Vec::new();
                 let mut others = 0;
-                for e in st.rows.iter().filter_map(|row| st.rows_index.entries.get(row.entry as usize)) {
-                    if e.is_dir {
+                for (path, is_dir) in results {
+                    if is_dir {
                         continue;
                     }
-                    let ext = std::path::Path::new(&*e.path).extension().and_then(|x| x.to_str()).map(str::to_ascii_lowercase);
+                    let ext = std::path::Path::new(&path).extension().and_then(|x| x.to_str()).map(str::to_ascii_lowercase);
                     if ext.is_some_and(|x| crate::extract::is_plain_text(&x)) && files.len() < MAX_FILES {
-                        files.push(e.path.to_string());
+                        files.push(path);
                     } else {
                         others += 1;
                     }

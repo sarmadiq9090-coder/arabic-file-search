@@ -248,6 +248,12 @@ pub enum Request {
     ClassicLook {},
     /// Start app `id` of those offered for search `seq` ([`Outbound::Apps`]).
     App { seq: u64, id: u32 },
+    /// Export the results listed now to a CSV file (Save dialog).
+    Export {},
+    /// Replace text in the plain-text files among the results listed now.
+    ReplaceText {},
+    /// Folder sizes of the folder of row `id` (the folder itself for a folder).
+    FolderSizes { list: List, seq: u64, ver: u64, id: u32 },
     /// Open the program's Options menu (the classic window's, with its
     /// tools, support, updates and quick-search settings) at the pointer.
     OptionsMenu {},
@@ -1334,6 +1340,11 @@ mod tests {
         assert_eq!(req(r#""op":"restart""#), Ok(Request::Restart {}));
         assert_eq!(req(r#""op":"classic_look""#), Ok(Request::ClassicLook {}));
         assert_eq!(req(r#""op":"options_menu""#), Ok(Request::OptionsMenu {}));
+        assert_eq!(req(r#""op":"export""#), Ok(Request::Export {}));
+        assert_eq!(req(r#""op":"export","path":"C:\\x.csv""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"replace_text""#), Ok(Request::ReplaceText {}));
+        assert_eq!(req(r#""op":"folder_sizes","list":"results","seq":1,"ver":2,"id":0"#), Ok(Request::FolderSizes { list: List::Results, seq: 1, ver: 2, id: 0 }));
+        assert_eq!(req(r#""op":"folder_sizes","seq":1,"id":0"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"app","seq":4,"id":0"#), Ok(Request::App { seq: 4, id: 0 }));
         assert_eq!(req(r#""op":"app","seq":4,"id":0,"path":"C:\\x.exe""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"app","seq":4"#), Err(Rejected::Malformed));

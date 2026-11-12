@@ -48,6 +48,7 @@
       stop: "إيقاف", note: "تنبيه",
       // right-click menu
       mOpen: "فتح الملف", mReveal: "فتح المجلد الذي يحتويه", mCopyFile: "نسخ الملف", mCopyPath: "نسخ المسار", mCopyAll: "نسخ مسارات كل النتائج",
+      mSizes: "أحجام المجلدات هنا…", mReplace: "استبدال نص في الملفات…", exportBtn: "تصدير النتائج", reindexBtn: "تحديث الفهرس",
       mScope: "البحث في هذا المجلد", mRename: "تغيير الاسم", mRecycle: "نقل إلى سلة المحذوفات", mMatches: "عرض كل التطابقات داخل الملف",
       // dialogs
       renameH: "تغيير الاسم", renameLabel: "الاسم الجديد", renameOk: "تغيير الاسم", cancel: "إلغاء", close: "إغلاق",
@@ -109,6 +110,7 @@
       units: ["bytes", "KB", "MB", "GB", "TB"],
       stop: "Stop", note: "Note",
       mOpen: "Open file", mReveal: "Open containing folder", mCopyFile: "Copy file", mCopyPath: "Copy path", mCopyAll: "Copy paths of all results",
+      mSizes: "Folder sizes here…", mReplace: "Replace text in files…", exportBtn: "Export results", reindexBtn: "Update index",
       mScope: "Search in this folder", mRename: "Rename", mRecycle: "Move to Recycle Bin", mMatches: "Show all matches in the file",
       renameH: "Rename", renameLabel: "New name", renameOk: "Rename", cancel: "Cancel", close: "Close",
       recycleH: "Move to the Recycle Bin", recycleQ: ["Move “", "” to the Recycle Bin?"], recycleQDir: ["Move the folder “", "” and everything in it to the Recycle Bin?"],
@@ -222,6 +224,8 @@
     pen: [["path", { d: "M4 20h4L20 8l-4-4L4 16z" }]],
     back: [["path", { d: "M15 6l-6 6 6 6" }]],
     rows: [["path", { d: "M4 6h16M4 10h16M4 14h16M4 18h16" }]],
+    export: [["path", { d: "M12 3v12M7 10l5 5 5-5M5 21h14" }]],
+    refresh: [["path", { d: "M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" }]],
     pane: [["rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }], ["path", { d: "M14 5v14" }]],
   };
 
@@ -531,7 +535,11 @@
       const el = btn("icon view", ic, null, click, { id, "aria-pressed": String(on), "aria-label": label, title: label });
       return el;
     };
-    return h("span", { class: "viewbtns" },
+    const tools = [
+      btn("small", I.export, T.exportBtn, () => send({ op: "export" }), { id: "tool-export" }),
+      btn("small", I.refresh, T.reindexBtn, () => send({ op: "reindex" }), { id: "tool-reindex" }),
+    ];
+    return h("span", { class: "viewbtns" }, ...tools,
       b("view-compact", I.rows, compactOn(), T.compact, () => setPref("compact", !compactOn())),
       b("view-preview", I.pane, previewOn(), previewOn() ? T.hidePreview : T.showPreview, () => setPref("preview", !previewOn())));
   }
@@ -611,9 +619,21 @@
     for (const [n, pieces] of m.lines.slice(0, max)) box.append(h("li", null, h("span", { class: "ln num" }, T.line(n)), marked(pieces, "lt")));
     return box;
   }
+  // The selected result's actions under the list, when the preview pane is
+  // not there (a narrow window, or hidden).
+  function renderActbar(r) {
+    const bar = $("actbar");
+    if (!r || r.gone) { bar.replaceChildren(); return; }
+    bar.replaceChildren(
+      btn("primary small", I.open, T.open, () => act("open", S.rows[S.sel])),
+      btn("small", I.folder, T.openFolder, () => act("reveal", S.rows[S.sel])),
+      btn("small", I.copy, T.copyPath, () => act("copy", S.rows[S.sel])),
+      btn("icon small", I.dots, null, (e) => openCtx(S.sel, e.currentTarget), { "aria-label": T.more, title: T.more, "aria-haspopup": "menu" }));
+  }
   function renderPreview() {
     const pv = $("preview");
     const r = S.view === "results" ? S.rows[S.sel] : null;
+    renderActbar(r);
     if (!r) { pv.replaceChildren(); return; }
     const kind = r.folder ? T.folder : r.ext ? `${r.ext.toUpperCase()} · ${T.file}` : T.file;
     const facts = h("dl", { class: "facts" }, h("dt", null, T.fType), h("dd", null, kind));
@@ -628,7 +648,7 @@
     ];
     if (r.gone) parts.push(h("p", { class: "gone-note" }, T.gone));
     else parts.push(h("div", { class: "actions" }, open, btn("", I.folder, T.openFolder, () => act("reveal", S.rows[S.sel])),
-      btn("icon", I.copy, null, () => act("copy", S.rows[S.sel]), { "aria-label": T.copyPath, title: T.copyPath }),
+      btn("", I.copy, T.copyPath, () => act("copy", S.rows[S.sel])),
       btn("icon", I.dots, null, (e) => openCtx(S.sel, e.currentTarget), { "aria-label": T.more, title: T.more, "aria-haspopup": "menu" })));
     parts.push(facts);
     if (r.snippet) {
@@ -818,7 +838,8 @@
     };
     const items = [item(T.mOpen, "Enter", "open", I.open), item(T.mReveal, "Ctrl+Enter", "reveal", I.folder), item(T.mCopyFile, "Ctrl+C", "copy_file", I.copy), item(T.mCopyPath, "Ctrl+Shift+C", "copy", I.copy)];
     if (listName === "results") items.push(item(T.mCopyAll, null, "copy_all", I.copy));
-    items.push(item(T.mScope, null, "scope", I.search));
+    items.push(item(T.mScope, null, "scope", I.search), item(T.mSizes, null, "folder_sizes", I.scale));
+    if (listName === "results") items.push(item(T.mReplace, null, "replace_text", I.pen));
     if (r.snippet) items.push(item(T.mMatches, "F4", "matches", I.text));
     items.push(h("div", { class: "sep", role: "separator" }), item(T.mRename, "F2", "rename", I.pen), item(T.mRecycle, "Delete", "recycle", I.trash));
     const menu = $("ctx");
@@ -844,6 +865,7 @@
     else if (op === "rename") renameDialog(r, at.list, at);
     else if (op === "recycle") recycleDialog(r, at.list, at);
     else if (op === "matches") { if (at.ver === S.ver) showMatches(r.id); }
+    else if (op === "replace_text") send({ op: "replace_text" });
     else act(op, r, at.list, at);
     if (!$("veil").hidden) return;
     q.focus();
