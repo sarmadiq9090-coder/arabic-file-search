@@ -177,6 +177,8 @@ impl App {
     /// selection, re-runs only a non-empty search, and saves less often.
     pub(super) fn edit_index(&self, change: impl FnOnce(&mut Index) -> bool, live: bool) {
         let selected = if live { self.selected_path() } else { None };
+        // The new look's list points into the index too; it keeps its own rows.
+        self.webui_release_index();
         let mut st = self.state.borrow_mut();
         // Paths of the current rows, to find them again after the change.
         let rows = std::mem::take(&mut st.rows);
