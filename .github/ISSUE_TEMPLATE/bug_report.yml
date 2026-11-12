@@ -70,3 +70,11 @@ body:
       render: text
     validations:
       required: false
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: "تقرير التشخيص / Diagnostic report"
+      description: "يُملأ من «خيارات ← الإبلاغ عن مشكلة…»: الإصدار والذاكرة وحجم الفهرس وآخر سطور السجل، بلا أسماء ملفات أو مسارات. / Filled in from Options ▸ Report a problem…: version, memory, index size and the last log lines, without file names or paths."
+      render: text
+    validations:
+      required: false

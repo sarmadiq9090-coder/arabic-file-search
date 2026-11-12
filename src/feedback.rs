@@ -114,15 +114,37 @@ pub fn search_issue_url(info: &SystemInfo, query: &str, english: bool) -> String
     url
 }
 
+/// Options ▸ "Report a problem…" (`crate::report`): a new issue with the
+/// user's words in "what happened" and the report in "diagnostics", cut to
+/// keep the address within limits. True when it was cut: the window then
+/// puts the whole report on the clipboard, which the note asks to paste.
+pub fn report_issue_url(info: &SystemInfo, what: &str, details: &str) -> (String, bool) {
+    const CUT: &str = "\n… (shortened: the full report is on your clipboard; paste it here)";
+    let mut url = issue_url(Kind::Bug, info, None);
+    let what: String = what.chars().take(crate::report::MAX_WHAT).collect();
+    if !what.is_empty() {
+        let _ = write!(url, "&what={}", crate::web::percent_encode(&what));
+    }
+    let budget = MAX_URL.saturating_sub(url.len() + "&diagnostics=".len());
+    let text = fit_encoded_with(details, budget, CUT);
+    let cut = text != details;
+    let _ = write!(url, "&diagnostics={}", crate::web::percent_encode(&text));
+    (url, cut)
+}
+
 /// The longest start of `text` (whole lines where possible) whose
 /// percent-encoding fits in `budget` bytes, with a note when cut.
 fn fit_encoded(text: &str, budget: usize) -> String {
-    const CUT: &str = "\n… (shortened; the full report is in %LOCALAPPDATA%\\BahthSari\\crash.txt)";
+    fit_encoded_with(text, budget, "\n… (shortened; the full report is in %LOCALAPPDATA%\\BahthSari\\crash.txt)")
+}
+
+/// [`fit_encoded`] with `cut` as the note.
+fn fit_encoded_with(text: &str, budget: usize, cut: &str) -> String {
     let enc = |s: &str| crate::web::percent_encode(s).len();
     if enc(text) <= budget {
         return text.to_string();
     }
-    let budget = budget.saturating_sub(enc(CUT));
+    let budget = budget.saturating_sub(enc(cut));
     let mut out = String::new();
     let mut used = 0;
     for line in text.split_inclusive('\n') {
@@ -145,7 +167,7 @@ fn fit_encoded(text: &str, budget: usize) -> String {
         out.push_str(line);
     }
     out.truncate(out.trim_end().len());
-    out.push_str(CUT);
+    out.push_str(cut);
     out
 }
 
@@ -407,6 +429,28 @@ mod tests {
         assert!(url.len() <= MAX_URL);
         let small = fit_encoded("abc\ndef", 4);
         assert!(small.len() < 200);
+    }
+
+    #[test]
+    fn report_url_fills_what_and_diagnostics() {
+        let (url, cut) = report_issue_url(&info(), "بطيء جداً", "InstaFind 0.7.0\nMemory: private 900 MB");
+        assert!(!cut);
+        assert!(url.contains("template=bug_report.yml"));
+        let q = query(&url);
+        assert!(q.contains(&("what".into(), "بطيء جداً".into())));
+        assert!(q.contains(&("diagnostics".into(), "InstaFind 0.7.0\nMemory: private 900 MB".into())));
+        assert!(q.contains(&("version".into(), "0.7.0".into())));
+        let (url, _) = report_issue_url(&info(), "", "x");
+        assert!(!query(&url).iter().any(|(k, _)| k == "what"));
+        // A long report is cut to fit, and says where the rest is.
+        let big: String = (0..400).map(|i| format!("1731400{i:03} memory: private {i} MB, entries 4000000, documents 300000\n")).collect();
+        let (url, cut) = report_issue_url(&info(), &"ب".repeat(2000), &big);
+        assert!(cut);
+        assert!(url.len() <= MAX_URL, "{}", url.len());
+        let q = query(&url);
+        let d = &q.iter().find(|(k, _)| k == "diagnostics").unwrap().1;
+        assert!(d.starts_with("1731400000 memory") && d.ends_with("on your clipboard; paste it here)"), "{d}");
+        assert_eq!(q.iter().find(|(k, _)| k == "what").unwrap().1.chars().count(), crate::report::MAX_WHAT);
     }
 
     #[test]

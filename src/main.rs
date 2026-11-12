@@ -79,6 +79,8 @@ mod relocate;
 #[cfg(any(windows, test))]
 mod replace;
 #[cfg(any(windows, test))]
+mod report;
+#[cfg(any(windows, test))]
 mod root;
 #[cfg(any(windows, test))]
 mod run_entry;
