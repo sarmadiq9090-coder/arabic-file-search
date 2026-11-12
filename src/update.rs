@@ -73,6 +73,30 @@ pub fn required_sha256(rel: &Release) -> Result<&str, String> {
     rel.sha256.as_deref().ok_or_else(missing_digest_message)
 }
 
+/// Said when the checksum could not be asked for (the GitHub API refused:
+/// it limits calls per address, the web page does not). Not an error of the
+/// release: the check is tried again later, and nothing is installed meanwhile.
+pub fn verify_later_message() -> String {
+    tr!("تعذّر التحقق الآن، سنحاول لاحقاً.", "Could not verify the update right now; we will try again later.").to_string()
+}
+
+/// A release found through the web page carries no checksum; `fetched` is
+/// the API's answer for it: `Ok(Some)` the checksum, `Ok(None)` the API
+/// answered without one (a real "no checksum"), `Err` the API could not be
+/// asked. Only then is the release held back, to be checked again later.
+pub fn with_digest(mut rel: Release, fetched: impl FnOnce(&str) -> Result<Option<String>, String>) -> Result<Release, String> {
+    if rel.sha256.is_some() {
+        return Ok(rel);
+    }
+    match fetched(&rel.tag) {
+        Ok(digest) => {
+            rel.sha256 = digest;
+            Ok(rel)
+        }
+        Err(_) => Err(verify_later_message()),
+    }
+}
+
 /// Why a release without a checksum is refused, and where to get it by hand.
 pub fn missing_digest_message() -> String {
     trf!(
@@ -666,8 +690,14 @@ mod win {
     pub fn check_latest() -> Result<Option<Release>, String> {
         match check_latest_api() {
             Ok(r) => Ok(r),
-            // The API limits calls per address; the web page does not.
-            Err(api_err) => check_latest_page().map_err(|_| api_err),
+            // The API limits calls per address; the web page does not. A
+            // release found there needs the API for its checksum: when it
+            // still refuses, the check counts as failed and is tried again
+            // at the next hourly tick, and no update is offered meanwhile.
+            Err(api_err) => match check_latest_page().map_err(|_| api_err)? {
+                Some(rel) => with_digest(rel, fetch_sha256).map(Some),
+                None => Ok(None),
+            },
         }
     }
 
@@ -695,15 +725,19 @@ mod win {
         parse_release(&text, env!("CARGO_PKG_VERSION"))
     }
 
-    /// The SHA-256 GitHub publishes for this CPU's program in release `tag`,
-    /// if the API answers (it may still be rate-limited).
-    fn fetch_sha256(tag: &str) -> Option<String> {
+    /// The SHA-256 GitHub publishes for this CPU's program in release `tag`:
+    /// `Ok(None)` when the API answered without one, `Err` when it could not
+    /// be asked (it may still be rate-limited).
+    fn fetch_sha256(tag: &str) -> Result<Option<String>, String> {
         if tag.is_empty() || !tag.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-') {
-            return None;
+            return Ok(None);
         }
-        let body = fetch_json(&format!("{RELEASE_BY_TAG_URL}{tag}"), MAX_JSON as u64).ok()?;
-        let rel = parse_release(std::str::from_utf8(&body).ok()?, env!("CARGO_PKG_VERSION")).ok()??;
-        (rel.tag == tag).then_some(rel.sha256).flatten()
+        let body = fetch_json(&format!("{RELEASE_BY_TAG_URL}{tag}"), MAX_JSON as u64)?;
+        let Ok(text) = std::str::from_utf8(&body) else { return Ok(None) };
+        Ok(match parse_release(text, env!("CARGO_PKG_VERSION")) {
+            Ok(Some(rel)) if rel.tag == tag => rel.sha256,
+            _ => None,
+        })
     }
 
     /// The package manager that installed this copy, if any (then it, not
@@ -763,10 +797,7 @@ mod win {
         }
         // Found through the web page (API rate-limited): ask the API once
         // more, for this release only, for the checksum. Without it, refuse.
-        let mut rel = rel.clone();
-        if rel.sha256.is_none() {
-            rel.sha256 = fetch_sha256(&rel.tag);
-        }
+        let rel = with_digest(rel.clone(), fetch_sha256)?;
         required_sha256(&rel)?;
         let rel = &rel;
         let exe = original_exe()?.to_path_buf();
@@ -1066,6 +1097,32 @@ mod tests {
         assert_eq!(PackageManager::Store.update_command(), None);
         let store = managed_message(PackageManager::Store);
         assert!(store.contains("متجر Microsoft") || store.contains("Microsoft Store"), "{store}");
+    }
+
+    /// Behind a rate limit the web page finds the release and the API cannot
+    /// give its checksum: "try again later", never "no checksum", never an
+    /// install without one.
+    #[test]
+    fn a_checksum_that_cannot_be_asked_for_now_is_asked_again_later() {
+        let rel = parse_release(SAMPLE, "0.0.1").unwrap().unwrap();
+        let page = Release { sha256: None, ..rel.clone() };
+        // The API is still refused.
+        let e = with_digest(page.clone(), |_| Err("HTTP 403".into())).unwrap_err();
+        assert_eq!(e, verify_later_message());
+        assert!(!e.contains("SHA-256"), "{e}");
+        // The API answers with the checksum: offered, verifiable.
+        let got = with_digest(page.clone(), |tag| {
+            assert_eq!(tag, rel.tag);
+            Ok(Some("ab".repeat(32)))
+        })
+        .unwrap();
+        assert_eq!(required_sha256(&got).unwrap(), "ab".repeat(32));
+        // The API answers without one: the real refusal, at install time.
+        let none = with_digest(page, |_| Ok(None)).unwrap();
+        assert_eq!(required_sha256(&none).unwrap_err(), missing_digest_message());
+        // A release that has its checksum is not asked again.
+        let known = Release { sha256: Some("cd".repeat(32)), ..rel };
+        assert_eq!(with_digest(known.clone(), |_| panic!("not asked")).unwrap(), known);
     }
 
     #[test]
