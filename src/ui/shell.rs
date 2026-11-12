@@ -10,6 +10,29 @@ use winapi::um::timezoneapi::{FileTimeToSystemTime, SystemTimeToTzSpecificLocalT
 use winapi::um::winnt::{FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL};
 use winapi::um::winuser::SW_SHOWNORMAL;
 
+/// Puts `text` on the clipboard for `owner`, trying again for a moment
+/// while another program holds the clipboard open. False when it is not
+/// there, so the caller can say so (the user would paste the old content).
+pub fn copy_text<C: Into<native_windows_gui::ControlHandle> + Copy>(owner: C, text: &str) -> bool {
+    let ok = crate::quick::retry_briefly(
+        6,
+        || native_windows_gui::Clipboard::set_data_text(owner, text),
+        || std::thread::sleep(std::time::Duration::from_millis(15)),
+    );
+    if !ok {
+        super::startup::log("clipboard: another program kept it open; nothing copied");
+    }
+    ok
+}
+
+/// What the user is told when [`copy_text`] failed.
+pub fn copy_failed_text() -> &'static str {
+    tr!(
+        "تعذر النسخ: برنامج آخر يستخدم الحافظة الآن. جرّب مرة أخرى.",
+        "Could not copy: another program is using the clipboard. Try again."
+    )
+}
+
 pub fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }

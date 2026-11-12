@@ -1120,7 +1120,11 @@ impl App {
             },
             (t, How::CopyPath) => match t.path() {
                 Some(p) => {
-                    nwg::Clipboard::set_data_text(&self.window, p);
+                    // Not copied: the popup stays, saying why.
+                    if !shell::copy_text(&self.window, p) {
+                        self.popup_error(shell::copy_failed_text());
+                        return;
+                    }
                     true
                 }
                 None => return,
@@ -1200,7 +1204,11 @@ impl App {
             Action::Launch { target, args } => shell_execute(admin.then_some("runas"), &system_tool(target), args),
             Action::OpenUri(uri) => shell::open(uri),
             Action::CopyText(text) => {
-                nwg::Clipboard::set_data_text(&self.window, text);
+                // Not copied: back to the list (the popup stays), saying why.
+                if !shell::copy_text(&self.window, text) {
+                    self.popup_error(shell::copy_failed_text());
+                    return None;
+                }
                 true
             }
             Action::FocusWindow(h) => shim::focus_window(*h),

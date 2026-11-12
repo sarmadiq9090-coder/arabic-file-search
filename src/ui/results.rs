@@ -111,8 +111,11 @@ impl App {
     pub(super) fn copy_path(&self) {
         match self.selected_path() {
             Some(p) => {
-                nwg::Clipboard::set_data_text(&self.window, &p);
-                self.set_status(tr!("تم نسخ المسار.", "Path copied."));
+                if shell::copy_text(&self.window, &p) {
+                    self.set_status(tr!("تم نسخ المسار.", "Path copied."));
+                } else {
+                    self.set_status(shell::copy_failed_text());
+                }
             }
             None => self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first.")),
         }
@@ -131,8 +134,11 @@ impl App {
         let text = paths.join("\r\n");
         // Not borrowed while the clipboard notifies its previous owner.
         drop(st);
-        nwg::Clipboard::set_data_text(&self.window, &text);
-        self.set_status(&trf!("تم نسخ {} مسار.", "Copied {} paths.", fmt_num(n)));
+        if shell::copy_text(&self.window, &text) {
+            self.set_status(&trf!("تم نسخ {} مسار.", "Copied {} paths.", fmt_num(n)));
+        } else {
+            self.set_status(shell::copy_failed_text());
+        }
     }
 
     /// Puts the selected file itself on the clipboard, ready to paste into

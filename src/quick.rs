@@ -343,6 +343,21 @@ pub fn hotkey_retry_due(tick: u32, since: u32) -> bool {
     elapsed != 0 && if elapsed <= 300 { elapsed.is_multiple_of(25) } else { elapsed.is_multiple_of(150) }
 }
 
+/// Tries `attempt` up to `tries` times, calling `wait` between tries; true
+/// as soon as one works. For the clipboard, which another program often
+/// holds open for a few milliseconds.
+pub fn retry_briefly(tries: u32, mut attempt: impl FnMut() -> bool, mut wait: impl FnMut()) -> bool {
+    for i in 0..tries {
+        if i > 0 {
+            wait();
+        }
+        if attempt() {
+            return true;
+        }
+    }
+    false
+}
+
 // ------------------------------------------------------------------ results
 
 /// The sections of the quick-search list, in display order.
@@ -1476,6 +1491,22 @@ mod everyday_tests {
         assert_eq!(tries, TRAY_RESTORE_TRIES);
         assert_eq!(tray_restore_left(TRAY_RESTORE_TRIES, true), 0);
         assert_eq!(tray_restore_left(0, false), 0);
+    }
+
+    /// A clipboard held by another program for a moment: tried again a few
+    /// times, waiting only between tries; a real failure is reported.
+    #[test]
+    fn brief_retries() {
+        let (mut calls, mut waits) = (0, 0);
+        assert!(retry_briefly(5, || { calls += 1; calls == 3 }, || waits += 1));
+        assert_eq!((calls, waits), (3, 2));
+        let (mut calls, mut waits) = (0, 0);
+        assert!(!retry_briefly(5, || { calls += 1; false }, || waits += 1));
+        assert_eq!((calls, waits), (5, 4));
+        let (mut calls, mut waits) = (0, 0);
+        assert!(retry_briefly(5, || { calls += 1; true }, || waits += 1));
+        assert_eq!((calls, waits), (1, 0));
+        assert!(!retry_briefly(0, || true, || {}));
     }
 
     /// Alt+Space held by another program at start: retried every 5 s for a
