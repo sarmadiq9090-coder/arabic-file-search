@@ -278,6 +278,8 @@ const SHOTS = [
   // Dragging a row out asks the program to drag that file (once), naming its list version.
   ["drag-en-light", "en", "light", [["type", "report"], ["drag", "#r1"]], { expect: { drags: 1, dialog: false } }],
   ["drag-recent-ar-light", "ar", "light", [["drag", "#rr0"]], { expect: { lastSent: "drag", drags: 1 } }],
+  // After a drag the next click elsewhere still works (Windows' drag loop takes the mouseup).
+  ["drag-then-click-en-light", "en", "light", [["type", "report"], ["drag", "#r1"], ["wait", 50], ["click", "#set-btn"]], { expect: { drags: 1, settings: true } }],
   // A program the search names: a button above the results; a click asks for it by its place.
   ["apps-ar-light", "ar", "light", [["type", "كروم"], ["wait", 100], ["click", "#apps [data-app=\"0\"]"], ["wait", 50]], { expect: { apps: 1, lastSent: "app" } }],
   // «فتح قائمة الخيارات…»: the program's Options menu (tools, support, updates).

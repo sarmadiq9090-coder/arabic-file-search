@@ -1021,10 +1021,16 @@
     if (!press || !(e.buttons & 1)) { press = null; return; }
     if (Math.abs(e.clientX - press.x) + Math.abs(e.clientY - press.y) < 6) return;
     const p = press; press = null; dragged = true;
+    setTimeout(() => { dragged = false; }, 300);
     act("drag", (p.listName === "recent" ? S.recent : S.rows)[p.i], p.listName);
   });
   document.addEventListener("mouseup", () => { press = null; });
   document.addEventListener("click", (e) => { if (dragged) { dragged = false; e.stopPropagation(); e.preventDefault(); } }, true);
+  // The program's drag ends without a mouseup here (Windows' drag loop takes
+  // it), or does not start: the flag is forgotten on the next press, when
+  // the window loses the focus, and shortly after the drag anyway.
+  document.addEventListener("mousedown", () => { if (!press) dragged = false; }, true);
+  window.addEventListener("blur", () => { dragged = false; press = null; });
   $("recent").addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) openCtx(+r.dataset.i, null, "recent", { left: e.clientX, top: e.clientY }); });
   $("sugg").addEventListener("click", (e) => { const s = e.target.closest(".sg"); if (s) applySuggestion(S.sugg[+s.dataset.k]); });
   $("tips").addEventListener("click", (e) => { const c = e.target.closest("code"); if (c) { q.value = c.textContent; q.focus(); runSearch(); } });
