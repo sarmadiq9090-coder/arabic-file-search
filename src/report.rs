@@ -561,6 +561,17 @@ mod tests {
     }
 
     #[test]
+    fn local_names_are_known_and_hidden() {
+        let names = local_names();
+        assert!(names.iter().all(|n| !n.trim().is_empty()));
+        assert!(names.windows(2).all(|w| w[0] < w[1]));
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        for n in names.iter().filter(|n| n.chars().count() >= 3) {
+            assert!(!clean(&format!("by {n} now"), &refs).contains(n.as_str()), "{n}");
+        }
+    }
+
+    #[test]
     fn the_log_tail_is_short_and_clean() {
         let log: String = (0..200).map(|i| format!("{i} line {i} C:\\Users\\a\\f{i}.txt\n")).collect();
         let tail = log_tail(&log, 80, &[]);
