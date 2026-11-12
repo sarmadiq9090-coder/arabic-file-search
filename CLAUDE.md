@@ -14,15 +14,21 @@ through Claude sessions, with no fixed computer.
   same files.
 - The owner has no fixed computer: never ask them to keep files, keys or tools on a PC. Use GitHub
   (Environments/secrets, Codespaces) or their password manager.
-- **Daily release train (D-035, D-047).** Each app ships once a week on its day at 09:00 Asia/Baghdad:
-  Sat InstaFind, Sun Remember Me, Mon Lemon, Tue InstaWords, Wed InstaConvert (only when complete),
-  Thu QA, Fri rest. ALL of an app's finished, green features merge together on its day (D-032/D-034);
-  nothing is merged on other days. An app not ready on its day rolls to the same day next week; its
-  Store update ships the same day as the release. The site (fastkiwi.app) is exempt: it publishes
-  when green (D-046). A critical security fix may go early with the owner's explicit approval.
+- **Release train (D-035, D-047, D-057).** Each app has its own day at 09:00 Asia/Baghdad (InstaFind:
+  Saturday; Sun Remember Me, Mon Lemon, Tue InstaWords, Wed InstaConvert only when complete, Thu QA,
+  Fri rest). D-057 (one app at a time) means a release ships when the app is finished and the owner
+  says «موافق»; the day is the default slot, not a reason to wait. ALL of an app's finished, green
+  features merge together (D-032/D-034); nothing else is merged. The Store update ships with the
+  release. The site (fastkiwi.app) is exempt: it publishes when green (D-046). A critical security
+  fix may go early with the owner's explicit approval.
+- **Release standard (D-058).** The FastKiwi release standard 1.4 with the council's 11 amendments
+  applies (full text: brain `core/RELEASE-STANDARD.md`). The release checklist with evidence (brain
+  `core/RELEASE-CHECKLIST.md`) goes in every release PR body. CI runs on Windows Server images, so
+  say "Windows 10/11 not tested on a real device" unless the owner tested. Every app must have an
+  in-app update button and a report-a-problem button.
 - **One GitHub writer (D-040, core/GITHUB-SAFETY.md in the brain).** Only the manager session pushes,
   opens PRs, comments, merges or dispatches workflows; other sessions work locally and report to the
-  manager. Serial writes >=2 s apart, <=15 per hour, <=150 per day, <=3 new PRs per repo per day, <=2
+  manager. Serial writes >=2 s apart (one serial writer), <=12 writes per hour, <=100 per day, <=3 new PRs per repo per day, <=2
   workflow_dispatch per repo per day, 1 rerun max. On any 403/429/abuse/CAPTCHA signal: stop all
   writes and tell the owner.
 - **Closed source (D-051, 2026-11-09).** FastKiwi apps are proprietary (free to use; pricing
@@ -84,7 +90,7 @@ line), merge to main. The job tags `vX.Y.Z`, uploads the exes and starts `packag
 
 Must not break:
 - Asset names `bahth.exe` (x64; every installed copy since 0.3.0 looks for it), `bahth-x86.exe`,
-  `bahth-arm64.exe` (`src/update.rs`). Releases stay non-draft, non-prerelease, marked latest.
+  `bahth-arm64.exe` (`src/update.rs`); `SHA256SUMS.txt` is an additional asset, keep it. Releases stay non-draft, non-prerelease, marked latest.
 - The repository URL `sarmadiq9090-coder/arabic-file-search` (hard-coded in `src/update.rs`, the
   manifests, and the Scoop bucket users added).
 - Data in `%LOCALAPPDATA%\BahthSari` and `HKCU\Software\BahthSari`.
