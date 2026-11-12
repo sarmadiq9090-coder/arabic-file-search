@@ -14,6 +14,7 @@
 - **«إخفاء بجانب الساعة»** بدل «إخفاء إلى شريط المهام» في قائمة «خيارات»: النافذة تختفي إلى الأيقونة بجانب الساعة لا إلى شريط المهام. / **English:** the Options item "Hide to the taskbar tray" is now "Hide next to the clock".
 - **مصطلحات موحّدة**: «جارٍ» في كل رسائل الانتظار (بدل «جاري» و«جارِ»)، و«خانة البحث» بدل «المربع» في قائمتَي الأيقونة والخانة العائمة، و«خيارات…» بدل «الإعدادات…» في قائمة الأيقونة لأنها تفتح قائمة «خيارات». / **English:** consistent Arabic terms in status texts and menus; the tray menu's "Settings…" is now "Options…" (it opens the Options menu).
 - **عبارة خانة البحث أبسط**: «اكتب اسم الملف أو جزءاً منه… مثال: تقرير .pdf» بدل أمثلة برموز غير مشروحة (! و|). / **English:** simpler search hint: "Type a file name or part of it… e.g. report .pdf".
+- **مفاتيح نافذة البحث الصغيرة ظاهرة**: سطر تحت خانة البحث «Enter فتح · Ctrl+Enter المجلد · Tab المزيد · Esc إغلاق». / **English:** the quick popup shows its keys under the box: "Enter open · Ctrl+Enter folder · Tab more · Esc close".
 
 ## 0.10.0 — 2026-11-11
 

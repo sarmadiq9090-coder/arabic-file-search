@@ -913,9 +913,28 @@ pub fn hidden_hint(lang: crate::i18n::Lang, hotkey: Option<&str>) -> String {
     }
 }
 
+/// The line of key hints under the quick popup's search box.
+pub fn key_hints(lang: crate::i18n::Lang) -> &'static str {
+    lang.pick("Enter فتح · Ctrl+Enter المجلد · Tab المزيد · Esc إغلاق", "Enter open · Ctrl+Enter folder · Tab more · Esc close")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn key_hints_name_the_keys_the_popup_answers_to() {
+        use crate::i18n::Lang;
+        assert_eq!(key_hints(Lang::Ar), "Enter فتح · Ctrl+Enter المجلد · Tab المزيد · Esc إغلاق");
+        assert_eq!(key_hints(Lang::En), "Enter open · Ctrl+Enter folder · Tab more · Esc close");
+        // In the right-to-left popup each key stays next to its word: the
+        // keys and the words alternate, read from the right.
+        let t = key_hints(Lang::Ar);
+        let n = t.chars().count();
+        let spans = crate::bidi_layout::visual_spans(t, &vec![1; n], true).unwrap();
+        let x = |piece: &str| spans[t[..t.find(piece).unwrap()].chars().count()].0;
+        assert!(x("Ctrl") < x("فتح") && x("المجلد") < x("Ctrl") && x("Tab") < x("المجلد") && x("Esc") < x("المزيد"));
+    }
 
     #[test]
     fn the_hidden_window_balloon_says_how_to_open_and_how_to_exit() {
