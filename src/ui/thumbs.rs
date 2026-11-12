@@ -497,6 +497,13 @@ impl App {
     /// Makes the image list and gives it to the list. False if it can't.
     fn ensure_image_list(&self) -> bool {
         if self.thumbs.images.get() != 0 {
+            // The memory guard drops the cache while the view is off
+            // (`memory.rs`): start a new one, and new type-icon slots with
+            // it (the old ones were pinned in the dropped cache).
+            if self.thumbs.cache.borrow().is_none() {
+                *self.thumbs.cache.borrow_mut() = Some(ThumbCache::new(MAX_IMAGES, MAX_ENTRIES));
+                *self.thumbs.type_icons.borrow_mut() = TypeSlots::default();
+            }
             return true;
         }
         let Some(h) = self.list.handle.hwnd() else { return false };
