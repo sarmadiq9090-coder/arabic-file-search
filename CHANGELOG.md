@@ -11,6 +11,9 @@
 - **الاستبدال لا يفسد ملفات بترميزات أخرى**: الملف الذي ليس UTF-8 يُعامل على أنه Windows-1256 فقط إذا قُرئ نصاً عربياً؛ ملفات Shift-JIS وGBK وBig5 وغيرها تُترك وتظهر «ترميز غير معروف — لم يُغيَّر». / **Replace no longer corrupts files in other encodings:** a non-UTF-8 file is treated as Windows-1256 only when it reads as Arabic; Shift-JIS, GBK, Big5 and others are skipped as "unknown encoding — not changed".
 - **تصدير النتائج (CSV) يفتح في أعمدة في Excel** حتى حيث فاصل القوائم في ويندوز «;»: يُستعمل فاصل القوائم من إعدادات المنطقة، مع بقاء العربية سليمة. / **CSV export opens in columns in Excel** where Windows' list separator is `;`: the export uses the regional list separator; Arabic stays intact.
 
+### خصوصية
+- **تقرير العطل يخفي اسم المستخدم كاملاً**: «C:\Users\الاسم الأول الأخير» يصبح «<user>» بكل كلماته، وكذلك «Documents and Settings» ومسارات الشبكة، واسم الحساب أينما ورد في النص. / **Crash reports hide the whole user name:** the full profile folder name (spaces included), Documents and Settings, UNC paths, and the account name anywhere in the text.
+
 ## 0.10.0 — 2026-11-11
 
 ### الرخصة

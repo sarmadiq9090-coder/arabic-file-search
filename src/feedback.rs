@@ -149,27 +149,81 @@ fn fit_encoded(text: &str, budget: usize) -> String {
     out
 }
 
-/// Replaces the account name in `C:\Users\<name>\…` paths, which a panic
-/// message may contain, so a public issue does not show it.
+/// Replaces the account name in profile paths, which a panic message may
+/// contain, so a public issue does not show it: see [`anonymize_with`], with
+/// the names this account is known by (`USERNAME`, `USER` and the profile
+/// folder's own name).
 pub fn anonymize(text: &str) -> String {
+    let names: Vec<String> = ["USERNAME", "USER"]
+        .iter()
+        .filter_map(|v| std::env::var(v).ok())
+        .chain(["USERPROFILE", "HOME"].iter().filter_map(|v| {
+            let p = std::env::var(v).ok()?;
+            Some(p.trim_end_matches(['\\', '/']).rsplit(['\\', '/']).next()?.to_string())
+        }))
+        .collect();
+    let names: Vec<&str> = names.iter().map(String::as_str).collect();
+    anonymize_with(text, &names)
+}
+
+/// Characters a Windows account name can't hold: the end of a profile
+/// folder's name in a path, with the line breaks.
+const NOT_IN_NAME: [char; 18] = ['\\', '/', '"', '[', ']', ':', ';', '|', '=', ',', '+', '*', '?', '<', '>', '\n', '\r', '\t'];
+
+/// Replaces with `<user>` the whole folder name after `\Users\` and
+/// `\Documents and Settings\` (either slash, any case, also in UNC paths
+/// such as `\\server\Users\…`) up to the next character an account name
+/// can't hold, so `C:\Users\First Last\…` hides both words; then each of
+/// `names` (three characters or more) wherever it stands as a whole word.
+pub fn anonymize_with(text: &str, names: &[&str]) -> String {
+    const KEEP: [&str; 4] = ["public", "default", "default user", "all users"];
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     loop {
         let lower = rest.to_ascii_lowercase();
-        let found = ["\\users\\", "/users/"].iter().filter_map(|p| lower.find(p).map(|i| (i, p.len()))).min();
+        let found = ["\\users\\", "/users/", "\\documents and settings\\", "/documents and settings/"]
+            .iter()
+            .filter_map(|p| lower.find(p).map(|i| (i, p.len())))
+            .min();
         let Some((at, len)) = found else {
             out.push_str(rest);
-            return out;
+            break;
         };
         let start = at + len;
         out.push_str(&rest[..start]);
         let tail = &rest[start..];
-        let end = tail.find(['\\', '/', '\'', '"', ' ', '\n', '\r', ')', ':']).unwrap_or(tail.len());
+        let end = tail.find(NOT_IN_NAME).unwrap_or(tail.len());
         let name = &tail[..end];
-        let keep = ["public", "default", "all users"].iter().any(|k| name.eq_ignore_ascii_case(k)) || name.is_empty();
+        let keep = name.is_empty() || KEEP.iter().any(|k| name.eq_ignore_ascii_case(k));
         out.push_str(if keep { name } else { "<user>" });
         rest = &tail[end..];
     }
+    for name in names.iter().map(|n| n.trim()) {
+        if name.chars().count() >= 3 && !KEEP.iter().any(|k| name.eq_ignore_ascii_case(k)) && name != "<user>" {
+            out = replace_word(&out, name);
+        }
+    }
+    out
+}
+
+/// `text` with every whole-word `name` (ASCII letters in any case) replaced
+/// by `<user>`.
+fn replace_word(text: &str, name: &str) -> String {
+    let word = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0;
+    while i < text.len() {
+        let hit = text.get(i..i + name.len()).filter(|s| s.eq_ignore_ascii_case(name));
+        if hit.is_some() && !word(text[..i].chars().next_back()) && !word(text[i + name.len()..].chars().next()) {
+            out.push_str("<user>");
+            i += name.len();
+        } else {
+            let c = text[i..].chars().next().unwrap_or_default();
+            out.push(c);
+            i += c.len_utf8().max(1);
+        }
+    }
+    out
 }
 
 /// One report in `crash.txt`: when it was written and its text.
@@ -359,9 +413,30 @@ mod tests {
     fn user_names_are_hidden() {
         assert_eq!(anonymize("C:\\Users\\Saif\\a.txt and c:\\users\\bob"), "C:\\Users\\<user>\\a.txt and c:\\users\\<user>");
         assert_eq!(anonymize("C:\\Users\\Public\\x"), "C:\\Users\\Public\\x");
-        assert_eq!(anonymize("/Users/ana/x 'C:\\Users\\Ü ber'"), "/Users/<user>/x 'C:\\Users\\<user> ber'");
+        assert_eq!(anonymize_with("/Users/ana/x 'C:\\Users\\Ü ber'", &[]), "/Users/<user>/x 'C:\\Users\\<user>");
         assert_eq!(anonymize("no paths, \\users\\"), "no paths, \\users\\");
         assert_eq!(anonymize(""), "");
+    }
+
+    /// A profile folder with a space (`C:\\Users\\First Last`) leaked "Last".
+    #[test]
+    fn whole_profile_names_are_hidden() {
+        let a = |t: &str| anonymize_with(t, &[]);
+        assert_eq!(a("at C:\\Users\\First Last\\Desktop\\x.pdf"), "at C:\\Users\\<user>\\Desktop\\x.pdf");
+        assert_eq!(a("C:/Users/First Last/x"), "C:/Users/<user>/x");
+        assert_eq!(a("C:\\Documents and Settings\\Saif Ali\\x"), "C:\\Documents and Settings\\<user>\\x");
+        assert_eq!(a("\\\\server\\Users\\Saif Ali (Work)\\x"), "\\\\server\\Users\\<user>\\x");
+        assert_eq!(a("'C:\\Users\\O'Neil Smith\\a'"), "'C:\\Users\\<user>\\a'");
+        // A path ending at the profile: up to a character a name can't hold.
+        assert_eq!(a("dir \"C:\\Users\\سيف علي\": denied\nnext"), "dir \"C:\\Users\\<user>\": denied\nnext");
+        assert_eq!(a("C:\\Users\\Default User\\x"), "C:\\Users\\Default User\\x");
+        // The account name anywhere else in the text, when it is known.
+        let names = ["First Last", "flast"];
+        assert_eq!(
+            anonymize_with("D:\\Profiles\\FLAST\\a by First Last; flasts", &names),
+            "D:\\Profiles\\<user>\\a by <user>; flasts"
+        );
+        assert_eq!(anonymize_with("x", &["ab", ""]), "x");
     }
 
     #[test]
