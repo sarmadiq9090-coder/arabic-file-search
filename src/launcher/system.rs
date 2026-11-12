@@ -171,6 +171,18 @@ pub fn confirm_text(cmd: &SystemCommand, english: bool) -> String {
     }
 }
 
+/// Whether `cmd` runs on a background thread: emptying a large Recycle Bin
+/// takes seconds to minutes, and the window must keep answering meanwhile.
+/// The others return at once (or end the session).
+pub fn runs_in_background(cmd: &SystemCommand) -> bool {
+    matches!(cmd, SystemCommand::EmptyRecycleBin)
+}
+
+/// The message when `cmd` failed.
+pub fn failed_text(cmd: &SystemCommand, english: bool) -> String {
+    if english { format!("Could not do this: {}.", title(cmd, true)) } else { format!("تعذر تنفيذ: {}.", title(cmd, false)) }
+}
+
 fn item(cmd: SystemCommand, subtitle: String, score: u32, english: bool) -> Item {
     Item { kind: Kind::Command, title: title(&cmd, english), subtitle, action: Action::System(cmd), score, icon_path: None, strong: false }
 }
@@ -551,6 +563,16 @@ mod tests {
         assert!(confirm_text(&ex, true).contains("taskbar"));
         assert!(confirm_text(&ex, false).contains("شريط المهام"));
         assert!(commands("shutdown", &ctx_with(false, &[]))[0].score > commands("shut", &ctx_with(false, &[]))[0].score);
+    }
+
+    #[test]
+    fn only_slow_commands_leave_the_ui_thread() {
+        assert!(runs_in_background(&EmptyRecycleBin));
+        for c in [Shutdown, Restart, Sleep, Lock, SignOut, EndProcess { pid: 1, name: "a.exe".into() }] {
+            assert!(!runs_in_background(&c), "{c:?}");
+        }
+        assert_eq!(failed_text(&EmptyRecycleBin, true), "Could not do this: Empty Recycle Bin.");
+        assert_eq!(failed_text(&EmptyRecycleBin, false), "تعذر تنفيذ: إفراغ سلة المحذوفات.");
     }
 
     #[test]
