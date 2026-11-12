@@ -71,6 +71,8 @@ mod replace;
 #[cfg(any(windows, test))]
 mod root;
 #[cfg(any(windows, test))]
+mod run_entry;
+#[cfg(any(windows, test))]
 mod search;
 #[cfg(any(windows, test))]
 mod suggest;

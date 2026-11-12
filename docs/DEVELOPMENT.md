@@ -55,6 +55,7 @@ The updater fails closed: it installs a release only when GitHub publishes a SHA
 | `src/index.rs` | Parallel drive indexing and the saved index (`%LOCALAPPDATA%\BahthSari\index.bin`) |
 | `src/indexing_status.rs`, `src/ui/indexing.rs` | First day: the indexing progress («جارِ الفهرسة… 36,000 من 432,000 ملف») in the status bar's last part and under the quick popup's results, and "results may be incomplete while indexing" instead of "no results"; read from the scan's and the content warm-up's own counters |
 | `src/relocate.rs`, `src/ui/relocate.rs` | First run from Downloads or a temp folder: the one-time offer to copy the exe to `%LOCALAPPDATA%\Programs\InstaFind\bahth.exe`, add a Start-menu shortcut, point start-with-Windows there and restart (`--moved`); never for winget, Scoop, Chocolatey or Program Files copies |
+| `src/run_entry.rs` | Which exe the start-with-Windows entry starts: a copy in Downloads or a temp folder keeps an entry pointing to another copy that still exists (the moved one); unit-tested |
 | `src/watch.rs`, `src/watch_pace.rs` | Live index updates (ReadDirectoryChangesW), with paced rescans after lost events |
 | `src/search.rs`, `src/search/` | Query parsing, name and content search; `members.rs` one result per archive; `robustness.rs` fuzz-style tests |
 | `src/normalize.rs` | Arabic normalisation for matching (hamza, ta marbuta, alef maqsura, diacritics, tatweel, Persian letters, presentation forms) |

@@ -85,6 +85,48 @@ fn set_string(key: &Key, name: &str, value: &str) -> bool {
     }
 }
 
+/// A string value (REG_SZ), if the key has one under `name`.
+fn get_string(key: &Key, name: &str) -> Option<String> {
+    let name = wide(name);
+    let mut buf = [0u16; 1024];
+    let mut size = (buf.len() * 2) as DWORD;
+    let mut kind: DWORD = 0;
+    let ok = unsafe {
+        RegQueryValueExW(key.0, name.as_ptr(), std::ptr::null_mut(), &mut kind, buf.as_mut_ptr().cast(), &mut size)
+    };
+    if ok != ERROR_SUCCESS as i32 || kind != REG_SZ {
+        return None;
+    }
+    let n = (size as usize / 2).min(buf.len());
+    let s = &buf[..n];
+    let end = s.iter().position(|&c| c == 0).unwrap_or(n);
+    Some(String::from_utf16_lossy(&s[..end]))
+}
+
+/// The folders `run_entry` tells Downloads and temp folders by. The same
+/// lookup as `ui/relocate.rs` (kept apart so the two files stay separate).
+fn folders() -> crate::relocate::Folders {
+    crate::relocate::Folders::from_env(&|name| std::env::var(name).ok(), downloads_folder())
+}
+
+/// The Downloads folder, also when the user moved it.
+fn downloads_folder() -> Option<String> {
+    use winapi::shared::winerror::SUCCEEDED;
+    use winapi::um::combaseapi::CoTaskMemFree;
+    use winapi::um::knownfolders::FOLDERID_Downloads;
+    use winapi::um::shlobj::SHGetKnownFolderPath;
+    let mut p = std::ptr::null_mut();
+    // SAFETY: `p` receives a string the shell allocated; it is freed below
+    // even when the call fails.
+    let hr = unsafe { SHGetKnownFolderPath(&FOLDERID_Downloads, 0, std::ptr::null_mut(), &mut p) };
+    if p.is_null() {
+        return None;
+    }
+    let s = unsafe { super::format::wide_to_string(p) };
+    unsafe { CoTaskMemFree(p.cast()) };
+    SUCCEEDED(hr).then_some(s)
+}
+
 /// The first byte of Task Manager's record for our entry, if it has one:
 /// even (2, 6) means allowed, odd (3, 7) means turned off there.
 fn approved_flag() -> Option<u8> {
@@ -121,7 +163,10 @@ pub fn is_enabled() -> bool {
 }
 
 /// Turns starting with Windows on or off for the current user. The entry
-/// points at this exe, which the updater keeps at the same path.
+/// points at this exe, which the updater keeps at the same path, except
+/// that a copy in Downloads or a temp folder keeps an entry that starts
+/// another copy which still exists (the one it was moved to:
+/// `crate::run_entry::target`).
 pub fn set_enabled(on: bool) -> bool {
     let Some(key) = open(RUN_KEY, true) else { return false };
     if let Some(own) = open(OWN_KEY, true) {
@@ -129,8 +174,12 @@ pub fn set_enabled(on: bool) -> bool {
     }
     if on {
         let Ok(exe) = std::env::current_exe() else { return false };
+        let current = exe.to_string_lossy();
+        let existing = get_string(&key, VALUE);
+        let target =
+            crate::run_entry::target(&current, existing.as_deref(), &folders(), &|p| std::path::Path::new(p).is_file());
         unblock();
-        set_string(&key, VALUE, &command(&exe))
+        set_string(&key, VALUE, &command(std::path::Path::new(target)))
     } else {
         let name = wide(VALUE);
         let r = unsafe { RegDeleteValueW(key.0, name.as_ptr()) };

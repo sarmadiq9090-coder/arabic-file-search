@@ -7,6 +7,7 @@
 ### أمان
 - **ملفات DLL مزروعة بجانب البرنامج**: كان ويندوز يبحث عن بعض مكتبات النظام (مثل `version.dll`) في مجلد البرنامج أولاً، فلو وُضع ملف بهذا الاسم بجانب `bahth.exe` في «التنزيلات» لعمل مع كل تشغيل. الآن تُحمَّل مكتبات النظام من مجلد System32 فقط، عند بدء التشغيل وأثناء العمل، وفحص البناء يرفض أي نسخة تفقد هذه الحماية. / **DLL planting:** system DLLs now load from System32 only (`/DEPENDENTLOADFLAG:0x800` and `SetDefaultDllDirectories`), never from the exe's folder; CI fails an exe without the flag.
 - **برامج ويندوز بمسارها الكامل**: «فتح المجلد» يشغّل مستكشف الملفات من مجلد ويندوز، وأدوات البحث السريع («إدارة الأجهزة»، «لوحة التحكم»، «محرر التسجيل»…) تُشغَّل من System32 أو مجلد ويندوز فقط، فلا يعمل برنامج بالاسم نفسه وُضع في «التنزيلات». الأداة غير الموجودة في ويندوز (مثل «محرر نهج المجموعة» في إصدار Home) لا تُشغَّل. / **Windows programs by full path:** explorer.exe and the quick search's classic tools start from System32 or the Windows folder only, never by a bare name.
+- **«التشغيل مع ويندوز» يبقى على النسخة المنقولة**: بعد نقل البرنامج إلى مكانه الدائم، تشغيل النسخة القديمة من «التنزيلات» (من اختصار أو تثبيت قديم) لم يعد يعيد التشغيل التلقائي إليها؛ يبقى على النسخة المنقولة ما دامت موجودة. / **Start with Windows stays on the moved copy:** an old Downloads or temp copy no longer points the Run entry back at itself while the installed copy exists.
 
 ## 0.10.0 — 2026-11-11
 
