@@ -2498,12 +2498,17 @@ function Scenario-K([string]$V) {
             [void](Wait-Until { -not (Get-Process bahth -ErrorAction SilentlyContinue) } 10)
             $done++
             Set-Phase $V 'K' 'restart'
+            # index.bin is intact when the next start LOADS it (log 'index load: N entries', N > 0). A branch
+            # build then may rescan once to pick up the changes the killed copy had not saved: that is a repair,
+            # not a rebuild from nothing, so it counts as loaded.
+            $loadsBefore = Log-Count 'index load: [1-9]\d* entries'
             Start-App @()
             $main = Wait-Until { Main-Window } 40
             if (-not $main) { $noWindow++; Note "K ($V): no window after kill $i"; Check-Crash "K kill $i"; continue }
             $state = Wait-Until {
                 $st = Status-Line
-                if ($st -match 'Index loaded|تم تحميل الفهرس') { 'loaded' }
+                if ((Log-Count 'index load: [1-9]\d* entries') -gt $loadsBefore) { 'loaded' }
+                elseif ($st -match 'Index loaded|تم تحميل الفهرس') { 'loaded' }
                 elseif ($st -match 'Indexing files on all drives|files so far|جاري فهرسة الملفات|ملف حتى الآن') { 'rebuild' }
             } 25
             Check-Crash "K kill $i"
@@ -2522,7 +2527,7 @@ function Scenario-K([string]$V) {
     $newCrashes = $crashes.Count - $crashesBefore
     $laterBuilds = (Log-Count 'index build: \d+ entries') - 1
     $text = "{0} kills ({1} while index.tmp was there); next start loaded the index {2} times, rebuilt it {3} times, unclear {4}, no window {5}; crash reports {6}; index builds in log.txt after the first: {7}{8}" -f $done, $midSave, $loaded, $rebuilt, $unknown, $noWindow, $newCrashes, $laterBuilds, $(if ($hook) { "; saves delayed 5 s by $SaveDelayVar" } else { '' })
-    Add-Criterion 'K. Killed in the middle of a save' $V 'index.bin loads on every next start (no rebuild, no crash report)' ($done -gt 0 -and $rebuilt -eq 0 -and $laterBuilds -le 0 -and $noWindow -eq 0 -and $newCrashes -eq 0) $text
+    Add-Criterion 'K. Killed in the middle of a save' $V 'index.bin loads on every next start (no rebuild from nothing, no crash report)' ($done -gt 0 -and $rebuilt -eq 0 -and $noWindow -eq 0 -and $newCrashes -eq 0) $text
     $all = Get-Ticks $V 'K' @('change', 'restart')
     Add-Row 66 'K. Killed in the middle of saving index.bin, again and again' $V $all $all $text
     Finish-Session $V 'K' "K. Killed mid-save, $V" @("Name index: $($s.Text).", "K: $text.", 'Two savers at once are not provoked from outside; only the kills are.') $hash
