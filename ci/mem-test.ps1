@@ -2304,7 +2304,7 @@ function Scenario-F([string]$V, [bool]$Hook = $false) {
     # The disk that holds the data folder (index.bin) is kept busy too.
     $loadDir = Join-Path $env:LOCALAPPDATA 'InstaFind-memtest-load'
     $loadFree = Free-GB $loadDir
-    $loadCap = [int64][Math]::Max(256MB, [Math]::Min(4GB * $SizeScale, ($loadFree - 16) * 1GB / 4))
+    $loadCap = [int64][Math]::Max([int64]256MB, [Math]::Min([int64](4GB * $SizeScale), [int64](($loadFree - 16) * 1GB / 4)))
     Say ("load: {0} CPU burner threads at normal priority; {1} threads of unbuffered sequential writes in {2} (files of {3:N0} MB, {4:N0} GB free there)" -f $burners, $loaders, $loadDir, ($loadCap / 1MB), $loadFree)
     Reset-SaveWatch
     Poll-IndexSave
