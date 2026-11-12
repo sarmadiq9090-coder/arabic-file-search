@@ -859,7 +859,8 @@ mod tests {
         let model = index_of(20_000);
         let (one, copy) = crate::test_alloc::peak_of(|| Index { entries: model.entries.clone(), roots: model.roots.clone(), built_at: 0 });
         drop(copy);
-        assert!(one > 2_000_000, "one copy is {one} bytes");
+        // About 1.8 MB with 32-bit pointers, more on 64-bit.
+        assert!(one > 1_000_000, "one copy is {one} bytes");
 
         let disk = Arc::new(Disk::default());
         let queue = queue_on(&disk);

@@ -438,8 +438,12 @@ fn xlsx_huge_unique_count_does_not_kill_the_process() {
     // one: 10^13 in a file of a few hundred bytes is a failed allocation,
     // which aborts.
     let bomb = xlsx_with_shared_strings(r#"<sst xmlns="x" uniqueCount="10000000000000"><si><t>a</t></si></sst>"#);
-    let c = child("count-unchecked.xlsx", &bomb, &[UNCHECKED_SHEETS]);
-    assert!(!c.ok && c.text.is_none(), "without the check: {c:?}");
+    // The unchecked abort needs 64-bit sizes: on a 32-bit build calamine cannot
+    // even express the reservation, so only the guarded read is checked there.
+    if cfg!(target_pointer_width = "64") {
+        let c = child("count-unchecked.xlsx", &bomb, &[UNCHECKED_SHEETS]);
+        assert!(!c.ok && c.text.is_none(), "without the check: {c:?}");
+    }
     let c = child("count.xlsx", &bomb, &[]);
     assert!(c.ok && c.text == Some(None), "{c:?}");
     // An honest count, and none at all, still read.
