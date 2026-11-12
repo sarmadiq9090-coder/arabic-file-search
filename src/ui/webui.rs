@@ -1051,6 +1051,11 @@ mod imp {
                 Request::Hide {} => self.webui_hide(),
                 Request::ClassicLook {} => self.webui_leave(true),
                 Request::OptionsMenu {} => self.webui.options_pending.set(true),
+                Request::ReportProblem {} => {
+                    if let Some(app) = self.webui.me.borrow().upgrade() {
+                        app.show_report();
+                    }
+                }
                 // The Save dialog runs inside this handler: the timer leaves the page alone meanwhile.
                 Request::Export {} => {
                     self.webui.in_page_call.set(true);
