@@ -142,7 +142,12 @@ impl App {
                 let saving = std::time::Instant::now();
                 match SAVES.save_now(idx) {
                     Ok(()) => log(&format!("index save: {} entries in {} ms (after the scan)", idx.entries.len(), saving.elapsed().as_millis())),
-                    Err(e) => log(&format!("index save failed after the scan: {e}")),
+                    Err(e) => {
+                        // Queued again once the window has the new index
+                        // (`poll_scan`): retried, and marked as unsaved.
+                        SCAN_SAVE_FAILED.store(true, Ordering::Relaxed);
+                        log(&format!("index save failed after the scan: {e}; it will be tried again"));
+                    }
                 }
             }
             if let Ok(mut slot) = r.lock() {
@@ -504,6 +509,11 @@ impl App {
                 let n = idx.entries.len();
                 st.index = Arc::new(idx);
                 st.scan = None;
+                // The scan could not write its index: the save queue takes it
+                // (tries again, and marks it unsaved until it is on disk).
+                if SCAN_SAVE_FAILED.swap(false, Ordering::Relaxed) {
+                    SAVES.set_pending(st.index.clone(), EDIT_SAVE);
+                }
                 drop(st);
                 self.start_warm();
                 self.reindex_btn.set_enabled(true);
@@ -617,6 +627,9 @@ impl App {
         }
     }
 }
+
+/// The last full scan could not save its index (see `poll_scan`).
+static SCAN_SAVE_FAILED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// " — تنبيه: …" for parts of the query that could not be understood, or "".
 fn warnings_text(q: Option<&Query>) -> String {

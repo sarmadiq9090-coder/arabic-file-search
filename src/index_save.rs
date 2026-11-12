@@ -1147,6 +1147,41 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// A full scan whose own save failed hands its index to the queue (as
+    /// `poll_scan` does): it is marked unsaved, tried again and, at rest,
+    /// the disk holds it.
+    #[test]
+    fn a_scan_whose_save_failed_is_saved_later() {
+        let fail = Arc::new(AtomicUsize::new(1));
+        let written = Arc::new(AtomicUsize::new(0));
+        let marked = Arc::new(AtomicUsize::new(0));
+        let (f, w, m) = (fail.clone(), written.clone(), marked.clone());
+        let queue = SaveQueue::new(
+            Box::new(move |i| {
+                if f.swap(0, Ordering::SeqCst) == 1 {
+                    return Err(io::Error::other("disk full"));
+                }
+                w.store(i.entries[0].size as usize, Ordering::SeqCst);
+                Ok(())
+            }),
+            Box::new(move |on| m.store(usize::from(on), Ordering::SeqCst)),
+            Box::new(|_| {}),
+            || {},
+            0,
+            Duration::ZERO,
+        );
+        let mut scan = index_of(4);
+        scan.entries[0].size = 9;
+        let scan = Arc::new(scan);
+        assert!(queue.save_now(&scan).is_err());
+        assert_eq!(written.load(Ordering::SeqCst), 0);
+        queue.set_pending(scan.clone(), Duration::ZERO);
+        until("the marker", || marked.load(Ordering::SeqCst) == 1 || written.load(Ordering::SeqCst) == 9);
+        until("the retry", || written.load(Ordering::SeqCst) == 9);
+        until("rest", || at_rest(&queue));
+        until("the marker to go", || marked.load(Ordering::SeqCst) == 0);
+    }
+
     #[test]
     fn leaving_waits_a_bounded_time_for_a_stuck_disk() {
         let disk = Arc::new(Disk::default());
