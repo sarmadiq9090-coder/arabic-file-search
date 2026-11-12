@@ -9,8 +9,12 @@
 //!
 //! The quick mode compares only the name (ignoring case) and the size, and
 //! reads nothing.
+//!
+//! The list is a picture of an earlier moment. Before anything is deleted,
+//! [`plan_delete`] looks at the disk again and lets a file go only while a
+//! copy that stays is still there and still the same.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;
@@ -24,9 +28,10 @@ use crate::index::{Entry, Index};
 const EDGE: u64 = 64 * 1024;
 
 /// How files are compared.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum Mode {
     /// Same size and the same SHA-256 of the whole content.
+    #[default]
     Content,
     /// Same file name (ignoring case) and the same size; nothing is read.
     NameAndSize,
@@ -88,6 +93,10 @@ pub struct Report {
     pub groups: Vec<Group>,
     /// Files that could not be read (gone, locked, no permission).
     pub unreadable: usize,
+    /// How the groups were made. A group of the quick mode says nothing
+    /// about the files' contents, so the list is only ever acted on in the
+    /// mode that made it.
+    pub mode: Mode,
 }
 
 impl Report {
@@ -291,7 +300,7 @@ pub fn find(index: &Index, scope: &Scope, mode: Mode, min_size: u64, progress: &
         })
         .collect();
     groups.sort_by(|a, b| b.wasted().cmp(&a.wasted()).then_with(|| a.files[0].path.cmp(&b.files[0].path)));
-    Some(Report { groups, unreadable })
+    Some(Report { groups, unreadable, mode })
 }
 
 /// Removes deleted files from the report and drops groups left with one file.
@@ -300,6 +309,120 @@ pub fn forget_paths(report: &mut Report, gone: &[String]) {
         g.files.retain(|f| !gone.contains(&f.path));
     }
     report.groups.retain(|g| g.files.len() >= 2);
+}
+
+// ---------------------------------------------------------------- deleting
+
+/// What is at a path right now.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Seen {
+    pub size: u64,
+    /// SHA-256 of the whole content, read now. `None` when it was not read:
+    /// the quick mode reads nothing, and a file of another size needs no hash.
+    pub hash: Option<[u8; 32]>,
+}
+
+/// Why a selected file is left where it is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kept {
+    /// The list was made in another comparison mode.
+    ModeChanged,
+    /// Every copy of its group is selected.
+    AllSelected,
+    /// The file is gone, is no longer a file, or can't be read.
+    Gone,
+    /// Its size is no longer the one the search saw.
+    Changed,
+    /// No copy that is not selected is still on disk and still the same.
+    NoCopyLeft,
+}
+
+/// Which of the selected files may go, and why the others stay.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct DeletePlan {
+    pub delete: Vec<String>,
+    pub kept: Vec<(String, Kept)>,
+}
+
+/// Whether what is at a path is still what its group was made of. The
+/// content itself is compared between the files, by their hashes.
+fn still_fits(seen: &Seen, size: u64, mode: Mode) -> bool {
+    seen.size == size && (mode == Mode::NameAndSize || seen.hash.is_some())
+}
+
+/// Decides, right before a delete, which of the `selected` files may go.
+///
+/// The list in `report` is from an earlier moment, so it is not trusted:
+/// `look` says what is at a path now (see [`look`]). A selected file goes
+/// only when a copy that is NOT selected is still on disk, with the size the
+/// search saw and, in the content mode, with the very same content as the
+/// selected file has now. Otherwise it stays, with the reason. `mode` is the
+/// mode the user sees; a list made in another mode is not acted on at all.
+/// Paths that are in no group are never deleted.
+///
+/// The quick mode compares no content, here either: the caller must say so
+/// when asking the user.
+pub fn plan_delete(
+    report: &Report,
+    mode: Mode,
+    selected: &[String],
+    look: &mut dyn FnMut(&str, u64) -> Option<Seen>,
+) -> DeletePlan {
+    let chosen: HashSet<&str> = selected.iter().map(String::as_str).collect();
+    let mut plan = DeletePlan::default();
+    for g in &report.groups {
+        let (going, staying): (Vec<&DupFile>, Vec<&DupFile>) = g.files.iter().partition(|f| chosen.contains(f.path.as_str()));
+        if going.is_empty() {
+            continue;
+        }
+        let whole = if report.mode != mode {
+            Some(Kept::ModeChanged)
+        } else if staying.is_empty() {
+            Some(Kept::AllSelected)
+        } else {
+            None
+        };
+        if let Some(why) = whole {
+            plan.kept.extend(going.iter().map(|f| (f.path.clone(), why)));
+            continue;
+        }
+        // The copies that stay are looked at when first needed, once each.
+        let mut seen: Vec<Option<Option<Seen>>> = vec![None; staying.len()];
+        for f in going {
+            let why = match look(&f.path, g.size) {
+                None => Some(Kept::Gone),
+                Some(now) if !still_fits(&now, g.size, mode) => Some(Kept::Changed),
+                Some(now) => {
+                    let has_copy = staying.iter().zip(seen.iter_mut()).any(|(c, slot)| {
+                        slot.get_or_insert_with(|| look(&c.path, g.size))
+                            .as_ref()
+                            .is_some_and(|c| still_fits(c, g.size, mode) && c.hash == now.hash)
+                    });
+                    (!has_copy).then_some(Kept::NoCopyLeft)
+                }
+            };
+            match why {
+                Some(why) => plan.kept.push((f.path.clone(), why)),
+                None => plan.delete.push(f.path.clone()),
+            }
+        }
+    }
+    plan
+}
+
+/// What is at `path` now, for [`plan_delete`]: its size and, in the content
+/// mode while the size is still `size`, the SHA-256 of all of it. `None`
+/// when the file is gone, is not a file any more, can't be read, changed
+/// while it was read, or the work was cancelled.
+pub fn look(path: &str, size: u64, mode: Mode, progress: &Progress) -> Option<Seen> {
+    let meta = std::fs::metadata(path).ok()?;
+    if !meta.is_file() {
+        return None;
+    }
+    let len = meta.len();
+    let hash = if mode == Mode::Content && len == size { Some(full_hash(path, size, progress)?) } else { None };
+    progress.files_done.fetch_add(1, Ordering::Relaxed);
+    Some(Seen { size: len, hash })
 }
 
 #[cfg(test)]
@@ -498,7 +621,7 @@ mod tests {
                 Group { size: 5, files: vec![f("a"), f("b")] },
                 Group { size: 5, files: vec![f("c"), f("d"), f("e")] },
             ],
-            unreadable: 0,
+            ..Default::default()
         };
         forget_paths(&mut r, &["a".into(), "c".into()]);
         assert_eq!(r.groups.len(), 1);
@@ -506,12 +629,146 @@ mod tests {
         assert_eq!(r.wasted(), 5);
     }
 
+    /// The paths of `names` under `dir`, as the index spells them.
+    fn paths(dir: &Path, names: &[&str]) -> Vec<String> {
+        names.iter().map(|n| dir.join(n).to_string_lossy().into_owned()).collect()
+    }
+
+    /// The plan for deleting `names`, read from the real disk.
+    fn plan(r: &Report, mode: Mode, dir: &Path, names: &[&str]) -> DeletePlan {
+        let p = Progress::default();
+        plan_delete(r, mode, &paths(dir, names), &mut |path: &str, size: u64| look(path, size, mode, &p))
+    }
+
+    fn kept(dir: &Path, names: &[(&str, Kept)]) -> Vec<(String, Kept)> {
+        names.iter().map(|(n, why)| (dir.join(n).to_string_lossy().into_owned(), *why)).collect()
+    }
+
+    /// The list is from an earlier moment: the copy that was to stay has
+    /// since been deleted or moved in Explorer. The selected file is then
+    /// the last copy and must stay.
+    #[test]
+    fn delete_is_refused_when_the_other_copy_is_gone_from_disk() {
+        let d = temp("plan_gone");
+        let idx = index_of(&d.0, &[("a.txt", b"same".to_vec()), ("b.txt", b"same".to_vec()), ("x/c.txt", b"other one".to_vec()), ("x/d.txt", b"other one".to_vec())]);
+        let r = find(&idx, &all(&idx), Mode::Content, 0, &Progress::default()).unwrap();
+        assert_eq!(r.groups.len(), 2);
+        // Nothing changed: the selected copy may go.
+        assert_eq!(plan(&r, Mode::Content, &d.0, &["b.txt"]), DeletePlan { delete: paths(&d.0, &["b.txt"]), kept: Vec::new() });
+        // b is deleted, d is moved away: a and c are the last copies.
+        std::fs::remove_file(d.0.join("b.txt")).unwrap();
+        std::fs::rename(d.0.join("x").join("d.txt"), d.0.join("moved.txt")).unwrap();
+        let c = Path::new("x").join("c.txt");
+        let c = c.to_str().unwrap();
+        let got = plan(&r, Mode::Content, &d.0, &["a.txt", c]);
+        assert_eq!(got.delete, Vec::<String>::new());
+        // In the list's order: the group that wastes most comes first.
+        assert_eq!(got.kept, kept(&d.0, &[(c, Kept::NoCopyLeft), ("a.txt", Kept::NoCopyLeft)]));
+        // A selected file that is itself gone is reported, not "deleted".
+        let got = plan(&r, Mode::Content, &d.0, &["b.txt"]);
+        assert_eq!((got.delete.len(), got.kept), (0, kept(&d.0, &[("b.txt", Kept::Gone)])));
+    }
+
+    /// The copy that was to stay has been edited since the search: same
+    /// size or not, it no longer holds what the selected file holds.
+    #[test]
+    fn delete_is_refused_when_the_other_copy_changed() {
+        let d = temp("plan_changed");
+        let idx = index_of(&d.0, &[("a", b"12345".to_vec()), ("b", b"12345".to_vec())]);
+        let r = find(&idx, &all(&idx), Mode::Content, 0, &Progress::default()).unwrap();
+        // Same size, other content.
+        std::fs::write(d.0.join("b"), b"1234X").unwrap();
+        assert_eq!(plan(&r, Mode::Content, &d.0, &["a"]).kept, kept(&d.0, &[("a", Kept::NoCopyLeft)]));
+        // The edited file itself is not a duplicate any more either.
+        assert_eq!(plan(&r, Mode::Content, &d.0, &["b"]).kept, kept(&d.0, &[("b", Kept::NoCopyLeft)]));
+        // Another size.
+        std::fs::write(d.0.join("b"), b"123456").unwrap();
+        assert_eq!(plan(&r, Mode::Content, &d.0, &["a"]).kept, kept(&d.0, &[("a", Kept::NoCopyLeft)]));
+        let got = plan(&r, Mode::Content, &d.0, &["b"]);
+        assert_eq!((got.delete.len(), got.kept), (0, kept(&d.0, &[("b", Kept::Changed)])));
+        // Both changed in the same way: still copies of each other.
+        std::fs::write(d.0.join("a"), b"abcde").unwrap();
+        std::fs::write(d.0.join("b"), b"abcde").unwrap();
+        assert_eq!(plan(&r, Mode::Content, &d.0, &["a"]).delete, paths(&d.0, &["a"]));
+    }
+
+    /// With three copies, one good copy that stays is enough, whichever it is.
+    #[test]
+    fn delete_needs_one_good_copy_among_those_that_stay() {
+        let d = temp("plan_three");
+        let idx = index_of(&d.0, &[("a", b"copy".to_vec()), ("b", b"copy".to_vec()), ("c", b"copy".to_vec())]);
+        let r = find(&idx, &all(&idx), Mode::Content, 0, &Progress::default()).unwrap();
+        assert_eq!(plan(&r, Mode::Content, &d.0, &["a", "b"]).delete, paths(&d.0, &["a", "b"]));
+        // b changed: c still stands in for a.
+        std::fs::write(d.0.join("b"), b"edit").unwrap();
+        assert_eq!(plan(&r, Mode::Content, &d.0, &["a"]).delete, paths(&d.0, &["a"]));
+        // …but not once c is gone too.
+        std::fs::remove_file(d.0.join("c")).unwrap();
+        let got = plan(&r, Mode::Content, &d.0, &["a"]);
+        assert_eq!((got.delete.len(), got.kept), (0, kept(&d.0, &[("a", Kept::NoCopyLeft)])));
+    }
+
+    #[test]
+    fn delete_is_refused_for_a_whole_group_and_after_a_mode_change() {
+        let d = temp("plan_all");
+        let idx = index_of(&d.0, &[("a", b"copy".to_vec()), ("b", b"copy".to_vec()), ("k/n.txt", b"1111".to_vec()), ("l/n.txt", b"1111".to_vec())]);
+        let r = find(&idx, &all(&idx), Mode::Content, 0, &Progress::default()).unwrap();
+        // Every copy of one group selected: none of them goes, and the disk
+        // is not even read; the other group is judged on its own.
+        let n = Path::new("k").join("n.txt");
+        let n = n.to_str().unwrap();
+        let mut looked = Vec::new();
+        let p = Progress::default();
+        let got = plan_delete(&r, Mode::Content, &paths(&d.0, &["a", "b", n]), &mut |path: &str, size: u64| {
+            looked.push(path.to_string());
+            look(path, size, Mode::Content, &p)
+        });
+        assert_eq!(got.delete, paths(&d.0, &[n]));
+        assert_eq!(got.kept, kept(&d.0, &[("a", Kept::AllSelected), ("b", Kept::AllSelected)]));
+        assert!(looked.iter().all(|l| l.ends_with("n.txt")), "{looked:?}");
+        // A list made by comparing contents is not acted on in the quick
+        // mode, nor the other way round.
+        let got = plan_delete(&r, Mode::NameAndSize, &paths(&d.0, &["a"]), &mut |_: &str, _: u64| panic!("the disk is not read"));
+        assert_eq!((got.delete.len(), got.kept), (0, kept(&d.0, &[("a", Kept::ModeChanged)])));
+        let quick = find(&idx, &all(&idx), Mode::NameAndSize, 0, &Progress::default()).unwrap();
+        assert_eq!((quick.mode, r.mode), (Mode::NameAndSize, Mode::Content));
+        let got = plan(&quick, Mode::Content, &d.0, &[n]);
+        assert_eq!((got.delete.len(), got.kept), (0, kept(&d.0, &[(n, Kept::ModeChanged)])));
+        // A path that is in no group is never deleted.
+        assert_eq!(plan(&r, Mode::Content, &d.0, &["zz"]), DeletePlan::default());
+    }
+
+    /// The quick mode reads no content, before a delete either: it checks
+    /// that a file of the same name and size stays.
+    #[test]
+    fn quick_mode_delete_rechecks_size_only() {
+        let d = temp("plan_quick");
+        let idx = index_of(&d.0, &[("k/n.txt", b"1111".to_vec()), ("l/n.txt", b"2222".to_vec())]);
+        let r = find(&idx, &all(&idx), Mode::NameAndSize, 0, &Progress::default()).unwrap();
+        assert_eq!(r.groups.len(), 1);
+        let (k, l) = (Path::new("k").join("n.txt"), Path::new("l").join("n.txt"));
+        let (k, l) = (k.to_str().unwrap(), l.to_str().unwrap());
+        let p = Progress::default();
+        let got = plan(&r, Mode::NameAndSize, &d.0, &[k]);
+        assert_eq!(got.delete, paths(&d.0, &[k]));
+        assert_eq!(look(&paths(&d.0, &[k])[0], 4, Mode::NameAndSize, &p), Some(Seen { size: 4, hash: None }));
+        assert_eq!(p.bytes_done.load(Ordering::Relaxed), 0);
+        // The file that stays grew: not the same size any more.
+        std::fs::write(d.0.join("l").join("n.txt"), b"22222").unwrap();
+        assert_eq!(plan(&r, Mode::NameAndSize, &d.0, &[k]).kept, kept(&d.0, &[(k, Kept::NoCopyLeft)]));
+        assert_eq!(plan(&r, Mode::NameAndSize, &d.0, &[l]).kept, kept(&d.0, &[(l, Kept::Changed)]));
+        // It was replaced by a folder of that name.
+        std::fs::remove_file(d.0.join("l").join("n.txt")).unwrap();
+        std::fs::create_dir(d.0.join("l").join("n.txt")).unwrap();
+        assert_eq!(plan(&r, Mode::NameAndSize, &d.0, &[k]).kept, kept(&d.0, &[(k, Kept::NoCopyLeft)]));
+    }
+
     #[test]
     fn huge_sizes_from_a_damaged_index_do_not_overflow() {
         let f = |p: &str| DupFile { path: p.into(), mtime: 0 };
         let g = Group { size: u64::MAX / 2 + 1, files: vec![f("a"), f("b"), f("c")] };
         assert_eq!(g.wasted(), u64::MAX);
-        let r = Report { groups: vec![g.clone(), g], unreadable: 0 };
+        let r = Report { groups: vec![g.clone(), g], ..Default::default() };
         assert_eq!(r.wasted(), u64::MAX);
         // Entries claiming exabytes: grouped, the files' real sizes differ,
         // so they are unreadable rather than a panic in the byte totals.

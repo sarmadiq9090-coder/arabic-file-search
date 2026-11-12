@@ -3,7 +3,13 @@
 //! on a background thread with progress and a Stop button.
 //!
 //! Nothing is ever deleted without the user selecting the files and
-//! confirming, and all copies of a group can't be deleted together.
+//! confirming, and all copies of a group can't be deleted together. The
+//! list is not trusted for that: right before the delete the disk is read
+//! again (`dupes::plan_delete`, on a background thread), and a file goes
+//! only while a copy that stays is still there and still the same. A list
+//! belongs to the comparison mode that made it and is cleared when the mode
+//! changes; in the quick mode the question says that contents were not
+//! compared, and asks to confirm that sentence.
 
 use native_windows_gui as nwg;
 use std::cell::RefCell;
@@ -25,7 +31,7 @@ use super::shell::{self, wide};
 use super::lazy::{Bound, Lazy};
 use super::startup::background_priority;
 use super::{App, WS_EX_LAYOUTRTL, autostart, title};
-use crate::dupes::{self, Mode, Progress, Report, Scope};
+use crate::dupes::{self, DeletePlan, Kept, Mode, Progress, Report, Scope};
 
 /// Minimum file sizes offered, in bytes. Empty files are always skipped.
 const MIN_SIZES: [u64; 6] = [1, 1024, 100 * 1024, 1024 * 1024, 10 * 1024 * 1024, 100 * 1024 * 1024];
@@ -57,11 +63,21 @@ enum Row {
     File(usize, usize),
 }
 
+/// What a background job ended with; `None` inside when it was stopped.
+enum Finished {
+    /// A search for duplicates.
+    Found(Option<Report>),
+    /// The look at the disk before a delete.
+    Checked(Option<DeletePlan>),
+}
+
 struct Job {
     progress: Arc<Progress>,
-    /// `Some(None)` when it was cancelled.
-    result: Arc<Mutex<Option<Option<Report>>>>,
+    result: Arc<Mutex<Option<Finished>>>,
 }
+
+/// `Progress::stage` while the disk is checked before a delete.
+const STAGE_CHECK: usize = 3;
 
 /// The finder's menu item, window and state, one field of `App`.
 #[derive(Default)]
@@ -147,6 +163,20 @@ fn split_path(path: &str) -> (&str, &str) {
     match path.rfind('\\') {
         Some(i) => (&path[i + 1..], &path[..i + 1]),
         None => (path, ""),
+    }
+}
+
+/// Why a selected file was not deleted, for the list shown after a delete.
+fn kept_reason(why: Kept) -> &'static str {
+    match why {
+        Kept::ModeChanged => tr!("طريقة المقارنة تغيّرت بعد البحث", "the comparison mode changed after the search"),
+        Kept::AllSelected => tr!("كل نسخ مجموعته محددة", "every copy in its group is selected"),
+        Kept::Gone => tr!("الملف لم يعد موجوداً أو تعذرت قراءته", "the file is gone or can't be read"),
+        Kept::Changed => tr!("تغيّر حجمه بعد البحث", "its size changed after the search"),
+        Kept::NoCopyLeft => tr!(
+            "لم تبقَ على القرص نسخة مطابقة غير محددة (حُذفت أو نُقلت أو تغيّرت)",
+            "no matching copy that is not selected is left on disk (deleted, moved or changed)"
+        ),
     }
 }
 
@@ -302,6 +332,7 @@ impl App {
                         save_dword(REG_MIN, d.min_combo.selection().unwrap_or(DEFAULT_MIN) as u32);
                     } else if handle == d.mode_combo {
                         save_dword(REG_MODE, d.mode_combo.selection().unwrap_or(0) as u32);
+                        app.dupes_mode_changed();
                     }
                 }
                 E::OnListViewItemActivated if handle == d.list => app.dupes_open(false),
@@ -473,6 +504,28 @@ impl App {
         true
     }
 
+    /// The comparison mode chosen in the window.
+    fn dupes_mode(&self) -> Mode {
+        if self.dupes.mode_combo.selection() == Some(1) { Mode::NameAndSize } else { Mode::Content }
+    }
+
+    /// The mode was changed: the list made in the other mode is cleared, so
+    /// that files matched by name and size are never taken for files with
+    /// the same content (or the other way round).
+    fn dupes_mode_changed(&self) {
+        let d = &self.dupes;
+        let mode = self.dupes_mode();
+        if d.job.borrow().is_some() || d.report.borrow().mode == mode {
+            return;
+        }
+        *d.report.borrow_mut() = Report { mode, ..Default::default() };
+        self.dupes_show_report();
+        d.summary.set_text(tr!(
+            "تغيّرت طريقة المقارنة؛ اضغط «بحث» للبحث بها من جديد.",
+            "The comparison mode changed; press Search to search again with it."
+        ));
+    }
+
     fn start_dupes(&self) {
         let d = &self.dupes;
         if d.job.borrow().is_some() {
@@ -481,7 +534,7 @@ impl App {
         let Some(scope) = d.scope.borrow().clone() else { return };
         let index = self.state.borrow().index.clone();
         let min_size = MIN_SIZES[d.min_combo.selection().unwrap_or(DEFAULT_MIN).min(MIN_SIZES.len() - 1)];
-        let mode = if d.mode_combo.selection() == Some(1) { Mode::NameAndSize } else { Mode::Content };
+        let mode = self.dupes_mode();
         let progress = Arc::new(Progress::default());
         let result = Arc::new(Mutex::new(None));
         {
@@ -492,7 +545,7 @@ impl App {
                 // so the window never waits for it forever.
                 let r = crate::crash_log::catch(|| dupes::find(&index, &scope, mode, min_size, &progress)).flatten();
                 if let Ok(mut slot) = result.lock() {
-                    *slot = Some(r);
+                    *slot = Some(Finished::Found(r));
                 }
             });
             if started.is_none() {
@@ -542,6 +595,11 @@ impl App {
                 let pct = (b * 100).checked_div(bt).unwrap_or(0).min(100);
                 let text = match p.stage.load(Ordering::Relaxed) {
                     0 => tr!("جارٍ التجميع حسب الحجم…", "Grouping by size…").to_string(),
+                    STAGE_CHECK => trf!(
+                        "التحقق من أن نسخة من كل ملف ما زالت موجودة… ({} ملف)",
+                        "Checking that a copy of every file is still there… ({} files)",
+                        fmt_num(n)
+                    ),
                     1 => trf!(
                         "مقارنة بداية الملفات ونهايتها: {} من {}",
                         "Comparing the start and end of files: {} of {}",
@@ -565,11 +623,15 @@ impl App {
         *d.job.borrow_mut() = None;
         self.dupes_busy(false);
         match result {
-            Some(report) => {
+            Finished::Found(Some(report)) => {
                 *d.report.borrow_mut() = report;
                 let _ = self.dupes_show_report();
             }
-            None => d.summary.set_text(tr!("أُوقف البحث.", "Search stopped.")),
+            Finished::Found(None) => d.summary.set_text(tr!("أُوقف البحث.", "Search stopped.")),
+            Finished::Checked(Some(plan)) => self.dupes_finish_delete(plan),
+            Finished::Checked(None) => {
+                d.summary.set_text(tr!("أُوقف التحقق؛ لم يُحذف أي ملف.", "The check was stopped; no file was deleted."));
+            }
         }
     }
 
@@ -602,6 +664,9 @@ impl App {
                 size_text(report.wasted())
             )
         };
+        if report.mode == Mode::NameAndSize && !report.groups.is_empty() {
+            text += tr!(" — بالاسم والحجم فقط، لم يُقارَن المحتوى", " — by name and size only; contents were not compared");
+        }
         if report.unreadable > 0 {
             text += &trf!(" (تعذرت قراءة {} ملف)", " ({} files could not be read)", fmt_num(report.unreadable));
         }
@@ -623,6 +688,9 @@ impl App {
                         fmt_num(g + 1),
                         fmt_num(group.files.len())
                     ),
+                    1 if report.mode == Mode::NameAndSize => {
+                        trf!("المهدر إن تطابق المحتوى: {}", "Wasted if the contents match: {}", size_text(group.wasted()))
+                    }
                     1 => trf!("المهدر: {}", "Wasted: {}", size_text(group.wasted())),
                     _ => String::new(),
                 }
@@ -670,8 +738,10 @@ impl App {
         }
     }
 
-    /// Moves the selected files to the Recycle Bin after asking, keeping at
-    /// least one copy of every group.
+    /// Asks about moving the selected files to the Recycle Bin, then starts
+    /// the check of the disk that decides which of them may go
+    /// (`dupes_finish_delete` deletes those), keeping at least one copy of
+    /// every group.
     fn dupes_delete(&self) {
         let d = &self.dupes;
         if d.job.borrow().is_some() {
@@ -680,6 +750,12 @@ impl App {
         let paths = self.dupes_selected_files();
         if paths.is_empty() {
             d.summary.set_text(tr!("اختر الملفات التي تريد حذفها أولاً.", "Select the files to delete first."));
+            return;
+        }
+        // The list is cleared when the mode changes; checked all the same.
+        let mode = d.report.borrow().mode;
+        if mode != self.dupes_mode() {
+            self.dupes_mode_changed();
             return;
         }
         let whole_group = d
@@ -706,13 +782,19 @@ impl App {
         }
         let shown: Vec<&str> = paths.iter().take(10).map(String::as_str).collect();
         let more = if paths.len() > 10 { trf!("\n… و{} غيرها", "\n… and {} more", paths.len() - 10) } else { String::new() };
-        let text = trf!(
+        let mut text = trf!(
             "نقل {} ملف إلى سلة المحذوفات؟\n\n{}{}",
             "Move {} files to the Recycle Bin?\n\n{}{}",
             fmt_num(paths.len()),
             shown.join("\n"),
             more
         );
+        if mode == Mode::NameAndSize {
+            text += tr!(
+                "\n\nتنبيه: هذه الملفات تطابقت بالاسم والحجم فقط، ولم يُقارَن محتواها.",
+                "\n\nWarning: these files matched by name and size only. Their contents were NOT compared."
+            );
+        }
         let params = nwg::MessageParams {
             title: title(),
             content: &text,
@@ -722,7 +804,69 @@ impl App {
         if nwg::modal_message(&d.window, &params) != nwg::MessageChoice::Yes {
             return;
         }
-        let gone: Vec<String> = shell::recycle_many(&paths);
+        if mode == Mode::NameAndSize {
+            // The quick mode read nothing: the user confirms that sentence
+            // on its own, not as a line under a list of paths.
+            let params = nwg::MessageParams {
+                title: title(),
+                content: tr!(
+                    "محتوى هذه الملفات لم يُقارَن: تطابقت بالاسم والحجم فقط، وقد تكون ملفات مختلفة.\n\nهل تؤكد أنك تعلم أن المحتوى لم يُقارَن وتريد نقلها إلى سلة المحذوفات؟",
+                    "The contents of these files were NOT compared: they matched by name and size only, and may be different files.\n\nDo you confirm that you know the contents were not compared, and want to move them to the Recycle Bin?"
+                ),
+                buttons: nwg::MessageButtons::YesNo,
+                icons: nwg::MessageIcons::Warning,
+            };
+            if nwg::modal_message(&d.window, &params) != nwg::MessageChoice::Yes {
+                return;
+            }
+        }
+        // The list may be old (a copy deleted, moved or edited since the
+        // search), so the disk decides, on a background thread: whole files
+        // are read again in the content mode.
+        let report = Report { groups: d.report.borrow().groups.clone(), unreadable: 0, mode };
+        let progress = Arc::new(Progress::default());
+        progress.stage.store(STAGE_CHECK, Ordering::Relaxed);
+        let result = Arc::new(Mutex::new(None));
+        {
+            let (progress, result) = (progress.clone(), result.clone());
+            let started = crate::crash_log::spawn_named("dupes-check", move || {
+                background_priority();
+                // A panic (logged by the hook) or Stop ends the check with
+                // no plan, so nothing is deleted.
+                let plan = crate::crash_log::catch(|| {
+                    dupes::plan_delete(&report, mode, &paths, &mut |path: &str, size: u64| dupes::look(path, size, mode, &progress))
+                })
+                .filter(|_| !progress.cancelled());
+                if let Ok(mut slot) = result.lock() {
+                    *slot = Some(Finished::Checked(plan));
+                }
+            });
+            if started.is_none() {
+                d.summary.set_text(tr!("تعذر بدء التحقق؛ لم يُحذف أي ملف.", "Could not start the check; no file was deleted."));
+                return;
+            }
+        }
+        *d.job.borrow_mut() = Some(Job { progress, result });
+        self.dupes_busy(true);
+        d.summary.set_text(tr!(
+            "التحقق من أن نسخة من كل ملف ما زالت موجودة…",
+            "Checking that a copy of every file is still there…"
+        ));
+        d.timer.start();
+    }
+
+    /// The disk was checked: moves the files of `plan` that may go to the
+    /// Recycle Bin, with nothing asked in between, and says which stayed.
+    fn dupes_finish_delete(&self, plan: DeletePlan) {
+        let d = &self.dupes;
+        if self.index_busy() {
+            d.summary.set_text(tr!(
+                "بدأت الفهرسة أو البحث داخل المستندات أثناء التحقق؛ لم يُحذف أي ملف. أعد المحاولة بعد انتهائها.",
+                "Indexing or the document search started during the check; no file was deleted. Try again when it has finished."
+            ));
+            return;
+        }
+        let gone: Vec<String> = if plan.delete.is_empty() { Vec::new() } else { shell::recycle_many(&plan.delete) };
         if !gone.is_empty() {
             self.update_index(|idx| {
                 for p in &gone {
@@ -737,8 +881,8 @@ impl App {
         }
         dupes::forget_paths(&mut d.report.borrow_mut(), &gone);
         let totals = self.dupes_show_report();
-        let left = paths.len().saturating_sub(gone.len());
-        let msg = if left == 0 {
+        let left = plan.delete.len().saturating_sub(gone.len());
+        let mut msg = if left == 0 {
             trf!("نُقل {} ملف إلى سلة المحذوفات.", "Moved {} files to the Recycle Bin.", fmt_num(gone.len()))
         } else {
             trf!(
@@ -748,8 +892,30 @@ impl App {
                 fmt_num(left)
             )
         };
+        if !plan.kept.is_empty() {
+            msg += &trf!(
+                " تُرك {} ملف حفاظاً على آخر نسخة.",
+                " {} files were left alone to keep the last copy.",
+                fmt_num(plan.kept.len())
+            );
+        }
         self.set_status(&msg);
         d.summary.set_text(&format!("{msg}  {totals}"));
+        if !plan.kept.is_empty() {
+            let shown: Vec<String> = plan.kept.iter().take(10).map(|(p, why)| format!("{p}\n    {}", kept_reason(*why))).collect();
+            let more = if plan.kept.len() > 10 { trf!("\n… و{} غيرها", "\n… and {} more", plan.kept.len() - 10) } else { String::new() };
+            nwg::modal_info_message(
+                &d.window,
+                title(),
+                &trf!(
+                    "لم يُحذف {} ملف، حتى لا تُحذف آخر نسخة:\n\n{}{}\n\nاضغط «بحث» لتحديث القائمة.",
+                    "{} files were not deleted, so that the last copy is not lost:\n\n{}{}\n\nPress Search to refresh the list.",
+                    fmt_num(plan.kept.len()),
+                    shown.join("\n"),
+                    more
+                ),
+            );
+        }
     }
 }
 

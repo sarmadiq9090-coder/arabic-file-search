@@ -2,6 +2,11 @@
 
 # سجل التغييرات
 
+## غير منشور (Unreleased)
+
+### أمان البيانات
+- **الملفات المكررة لا تحذف آخر نسخة**: قبل النقل إلى سلة المحذوفات يُفحص القرص من جديد، ولا يُحذف ملف إلا إذا بقيت منه نسخة غير محددة ما زالت موجودة ومطابقة (الحجم نفسه، والمحتوى نفسه في المقارنة الدقيقة). ما لا يتحقق فيه ذلك يُترك ويُذكر مع السبب. تغيير طريقة المقارنة يمسح القائمة، وفي «نفس الاسم والحجم» يقول التأكيد صراحةً إن المحتوى لم يُقارَن ويطلب تأكيد ذلك. / **Duplicate finder never deletes the last copy:** the disk is re-checked right before the Recycle Bin; a file goes only while an unselected copy still exists and still matches. Skipped files are listed with the reason; changing the mode clears the list; the quick mode's confirmation says contents were not compared.
+
 ## 0.10.0 — 2026-11-11
 
 ### الرخصة
