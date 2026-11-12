@@ -212,6 +212,36 @@ pub fn remove_leftovers(exe: &Path, tries: u32, pause: Duration) -> Option<Strin
     (!lines.is_empty()).then(|| format!("update leftovers: {}", lines.join("; ")))
 }
 
+/// What a start does about the trial of a new version (see [`trial`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Trial {
+    /// Nothing to do.
+    Run,
+    /// Started as the new version after an update: write the trial marker
+    /// now, before any window; the first timer tick clears it.
+    Begin,
+    /// The marker is there and so is the old program: the new version did
+    /// not reach its first tick last time (blocked, or ended while its window
+    /// was being made). Put the old program back and start it instead.
+    RollBack,
+    /// A marker without an old program to go back to: just remove it.
+    Forget,
+}
+
+/// The takeover grace (`TAKEOVER_GRACE`) covers only the start of the new
+/// copy before it waits for the old one; window creation, WebView2 and the
+/// index load come after the old copy has gone. So the new version is on
+/// trial until its first timer tick: `updated` (started with `--updated`),
+/// `marker` (the trial marker exists), `old` (`bahth.exe.old` exists).
+pub fn trial(updated: bool, marker: bool, old: bool) -> Trial {
+    match (updated, marker, old) {
+        (true, _, _) => Trial::Begin,
+        (false, true, true) => Trial::RollBack,
+        (false, true, false) => Trial::Forget,
+        (false, false, _) => Trial::Run,
+    }
+}
+
 /// The titles the running copy's window may have: it keeps the language it
 /// started with, which may not be the one saved since.
 pub fn window_titles<'a>(current: &'a str, other: &'a str) -> [&'a str; 2] {
@@ -386,6 +416,21 @@ mod tests {
         let line = remove_leftovers(&exe, 2, Duration::from_millis(1)).unwrap();
         assert!(line.starts_with("update leftovers: kept bahth.exe.old (") && line.ends_with("trying again at the next start"), "{line}");
         assert!(exe.is_file());
+    }
+
+    #[test]
+    fn a_new_version_that_never_reached_its_first_tick_is_rolled_back() {
+        // Started after an update: on trial, whatever was left before.
+        for (marker, old) in [(false, false), (false, true), (true, true), (true, false)] {
+            assert_eq!(trial(true, marker, old), Trial::Begin);
+        }
+        // The next start finds the trial unfinished: back to the old program.
+        assert_eq!(trial(false, true, true), Trial::RollBack);
+        // Nothing to go back to (cleaned up already): the marker just goes.
+        assert_eq!(trial(false, true, false), Trial::Forget);
+        // No trial: a normal start, an old file or not.
+        assert_eq!(trial(false, false, true), Trial::Run);
+        assert_eq!(trial(false, false, false), Trial::Run);
     }
 
     #[test]

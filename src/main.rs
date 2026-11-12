@@ -97,6 +97,8 @@ mod update;
 #[cfg(any(windows, test))]
 mod watch_pace;
 #[cfg(any(windows, test))]
+mod winrt_guard;
+#[cfg(any(windows, test))]
 mod web;
 #[cfg(any(windows, test))]
 mod webui;

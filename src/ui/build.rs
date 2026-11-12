@@ -248,6 +248,7 @@ impl NativeUi<AppUi> for App {
         nwg::Notice::builder().parent(w).build(&mut app.name_notice)?;
         nwg::Notice::builder().parent(w).build(&mut app.update_notice)?;
         nwg::Notice::builder().parent(w).build(&mut app.watch_notice)?;
+        nwg::Notice::builder().parent(w).build(&mut app.matches_notice)?;
         phase("controls");
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.menu)?;
         nwg::MenuItem::builder().text(tr!("فتح الملف\tEnter", "Open file\tEnter")).parent(&app.menu).build(&mut app.menu_open)?;
@@ -431,6 +432,7 @@ impl NativeUi<AppUi> for App {
                 E::OnNotice if handle == app.name_notice => app.on_names_found(),
                 E::OnNotice if handle == app.update_notice => app.on_update_event(),
                 E::OnNotice if handle == app.watch_notice => app.on_watch_notice(),
+                E::OnNotice if handle == app.matches_notice => app.on_matches_read(),
                 E::OnComboxBoxSelection if handle == app.kind_combo => app.on_kind_changed(),
                 E::OnButtonClick => {
                     if app.on_suggestion_click(handle) || app.on_rating_click(handle) {

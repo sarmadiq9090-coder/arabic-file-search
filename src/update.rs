@@ -924,6 +924,72 @@ mod win {
         original_exe().is_ok_and(crate::handover::restore_if_missing)
     }
 
+    /// The trial marker of a new version (see `handover::trial`).
+    pub fn trial_marker() -> PathBuf {
+        crate::index::cache_path().with_file_name("update-trial.txt")
+    }
+
+    /// Before any window: starts or settles the trial of a new version.
+    /// True when this process must leave at once (the old program was put
+    /// back and started instead).
+    pub fn settle_trial(updated: bool, log: &dyn Fn(&str)) -> bool {
+        let Ok(exe) = original_exe() else { return false };
+        let marker = trial_marker();
+        let old = crate::handover::sibling(exe, ".old");
+        match crate::handover::trial(updated, marker.exists(), old.is_file()) {
+            crate::handover::Trial::Run => false,
+            crate::handover::Trial::Begin => {
+                if let Err(e) = fs::write(&marker, env!("CARGO_PKG_VERSION")) {
+                    log(&format!("update trial: cannot write {}: {e}", marker.display()));
+                }
+                false
+            }
+            crate::handover::Trial::Forget => {
+                let _ = fs::remove_file(&marker);
+                false
+            }
+            crate::handover::Trial::RollBack => {
+                let tried = fs::read_to_string(&marker).unwrap_or_default();
+                match crate::handover::roll_back(exe, &old) {
+                    Ok(()) => {
+                        let _ = fs::remove_file(&marker);
+                        log(&format!("update trial: version {} never finished starting; put the previous version back", tried.trim()));
+                        let shown = tr!(
+                            "لم يعمل الإصدار الجديد من البرنامج، فأُعيد الإصدار السابق.",
+                            "The new version of the program did not start, so the previous version was put back."
+                        );
+                        message_box(shown);
+                        // As a relaunch: it waits for this process (which
+                        // holds the single-instance lock) to go, then runs.
+                        let restarted = std::process::Command::new(exe)
+                            .arg(crate::relocate::MOVED_ARG)
+                            .arg(crate::ui::this_copy_arg())
+                            .spawn()
+                            .is_ok();
+                        log(&format!("update trial: starting the previous version {}", if restarted { "now" } else { "failed; open it again" }));
+                        true
+                    }
+                    Err(e) => {
+                        log(&format!("update trial: version {} never finished starting; rolling back failed: {e}", tried.trim()));
+                        false
+                    }
+                }
+            }
+        }
+    }
+
+    /// The first timer tick: the new version runs, its trial is over.
+    pub fn end_trial() {
+        let _ = fs::remove_file(trial_marker());
+    }
+
+    /// A short message before any window exists.
+    fn message_box(text: &str) {
+        use winapi::um::winuser::{MB_ICONINFORMATION, MB_OK, MessageBoxW};
+        let (text, title) = (wide(text), wide(env!("CARGO_PKG_NAME")));
+        unsafe { MessageBoxW(std::ptr::null_mut(), text.as_ptr(), title.as_ptr(), MB_OK | MB_ICONINFORMATION) };
+    }
+
     /// Once this copy has shown it runs (its first timer tick): deletes
     /// `bahth.exe.old` and `bahth.exe.new` left by an update, with a few
     /// tries; one still locked is deleted at a later start. Blocks for a few

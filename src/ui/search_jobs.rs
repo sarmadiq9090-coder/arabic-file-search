@@ -450,7 +450,9 @@ impl App {
         if LOOP_STARTED.load(Ordering::Relaxed) && !self.startup_logged.replace(true) {
             phase("first-tick");
             log_phases();
-            // This copy runs: the old program file of an update may go now.
+            // This copy runs: its trial is over, and the old program file of
+            // an update may go now.
+            crate::update::end_trial();
             crate::crash_log::spawn_named("update-leftovers", || {
                 if let Some(line) = crate::update::remove_update_leftovers() {
                     log(&line);

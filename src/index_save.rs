@@ -237,6 +237,19 @@ impl SaveQueue {
         self.lock().scan_owed = true;
     }
 
+    /// The index in memory no longer follows the disk (the watcher was
+    /// stopped by the memory guard): the marker file is written now and stays
+    /// until a full scan has been saved, so a start after leaving meanwhile
+    /// scans the drives again.
+    pub fn index_out_of_date(&self) {
+        let _one = self.marking.lock().unwrap_or_else(|e| e.into_inner());
+        let mut inner = self.lock();
+        inner.scan_owed = true;
+        inner.marked = true;
+        drop(inner);
+        (self.marker)(true);
+    }
+
     /// Creates the marker file once there are unsaved changes (called on
     /// the saving thread, never on the UI thread).
     fn mark_unsaved(&self) {
@@ -1297,6 +1310,23 @@ mod tests {
         until("rest", || at_rest(&queue));
         until("the marker to go", || marked.load(Ordering::SeqCst) == 0);
         assert!(!queue.lock().marked);
+    }
+
+    /// The memory guard stopped the watcher: the marker is written at once
+    /// and only a scan's save removes it; edits saved meanwhile do not.
+    #[test]
+    fn an_out_of_date_index_keeps_its_marker_until_a_scan() {
+        let marked = Arc::new(AtomicUsize::new(0));
+        let m = marked.clone();
+        let queue = SaveQueue::new(Box::new(|_| Ok(())), Box::new(move |on| m.store(usize::from(on), Ordering::SeqCst)), Box::new(|_| {}), || {}, 0, Duration::ZERO);
+        queue.index_out_of_date();
+        assert_eq!(marked.load(Ordering::SeqCst), 1);
+        let mut index = Arc::new(index_of(3));
+        edit(&queue, &mut index, |idx| { idx.entries[0].size = 4; true }, Some(Duration::ZERO));
+        until("rest", || at_rest(&queue));
+        assert_eq!(marked.load(Ordering::SeqCst), 1, "an edit's save is not a scan");
+        queue.save_now(&index_of(3)).unwrap();
+        assert_eq!(marked.load(Ordering::SeqCst), 0);
     }
 
     #[test]

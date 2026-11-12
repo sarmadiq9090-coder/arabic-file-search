@@ -193,6 +193,16 @@ impl State {
     }
 }
 
+/// Matching lines read again from a document on a background thread (they
+/// can take long: a big file is extracted again), for the classic window's
+/// row (by path) or a row of the new look's list.
+enum MatchesRead {
+    Classic { path: String, found: Option<(u32, Vec<(u32, String)>)> },
+    // (Only the MSVC build has the new look.)
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))]
+    Web { seq: u64, ver: u64, id: u32, found: Option<(u32, Vec<(u32, String)>)> },
+}
+
 /// The memory guard's state in the window (see `memory.rs`).
 #[derive(Default)]
 struct MemoryWatch {
@@ -240,6 +250,9 @@ pub struct App {
     /// Wakes the UI thread when an update check or download finishes.
     update_notice: nwg::Notice,
     update_result: Arc<Mutex<Option<UpdateEvent>>>,
+    /// Wakes the UI thread when matches read again in the background are ready.
+    matches_notice: nwg::Notice,
+    matches_read: Arc<Mutex<Vec<MatchesRead>>>,
     /// Wakes the UI thread when the drive watcher has a batch of changes.
     watch_notice: nwg::Notice,
     watch_inbox: Arc<Mutex<watching::Inbox>>,
@@ -682,6 +695,8 @@ impl App {
     fn close(&self, why: Leaving) {
         let budget = why.budget();
         crate::leave::watchdog(budget.deadline, move || {
+            // The files being read now are not crashes (`content_cache`).
+            crate::content_cache::clear_markers_now();
             startup::log(&format!("exit: not done after {} s ({why:?}); ending the process", budget.deadline.as_secs()));
             // Hard: nothing here may wait for a thread that is stuck.
             unsafe {
@@ -694,6 +709,9 @@ impl App {
         self.stop_watching();
         self.cancel_content();
         self.stop_warm();
+        // `process::exit` and `TerminateProcess` follow; with the static C
+        // runtime the `atexit` handler that clears these does not run then.
+        crate::content_cache::clear_markers_now();
         if let Some(job) = &self.state.borrow().scan {
             job.progress.cancel.store(true, Ordering::Relaxed);
         }
@@ -739,6 +757,11 @@ pub fn run() {
         }
     }
     if activate_running_copy(updated || moved) {
+        return;
+    }
+    // The new version is on trial until its first timer tick; a start that
+    // finds an unfinished trial puts the previous version back and starts it.
+    if crate::update::settle_trial(updated, &|l| startup::log(l)) {
         return;
     }
     if let Some(d) = files::test_save_delay() {

@@ -175,13 +175,17 @@ pub(super) fn end_previous_copy(prev: Option<crate::handover::PrevCopy>) {
         log(&format!("handover: pid {pid} is now another process (the previous copy had ended); left alone"));
         return;
     }
-    let (_, line) = crate::handover::end_previous(
+    let (outcome, line) = crate::handover::end_previous(
         pid,
         |budget| Some(unsafe { WaitForSingleObject(h, budget.as_millis() as u32) } == WAIT_OBJECT_0),
         || unsafe { TerminateProcess(h, 1) } != 0,
     );
     unsafe { CloseHandle(h) };
     log(&line);
+    if outcome == crate::handover::Previous::Terminated {
+        // Ended from outside: what it was reading did not crash it.
+        crate::content_cache::clear_markers_in(&index::cache_path().with_file_name("content"));
+    }
 }
 
 /// When the process `h` was created (FILETIME), if Windows says.

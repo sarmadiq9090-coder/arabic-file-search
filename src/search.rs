@@ -260,7 +260,7 @@ impl Near {
 /// date), `regex:` / `re:` (regular expression), `ww:` / `كلمة:` (whole word)
 /// and `"a b"~5` (words near each other). Windows system files are left out
 /// unless `sys:` / `نظام:` is typed (or [`Query::show_system`] is set).
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct Query {
     pub terms: Vec<Term>,
     pub excludes: Vec<String>,

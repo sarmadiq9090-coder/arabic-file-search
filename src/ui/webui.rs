@@ -886,6 +886,24 @@ mod imp {
                     }
                 }
                 Request::Matches { seq, ver, id } => {
+                    // Lines not kept with the row are read again on another
+                    // thread (a big document can take long); the answer
+                    // comes from `webui_matches_read`.
+                    let to_read = self.webui.lists.borrow().shown_at(seq, ver).ok().and_then(|s| s.matches_to_read(id));
+                    if let Some((path, q)) = to_read {
+                        let use_index = self.state.borrow().settings.content_index;
+                        let slot = self.matches_read.clone();
+                        let notice = self.matches_notice.sender();
+                        crate::crash_log::spawn_named("matches-read", move || {
+                            let cache = if use_index { content_index::shared() } else { None };
+                            let found = crate::crash_log::catch(|| crate::search::document_matches(&path, &q, cache)).flatten();
+                            if let Ok(mut s) = slot.lock() {
+                                s.push(super::super::MatchesRead::Web { seq, ver, id, found });
+                            }
+                            notice.notice();
+                        });
+                        return;
+                    }
                     let msg = self.webui.lists.borrow().shown_at(seq, ver).ok().and_then(|s| s.matches(id));
                     if let Some(msg) = msg {
                         self.webui_send(&msg);
@@ -1539,6 +1557,15 @@ mod imp {
         /// about once a second: the indexing status, and the shown name
         /// results kept in step with the index (finished scan, files changed
         /// on disk).
+        /// Matches of a row read again in the background: sent to the page,
+        /// unless its list changed meanwhile.
+        pub(in super::super) fn webui_matches_read(&self, seq: u64, ver: u64, id: u32, found: Option<(u32, Vec<(u32, String)>)>) {
+            let msg = self.webui.lists.borrow().shown_at(seq, ver).ok().and_then(|s| s.matches_read(id, found));
+            if let Some(msg) = msg {
+                self.webui_send(&msg);
+            }
+        }
+
         pub(in super::super) fn webui_tick(&self, tick: u32) {
             // A dialog runs inside the page's handler: no page dropped or
             // created under it (a failure is handled when it closes).
@@ -1730,6 +1757,8 @@ mod imp {
         pub(in super::super) fn webui_close(&self) {}
 
         pub(in super::super) fn webui_tick(&self, _tick: u32) {}
+
+        pub(in super::super) fn webui_matches_read(&self, _seq: u64, _ver: u64, _id: u32, _found: Option<(u32, Vec<(u32, String)>)>) {}
 
         pub(in super::super) fn webui_release_index(&self) {}
     }
