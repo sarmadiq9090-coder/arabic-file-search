@@ -13,7 +13,7 @@
 
 use native_windows_gui as nwg;
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use winapi::ctypes::c_void;
 use std::rc::Rc;
 use std::sync::{Arc, Condvar, Mutex};
@@ -37,7 +37,7 @@ use winapi::um::winuser::{DestroyIcon, GetIconInfo, GetKeyState, ICONINFO, NMHDR
 
 use super::shell::wide;
 use super::{App, COL_NAME, autostart};
-use crate::thumb_cache::{Cached, ThumbCache};
+use crate::thumb_cache::{Cached, ThumbCache, TypeSlot, TypeSlots};
 
 /// On/off, a DWORD under `HKCU\Software\BahthSari`.
 const REG_VALUE: &str = "ThumbnailView";
@@ -108,8 +108,8 @@ pub struct Thumbs {
     /// Tile edge in physical pixels.
     size: Cell<i32>,
     cache: RefCell<Option<ThumbCache>>,
-    /// Image-list slot of the file-type icon of each extension ("/" folders).
-    type_icons: RefCell<HashMap<String, i32>>,
+    /// Image-list slots of the file-type icons ("/" folders), capped.
+    type_icons: RefCell<TypeSlots>,
     /// Number of results last arranged.
     count: Cell<usize>,
     /// The thread's queue, once it has been started.
@@ -532,13 +532,19 @@ impl App {
     }
 
     /// Image-list slot of the file-type icon for an extension ("/" folders).
+    /// Past `MAX_TYPE_SLOTS` types, every other type shares the generic icon.
     fn type_tile(&self, ext: &str) -> i32 {
-        if let Some(&i) = self.thumbs.type_icons.borrow().get(ext) {
-            return i;
-        }
-        let Some(slot) = self.thumbs.cache.borrow_mut().as_mut().map(|c| c.pin_slot()) else { return 0 };
+        let slot = {
+            let mut cache = self.thumbs.cache.borrow_mut();
+            let Some(cache) = cache.as_mut() else { return 0 };
+            self.thumbs.type_icons.borrow_mut().slot(ext, cache)
+        };
+        let (slot, ext) = match slot {
+            TypeSlot::Known(s) => return s,
+            TypeSlot::New { slot, ext } => (slot, ext),
+        };
         let n = self.thumbs.size.get();
-        let icon = type_icon_handle(ext);
+        let icon = type_icon_handle(&ext);
         let mut tile = icon_tile(icon, n);
         if !icon.is_null() {
             unsafe { DestroyIcon(icon) };
@@ -548,7 +554,6 @@ impl App {
             tile = make_tile(0, 0, &[], n);
         }
         self.put_tile(slot, tile);
-        self.thumbs.type_icons.borrow_mut().insert(ext.to_string(), slot);
         slot
     }
 

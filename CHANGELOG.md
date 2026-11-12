@@ -13,6 +13,7 @@
 - **إعداد Alt+Space لا يضيع بصمت**: إذا سبقك برنامج آخر إلى الاختصار عند بدء التشغيل كان الإعداد يُطفأ ويُحفظ مطفأً. الآن يبقى مفعّلاً، ويكتب الخيار في القائمة أن برنامجاً آخر يستخدمه الآن، ويعيد البرنامج المحاولة كل بضع ثوانٍ حتى يتحرر. / **English:** the Alt+Space setting is no longer turned off when another program holds the key at start; the menu says so and it is retried until free.
 - **النسخ الفاشل لا يُعلن نجاحاً**: إذا كان برنامج آخر يستخدم الحافظة لحظة النسخ كان البرنامج يقول «تم النسخ» ويغلق نافذة البحث، فيُلصق المستخدم محتوى قديماً. الآن يعيد المحاولة بضع مرات، وإن فشل تبقى النافذة مفتوحة مع رسالة قصيرة. / **English:** a failed clipboard copy is retried and then reported (the popup stays open) instead of claiming success.
 - **Ctrl+Alt+G لا يعمل إلا في نوافذ الحفظ والفتح**: كانت نوافذ أخرى من النوع نفسه تُعدّ نافذة ملفات (خانة «البحث عن» في المفكرة، ونطاق الصفحات في الطباعة)، فيكتب Enter فيها مسار مجلد ويضغط موافق. الآن يُشترط وجود خانة اسم الملف وعرض الملفات معاً. / **English:** Ctrl+Alt+G only acts on real Open/Save dialogs (a file-name box and a file view), not Find or Print.
+- **عرض المصغرات لا يكدّس أيقونات الأنواع**: كانت كل لاحقة ملف جديدة تحجز صورة دائمة في الذاكرة (وتُرسم في خيط الواجهة). الآن أول 64 نوعاً فقط لها أيقونة خاصة، والبقية تشترك في أيقونة الملف العامة. / **English:** the thumbnail view keeps at most 64 file-type icons; other types share the generic file icon.
 
 ## 0.10.0 — 2026-11-11
 
