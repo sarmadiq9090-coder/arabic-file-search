@@ -8,6 +8,7 @@
 - **ملف PDF مصمَّم بحلقة لا تنتهي** (نموذج يرسم نفسه، أو صفحة هي أصل نفسها) كان يُغلق البرنامج بعد ثوانٍ من كل تشغيل أثناء فهرسة المحتوى؛ صار يُفحص قبل قراءته ويُتخطّى. / **PDF loops** (a form drawing itself, a page tree that is its own parent) no longer crash the app: such files are checked first and skipped.
 - **ملف Excel (.xlsx) صغير يعلن عن عدد هائل من النصوص** كان يُغلق البرنامج لنفاد الذاكرة؛ صار يُرفض. / A tiny **.xlsx declaring trillions of shared strings** no longer aborts the app.
 - **ملف Excel قديم (.xls) يكرّر نصاً طويلاً في آلاف الخلايا** كان يستهلك جيجابايتات من الذاكرة؛ صار يُقرأ بالطريقة الآمنة الاحتياطية. / An **.xls repeating one long shared string in many cells** (a 2 MB file took ~9 GB) now falls back to the safe raw reader.
+- **حماية من تكرار الانهيار**: إذا أُغلق البرنامج فجأة أثناء قراءة ملف، يتخطّى ذلك الملف في التشغيل التالي (ويذكره في السجل) إلى أن يتغيّر، بدل أن ينهار عند كل تشغيل. / **Crash-loop guard:** a file the app died reading is skipped at the next start (and logged) until it changes.
 
 ## 0.10.0 — 2026-11-11
 

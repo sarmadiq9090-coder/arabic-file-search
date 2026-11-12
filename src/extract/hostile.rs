@@ -109,6 +109,8 @@ pub(crate) struct Child {
     pub peak: Option<usize>,
     pub elapsed: Duration,
     pub stderr: String,
+    /// With a store: how many files the last run died in (`recovered`).
+    pub recovered: Option<usize>,
 }
 
 const MB: usize = 1024 * 1024;
@@ -152,6 +154,7 @@ pub(crate) fn extract_in_child(path: &Path, mem_cap: usize, timeout: Duration, e
         peak: field("CHILD-PEAK").and_then(|v| v.parse().ok()),
         elapsed,
         stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        recovered: field("CHILD-RECOVERED").and_then(|v| v.parse().ok()),
     }
 }
 
@@ -168,7 +171,15 @@ fn child_entry() {
             let (base, _) = heap();
             PEAK.store(base, Ordering::Relaxed);
             CAP.store(base.saturating_add(cap), Ordering::Relaxed);
-            let text = extract_text(&path);
+            // With a store, the way the warm-up and the content search read.
+            let text = match std::env::var_os("BAHTH_TEST_CACHE_DIR") {
+                Some(dir) => {
+                    let cache = crate::content_cache::ContentCache::open(Path::new(&dir)).unwrap();
+                    println!("\nCHILD-RECOVERED {}", cache.recovered().len());
+                    crate::content_cache::text_of(Some(&cache), path.to_str().unwrap()).0
+                }
+                None => extract_text(&path),
+            };
             CAP.store(usize::MAX, Ordering::Relaxed);
             (text.map(|t| t.len()), heap().1.saturating_sub(base))
         })
@@ -379,6 +390,25 @@ fn pdf_parent_loop_does_not_kill_or_hang_the_process() {
         assert!(c.ok, "{name}: {c:?}");
         assert_eq!(c.text, Some(None), "{name}: {c:?}");
     }
+}
+
+#[test]
+fn crash_loop_guard_skips_the_file_the_last_run_died_in() {
+    // The reviewer's PDF with the check off stands for the next unknown
+    // parser bug: the first run dies inside it, the second skips it.
+    let pdf = temp_file("loop-start.pdf", &pdf_form_calling_itself());
+    let store = std::env::temp_dir().join(format!("bahth_hostile_store_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&store);
+    let env = [UNCHECKED_PDF, ("BAHTH_TEST_CACHE_DIR", store.to_str().unwrap())];
+    let run = || extract_in_child(&pdf, 512 * MB, Duration::from_secs(60), &env);
+    let first = run();
+    assert!(!first.ok && first.stderr.contains("overflowed its stack"), "{first:?}");
+    let second = run();
+    assert!(second.ok && second.text == Some(None) && second.recovered == Some(1), "{second:?}");
+    // Reported once; still skipped while the file stays as it is.
+    let third = run();
+    assert!(third.ok && third.text == Some(None) && third.recovered == Some(0), "{third:?}");
+    let _ = std::fs::remove_dir_all(&store);
 }
 
 // ---------------------------------------------------------------------------

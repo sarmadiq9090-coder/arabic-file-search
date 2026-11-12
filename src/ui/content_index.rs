@@ -27,6 +27,13 @@ pub(super) fn shared() -> Option<&'static ContentCache> {
                 )),
                 Err(e) => log(&format!("content index open failed: {e}")),
             }
+            if let Ok(c) = &cache {
+                // The last run died reading these: now skipped until they change.
+                for path in c.recovered() {
+                    log(&format!("content index: the last run stopped while reading {path}; skipped until the file changes"));
+                }
+                c.clear_markers_at_exit();
+            }
             cache.ok()
         })
         .as_ref()
