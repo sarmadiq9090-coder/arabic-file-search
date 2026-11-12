@@ -249,7 +249,12 @@ impl App {
         self.matches_text.set_focus();
     }
 
-    /// Saves the result list as a CSV file that Excel opens with Arabic intact.
+    /// Saves the result list as a CSV file that Excel opens with Arabic intact,
+    /// in columns. The file starts with the UTF-8 BOM (Excel reads Arabic
+    /// only with it) and uses Windows' list separator, as Excel does when
+    /// it opens a CSV: `,` in most regions, `;` where the decimal mark is a
+    /// comma. A `sep=,` first line is not used: the BOM has to come first,
+    /// and Excel then ignores the BOM and shows the Arabic as gibberish.
     pub(super) fn export_csv(&self) {
         if self.state.borrow().rows.is_empty() {
             self.set_status(tr!("لا توجد نتائج لتصديرها.", "There are no results to export."));
@@ -279,17 +284,23 @@ impl App {
             path.set_extension("csv");
         }
         let st = self.state.borrow();
+        let sep = csv_separator(&list_separator());
         let write = || -> std::io::Result<usize> {
             let mut f = std::io::BufWriter::new(std::fs::File::create(&path)?);
-            f.write_all(tr!("\u{FEFF}الاسم,المسار,الحجم بالبايت,تاريخ التعديل,النص المطابق\r\n", "\u{FEFF}Name,Path,Size in bytes,Date modified,Matching text\r\n").as_bytes())?;
+            let head = [
+                tr!("الاسم", "Name"),
+                tr!("المسار", "Path"),
+                tr!("الحجم بالبايت", "Size in bytes"),
+                tr!("تاريخ التعديل", "Date modified"),
+                tr!("النص المطابق", "Matching text"),
+            ];
+            f.write_all(format!("\u{FEFF}{}", csv_line(&head, sep)).as_bytes())?;
             let mut n = 0;
             for r in &st.rows {
                 let Some(e) = st.rows_index.entries.get(r.entry as usize) else { continue };
                 let size = if e.is_dir { String::new() } else { e.size.to_string() };
                 let fields = [e.name(), &e.path, &size, &shell::format_time(e.mtime, false), r.snippet.as_deref().unwrap_or("")];
-                let line: Vec<String> = fields.iter().map(|s| csv_field(s)).collect();
-                f.write_all(line.join(",").as_bytes())?;
-                f.write_all(b"\r\n")?;
+                f.write_all(csv_line(&fields, sep).as_bytes())?;
                 n += 1;
             }
             f.flush()?;
@@ -358,5 +369,74 @@ impl App {
 
     pub(super) fn custom_draw(&self, l: LPARAM) -> Option<isize> {
         crate::draw::handle_custom_draw(l, |row| self.match_ranges(row), |row| self.cell_text(row, COL_NAME))
+    }
+}
+
+/// Windows' list separator for the user (Region ▸ Additional settings ▸
+/// List separator), the one Excel splits a CSV it opens by. Empty when it
+/// can't be read.
+fn list_separator() -> String {
+    // Declared here: winapi's binding needs the "winnls" feature.
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetLocaleInfoW(locale: u32, lctype: u32, data: *mut u16, len: i32) -> i32;
+    }
+    const LOCALE_USER_DEFAULT: u32 = 0x0400;
+    const LOCALE_SLIST: u32 = 0x000C;
+    let mut buf = [0u16; 8];
+    // SAFETY: `buf` holds `buf.len()` units; the call writes at most that many.
+    let n = unsafe { GetLocaleInfoW(LOCALE_USER_DEFAULT, LOCALE_SLIST, buf.as_mut_ptr(), buf.len() as i32) };
+    let n = usize::try_from(n).unwrap_or(0).min(buf.len());
+    String::from_utf16_lossy(&buf[..n]).trim_end_matches('\0').to_string()
+}
+
+/// The separator for an exported CSV: Windows' list separator when it is
+/// one character Excel can split by, else a comma.
+fn csv_separator(list: &str) -> char {
+    let mut chars = list.chars();
+    match (chars.next(), chars.next()) {
+        (Some(c @ (',' | ';' | '\t' | '|')), None) => c,
+        _ => ',',
+    }
+}
+
+/// One CSV line, ending with CRLF: each field through `csv_field` (quotes,
+/// and the apostrophe that stops formulas), and quoted when it holds `sep`.
+fn csv_line(fields: &[&str], sep: char) -> String {
+    let mut line = String::new();
+    for (i, s) in fields.iter().enumerate() {
+        if i > 0 {
+            line.push(sep);
+        }
+        let f = csv_field(s);
+        // `csv_field` quotes for commas; an unquoted field has no `"` in it.
+        if !f.starts_with('"') && f.contains(sep) {
+            line.push('"');
+            line.push_str(&f);
+            line.push('"');
+        } else {
+            line.push_str(&f);
+        }
+    }
+    line.push_str("\r\n");
+    line
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn csv_uses_the_list_separator_and_keeps_the_formula_guard() {
+        assert_eq!(csv_separator(";"), ';');
+        assert_eq!(csv_separator(","), ',');
+        for odd in ["", "ab", ";;", "x", "\u{060C}"] {
+            assert_eq!(csv_separator(odd), ',', "{odd:?}");
+        }
+        assert_eq!(csv_line(&["تقرير.pdf", "C:\\a;b", "=1+1", "x,y"], ';'), "تقرير.pdf;\"C:\\a;b\";'=1+1;\"x,y\"\r\n");
+        assert_eq!(csv_line(&["a", "say \"hi\"", "-1"], ','), "a,\"say \"\"hi\"\"\",'-1\r\n");
+        assert_eq!(csv_line(&["=a;b"], ';'), "\"'=a;b\"\r\n");
+        // The locale call answers something (a comma on CI runners).
+        let _ = csv_separator(&list_separator());
     }
 }

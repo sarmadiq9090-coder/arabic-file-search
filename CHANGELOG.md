@@ -9,6 +9,7 @@
 - **الملف نفسه بمسارين ليس نسخة مكررة**: الروابط الصلبة (hard links) والوصلات (junctions) وأقراص `subst` تُعرف برقم الملف على القرص، فتُعرض «نفس الملف» دون حساب مساحة مهدرة، ولا يُحذف ملف لأن «نسخته» اسم آخر له. / **The same file under two paths is not a duplicate:** hard links, junctions and `subst` drives are recognised by file ID, shown as "the same file", not counted as wasted, and never deleted as each other's copy.
 - **الاستبدال بالتعبير النمطي لا يحذف نصاً بصمت**: «‎$1em» تعني المجموعة 1 ثم «em» (كانت تُقرأ مجموعة اسمها «1em» فيُستبدل التطابق بلا شيء)، والمجموعة غير الموجودة تُرفض برسالة واضحة، والمعاينة تعرض ما سيُكتب بالضبط. / **Regex replace no longer deletes text silently:** `$1em` is group 1 then "em"; a group that does not exist is refused with a clear message.
 - **الاستبدال لا يفسد ملفات بترميزات أخرى**: الملف الذي ليس UTF-8 يُعامل على أنه Windows-1256 فقط إذا قُرئ نصاً عربياً؛ ملفات Shift-JIS وGBK وBig5 وغيرها تُترك وتظهر «ترميز غير معروف — لم يُغيَّر». / **Replace no longer corrupts files in other encodings:** a non-UTF-8 file is treated as Windows-1256 only when it reads as Arabic; Shift-JIS, GBK, Big5 and others are skipped as "unknown encoding — not changed".
+- **تصدير النتائج (CSV) يفتح في أعمدة في Excel** حتى حيث فاصل القوائم في ويندوز «;»: يُستعمل فاصل القوائم من إعدادات المنطقة، مع بقاء العربية سليمة. / **CSV export opens in columns in Excel** where Windows' list separator is `;`: the export uses the regional list separator; Arabic stays intact.
 
 ## 0.10.0 — 2026-11-11
 
