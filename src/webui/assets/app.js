@@ -647,6 +647,8 @@
     const r = S.view === "results" ? S.rows[S.sel] : null;
     renderActbar(r);
     if (!r) { pv.replaceChildren(); return; }
+    // A document found by its text: a small icon, so its matching lines show.
+    pv.classList.toggle("doc", !!r.snippet);
     const kind = r.folder ? T.folder : r.ext ? T.fileOf(r.ext.toUpperCase()) : T.file;
     const facts = h("dl", { class: "facts" }, h("dt", null, T.fType), h("dd", null, kind));
     if (!r.folder) facts.append(h("dt", null, T.fSize), h("dd", { class: "num" }, size(r.size)));

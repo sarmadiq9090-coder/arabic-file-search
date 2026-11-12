@@ -214,6 +214,17 @@ mark { background: var(--mark-bg); color: var(--mark-fg); border-radius: 3px; pa
 .pv-name { font-size: 16px; font-weight: 600; line-height: 1.35; word-break: break-word; unicode-bidi: plaintext; text-align: start; }
 .pv-path { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; margin-top: 4px; text-align: start; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+/* The pane's buttons fit one or two even rows (English labels are longer). */
+.preview .actions .btn { padding-inline: 10px; }
+.preview .actions .btn.primary { flex: 1 1 auto; justify-content: center; }
+.preview.doc .thumb { height: 64px; }
+.preview.doc .thumb .ft { width: 30px; height: 34px; }
+/* Wide screens: a wider preview, the rows not stretched across the screen. */
+@media (min-width: 1700px) {
+  .body { grid-template-columns: minmax(0, 1fr) 440px; }
+  .chips, .apps, .switched, .banner { padding-inline: 28px; }
+  .row, .cols { padding-inline: 20px 28px; }
+}
 .btn { height: 36px; display: inline-flex; align-items: center; gap: 8px; padding-inline: 14px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text); font-weight: 500; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .btn:hover { border-color: var(--link); }
 .btn svg.i { width: 16px; height: 16px; }
