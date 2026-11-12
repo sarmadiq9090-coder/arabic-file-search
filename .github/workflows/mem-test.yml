@@ -1,0 +1,211 @@
+name: mem-test
+
+# Memory measurement of InstaFind on a real Windows machine (ci/mem-test.ps1):
+# the RELEASED bahth.exe of v0.9.1 and v0.10.0, and an exe built from this
+# branch exactly as build.yml's `exe` job builds the published one, side by
+# side. It measures; it is not a gate: high memory only raises warnings. A
+# job fails when the harness breaks, the program crashes or exits by itself.
+#
+# What runs is written in ci/test-plan.json, entry `mem-test` (see
+# ci/mem-test-plan.py): which exes, which scenarios. What is not in the plan
+# does not run; on a push, no plan means nothing runs at all. The scenarios
+# run as "legs", one Windows job each:
+#   quick          a short run of the harness itself (5 % of the waits and data)
+#   churn-<exe>    A (baseline) and F (file churn with every core and the disk busy, a big index)
+#   hook-branch    H (the same churn with the branch build's save-delay hook)
+#   robust-<exe>   O (watch-buffer overflow), K (killed mid-save), M (--moved handover),
+#                  S (second start beside a suspended copy), Q (session end)
+#   update         D (0.9.1 updates itself; a second copy is started), G (new look)
+#   static-<exe>   B, C, E (heavy tree, search stress, long idle; one run of the program)
+# The `report` job puts every leg in one table (job summary, artifact
+# `mem-test`).
+#
+# Limits, on purpose: a new push cancels the run before it; at most three
+# legs at a time; every job has a timeout, and the script stops by itself
+# before it (-BudgetMinutes, then its watchdog); the synthetic files leave at
+# least 10 GB of the disk free and are deleted at the end; no cache, no
+# secrets, read-only token. Network: the two released exes are downloaded
+# once per run (job `setup`), and in scenario D the program's own updater
+# asks GitHub for the latest release and downloads it once. Nothing else.
+#
+# Run it by hand (Actions → mem-test → Run workflow), or it runs when the
+# plan, its own files or the program's sources change on a claude/mem-test*
+# branch.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/mem-test**"]
+    paths:
+      - "ci/test-plan.json"
+      - "ci/mem-test.ps1"
+      - "ci/mem-test-plan.py"
+      - ".github/workflows/mem-test.yml"
+      # The exe built from the branch is one of the three measured.
+      - "src/**"
+      - "vendor/**"
+      - "assets/**"
+      - "build.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".cargo/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mem-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Reads the plan and, when a released exe is in it, downloads the two
+  # released exes once for every leg.
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      any: ${{ steps.plan.outputs.any }}
+      branch: ${{ steps.plan.outputs.branch }}
+      released: ${{ steps.plan.outputs.released }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Read ci/test-plan.json
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: python3 ci/mem-test-plan.py ci/test-plan.json
+      - name: Download the released exes
+        if: steps.plan.outputs.released == 'true'
+        run: |
+          for v in 0.9.1 0.10.0; do
+            mkdir -p "exe/$v"
+            curl --fail --silent --show-error --location --retry 3 --retry-delay 5 \
+              --output "exe/$v/bahth.exe" \
+              "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v$v/bahth.exe"
+            echo "v$v: $(stat -c %s "exe/$v/bahth.exe") bytes, SHA-256 $(sha256sum "exe/$v/bahth.exe" | cut -d' ' -f1)"
+          done
+      - if: steps.plan.outputs.released == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bahth-released-exes
+          path: exe
+          retention-days: 3
+
+  # The x64 exe of this branch, exactly as build.yml's `exe` job builds the
+  # published one: MSVC with a static C runtime (.cargo/config.toml), on
+  # Windows, without a build cache.
+  exe:
+    needs: setup
+    if: needs.setup.outputs.branch == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+      - name: Build bahth.exe
+        shell: bash
+        run: |
+          cargo build --release --target x86_64-pc-windows-msvc
+          cp target/x86_64-pc-windows-msvc/release/bahth.exe bahth.exe
+          echo "branch exe: $(stat -c %s bahth.exe) bytes, SHA-256 $(sha256sum bahth.exe | cut -d' ' -f1)"
+      - name: Check the imported DLLs
+        run: python ci/check_imports.py bahth.exe
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bahth-branch-exe
+          path: bahth.exe
+          retention-days: 3
+
+  # One leg of the plan. (Runs when the build above was skipped or failed
+  # too: only the legs of the branch exe need it.)
+  mem:
+    name: mem (${{ matrix.leg }})
+    needs: [setup, exe]
+    if: ${{ !cancelled() && needs.setup.outputs.any == 'true' }}
+    runs-on: windows-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - if: needs.setup.outputs.released == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bahth-released-exes
+          path: exe
+      - if: contains(matrix.versions, 'branch')
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bahth-branch-exe
+          path: exe/branch
+      - name: Memory test
+        shell: powershell
+        env:
+          MEM_LEG: ${{ matrix.leg }}
+          MEM_VERSIONS: ${{ matrix.versions }}
+          MEM_SCENARIOS: ${{ matrix.scenarios }}
+          MEM_TIME_SCALE: ${{ matrix.time_scale }}
+          MEM_SIZE_SCALE: ${{ matrix.size_scale }}
+          MEM_SAVE_DELAY_VAR: ${{ matrix.save_delay_var }}
+          MEM_SAVE_DELAY_MS: ${{ matrix.save_delay_ms }}
+          MEM_FAIL_ON_CRITERIA: ${{ matrix.fail_on_criteria }}
+        # 75 of the job's 90 minutes: the script's watchdog would end a hung
+        # run at 81, which leaves time to upload what was measured.
+        run: |
+          $a = @{
+            Out = "$env:RUNNER_TEMP/mem-test"; Leg = $env:MEM_LEG
+            Versions = $env:MEM_VERSIONS; Scenarios = $env:MEM_SCENARIOS
+            TimeScale = [double]$env:MEM_TIME_SCALE; SizeScale = [double]$env:MEM_SIZE_SCALE
+            SaveDelayVar = $env:MEM_SAVE_DELAY_VAR; SaveDelayMs = [int]$env:MEM_SAVE_DELAY_MS
+            BudgetMinutes = 75
+          }
+          if ($env:MEM_FAIL_ON_CRITERIA -eq 'true') { $a.FailOnCriteria = $true }
+          foreach ($e in @(@('Exe091', 'exe/0.9.1/bahth.exe'), @('Exe0100', 'exe/0.10.0/bahth.exe'), @('ExeBranch', 'exe/branch/bahth.exe'))) {
+            if (Test-Path $e[1]) {
+              $a[$e[0]] = $e[1]
+              Write-Host ("{0}: {1:N0} bytes, SHA-256 {2}" -f $e[1], (Get-Item $e[1]).Length, (Get-FileHash $e[1] -Algorithm SHA256).Hash.ToLower())
+            }
+          }
+          ./ci/mem-test.ps1 @a
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mem-test-${{ matrix.leg }}
+          path: ${{ runner.temp }}/mem-test
+          retention-days: 14
+
+  # One report from every leg that got as far as uploading its results.
+  report:
+    needs: [setup, mem]
+    if: ${{ !cancelled() && needs.setup.outputs.any == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: mem-test-*
+          path: ${{ runner.temp }}/mem-test
+      - name: One report
+        shell: pwsh
+        run: ./ci/mem-test.ps1 -Merge "$env:RUNNER_TEMP/mem-test" -Out "$env:RUNNER_TEMP/mem-test"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mem-test
+          path: ${{ runner.temp }}/mem-test
+          retention-days: 14
