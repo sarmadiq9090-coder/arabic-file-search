@@ -89,9 +89,38 @@ pub fn recycle_many(paths: &[String]) -> Vec<String> {
     paths.iter().filter(|p| !std::path::Path::new(p.as_str()).exists()).cloned().collect()
 }
 
-/// Opens Explorer with the file selected.
+/// Opens Explorer with the file selected. Explorer is started by its full
+/// path: a bare `explorer.exe` would be looked for in this exe's own folder
+/// first (Downloads, for a portable copy), where one could have been planted.
 pub fn reveal(path: &str) {
-    let _ = std::process::Command::new("explorer.exe").raw_arg(format!("/select,\"{path}\"")).spawn();
+    let Some(explorer) = windows_program("explorer.exe") else { return };
+    let _ = std::process::Command::new(explorer).raw_arg(format!("/select,\"{path}\"")).spawn();
+}
+
+/// A folder Windows reports through `get` (`GetSystemDirectoryW`,
+/// `GetWindowsDirectoryW`).
+fn windows_folder(get: unsafe extern "system" fn(*mut u16, u32) -> u32) -> Option<std::path::PathBuf> {
+    let mut buf = [0u16; 260];
+    let n = unsafe { get(buf.as_mut_ptr(), buf.len() as u32) } as usize;
+    (n > 0 && n < buf.len()).then(|| std::path::PathBuf::from(String::from_utf16_lossy(&buf[..n])))
+}
+
+/// The full path of a program that comes with Windows (`explorer.exe`,
+/// `control.exe`, `devmgmt.msc`, `regedit.exe`…): in the system folder
+/// (System32; SysWOW64 for the 32-bit exe on 64-bit Windows), then the
+/// 64-bit System32 as the 32-bit exe sees it (`Sysnative`, for tools that
+/// only exist there), then the Windows folder; `None` when it is in none of
+/// them (say `gpedit.msc` on Windows Home). Never a bare name, which
+/// `CreateProcess` and `ShellExecute` would look for in this exe's folder or
+/// the current folder first.
+pub fn windows_program(name: &str) -> Option<std::path::PathBuf> {
+    use winapi::um::sysinfoapi::{GetSystemDirectoryW, GetWindowsDirectoryW};
+    let windows = windows_folder(GetWindowsDirectoryW);
+    [windows_folder(GetSystemDirectoryW), windows.as_ref().map(|w| w.join("Sysnative")), windows]
+        .into_iter()
+        .flatten()
+        .map(|dir| dir.join(name))
+        .find(|p| p.is_file())
 }
 
 fn query_icon(name: &str, attrs: u32, flags: u32) -> (usize, i32) {
