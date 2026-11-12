@@ -20,11 +20,14 @@ use quick_xml::events::Event;
 
 mod archive;
 mod bidi_fix;
+mod budget;
 mod epub;
 #[cfg(test)]
 mod fuzz;
 #[cfg(test)]
 pub(crate) mod hostile;
+#[cfg(test)]
+mod slow;
 mod mail;
 mod pdf_guard;
 mod pdf_images;
@@ -121,9 +124,15 @@ pub fn extract_text(path: &Path) -> Option<String> {
         return None;
     }
 
-    let text = crate::crash_log::quietly(|| extract_by_ext(path, &ext))
-        .ok()
-        .flatten()?;
+    let budget = budget::start();
+    let text = crate::crash_log::quietly(|| extract_by_ext(path, &ext)).ok().flatten();
+    // Over its time budget (see `budget`): no text, rather than part of it,
+    // so the file is stored as such and not read again at every start.
+    if budget::exceeded() {
+        return None;
+    }
+    drop(budget);
+    let text = text?;
     let text = normalize_arabic_forms(&text).into_owned();
     if text.trim().is_empty() {
         None
@@ -233,7 +242,7 @@ fn strip_html(html: &str) -> String {
     let mut out = String::with_capacity(html.len() / 2);
     let lower = html.to_ascii_lowercase(); // same byte offsets as `html`
     let mut i = 0;
-    while i < html.len() {
+    while i < html.len() && !budget::tick() {
         let rest = &html[i..];
         if rest.starts_with("<!--") {
             i += rest.find("-->").map_or(rest.len(), |p| p + 3);
@@ -372,7 +381,7 @@ fn xml_to_text(xml: &str, flavor: XmlFlavor, out: &mut String) {
     };
 
     loop {
-        if out.len() > MAX_OUTPUT {
+        if out.len() > MAX_OUTPUT || budget::tick() {
             break;
         }
         let event = match reader.read_event() {
@@ -853,6 +862,9 @@ fn owned_data(d: calamine::DataRef<'_>) -> Data {
 fn push_sheet_cells(cells: impl Iterator<Item = (u32, Data)>, out: &mut String) -> bool {
     let mut row = None;
     for (r, cell) in cells {
+        if budget::tick() {
+            return true;
+        }
         if matches!(cell, Data::Empty) {
             continue;
         }
@@ -1161,7 +1173,7 @@ fn rtf_to_text(data: &[u8]) -> String {
     };
     let mut ansi_cp: u16 = 1252;
     // Font number -> code page, learned from \fonttbl.
-    let mut font_cp: Vec<(i32, u16)> = Vec::new();
+    let mut font_cp: std::collections::HashMap<i32, u16> = std::collections::HashMap::new();
     let mut table_font: Option<i32> = None;
 
     let mut state = RtfGroup {
@@ -1176,16 +1188,16 @@ fn rtf_to_text(data: &[u8]) -> String {
     // Fallback characters still to skip after a `\uN`.
     let mut pending_skip = 0usize;
 
-    let current_enc = |state: &RtfGroup, font_cp: &[(i32, u16)], ansi_cp: u16| {
-        let cp = state
-            .font
-            .and_then(|f| font_cp.iter().find(|(n, _)| *n == f).map(|(_, cp)| *cp))
-            .unwrap_or(ansi_cp);
+    let current_enc = |state: &RtfGroup, font_cp: &std::collections::HashMap<i32, u16>, ansi_cp: u16| {
+        let cp = state.font.and_then(|f| font_cp.get(&f).copied()).unwrap_or(ansi_cp);
         codepage_encoding(cp)
     };
 
     let mut i = 0;
     while i < data.len() {
+        if budget::tick() {
+            break;
+        }
         let b = data[i];
         match b {
             b'{' => {
@@ -1233,8 +1245,7 @@ fn rtf_to_text(data: &[u8]) -> String {
                             _ => None,
                         };
                         if let (Some(f), Some(cp)) = (table_font, cp) {
-                            font_cp.retain(|(n, _)| *n != f);
-                            font_cp.push((f, cp));
+                            font_cp.insert(f, cp);
                         }
                         continue;
                     }

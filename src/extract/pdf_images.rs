@@ -15,6 +15,8 @@ use lopdf::{Dictionary, Document, Object, ObjectId, Stream};
 
 /// Pages whose images are looked at.
 pub const MAX_PAGES: usize = 50;
+/// Images of one document handed to OCR, at most.
+pub const MAX_IMAGES: usize = 64;
 /// A PDF whose text averages fewer non-space characters per page than this
 /// counts as scanned.
 pub const SCANNED_CHARS_PER_PAGE: usize = 20;
@@ -51,22 +53,29 @@ pub fn page_images(doc: &Document, max_pages: usize) -> Vec<Vec<u8>> {
 
 /// Like [`page_images`] but hands each image to `f` as soon as it is found,
 /// stopping when `f` returns false.
+/// At most [`MAX_IMAGES`] in all.
 pub fn for_each_page_image(doc: &Document, max_pages: usize, mut f: impl FnMut(Vec<u8>) -> bool) {
     let mut seen = HashSet::new();
+    let mut given = 0;
     for (_, page_id) in doc.get_pages().into_iter().take(max_pages) {
         let mut ids = Vec::new();
         if let Some(res) = page_resources(doc, page_id) {
-            collect_images(doc, res, 0, &mut ids);
+            collect_images(doc, res, 0, &mut HashSet::new(), &mut ids);
         }
         for id in ids {
             if !seen.insert(id) {
                 continue;
             }
+            if super::budget::exceeded() {
+                return;
+            }
             if let Ok(Object::Stream(s)) = doc.get_object(id)
                 && let Some(img) = encode_image(doc, s)
-                && !f(img)
             {
-                return;
+                given += 1;
+                if !f(img) || given >= MAX_IMAGES {
+                    return;
+                }
             }
         }
     }
@@ -95,8 +104,11 @@ fn page_resources(doc: &Document, page_id: ObjectId) -> Option<&Dictionary> {
     None
 }
 
-/// Object ids of the image XObjects in `res`, descending into forms.
-fn collect_images(doc: &Document, res: &Dictionary, depth: u32, ids: &mut Vec<ObjectId>) {
+/// Object ids of the image XObjects in `res`, descending into forms, each
+/// form once per page (`forms`: those entered so far). Forms sharing one
+/// resource dictionary that lists them all were entered again at every
+/// level: 60 forms made 60^5 visits.
+fn collect_images(doc: &Document, res: &Dictionary, depth: u32, forms: &mut HashSet<ObjectId>, ids: &mut Vec<ObjectId>) {
     let Some(Object::Dictionary(xobjects)) = dict_entry(doc, res, b"XObject") else {
         return;
     };
@@ -104,14 +116,14 @@ fn collect_images(doc: &Document, res: &Dictionary, depth: u32, ids: &mut Vec<Ob
         let Ok(id) = value.as_reference() else { continue };
         let Ok(Object::Stream(s)) = doc.get_object(id) else { continue };
         match s.dict.get(b"Subtype").and_then(Object::as_name) {
-            Ok(b"Image") => {
+            Ok(b"Image") if ids.len() < MAX_IMAGES => {
                 if !ids.contains(&id) {
                     ids.push(id);
                 }
             }
-            Ok(b"Form") if depth < MAX_FORM_DEPTH => {
+            Ok(b"Form") if depth < MAX_FORM_DEPTH && ids.len() < MAX_IMAGES && forms.insert(id) => {
                 if let Some(Object::Dictionary(form_res)) = dict_entry(doc, &s.dict, b"Resources") {
-                    collect_images(doc, form_res, depth + 1, ids);
+                    collect_images(doc, form_res, depth + 1, forms, ids);
                 }
             }
             _ => {}

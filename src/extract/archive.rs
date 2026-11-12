@@ -178,7 +178,7 @@ impl<'a> Collector<'a> {
 
     /// Counts one more entry; false once the archive should not be read on.
     fn next_entry(&mut self) -> bool {
-        if self.seen >= self.lim.members || self.total >= self.lim.total || self.out_len >= MAX_OUTPUT {
+        if self.seen >= self.lim.members || self.total >= self.lim.total || self.out_len >= MAX_OUTPUT || super::budget::exceeded() {
             return false;
         }
         self.seen += 1;

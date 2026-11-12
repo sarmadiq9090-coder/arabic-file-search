@@ -9,6 +9,7 @@
 - **ملف Excel (.xlsx) صغير يعلن عن عدد هائل من النصوص** كان يُغلق البرنامج لنفاد الذاكرة؛ صار يُرفض. / A tiny **.xlsx declaring trillions of shared strings** no longer aborts the app.
 - **ملف Excel قديم (.xls) يكرّر نصاً طويلاً في آلاف الخلايا** كان يستهلك جيجابايتات من الذاكرة؛ صار يُقرأ بالطريقة الآمنة الاحتياطية. / An **.xls repeating one long shared string in many cells** (a 2 MB file took ~9 GB) now falls back to the safe raw reader.
 - **حماية من تكرار الانهيار**: إذا أُغلق البرنامج فجأة أثناء قراءة ملف، يتخطّى ذلك الملف في التشغيل التالي (ويذكره في السجل) إلى أن يتغيّر، بدل أن ينهار عند كل تشغيل. / **Crash-loop guard:** a file the app died reading is skipped at the next start (and logged) until it changes.
+- **ملفات مصمَّمة تُبطئ الفهرسة لساعات** (RTF بمئات آلاف الخطوط، رسائل eml بفواصل أو عناوين مشوّهة، PDF بنماذج متشابكة أو آلاف الصور) صارت تُقرأ بسرعة، ولكل ملف حدّ زمني: ما يتجاوزه يُحفظ «بلا نص» ولا يُعاد في كل تشغيل. / **Files crafted to take hours** (huge RTF font tables, eml boundaries and subjects, PDF form webs, thousands of images) are now fast, and every file has a time budget; one that runs over is stored as having no text.
 
 ## 0.10.0 — 2026-11-11
 
