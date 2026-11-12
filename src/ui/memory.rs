@@ -101,6 +101,15 @@ impl App {
     }
 
     fn memory_resume(&self) {
+        // Not when watching was switched off meanwhile, nor while the index
+        // is being scanned or loaded (that ends by watching again itself).
+        {
+            let st = self.state.borrow();
+            if !st.settings.auto_index || st.scan.is_some() || st.loading.is_some() {
+                log("memory guard: not watching again now (watching is off, or the index is being scanned or loaded)");
+                return;
+            }
+        }
         self.start_watching();
         let roots = self.state.borrow().index.roots.clone();
         log(&format!("memory guard: watching again; walking {} (paced)", roots.join(" ")));
