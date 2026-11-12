@@ -507,6 +507,10 @@ impl App {
             set_dword(REG_ON, 0);
             self.web.watcher.borrow_mut().take();
             self.stop_web();
+            // Off means off: every phone's cookie and the old link stop
+            // working, also for a request still being answered, and the
+            // next time it is turned on there is a new PIN.
+            self.rotate_web_secrets();
             *self.web.session.borrow_mut() = net::Session::Nothing;
             *self.web.failed_for.borrow_mut() = None;
             self.web.refusal.set(None);
@@ -523,14 +527,22 @@ impl App {
         }
     }
 
-    fn new_web_secrets(&self) {
+    /// New secrets for the running (or next) server; false if the OS
+    /// generator failed (the old ones then stay).
+    fn rotate_web_secrets(&self) -> bool {
         let Some((t, p)) = new_secrets() else {
-            *self.web.error.borrow_mut() = Some(tr!("تعذر إنشاء رمز سري آمن.", "Could not create a secure PIN.").into());
-            self.refresh_web_window();
-            return;
+            log("web: could not make new secrets");
+            return false;
         };
         if let Some(s) = self.web.shared.borrow().as_ref() {
             s.set_secrets(t, p);
+        }
+        true
+    }
+
+    fn new_web_secrets(&self) {
+        if !self.rotate_web_secrets() {
+            *self.web.error.borrow_mut() = Some(tr!("تعذر إنشاء رمز سري آمن.", "Could not create a secure PIN.").into());
         }
         self.refresh_web_window();
     }

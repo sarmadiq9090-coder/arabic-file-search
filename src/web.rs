@@ -1602,6 +1602,38 @@ mod tests {
         assert!(TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_err(), "stopped");
     }
 
+    /// Turning it off and on again, as the window does: the listener is
+    /// closed, and with the new secrets set on the same `Shared` the old
+    /// cookie and link no longer work.
+    #[test]
+    fn off_closes_and_new_secrets_end_old_sessions() {
+        let shared = Arc::new(shared_with(vec![entry(r"C:\docs\report.pdf", 10, false)]));
+        let mut server = Server::start_on(&[Ipv4Addr::LOCALHOST], 0, shared.clone()).unwrap();
+        let addr = server.addrs[0];
+        let fetch = |addr: SocketAddr, cookie: &str| {
+            let mut s = TcpStream::connect(addr).unwrap();
+            s.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            s.write_all(format!("GET /?q=report HTTP/1.1\r\nHost: {addr}\r\nCookie: {COOKIE}={cookie}\r\n\r\n").as_bytes()).unwrap();
+            let mut out = String::new();
+            let _ = s.read_to_string(&mut out);
+            out
+        };
+        assert!(fetch(addr, TOKEN).starts_with("HTTP/1.1 200"));
+        server.stop();
+        std::thread::sleep(Duration::from_millis(50));
+        assert!(TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_err(), "listener closed");
+        let new = "f".repeat(32);
+        shared.set_secrets(new.clone(), "87654321".into());
+        let server = Server::start_on(&[Ipv4Addr::LOCALHOST], 0, shared.clone()).unwrap();
+        let addr = server.addrs[0];
+        assert!(fetch(addr, TOKEN).starts_with("HTTP/1.1 401"), "old cookie");
+        assert_eq!(handle(&get(&format!("/?t={TOKEN}"), None), LAN, &shared, Instant::now()).status, 401, "old link");
+        assert!(fetch(addr, &new).starts_with("HTTP/1.1 200"));
+        // The session cookie stays out of scripts and other sites.
+        let c = session_cookie(TOKEN);
+        assert!(c.contains("; Path=/;") && c.contains("HttpOnly") && c.contains("SameSite=Strict"), "{c}");
+    }
+
     /// A tiny xorshift generator: the same cases on every run.
     struct Rng(u64);
     impl Rng {
