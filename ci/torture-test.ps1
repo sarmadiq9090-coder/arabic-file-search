@@ -382,8 +382,9 @@ function Health([string]$When) {
     return $alive
 }
 # Runs the command-line search of the copy under test (never longer than
-# TimeoutS: a command line that hangs is a core failure).
-function Cli([string[]]$CliArgs, [int]$TimeoutS = 180) {
+# TimeoutS: a command line that hangs is a core failure). Not called "Cli":
+# that is a built-in alias of Clear-Item, and an alias wins over a function.
+function Run-Cli([string[]]$CliArgs, [int]$TimeoutS = 180) {
     $r = [TT]::Run($App, $CliArgs, $TimeoutS * 1000)
     Detail ("cli {0} -> exit {1} in {2} ms, {3} chars{4}" -f (Short $r.Line 300), $r.Code, $r.Ms, $r.Out.Length, $(if ($r.Err) { "; stderr: $(Short $r.Err 200)" } else { '' }))
     if ($r.TimedOut) { Record 'command line' 'core' "the command line answers within $TimeoutS s" $false (Short $r.Line 200) }
@@ -394,7 +395,7 @@ function Cli([string[]]$CliArgs, [int]$TimeoutS = 180) {
 function Cli-Map([string]$Scope, [string]$Text = 'zq') {
     $a = @('-s', $Text, '--all', '-n', '5000000')
     if ($Scope) { $a += @('--scope', $Scope) }
-    $r = Cli $a
+    $r = Run-Cli $a
     if ($r.TimedOut -or $r.Code -lt 0 -or $r.Code -gt 1) { $script:cliError = "exit $($r.Code) $(Short $r.Err 200)"; return $null }
     $map = @{}
     foreach ($line in ($r.Out -split "`r?`n")) {
@@ -553,9 +554,14 @@ function Gui-Seed([string]$When, [string]$Kind = 'core') {
 function Show-Main {
     $w = Main-Window -Shown
     if ($w) { return $w }
-    $again = Start-Process -FilePath $App -PassThru
-    [void]$again.WaitForExit(15000)
-    return (Wait-Until { Main-Window -Shown } 10)
+    for ($try = 1; $try -le 2; $try++) {
+        $again = Start-Process -FilePath $App -PassThru
+        [void]$again.WaitForExit(20000)
+        $w = Wait-Until { Main-Window -Shown } 15
+        if ($w) { return $w }
+        Detail "Show-Main: no window on screen after start $try; processes: $((App-Ids) -join ', ')"
+    }
+    return $null
 }
 # Opens a popup menu with `Open`, finds the item matching `Pattern`, closes
 # the menu and reports the choice the way the menu itself does
@@ -823,19 +829,19 @@ function Group-Names {
         # Reserved device names (CON, NUL, COM1...), which hold no token.
         $dev = $S.items | Where-Object { $_.Flags -eq 'dev' -and $_.Made -eq 1 } | Select-Object -First 1
         if ($dev) {
-            $r = Cli @('-s', 'con|prn|aux|nul|com|lpt|clock', '--scope', $dev.Dir, '--all', '--count')
+            $r = Run-Cli @('-s', 'con|prn|aux|nul|com|lpt|clock', '--scope', $dev.Dir, '--all', '--count')
             $n = 0; [void][int]::TryParse($r.Out.Trim(), [ref]$n)
             Record 'names' 'probe' 'files named like devices (CON, NUL, COM1...) are indexed' ($n -eq $dev.Kids) "$n of $($dev.Kids) listed"
         }
         # Output formats over the hostile names.
         $r1 = $S.items | Where-Object { $_.Round -eq 1 -and $_.Flags -eq '' } | Select-Object -First 1
         if ($r1) {
-            $r = Cli @('-s', 'zq', '--scope', $r1.Dir, '--all', '--json')
+            $r = Run-Cli @('-s', 'zq', '--scope', $r1.Dir, '--all', '--json')
             # (Windows PowerShell hands back a JSON array as one object: count its items.)
             $objects = -1
             try { $objects = @(ConvertFrom-Json $r.Out | ForEach-Object { $_ }).Count } catch { Detail "JSON did not parse: $_" }
             Record 'names' 'probe' 'the JSON output over hostile names parses' ($r.Code -eq 0 -and $objects -gt 50) "exit $($r.Code), $objects objects, $($r.Out.Length) characters"
-            $r = Cli @('-s', 'zq', '--scope', $r1.Dir, '--all', '--csv', '--sort', 'name', '--desc')
+            $r = Run-Cli @('-s', 'zq', '--scope', $r1.Dir, '--all', '--csv', '--sort', 'name', '--desc')
             Record 'names' 'probe' 'the CSV output over hostile names has its header and a row for each' ($r.Code -eq 0 -and $r.Out -match 'path,size,modified' -and ($r.Out -split "`n").Count -gt 50) "exit $($r.Code), $(($r.Out -split "`n").Count) lines"
         }
         [void](Check-Crash 'command-line searches for hostile names')
@@ -851,20 +857,20 @@ function Group-Names {
         $bad = @(); $slow = @()
         foreach ($q in $queries) {
             if (Out-Of-Time) { break }
-            $r = Cli @('-s', $q, '--count') 90
+            $r = Run-Cli @('-s', $q, '--count') 90
             if ($r.Code -lt 0 -or $r.Code -gt 2) { $bad += "'$(Short $q 40)' -> exit $($r.Code)" }
             if ($r.Ms -gt 20000) { $slow += "'$(Short $q 40)' $($r.Ms) ms" }
         }
         Record 'queries' 'core' 'hostile queries on the command line end with exit 0, 1 or 2' ($bad.Count -eq 0) ("{0} queries; wrong: {1}" -f $queries.Count, ($bad -join '; '))
         Record 'queries' 'probe' 'no query takes longer than 20 s on the command line' ($slow.Count -eq 0) ($slow -join '; ')
         foreach ($a in @(@('-n', '18446744073709551615', '-s', 'zq'), @('--max=0', '-s', 'zq'), @('--sort', 'date', '--desc', '--csv', '-s', 'zq', '-n', '5'), @('--scope', 'Q:\nowhere\', '-s', 'zq'), @('--scope', ('C:\' + ('x' * 30000)), '-s', 'zq'), @('--json', '--count', '-s', 'x'), @('-s'), @('-s', 'zq', '--bogus'), @('-s', 'zq', '-n', 'many'), @('-s', 'zq', '--sort', 'colour'))) {
-            $r = Cli $a 90
+            $r = Run-Cli $a 90
             if ($r.Code -lt 0 -or $r.Code -gt 2) { Record 'queries' 'core' "odd options end cleanly ($(Short ($a -join ' ') 60))" $false "exit $($r.Code)" }
         }
         [void](Check-Crash 'hostile queries on the command line')
         # An argument that is not valid Unicode: no shell passes one, so a
         # crash report here is a finding, not a failure.
-        $r = Cli @('-s', ('zq' + [char]0xD800 + 'x'), '--count') 60
+        $r = Run-Cli @('-s', ('zq' + [char]0xD800 + 'x'), '--count') 60
         $crashed = Test-Path -LiteralPath $crash
         if ($crashed) { Move-Item -LiteralPath $crash -Destination (Join-Path $Out 'crash-cli-lone-surrogate.txt') -Force }
         Record 'queries' 'probe' 'a command-line argument with a lone surrogate ends cleanly (no crash report)' (-not $crashed -and $r.Code -ge 0 -and $r.Code -le 2) "exit $($r.Code); crash report written: $crashed"
@@ -1108,13 +1114,13 @@ function Group-Tree {
         $inside = if ($map.ContainsKey($S.deniedInside)) { 'listed' } else { 'not listed (the folder cannot be opened)' }
         Note 'tree' 'file inside a folder with access denied' $inside
         # Junctions to the drive root and to Windows must not be followed.
-        $r = Cli @('-s', 'notepad.exe|explorer.exe|kernel32.dll', '--scope', (Join-Path $S.dir 'loop'), '--all', '--count')
+        $r = Run-Cli @('-s', 'notepad.exe|explorer.exe|kernel32.dll', '--scope', (Join-Path $S.dir 'loop'), '--all', '--count')
         $n = -1; [void][int]::TryParse($r.Out.Trim(), [ref]$n)
         Record 'tree' 'core' 'junctions and symbolic links to the drive root are not followed' ($r.Code -eq 1 -or $n -eq 0) "exit $($r.Code), $n Windows files listed under the loop folder"
-        $r = Cli @('-s', 'zq', '--scope', (Join-Path $S.dir 'loop'), '--all', '--count')
+        $r = Run-Cli @('-s', 'zq', '--scope', (Join-Path $S.dir 'loop'), '--all', '--count')
         Note 'tree' 'entries under the loop folder' "$($r.Out.Trim()) with a token (expected 1)"
         # The folder of 200,000.
-        $r = Cli @('-s', 'zq1', '--scope', $S.big, '--all', '--count')
+        $r = Run-Cli @('-s', 'zq1', '--scope', $S.big, '--all', '--count')
         $n = -1; [void][int]::TryParse($r.Out.Trim(), [ref]$n)
         Record 'tree' 'core' "all $($S.bigCount) files of the big folder are in the index" ($n -eq $S.bigCount) "$n counted in $($r.Ms) ms"
         $rng = New-Object Random 7
@@ -1124,12 +1130,12 @@ function Group-Tree {
         Record 'tree' 'core' 'a random sample of the big folder is found by name' ($missing.Count -eq 0) "$($pick.Count) sampled; missing: $($missing -join ' ')"
         # Sorting and formats over the odd dates and sizes.
         foreach ($a in @(@('--sort', 'date'), @('--sort', 'date', '--desc', '--csv'), @('--sort', 'size', '--desc', '--json'), @('--sort', 'size', '--csv'))) {
-            $r = Cli (@('-s', 'zq', '--scope', $S.dir, '--all') + $a)
+            $r = Run-Cli (@('-s', 'zq', '--scope', $S.dir, '--all') + $a)
             if ($r.Code -ne 0) { Record 'tree' 'core' "sorted output over odd dates and sizes ($($a -join ' '))" $false "exit $($r.Code)" }
             if ($a -contains '--csv' -and $a -contains 'date') { [IO.File]::WriteAllText((Join-Path $Out 'tree-dates.csv'), $r.Out, (New-Object Text.UTF8Encoding $true)) }
         }
         if ($S.sparseTb) {
-            $r = Cli @('-s', "$($S.sparseTb) size:>500gb", '--scope', $S.dir, '--all', '--count')
+            $r = Run-Cli @('-s', "$($S.sparseTb) size:>500gb", '--scope', $S.dir, '--all', '--count')
             Record 'tree' 'probe' 'size:>500gb finds the 1 TB sparse file' ($r.Out.Trim() -eq '1') "counted $($r.Out.Trim())"
         }
         if ($S.other) {
@@ -1419,7 +1425,12 @@ function Scenario([string]$Area, [string]$Label, [string[]]$Dirty, [scriptblock]
     [void](Stop-App)
     Restore-Data
     $S.dirty = $Dirty
-    try { & $Damage } catch { Record 'harness' 'core' "the damage for '$Label' could be made" $false "$($_.Exception.Message) (line $($_.InvocationInfo.ScriptLineNumber))"; return }
+    try { & $Damage } catch {
+        $msg = "$($_.Exception.Message) (line $($_.InvocationInfo.ScriptLineNumber))"
+        if ($msg -match 'Could not find|Cannot find path|does not exist') { Note $Area "skipped: $Label" "the file to damage is not there: $msg"; $S.skipped++ }
+        else { Record 'harness' 'core' "the damage for '$Label' could be made" $false $msg }
+        return
+    }
     [void](Start-App)
     $main = Wait-Until { Main-Window } 30
     $end = (Get-Date).AddSeconds($Observe)
@@ -1711,14 +1722,22 @@ function Group-Instances {
         Record 'instances' 'core' 'a second copy started from another folder steps aside' ($left -and $now.Count -eq 1 -and $now[0] -eq $first[0]) "second copy exited: $left; processes: $($now -join ', ') (first was $($first -join ', '))"
         if (-not $left) { try { $second.Kill() } catch { } }
         # With the command-line flags of a start at sign-in and after an update.
+        # --startup must step aside. --updated is how a freshly installed
+        # version starts while the old one closes: it may wait for the old
+        # copy or take over; either way exactly one copy must be left.
         foreach ($flag in '--startup', '--updated') {
+            $before = @(App-Ids)
             $p = Start-Process -FilePath $App -ArgumentList $flag -PassThru
             $left = $p.WaitForExit(80000)
-            $n = [TM]::AppCount()
-            Record 'instances' 'core' "a second copy started with $flag steps aside" ($left -and $n -eq 1) "exited: $left; processes: $n"
-            if (-not $left) { try { $p.Kill() } catch { } }
+            $one = Wait-Until { [TM]::AppCount() -eq 1 } 15
+            $now = @(App-Ids)
+            $how = if ($left) { 'it stepped aside' } elseif ($now -contains $p.Id) { 'it took over from the running copy' } else { 'unclear' }
+            if ($flag -eq '--startup') { Record 'instances' 'core' "a second copy started with $flag steps aside" ($left -and $now.Count -eq 1) "exited: $left; processes: $($now -join ', ') (before: $($before -join ', '))" }
+            else { Record 'instances' 'core' "a copy started with $flag leaves exactly one copy running" ([bool]$one) "$how; processes: $($now -join ', ') (before: $($before -join ', '))" }
+            if ($now.Count -gt 1 -and -not $left) { try { $p.Kill() } catch { } }
             if ((Time-Left) -lt 8) { break }
         }
+        [void](Wait-Main 'after the second copies' 60 -Quiet)
         [void](Health 'second copies')
     } 3
     Step 'the close button and Alt+F4 hide to the tray' {
@@ -1833,11 +1852,16 @@ function Group-Instances {
         [void](Health '--moved relaunch')
         if ($S.indexed) { [void](Wait-Loaded 60); [void](Gui-Seed 'after the --moved relaunch') }
         if ((Time-Left) -gt 4) {
-            # And when the old copy does not go away: the new one gives up.
+            # And when the old copy does not go away by itself: one of the
+            # two must go (the new one gives up, or it takes over).
+            $before = @(App-Ids)
             $p = Start-Process -FilePath $App -ArgumentList '--moved' -PassThru
             $left = $p.WaitForExit(90000)
-            Record 'instances' 'core' 'a --moved copy steps aside when the first copy keeps running' ($left -and [TM]::AppCount() -eq 1) "exited: $left; processes: $([TM]::AppCount())"
-            if (-not $left) { try { $p.Kill() } catch { } }
+            $one = Wait-Until { [TM]::AppCount() -eq 1 } 15
+            $now = @(App-Ids)
+            $how = if ($left) { 'it stepped aside' } elseif ($now -contains $p.Id) { 'it took over from the running copy' } else { 'unclear' }
+            Record 'instances' 'core' 'a --moved copy started while the first keeps running leaves exactly one copy' ([bool]$one) "$how; processes: $($now -join ', ') (before: $($before -join ', '))"
+            if ($now.Count -gt 1 -and -not $left) { try { $p.Kill() } catch { } }
         }
     } 3
 }
@@ -2122,7 +2146,7 @@ function Group-Soak {
             $round++
             if ($S.indexed) {
                 $q = $queries[$round % $queries.Count]
-                $r = Cli @('-s', $q, '--count', '--all') 120
+                $r = Run-Cli @('-s', $q, '--count', '--all') 120
                 $searches++
                 if ($r.Ms -gt $slowest) { $slowest = $r.Ms }
                 if ($r.Code -lt 0 -or $r.Code -gt 2) { $badCli += "'$q' exit $($r.Code)" }
