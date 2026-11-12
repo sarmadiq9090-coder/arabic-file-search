@@ -643,6 +643,53 @@ pub fn reselect(rows: &[Row], previous: Option<&Target>) -> Option<usize> {
     Some(previous.and_then(|t| rows.iter().position(|r| &r.target == t)).unwrap_or(0))
 }
 
+/// Whether the arrow keys stop on `row`. The exchange-rate credit under a
+/// currency answer (an answer row that opens a web page) is a source line:
+/// it stays clickable, as the provider's terms ask, but is not a second
+/// answer to step onto.
+pub fn selectable(row: &Row) -> bool {
+    !(row.group == Group::Answers && matches!(row.target, Target::Launcher(Action::OpenUri(_))))
+}
+
+/// The row the arrow keys (`delta` ±1, wrapping) or Page Up/Down (more,
+/// stopping at the ends) move to from `current`, passing over rows that
+/// are not [`selectable`]. `None` when no row is.
+pub fn step_selection(rows: &[Row], current: Option<usize>, delta: i32) -> Option<usize> {
+    let n = rows.len();
+    if !rows.iter().any(selectable) {
+        return None;
+    }
+    let ok = |i: usize| rows.get(i).is_some_and(selectable);
+    if delta.abs() > 1 {
+        let start = current.map_or(0, |c| (c as i64 + delta as i64).clamp(0, n as i64 - 1) as usize);
+        // Onward in the same direction, else back.
+        let dir: i64 = if delta > 0 { 1 } else { -1 };
+        let mut i = start as i64;
+        while (0..n as i64).contains(&i) {
+            if ok(i as usize) {
+                return Some(i as usize);
+            }
+            i += dir;
+        }
+        let mut i = start as i64;
+        while (0..n as i64).contains(&i) {
+            if ok(i as usize) {
+                return Some(i as usize);
+            }
+            i -= dir;
+        }
+        return None;
+    }
+    let mut at = current;
+    for _ in 0..n {
+        at = move_selection(at, delta, n);
+        if at.is_some_and(ok) {
+            return at;
+        }
+    }
+    None
+}
+
 /// Moves the selection by `delta` rows, wrapping around.
 pub fn move_selection(current: Option<usize>, delta: i32, len: usize) -> Option<usize> {
     if len == 0 {
@@ -1267,6 +1314,36 @@ mod tests {
         // Other answers carry no credit.
         let rows = arrange(Parts { query: "2+2".into(), pins: vec![], items: catalog_items(&[], "2+2"), files: vec![], files_done: true });
         assert!(rows.iter().all(|r| r.title != "Rates By Exchange Rate API"));
+    }
+
+    #[test]
+    fn the_arrow_keys_pass_over_the_rates_credit() {
+        let items = catalog_items(&["Notepad"], "100 usd to iqd");
+        let mut rows = arrange(Parts { query: "100 usd to iqd".into(), pins: vec![], items, files: vec![], files_done: true });
+        rows.push(Row::file("C:\\usd.txt", false));
+        let credit = rows.iter().position(|r| r.title == "Rates By Exchange Rate API").unwrap();
+        assert!(!selectable(&rows[credit]) && selectable(&rows[0]));
+        assert_eq!(credit, 1);
+        // Down from the answer goes past the credit, and up comes back to the answer.
+        let next = step_selection(&rows, Some(0), 1).unwrap();
+        assert!(next != credit && selectable(&rows[next]));
+        assert_eq!(step_selection(&rows, Some(next), -1), Some(0));
+        // Wrapping and Page Up/Down never land on it either.
+        for start in [None, Some(0), Some(rows.len() - 1)] {
+            for delta in [1, -1, 4, -4, 40, -40] {
+                let at = step_selection(&rows, start, delta);
+                assert!(at.is_some_and(|i| i != credit), "{start:?} {delta} -> {at:?}");
+            }
+        }
+        assert_eq!(step_selection(&rows, Some(0), -4), Some(0));
+        // Only the credit (or nothing): nothing to select.
+        assert_eq!(step_selection(&rows[credit..credit + 1], None, 1), None);
+        assert_eq!(step_selection(&[], Some(3), 1), None);
+        // Elsewhere the steps are the plain ones.
+        let files: Vec<Row> = (0..5).map(|i| Row::file(&format!("C:\\f{i}.txt"), false)).collect();
+        assert_eq!(step_selection(&files, Some(4), 1), Some(0));
+        assert_eq!(step_selection(&files, None, -1), Some(4));
+        assert_eq!(step_selection(&files, Some(1), 4), Some(4));
     }
 
     #[test]

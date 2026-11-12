@@ -16,6 +16,7 @@
 - **عبارة خانة البحث أبسط**: «اكتب اسم الملف أو جزءاً منه… مثال: تقرير .pdf» بدل أمثلة برموز غير مشروحة (! و|). / **English:** simpler search hint: "Type a file name or part of it… e.g. report .pdf".
 - **مفاتيح نافذة البحث الصغيرة ظاهرة**: سطر تحت خانة البحث «Enter فتح · Ctrl+Enter المجلد · Tab المزيد · Esc إغلاق». / **English:** the quick popup shows its keys under the box: "Enter open · Ctrl+Enter folder · Tab more · Esc close".
 - **«فتح باستخدام…» و«خصائص»** في قائمة النقر بالزر الأيمن على نتيجة، كما في مستكشف الملفات. / **English:** "Open with…" and "Properties" in the result list's right-click menu.
+- **جواب تحويل العملات**: السطر تحته «سعر تقريبي · التاريخ · Enter للنسخ»، وسطر مصدر الأسعار لم يعد «جواباً» ثانياً تقف عليه الأسهم (يبقى قابلاً للنقر لفتح موقع المصدر). / **English:** currency answers say "approximate rate · date · Enter copies"; the arrow keys pass over the rates source line, which stays clickable.
 
 ## 0.10.0 — 2026-11-11
 

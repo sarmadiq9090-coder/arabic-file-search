@@ -880,13 +880,8 @@ impl App {
     }
 
     fn popup_move(&self, delta: i32) {
-        let n = self.popup.rows.borrow().len();
-        let cur = self.popup.selected.get();
-        let next = if delta.abs() > 1 {
-            cur.map(|c| (c as i64 + delta as i64).clamp(0, n as i64 - 1) as usize).or((n > 0).then_some(0))
-        } else {
-            quick::move_selection(cur, delta, n)
-        };
+        // Past the rows that are not for selecting (the rates credit).
+        let next = quick::step_selection(&self.popup.rows.borrow(), self.popup.selected.get(), delta);
         self.popup.selected.set(next);
         unsafe { InvalidateRect(self.popup_hwnd(), std::ptr::null(), 0) };
     }
