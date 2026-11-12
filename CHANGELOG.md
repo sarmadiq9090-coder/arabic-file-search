@@ -2,6 +2,12 @@
 
 # سجل التغييرات
 
+## غير منشور (Unreleased)
+
+### أمان
+- **البحث من الهاتف يعمل في شبكة المنزل فقط**: بعد فتح البرنامج (ومنه التشغيل المخفي مع ويندوز) لا يبدأ وحده إلا على الشبكة التي فعّلته عليها وما دام ويندوز يعدّها شبكة خاصة، لا في شبكة مقهى أو فندق أو جامعة، ولا حين يتعذّر على ويندوز تحديد الشبكة. يتوقف حين يتغيّر الاتصال إلى شبكة أخرى، وتشرح نافذته السبب مع زر «السماح بهذه الشبكة». أثناء عمله يظهر «البحث من الهاتف يعمل» في تلميح أيقونة الساعة وعلامة بجانب الخيار. / **Phone search stays at home:** it starts by itself only on the network it was turned on at, while Windows marks it private; it stops on any other network, says why, and offers "Allow this network"; the tray tip shows "Phone search is on".
+- **عنوان البحث من الهاتف يتبع الشبكة**: إن بدأ البرنامج قبل اتصال Wi-Fi أو تغيّر عنوان الحاسوب، ينتقل الخادم إلى العنوان الجديد وتعرض النافذة العنوان الحالي أو سبب التوقف. / **Follows address changes:** it re-binds after Wi-Fi comes up or the IP changes, and the window shows the current address.
+
 ## 0.10.0 — 2026-11-11
 
 ### الرخصة

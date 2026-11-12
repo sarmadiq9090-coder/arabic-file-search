@@ -1,13 +1,24 @@
 //! Options ▸ "Search from phone (home network)…": the window that turns the
 //! read-only web server of `crate::web` on and off, and shows the address,
 //! the PIN and the direct link. Off by default; the switch, the port, the
-//! download switch and the secrets are kept under `HKCU\Software\BahthSari`.
+//! download switch, the secrets and the home network's id are kept under
+//! `HKCU\Software\BahthSari`.
+//!
+//! With the switch on, the server follows the network ([`web::net`]): a
+//! look every few seconds on a thread of its own, and it listens only on
+//! the addresses of the home network (the one it was turned on at, while
+//! Windows marks it private) or of a network the user allowed in this run.
+//! It stops when the PC leaves that network and moves with a new address.
+//! While it runs, the tray icon's tip and a check mark on the Options item
+//! say so.
 
 use native_windows_gui as nwg;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::net::Ipv4Addr;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::ERROR_SUCCESS;
@@ -18,14 +29,20 @@ use winapi::um::winuser::{GWL_EXSTYLE, GetWindowLongW, SWP_FRAMECHANGED, SWP_NOM
 use super::lazy::Lazy;
 use super::shell::wide;
 use super::startup::log;
-use super::{App, WS_EX_LAYOUTRTL, autostart};
+use super::keys::HOTKEY_TEXT;
+use super::{App, WS_EX_LAYOUTRTL, autostart, title};
 use crate::web;
+use crate::web::net::{self, Refusal};
 
 const REG_ON: &str = "WebServer";
 const REG_PORT: &str = "WebPort";
 const REG_DOWNLOAD: &str = "WebDownload";
 const REG_TOKEN: &str = "WebToken";
 const REG_PIN: &str = "WebPin";
+/// The Network List Manager id of the network the user turned it on at.
+const REG_HOME: &str = "WebHomeNetwork";
+/// How long a click waits for Windows to say which network this is.
+const LOOK_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// The server, its window and its menu item: one field of `App`.
 #[derive(Default)]
@@ -37,6 +54,22 @@ pub struct WebUi {
     server: RefCell<Option<web::Server>>,
     /// The last error, shown in the details until the next try.
     error: RefCell<Option<String>>,
+    /// The switch is on (saved as `WebServer`): the server runs whenever
+    /// the network allows it.
+    wanted: Cell<bool>,
+    /// Looks at the network while the switch is on.
+    watcher: RefCell<Option<net::Watcher>>,
+    /// What the user allowed in this run of the program.
+    session: RefCell<net::Session>,
+    /// The LAN addresses the running server was asked to listen on.
+    listening: RefCell<Option<Vec<Ipv4Addr>>>,
+    /// Addresses a start failed on (the port is taken): not retried until
+    /// the network or the user's choice changes.
+    failed_for: RefCell<Option<Vec<Ipv4Addr>>>,
+    /// Why the server is off although the switch is on.
+    refusal: Cell<Option<Refusal>>,
+    /// The network seen last, for the window.
+    seen: RefCell<Vec<net::Candidate>>,
 }
 
 impl std::ops::Deref for WebUi {
@@ -57,6 +90,7 @@ pub struct WebWindow {
     port_input: nwg::TextInput,
     details: nwg::TextBox,
     new_btn: nwg::Button,
+    allow_btn: nwg::Button,
     close_btn: nwg::Button,
 }
 
@@ -218,28 +252,44 @@ impl App {
             .position((12, 422))
             .size((200, 34))
             .build(&mut w.new_btn)?;
+        nwg::Button::builder()
+            .parent(p)
+            .font(f)
+            .text(tr!("السماح بهذه الشبكة", "Allow this network"))
+            .position((220, 422))
+            .size((200, 34))
+            .build(&mut w.allow_btn)?;
+        w.allow_btn.set_visible(false);
         nwg::Button::builder().parent(p).font(f).text(tr!("إغلاق", "Close")).position((428, 422)).size((120, 34)).build(&mut w.close_btn)?;
         self.web.ui.set(ui);
         Ok(())
     }
 
-    /// Binds the menu item's events and starts the server if it was left
-    /// on. Called once from `build_ui`; the handler is unbound with the others.
+    /// Binds the menu item's events and, if the switch was left on, starts
+    /// looking at the network (the server starts when the network allows
+    /// it). Called once from `build_ui`; the handler is unbound with the others.
     pub(super) fn setup_web(self: &Rc<Self>) -> nwg::EventHandler {
         let weak = Rc::downgrade(self);
         let main = self.bind_main_events(move |evt, _data, handle| {
             let Some(app) = weak.upgrade() else { return };
             match evt {
                 nwg::Event::OnMenuItemSelected if handle == app.web.menu_item && app.ensure_web_window() => app.show_web_window(),
-                nwg::Event::OnTimerTick if handle == app.timer => app.sync_web_index(),
+                nwg::Event::OnTimerTick if handle == app.timer => {
+                    app.poll_web_network();
+                    app.sync_web_index();
+                }
                 // Only a real exit stops it; the close button keeps the
                 // program running in the tray.
-                nwg::Event::OnWindowClose if handle == app.window && !app.close_hides() => app.stop_web(),
+                nwg::Event::OnWindowClose if handle == app.window && !app.close_hides() => {
+                    app.web.watcher.borrow_mut().take();
+                    app.stop_web();
+                }
                 _ => {}
             }
         });
         if get_dword(REG_ON) == Some(1) {
-            self.start_web();
+            self.web.wanted.set(true);
+            self.watch_web_network();
         }
         main
     }
@@ -259,6 +309,10 @@ impl App {
                 nwg::Event::OnButtonClick if handle == app.web.on_chk => app.on_web_switch(),
                 nwg::Event::OnButtonClick if handle == app.web.download_chk => app.on_web_download_switch(),
                 nwg::Event::OnButtonClick if handle == app.web.new_btn => app.new_web_secrets(),
+                nwg::Event::OnButtonClick if handle == app.web.allow_btn => {
+                    app.allow_web_network();
+                    app.refresh_web_window();
+                }
                 nwg::Event::OnButtonClick if handle == app.web.close_btn => app.web.window.set_visible(false),
                 _ => {}
             }
@@ -266,6 +320,10 @@ impl App {
     }
 
     fn show_web_window(&self) {
+        // A fresh look, so the window soon shows the network as it is now.
+        if let Some(w) = self.web.watcher.borrow().as_ref() {
+            w.look_now();
+        }
         self.refresh_web_window();
         self.web.window.set_visible(true);
         self.web.window.set_focus();
@@ -287,8 +345,11 @@ impl App {
         Some(s)
     }
 
-    fn start_web(&self) -> bool {
+    /// Starts the server on `ips` (LAN addresses [`net::plan`] allows) and
+    /// 127.0.0.1.
+    fn start_web(&self, ips: &[Ipv4Addr]) -> bool {
         self.stop_web();
+        *self.web.failed_for.borrow_mut() = Some(ips.to_vec());
         let port = if self.web.ui.is_built() {
             self.web.port_input.text().trim().parse::<u16>().ok().filter(|p| *p >= 1024)
         } else {
@@ -305,11 +366,15 @@ impl App {
         };
         shared.set_index(self.state.borrow().index.clone());
         self.set_web_show_system(&shared);
-        match web::Server::start(port, shared) {
+        let mut all = ips.to_vec();
+        all.push(Ipv4Addr::LOCALHOST);
+        match web::Server::start_on(&all, port, shared) {
             Ok(server) => {
                 log(&format!("web: listening on {} address(es), port {port}", server.addrs.len()));
                 set_dword(REG_PORT, port as u32);
                 *self.web.server.borrow_mut() = Some(server);
+                *self.web.listening.borrow_mut() = Some(ips.to_vec());
+                *self.web.failed_for.borrow_mut() = None;
                 *self.web.error.borrow_mut() = None;
                 true
             }
@@ -336,21 +401,116 @@ impl App {
 
     /// Stops the server, if running. Also called when the program closes.
     fn stop_web(&self) {
-        if let Some(mut s) = self.web.server.borrow_mut().take() {
+        *self.web.listening.borrow_mut() = None;
+        let stopped = self.web.server.borrow_mut().take();
+        if let Some(mut s) = stopped {
             s.stop();
             log("web: stopped");
         }
+        self.update_web_indicator();
+    }
+
+    fn watch_web_network(&self) {
+        let mut w = self.web.watcher.borrow_mut();
+        if w.is_none() {
+            *w = net::Watcher::start();
+            if w.is_none() {
+                log("web: could not start watching the network");
+            }
+        }
+    }
+
+    /// The newest look at the network, from the watcher's thread.
+    fn poll_web_network(&self) {
+        let seen = self.web.watcher.borrow().as_ref().and_then(|w| w.latest());
+        if let Some(seen) = seen {
+            self.apply_web_network(seen);
+        }
+    }
+
+    /// Starts, stops or moves the server as the network allows (the rule is
+    /// [`net::plan`] and [`net::step`]).
+    fn apply_web_network(&self, seen: Vec<net::Candidate>) {
+        if !self.web.wanted.get() {
+            return;
+        }
+        let home = get_string(REG_HOME).filter(|h| !h.is_empty());
+        let plan = net::plan(&seen, home.as_deref(), &self.web.session.borrow());
+        *self.web.seen.borrow_mut() = seen;
+        if plan.bind.is_empty() {
+            *self.web.failed_for.borrow_mut() = None;
+        }
+        let listening = self.web.listening.borrow().clone();
+        let mut changed = match net::step(listening.as_deref(), &plan) {
+            net::Step::Keep => false,
+            net::Step::Stop => {
+                log("web: this network is not allowed; stopping");
+                self.stop_web();
+                true
+            }
+            net::Step::Listen(ips) => {
+                if self.web.failed_for.borrow().as_ref() == Some(&ips) {
+                    false
+                } else {
+                    self.start_web(&ips);
+                    self.update_web_indicator();
+                    true
+                }
+            }
+        };
+        let refusal = if plan.bind.is_empty() { plan.refusal } else { None };
+        if self.web.refusal.replace(refusal) != refusal {
+            if let Some(r) = refusal {
+                log(&format!("web: not started: {r:?}"));
+            }
+            changed = true;
+        }
+        if changed && self.web.ui.is_built() && self.web.window.visible() {
+            self.refresh_web_window();
+        }
+    }
+
+    /// The user turned it on or pressed "Allow this network": this network
+    /// is allowed for this run, and remembered as home if Windows marks it
+    /// private.
+    fn allow_web_network(&self) {
+        let seen = net::look_within(LOOK_TIMEOUT);
+        let (home, session) = net::allow_now(&seen);
+        if let Some(id) = home {
+            set_string(REG_HOME, &id);
+        }
+        *self.web.session.borrow_mut() = session;
+        *self.web.failed_for.borrow_mut() = None;
+        *self.web.error.borrow_mut() = None;
+        self.apply_web_network(seen);
+    }
+
+    /// The tray icon's tip and the Options item's check mark say whether
+    /// the server runs.
+    fn update_web_indicator(&self) {
+        let on = self.web.server.borrow().is_some();
+        self.web.menu_item.set_checked(on);
+        let base = format!("{} ({HOTKEY_TEXT})", title());
+        let tip = if on { format!("{base} — {}", tr!("البحث من الهاتف يعمل", "Phone search is on")) } else { base };
+        self.tray.set_tip(&tip);
     }
 
     fn on_web_switch(&self) {
         let on = self.web.on_chk.check_state() == nwg::CheckBoxState::Checked;
         if on {
-            let ok = self.start_web();
-            set_dword(REG_ON, ok as u32);
+            self.web.wanted.set(true);
+            set_dword(REG_ON, 1);
+            self.allow_web_network();
+            self.watch_web_network();
         } else {
-            self.stop_web();
-            *self.web.error.borrow_mut() = None;
+            self.web.wanted.set(false);
             set_dword(REG_ON, 0);
+            self.web.watcher.borrow_mut().take();
+            self.stop_web();
+            *self.web.session.borrow_mut() = net::Session::Nothing;
+            *self.web.failed_for.borrow_mut() = None;
+            self.web.refusal.set(None);
+            *self.web.error.borrow_mut() = None;
         }
         self.refresh_web_window();
     }
@@ -391,8 +551,11 @@ impl App {
         let w = &self.web;
         let server = w.server.borrow();
         let running = server.is_some();
-        w.on_chk.set_check_state(if running { nwg::CheckBoxState::Checked } else { nwg::CheckBoxState::Unchecked });
+        let wanted = w.wanted.get();
+        w.on_chk.set_check_state(if wanted { nwg::CheckBoxState::Checked } else { nwg::CheckBoxState::Unchecked });
         w.port_input.set_readonly(running);
+        let refusal = if wanted && !running { w.refusal.get() } else { None };
+        w.allow_btn.set_visible(matches!(refusal, Some(Refusal::NotHome | Refusal::NotPrivate | Refusal::Unknown)));
         let mut text = String::new();
         if let Some(e) = w.error.borrow().as_ref() {
             text.push_str(e);
@@ -437,8 +600,43 @@ impl App {
                     text.push_str(&format!("http://{a}/?t={token}\r\n"));
                 }
             }
+            _ if wanted => text.push_str(&off_reason(refusal, &w.seen.borrow(), w.error.borrow().is_some())),
             _ => text.push_str(tr!("متوقف. فعّل الخيار أعلاه للبدء.", "Off. Tick the box above to start.")),
         }
         w.details.set_text(&text);
     }
+}
+
+/// Why the switch is on but the server is not running, for the window.
+fn off_reason(refusal: Option<Refusal>, seen: &[net::Candidate], failed: bool) -> String {
+    let mut text = String::from(match refusal {
+        Some(Refusal::NotHome) => tr!("لم يبدأ البحث من الهاتف: هذه ليست شبكتك المنزلية.", "Phone search did not start: this is not your home network."),
+        Some(Refusal::NotPrivate) => tr!(
+            "لم يبدأ البحث من الهاتف: ويندوز لا يعدّ هذه الشبكة خاصة (منزلية).",
+            "Phone search did not start: Windows does not mark this network as private (home)."
+        ),
+        Some(Refusal::Unknown) => tr!(
+            "لم يبدأ البحث من الهاتف: تعذّر على ويندوز تحديد هذه الشبكة.",
+            "Phone search did not start: Windows could not tell which network this is."
+        ),
+        Some(Refusal::NoNetwork) => tr!(
+            "لم يبدأ البحث من الهاتف: لا يوجد اتصال بشبكة. يبدأ وحده حين تتصل بشبكتك المنزلية.",
+            "Phone search did not start: no network connection. It starts by itself when you join your home network."
+        ),
+        None if failed => "",
+        None => tr!("جارِ التحقق من الشبكة…", "Checking the network…"),
+    });
+    let names: Vec<&str> = seen.iter().filter_map(|c| c.network.as_ref()).map(|n| n.name.as_str()).filter(|n| !n.is_empty()).collect();
+    if !names.is_empty() && refusal.is_some() {
+        text.push_str("\r\n");
+        text.push_str(&trf!("الشبكة الحالية: {}", "This network: {}", names.join("، ")));
+    }
+    if matches!(refusal, Some(Refusal::NotHome | Refusal::NotPrivate | Refusal::Unknown)) {
+        text.push_str("\r\n\r\n");
+        text.push_str(tr!(
+            "إن كانت هذه شبكتك المنزلية فاضغط «السماح بهذه الشبكة». الشبكة التي يعدّها ويندوز عامة تُسمح حتى إغلاق البرنامج فقط.",
+            "If this is your home network, press \"Allow this network\". A network Windows marks as public is allowed only until InstaFind closes."
+        ));
+    }
+    text
 }

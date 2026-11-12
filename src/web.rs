@@ -2,6 +2,9 @@
 //!
 //! Off unless the user turns it on (Options ▸ "Search from phone"). Safety
 //! comes first:
+//! - by itself it runs only on the home network: the one the user turned
+//!   it on at, while Windows marks it private ([`net`]); it stops when the
+//!   PC moves to another network;
 //! - it listens only on private LAN addresses (10/8, 172.16/12, 192.168/16,
 //!   169.254/16) and 127.0.0.1, and drops any connection whose peer or local
 //!   address is not private;
@@ -30,6 +33,8 @@ use std::time::{Duration, Instant};
 
 use crate::index::{Entry, Index};
 use crate::search::{Query, search_names};
+
+pub mod net;
 
 #[cfg_attr(not(windows), allow(dead_code))]
 pub const DEFAULT_PORT: u16 = 8765;
@@ -1060,14 +1065,9 @@ pub struct Server {
 
 #[cfg_attr(not(windows), allow(dead_code))]
 impl Server {
-    /// Listens on `port` of every private LAN address and of 127.0.0.1.
+    /// Listens on `port` of each of `ips` that is private (the caller
+    /// passes the LAN addresses [`net::plan`] allows, and 127.0.0.1).
     /// Fails if none of them can be bound (e.g. the port is taken).
-    pub fn start(port: u16, shared: Arc<Shared>) -> io::Result<Server> {
-        let mut ips: Vec<Ipv4Addr> = lan_addresses();
-        ips.push(Ipv4Addr::LOCALHOST);
-        Server::start_on(&ips, port, shared)
-    }
-
     pub fn start_on(ips: &[Ipv4Addr], port: u16, shared: Arc<Shared>) -> io::Result<Server> {
         let stop = Arc::new(AtomicBool::new(false));
         let active = Arc::new(AtomicUsize::new(0));
