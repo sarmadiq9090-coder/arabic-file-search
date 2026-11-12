@@ -18,34 +18,37 @@
       ph: "ابحث باسم الملف…", phContent: "ابحث داخل المستندات ثم اضغط Enter…", type: "النوع", size: "الحجم", date: "التاريخ",
       filters: "عوامل التصفية", lookIn: "البحث في", allDrives: "كل الأقراص", chooseFolder: "اختيار مجلد…", clearFilter: "إزالة",
       inside: "داخل المستندات", sortBy: "الترتيب",
-      sorts: { best: "الأنسب أولاً", name: "الاسم", path: "المسار", size: "الحجم", date: "آخر تعديل" },
+      sorts: { best: "الأنسب أولاً", name: "الاسم", path: "المسار", size: "الحجم", date: "تاريخ التعديل" },
       asc: "تصاعدي", desc: "تنازلي",
-      cName: "الاسم والمسار", cSize: "الحجم", cDate: "آخر تعديل",
+      cName: "الاسم والمسار", cSize: "الحجم", cDate: "تاريخ التعديل",
       results: "النتائج", preview: "المعاينة",
-      recent: "فتحتها مؤخراً", recentNone: "الملفات التي تفتحها تظهر هنا.", tryThese: "جرّب هذه",
+      recent: "ملفات فتحتها مؤخراً", recentNone: "الملفات التي تفتحها تظهر هنا.", tryThese: "جرّب هذه",
       trust: "كل شيء يبقى على جهازك. لا نجمع أي بيانات استخدام.",
       tips: [["تقرير .pdf", "ملفات PDF فقط"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"], ['"عقد إيجار"', "العبارة كما هي"], ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["hgjrvdv", "لوحة المفاتيح الخطأ ← «التقرير»"]],
-      kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد", kMenu: "إجراءات",
+      kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد", kMenu: "المزيد",
       open: "فتح", openFolder: "فتح المجلد", copyPath: "نسخ المسار", more: "إجراءات أخرى",
-      fType: "النوع", fSize: "الحجم", fMod: "آخر تعديل", fMatches: "التطابقات", folder: "مجلد", file: "ملف",
+      fType: "النوع", fSize: "الحجم", fMod: "تاريخ التعديل", fMatches: "التطابقات", folder: "مجلد", file: "ملف", fileOf: (x) => `ملف ${x}`,
       nres: (n) => (n === 0 ? "لا نتائج" : n === 1 ? "نتيجة واحدة" : n === 2 ? "نتيجتان" : n <= 10 ? `${num(n)} نتائج` : `${num(n)} نتيجة`),
       nMatches: (n) => (n === 1 ? "تطابق واحد" : n === 2 ? "تطابقان" : n <= 10 ? `${num(n)} تطابقات` : `${num(n)} تطابقاً`),
-      count: (n, ms) => `عدد النتائج: ${num(n)} (خلال ${num(ms)} ملّي ثانية)`,
+      count: (n, ms) => (n ? `وجدت ${T.nres(n)} في ${num(ms)} ملّي ثانية` : T.nres(0)),
       files: (n) => `الفهرس محدَّث · ${num(n)} ملف`,
       noresH: (q) => `لا توجد نتائج لـ «${q}»`,
       noresSub: (n, kind, scope) => `بحثنا في أسماء ${num(n)} ملف ${scope ? `داخل ${scope}` : "في كل الأقراص"}${kind ? `، ضمن «${kind}» فقط` : ""}.`,
       noresSubContent: (scope) => `بحثنا داخل المستندات ${scope ? `في ${scope}` : "في كل الأقراص"}.`,
       noresIx: "الفهرسة ما زالت جارية، وقد يظهر الملف حين تنتهي.",
+      stillIx: "ما زلنا نفهرس ملفاتك…", stillIxSub: "ستظهر النتائج هنا تلقائياً.",
+      switchedText: "هذا الشكل الجديد لبحث سريع. تفضّل القديم؟", dismiss: "إخفاء", matchesPre: "كل التطابقات — ",
       tagHead: "لا شيء يضيع بصمت", tagTail: ": إذا لم نجد شيئاً نقول لك أين بحثنا وماذا تجرّب.",
-      loading: "جارٍ تحميل الفهرس…", ixSub: "يمكنك البحث الآن، وقد تكون النتائج ناقصة حتى ننتهي. القائمة تتحدث وحدها.",
+      loading: "جارٍ تحميل الفهرس…", ixSub: "يمكنك البحث الآن. قد تكون النتائج ناقصة إلى أن تنتهي الفهرسة، وتكتمل القائمة تلقائياً.",
       moreRows: "مرّر لعرض المزيد", searching: "جارٍ البحث داخل المستندات…", pressEnter: "اضغط Enter للبحث داخل المستندات.",
-      sugg: { query: "يبحث بهذا النص بدلاً مما كتبت", all_kinds: "يزيل فلتر النوع", all_drives: "يبحث خارج المجلد المختار", contents: "يقرأ نص المستندات أيضاً", web: "يفتح المتصفح، ولا يرسل شيئاً غير ما كتبته" },
+      sugg: { query: "يبحث بهذا النص بدلاً مما كتبت", all_kinds: "يبحث في كل الأنواع", all_drives: "يبحث خارج المجلد المختار", contents: "يقرأ نص المستندات أيضاً", web: "يفتح المتصفح، ولا يرسل شيئاً غير ما كتبته" },
       now: "الآن", minAgo: (n) => (n === 1 ? "قبل دقيقة" : n === 2 ? "قبل دقيقتين" : n <= 10 ? `قبل ${num(n)} دقائق` : `قبل ${num(n)} دقيقة`),
       today: "اليوم", yesterday: "أمس",
       units: ["بايت", "كيلوبايت", "ميغابايت", "غيغابايت", "تيرابايت"],
       stop: "إيقاف", note: "تنبيه",
       // right-click menu
       mOpen: "فتح الملف", mReveal: "فتح المجلد الذي يحتويه", mCopyFile: "نسخ الملف", mCopyPath: "نسخ المسار", mCopyAll: "نسخ مسارات كل النتائج",
+      mSizes: "أحجام المجلدات هنا…", mReplace: "استبدال نص في الملفات…", exportBtn: "تصدير النتائج", reindexBtn: "تحديث الفهرس",
       mScope: "البحث في هذا المجلد", mRename: "تغيير الاسم", mRecycle: "نقل إلى سلة المحذوفات", mMatches: "عرض كل التطابقات داخل الملف",
       // dialogs
       renameH: "تغيير الاسم", renameLabel: "الاسم الجديد", renameOk: "تغيير الاسم", cancel: "إلغاء", close: "إغلاق",
@@ -62,11 +65,14 @@
       settings: "الإعدادات", settingsKey: "الإعدادات (Ctrl+,)", back: "رجوع إلى البحث",
       sLang: "اللغة", sLangNote: "ستظهر الواجهة باللغة المختارة بعد إعادة تشغيل البرنامج.", restart: "إعادة التشغيل الآن",
       sDisplay: "العرض", sDigits: "عرض الأرقام بالعربية (٠١٢٣)",
-      sLook: "الشكل الجديد", sLookSub: "هذا هو الشكل الجديد للبرنامج، وما زال تجريبياً. يمكنك العودة إلى الشكل القديم متى شئت.", classicLook: "العودة إلى الشكل القديم",
+      sLook: "الشكل الجديد", sLookSub: "هذا هو الشكل الجديد للبرنامج. يمكنك العودة إلى الشكل القديم متى شئت، والرجوع منه إلى الجديد من «خيارات ← جرّب الشكل الجديد».", classicLook: "العودة إلى الشكل القديم",
+      app: "تطبيق", appsLabel: "برامج بهذا الاسم",
+      compact: "عرض مضغوط", compactSub: "سطر واحد لكل نتيجة، فتظهر نتائج أكثر", showPreview: "إظهار المعاينة", hidePreview: "إخفاء المعاينة",
+      sMore: "المزيد", sMoreRow: "خيارات أخرى", sMoreSub: "التحقق من التحديثات، الدعم والملاحظات، أدوات مثل الملفات المكررة وأحجام المجلدات، وإعدادات البحث من أي مكان", moreBtn: "فتح قائمة الخيارات…",
       sSearch: "البحث والفهرسة", sHideSystem: "إخفاء ملفات النظام", sHideSystemSub: "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
       sContentIndex: "فهرسة محتوى المستندات في الخلفية", sContentIndexSub: "بحث أسرع داخل الملفات، ويشمل النص في الصور والملفات الممسوحة",
       sAutoIndex: "تحديث الفهرس تلقائياً عند تغيّر الملفات", reindex: "تحديث الفهرس الآن",
-      sAnywhere: "البحث من أي مكان", sHotkey: "Ctrl+Alt+F يفتح نافذة البحث الصغيرة (وإلا هذه النافذة)",
+      sAnywhere: "البحث من أي مكان", sHotkey: "Ctrl+Alt+F يفتح نافذة البحث الصغيرة (عند الإيقاف: هذه النافذة)",
       sFloating: "خانة بحث شفافة فوق الساعة", sTray: "أيقونة بجانب الساعة",
       sStartup: "التشغيل", sAutostart: "التشغيل مع ويندوز (في الخلفية)",
       sAbout: "حول البرنامج", version: (v) => `بحث سريع (InstaFind) — الإصدار ${v}`,
@@ -79,29 +85,32 @@
       asc: "ascending", desc: "descending",
       cName: "Name and path", cSize: "Size", cDate: "Modified",
       results: "Results", preview: "Preview",
-      recent: "Recently opened", recentNone: "Files you open show up here.", tryThese: "Try these",
+      recent: "Recently opened files", recentNone: "Files you open show up here.", tryThese: "Try these",
       trust: "Everything stays on your PC. No usage data is collected.",
       tips: [["report .pdf", "PDF files only"], ["size:>10mb", "Bigger than 10 MB"], ["dm:thisweek", "Changed this week"], ['"lease agreement"', "Exact phrase"], ["root: كتاب", "Arabic root: مكتبة، الكاتب"], ["احمد", "Also finds «أحمد»"]],
-      kNav: "Move", kOpen: "Open", kFolder: "Folder", kMenu: "Actions",
+      kNav: "Move", kOpen: "Open", kFolder: "Folder", kMenu: "More",
       open: "Open", openFolder: "Open folder", copyPath: "Copy path", more: "More actions",
-      fType: "Type", fSize: "Size", fMod: "Modified", fMatches: "Matches", folder: "Folder", file: "File",
+      fType: "Type", fSize: "Size", fMod: "Modified", fMatches: "Matches", folder: "Folder", file: "File", fileOf: (x) => `${x} file`,
       nres: (n) => (n === 0 ? "No results" : n === 1 ? "1 result" : `${num(n)} results`),
       nMatches: (n) => (n === 1 ? "1 match" : `${num(n)} matches`),
-      count: (n, ms) => `${num(n)} results in ${num(ms)} ms`,
+      count: (n, ms) => (n ? `Found ${T.nres(n)} in ${num(ms)} ms` : T.nres(0)),
       files: (n) => `Index up to date · ${num(n)} files`,
       noresH: (q) => `No results for “${q}”`,
       noresSub: (n, kind, scope) => `We searched ${num(n)} file names ${scope ? `in ${scope}` : "on all drives"}${kind ? `, “${kind}” only` : ""}.`,
       noresSubContent: (scope) => `We searched inside documents ${scope ? `in ${scope}` : "on all drives"}.`,
       noresIx: "Indexing is still running; the file may appear when it finishes.",
+      stillIx: "Still indexing your files…", stillIxSub: "Results will appear here by themselves.",
+      switchedText: "This is InstaFind's new look. Prefer the old one?", dismiss: "Dismiss", matchesPre: "All matches — ",
       tagHead: "Nothing gets lost silently", tagTail: ": when we find nothing, we tell you where we looked and what to try.",
       loading: "Loading the index…", ixSub: "You can search now; results may be incomplete until we finish. The list updates by itself.",
       moreRows: "Scroll for more", searching: "Searching inside documents…", pressEnter: "Press Enter to search inside documents.",
-      sugg: { query: "Searches for this instead", all_kinds: "Removes the type filter", all_drives: "Looks outside the chosen folder", contents: "Reads the documents' text too", web: "Opens your browser with only what you typed" },
+      sugg: { query: "Searches for this instead", all_kinds: "Searches all types", all_drives: "Looks outside the chosen folder", contents: "Reads the documents' text too", web: "Opens your browser with only what you typed" },
       now: "Just now", minAgo: (n) => (n === 1 ? "1 min ago" : `${num(n)} min ago`),
       today: "Today", yesterday: "Yesterday",
       units: ["bytes", "KB", "MB", "GB", "TB"],
       stop: "Stop", note: "Note",
       mOpen: "Open file", mReveal: "Open containing folder", mCopyFile: "Copy file", mCopyPath: "Copy path", mCopyAll: "Copy paths of all results",
+      mSizes: "Folder sizes here…", mReplace: "Replace text in files…", exportBtn: "Export results", reindexBtn: "Update index",
       mScope: "Search in this folder", mRename: "Rename", mRecycle: "Move to Recycle Bin", mMatches: "Show all matches in the file",
       renameH: "Rename", renameLabel: "New name", renameOk: "Rename", cancel: "Cancel", close: "Close",
       recycleH: "Move to the Recycle Bin", recycleQ: ["Move “", "” to the Recycle Bin?"], recycleQDir: ["Move the folder “", "” and everything in it to the Recycle Bin?"],
@@ -115,13 +124,16 @@
       settings: "Settings", settingsKey: "Settings (Ctrl+,)", back: "Back to search",
       sLang: "Language", sLangNote: "The interface changes language after the program restarts.", restart: "Restart now",
       sDisplay: "Display", sDigits: "Show Arabic-Indic digits (٠١٢٣)",
-      sLook: "New look", sLookSub: "This is the program's new look, still being tried out. You can go back to the classic look at any time.", classicLook: "Back to the classic look",
+      sLook: "New look", sLookSub: "This is the program's new look. You can go back to the classic look at any time, and come back from Options › Try the new look.", classicLook: "Back to the classic look",
+      app: "App", appsLabel: "Programs by this name",
+      compact: "Compact rows", compactSub: "One line per result, so more of them fit", showPreview: "Show the preview", hidePreview: "Hide the preview",
+      sMore: "More", sMoreRow: "More options", sMoreSub: "Check for updates, support and feedback, tools such as duplicate files and folder sizes, and search-from-anywhere settings", moreBtn: "Open the Options menu…",
       sSearch: "Search and indexing", sHideSystem: "Hide system files", sHideSystemSub: "The Windows folder, temporary and cache files",
       sContentIndex: "Index document contents in the background", sContentIndexSub: "Faster search inside files, text in pictures and scans included",
       sAutoIndex: "Update the index automatically when files change", reindex: "Update the index now",
-      sAnywhere: "Search from anywhere", sHotkey: "Ctrl+Alt+F opens the quick search (otherwise this window)",
+      sAnywhere: "Search from anywhere", sHotkey: "Ctrl+Alt+F opens the quick search (when off: this window)",
       sFloating: "Search box above the clock", sTray: "Icon in the notification area",
-      sStartup: "Start-up", sAutostart: "Start with Windows (in the background)",
+      sStartup: "Startup", sAutostart: "Start with Windows (in the background)",
       sAbout: "About", version: (v) => `InstaFind — version ${v}`,
     },
   }[LANG];
@@ -134,7 +146,7 @@
     rows: [], total: 0, ms: 0, done: true, sel: 0, asked: 0, running: false, isContent: false, contentFor: null,
     progress: "", warnings: [], files: 0, state: "ready", stateText: "",
     recent: [], sugg: [], ssel: 0, view: "empty", note: "", notice: "", resultsScope: "",
-    matches: null, history: { recent: [], saved: [] }, settings: null,
+    matches: null, history: { recent: [], saved: [] }, settings: null, apps: { seq: -1, apps: [] },
   };
 
   const $ = (id) => document.getElementById(id);
@@ -166,6 +178,10 @@
     if (days === 1) return digits(`${T.yesterday} ${fmtTime.format(d)}`);
     return digits((d.getFullYear() === now.getFullYear() ? fmtDay : fmtDayYear).format(d));
   }
+
+  // The date and time in full (the preview pane), as the classic window's column.
+  const fmtFull = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit" });
+  function fullDate(secs) { return secs ? digits(fmtFull.format(new Date(secs * 1000))) : ""; }
 
   // ---------- DOM helpers (no HTML from data, ever) ----------
   function h(tag, attrs, ...kids) {
@@ -211,6 +227,10 @@
     trash: [["path", { d: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" }]],
     pen: [["path", { d: "M4 20h4L20 8l-4-4L4 16z" }]],
     back: [["path", { d: "M15 6l-6 6 6 6" }]],
+    rows: [["path", { d: "M4 6h16M4 10h16M4 14h16M4 18h16" }]],
+    export: [["path", { d: "M12 3v12M7 10l5 5 5-5M5 21h14" }]],
+    refresh: [["path", { d: "M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" }]],
+    pane: [["rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }], ["path", { d: "M14 5v14" }]],
   };
 
   // File-type badge: colour by family, the extension as its label.
@@ -325,6 +345,7 @@
       S.sort = SORTS.includes(m.sort) ? m.sort : "best"; S.desc = !!m.desc;
       S.digits = !!m.digits; S.version = m.version || "";
       renderChips(); renderStatus();
+      if (m.switched) showSwitched();
     },
     results(m) {
       if (m.seq !== S.seq) return; // an older search: the user typed on
@@ -402,16 +423,23 @@
       if (hide && S.q.trim() && !S.content) runSearch();
     },
     status(m) {
+      const was = S.state;
       S.state = m.state; S.stateText = m.text || ""; S.files = m.files;
+      // Indexing ended with nothing listed: search again (the program does
+      // too when its index changes; this covers a list it never sent).
+      if (was !== "ready" && m.state === "ready" && S.view === "nores" && !S.content && S.q.trim()) runSearch();
       renderBanner(); renderStatus();
       if (S.view === "nores") renderNoResults();
     },
     query(m) { closeSettings(); q.value = m.q; onInput(); },
     focus() { q.focus(); },
+    apps(m) { S.apps = { seq: m.seq, apps: m.apps || [] }; renderApps(); },
     notice(m) {
-      S.notice = m.text; renderStatus();
+      S.notice = m.text; S.noticeWarn = !!m.warn; renderStatus();
       clearTimeout(handlers.noticeTimer);
-      handlers.noticeTimer = setTimeout(() => { S.notice = ""; renderStatus(); }, 3500);
+      // A problem stays until the next key or click, and is read out.
+      if (m.warn) $("live").textContent = m.text;
+      else handlers.noticeTimer = setTimeout(() => { S.notice = ""; renderStatus(); }, 3500);
     },
   };
   Object.defineProperty(window, "__instafind", { value: Object.freeze({ recv: (m) => { const f = handlers[m && m.type]; if (f) f(m); } }) });
@@ -474,12 +502,77 @@
     if (S.view === "settings") { renderStatus(); renderBanner(); return; }
     if (!S.q.trim()) setView("empty");
     else setView(S.rows.length || S.running ? "results" : "nores");
-    $("meta").textContent = S.q.trim() && !S.running ? T.nres(S.total) : "";
+    // (Not "no results" while the first indexing may still find them.)
+    const waiting = !S.total && !S.isContent && (S.state === "names" || S.state === "loading");
+    $("meta").textContent = S.q.trim() && !S.running && !waiting ? T.nres(S.total) : "";
     if (S.view === "results") { renderCols(); renderRows(refresh); }
     if (S.view === "nores") renderNoResults();
     renderPreview();
     renderStatus(); renderStop();
-    renderBanner();
+    renderBanner(); renderApps();
+  }
+  // Programs the search names (as the classic window's app buttons): a
+  // click starts one; the page names it by its place in the list sent.
+  // Once, for someone the update switched from the classic window: what
+  // happened, and the way back in one click.
+  function showSwitched() {
+    const bar = $("switched");
+    const back = btn("primary", I.back, T.classicLook, () => { bar.hidden = true; send({ op: "classic_look" }); }, { id: "switched-back" });
+    const x = btn("icon", I.x, null, () => { bar.hidden = true; q.focus(); }, { "aria-label": T.dismiss, title: T.dismiss, id: "switched-x" });
+    bar.replaceChildren(h("span", null, T.switchedText), back, x);
+    bar.hidden = false;
+  }
+  // ---------- how the results are laid out (kept in this page's storage) ----------
+  // Compact rows (one line each) unless chosen otherwise: on by itself in a
+  // window under 800 px high. The preview pane can be hidden.
+  const PREF = (() => { try { return JSON.parse(localStorage.getItem("instafind.view") || "{}") || {}; } catch { return {}; } })();
+  function savePref() { try { localStorage.setItem("instafind.view", JSON.stringify(PREF)); } catch { /* not kept */ } }
+  function compactOn() { return typeof PREF.compact === "boolean" ? PREF.compact : innerHeight < 800; }
+  function previewOn() { return PREF.preview !== false; }
+  function applyView() {
+    document.body.classList.toggle("compact", compactOn());
+    $("view-results").classList.toggle("nopreview", !previewOn());
+  }
+  const ZOOMS = [0.8, 0.9, 1, 1.1, 1.25, 1.4, 1.6];
+  function applyZoom() { document.documentElement.style.zoom = String(ZOOMS.includes(PREF.zoom) ? PREF.zoom : 1); }
+  function zoomBy(step) {
+    const i = ZOOMS.indexOf(ZOOMS.includes(PREF.zoom) ? PREF.zoom : 1);
+    PREF.zoom = step === 0 ? 1 : ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, i + step))];
+    savePref(); applyZoom();
+  }
+  document.addEventListener("wheel", (e) => { if (e.ctrlKey) { zoomBy(e.deltaY < 0 ? 1 : -1); e.preventDefault(); } }, { passive: false });
+  const COLW = { size: 96, date: 128 };
+  function colWidth(key) { const w = PREF.cols && PREF.cols[key]; return typeof w === "number" ? w : COLW[key]; }
+  function setColWidth(key, w, save = true) {
+    PREF.cols = Object.assign({}, PREF.cols, { [key]: Math.round(Math.max(64, Math.min(320, w))) });
+    applyCols();
+    if (save) savePref();
+  }
+  function applyCols() {
+    document.body.style.setProperty("--w-size", colWidth("size") + "px");
+    document.body.style.setProperty("--w-date", colWidth("date") + "px");
+  }
+  function setPref(key, on) { PREF[key] = on; savePref(); applyView(); renderChips(); if (S.view === "settings") renderSettings(); }
+  function viewButtons() {
+    const b = (id, ic, on, label, click) => {
+      const el = btn("icon view", ic, null, click, { id, "aria-pressed": String(on), "aria-label": label, title: label });
+      return el;
+    };
+    const tools = [
+      btn("small", I.export, T.exportBtn, () => send({ op: "export" }), { id: "tool-export" }),
+      btn("small", I.refresh, T.reindexBtn, () => send({ op: "reindex" }), { id: "tool-reindex" }),
+    ];
+    return h("span", { class: "viewbtns" }, ...tools,
+      b("view-compact", I.rows, compactOn(), T.compact, () => setPref("compact", !compactOn())),
+      b("view-preview", I.pane, previewOn(), previewOn() ? T.hidePreview : T.showPreview, () => setPref("preview", !previewOn())));
+  }
+  window.addEventListener("resize", () => { if (typeof PREF.compact !== "boolean") { applyView(); renderChips(); } });
+  function renderApps() {
+    const box = $("apps");
+    const show = S.apps.seq === S.seq && S.apps.apps.length > 0 && S.q.trim() && !S.content && (S.view === "results" || S.view === "nores");
+    box.hidden = !show;
+    if (!show) { box.replaceChildren(); return; }
+    box.replaceChildren(...S.apps.apps.map((title, id) => btn("app", I.open, `${T.app}: ${title}`, () => send({ op: "app", seq: S.apps.seq, id }), { "data-app": String(id) })));
   }
   function rowEl(r, i, listName) {
     const name = plainName(r);
@@ -505,7 +598,24 @@
       b.dataset.sort = key;
       return b;
     };
-    $("cols").replaceChildren(h("span"), col("name", T.cName), col("size", T.cSize, "end"), col("date", T.cDate, "end"));
+    // The Size and Date columns can be made wider or narrower by dragging
+    // the edge before their header (kept for next time).
+    const grip = (key) => {
+      const g = h("span", { class: "grip", role: "separator", "aria-orientation": "vertical", "aria-label": key === "size" ? T.cSize : T.cDate });
+      g.addEventListener("pointerdown", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const start = e.clientX, w0 = colWidth(key), rtl = document.documentElement.dir === "rtl";
+        g.setPointerCapture(e.pointerId); g.classList.add("on");
+        const move = (ev) => setColWidth(key, w0 + (rtl ? ev.clientX - start : start - ev.clientX), false);
+        const up = () => { g.classList.remove("on"); g.removeEventListener("pointermove", move); savePref(); };
+        g.addEventListener("pointermove", move);
+        g.addEventListener("pointerup", up, { once: true });
+      });
+      g.addEventListener("click", (e) => e.stopPropagation());
+      return g;
+    };
+    const size = col("size", T.cSize, "end"), date = col("date", T.cDate, "end");
+    $("cols").replaceChildren(h("span"), col("name", T.cName), h("span", { class: "cwrap end" }, grip("size"), size), h("span", { class: "cwrap end" }, grip("date"), date));
   }
   function renderRows(refresh) {
     const top = list.scrollTop;
@@ -549,14 +659,28 @@
     for (const [n, pieces] of m.lines.slice(0, max)) box.append(h("li", null, h("span", { class: "ln num" }, T.line(n)), marked(pieces, "lt")));
     return box;
   }
+  // The selected result's actions under the list, when the preview pane is
+  // not there (a narrow window, or hidden).
+  function renderActbar(r) {
+    const bar = $("actbar");
+    if (!r || r.gone) { bar.replaceChildren(); return; }
+    bar.replaceChildren(
+      btn("primary small", I.open, T.open, () => act("open", S.rows[S.sel])),
+      btn("small", I.folder, T.openFolder, () => act("reveal", S.rows[S.sel])),
+      btn("small", I.copy, T.copyPath, () => act("copy", S.rows[S.sel])),
+      btn("icon small", I.dots, null, (e) => openCtx(S.sel, e.currentTarget), { "aria-label": T.more, title: T.more, "aria-haspopup": "menu" }));
+  }
   function renderPreview() {
     const pv = $("preview");
     const r = S.view === "results" ? S.rows[S.sel] : null;
+    renderActbar(r);
     if (!r) { pv.replaceChildren(); return; }
-    const kind = r.folder ? T.folder : r.ext ? `${r.ext.toUpperCase()} · ${T.file}` : T.file;
+    // A document found by its text: a small icon, so its matching lines show.
+    pv.classList.toggle("doc", !!r.snippet);
+    const kind = r.folder ? T.folder : r.ext ? T.fileOf(r.ext.toUpperCase()) : T.file;
     const facts = h("dl", { class: "facts" }, h("dt", null, T.fType), h("dd", null, kind));
     if (!r.folder) facts.append(h("dt", null, T.fSize), h("dd", { class: "num" }, size(r.size)));
-    facts.append(h("dt", null, T.fMod), h("dd", { class: "num" }, when(r.mtime)));
+    facts.append(h("dt", null, T.fMod), h("dd", { class: "num", title: fullDate(r.mtime) }, fullDate(r.mtime)));
     if (r.matches) facts.append(h("dt", null, T.fMatches), h("dd", { class: "num" }, T.nMatches(r.matches)));
     const open = btn("primary", I.open, T.open + " ", () => act("open", S.rows[S.sel]), { disabled: r.gone });
     open.append(h("kbd", null, "Enter"));
@@ -566,7 +690,7 @@
     ];
     if (r.gone) parts.push(h("p", { class: "gone-note" }, T.gone));
     else parts.push(h("div", { class: "actions" }, open, btn("", I.folder, T.openFolder, () => act("reveal", S.rows[S.sel])),
-      btn("icon", I.copy, null, () => act("copy", S.rows[S.sel]), { "aria-label": T.copyPath, title: T.copyPath }),
+      btn("", I.copy, T.copyPath, () => act("copy", S.rows[S.sel])),
       btn("icon", I.dots, null, (e) => openCtx(S.sel, e.currentTarget), { "aria-label": T.more, title: T.more, "aria-haspopup": "menu" })));
     parts.push(facts);
     if (r.snippet) {
@@ -584,6 +708,17 @@
   }
   const SUGG_ICON = { query: I.bulb, all_kinds: I.filter, all_drives: I.folder, contents: I.text, web: I.globe };
   function renderNoResults() {
+    // The first indexing is still under way: say so, not "nothing in 0 files".
+    // The program lists the results by itself when the index is ready.
+    const indexing = !S.isContent && (S.state === "names" || S.state === "loading");
+    $("view-nores").classList.toggle("indexing", indexing);
+    if (indexing) {
+      $("nores-h").textContent = T.stillIx;
+      $("nores-sub").textContent = T.stillIxSub;
+      $("sugg").replaceChildren();
+      q.removeAttribute("aria-activedescendant");
+      return;
+    }
     $("nores-h").textContent = T.noresH(S.q.trim());
     const scope = S.resultsScope ? S.resultsScope : "";
     let sub = S.isContent ? T.noresSubContent(scope) : T.noresSub(S.files, S.kind ? S.kindLabel : "", scope);
@@ -607,10 +742,16 @@
     else if (s.kind === "contents") { S.content = true; renderChips(); runSearch(); }
     else if (s.kind === "web") send({ op: "web", q: S.q });
   }
+  // The indexing banner: in full for its first seconds, then one line.
+  let bannerSince = 0;
   function renderBanner() {
     const busy = S.state !== "ready";
     $("banner").hidden = !busy || S.view === "settings";
-    if (!busy) return;
+    if (!busy) { bannerSince = 0; $("banner").classList.remove("slim"); return; }
+    if (!bannerSince) {
+      bannerSince = Date.now();
+      setTimeout(() => { if (bannerSince) $("banner").classList.add("slim"); }, 6000);
+    }
     $("banner-title").textContent = S.state === "loading" ? T.loading : digits(S.stateText);
     $("banner-sub").textContent = T.ixSub;
     $("banner-bar").classList.add("busy");
@@ -629,7 +770,9 @@
       if (S.warnings.length) text += ` — ${T.note}: ${S.warnings.join(LANG === "ar" ? "، " : "; ")}`;
     } else if (!S.notice && S.content && contentStale() && S.q.trim()) text = T.pressEnter;
     $("status-text").textContent = text;
+    $("status-text").classList.toggle("warn", !!(S.notice && S.noticeWarn));
   }
+  for (const ev of ["keydown", "mousedown"]) document.addEventListener(ev, () => { if (S.notice && S.noticeWarn) { S.notice = ""; S.noticeWarn = false; renderStatus(); } }, true);
   function renderStop() { $("stop").hidden = !S.running; }
   // The result count for screen readers, once typing pauses.
   let liveTimer = 0;
@@ -675,7 +818,7 @@
       wrap.addEventListener("click", (e) => { const it = e.target.closest("[data-k]"); if (it) { closeMenus(); d.pick(+it.dataset.k); } });
       return wrap;
     });
-    $("chips").replaceChildren(...wraps);
+    $("chips").replaceChildren(...wraps, viewButtons());
     updatePlaceholder();
   }
   function updatePlaceholder() { q.placeholder = S.content ? T.phContent : T.ph; }
@@ -737,7 +880,8 @@
     };
     const items = [item(T.mOpen, "Enter", "open", I.open), item(T.mReveal, "Ctrl+Enter", "reveal", I.folder), item(T.mCopyFile, "Ctrl+C", "copy_file", I.copy), item(T.mCopyPath, "Ctrl+Shift+C", "copy", I.copy)];
     if (listName === "results") items.push(item(T.mCopyAll, null, "copy_all", I.copy));
-    items.push(item(T.mScope, null, "scope", I.search));
+    items.push(item(T.mScope, null, "scope", I.search), item(T.mSizes, null, "folder_sizes", I.scale));
+    if (listName === "results") items.push(item(T.mReplace, null, "replace_text", I.pen));
     if (r.snippet) items.push(item(T.mMatches, "F4", "matches", I.text));
     items.push(h("div", { class: "sep", role: "separator" }), item(T.mRename, "F2", "rename", I.pen), item(T.mRecycle, "Delete", "recycle", I.trash));
     const menu = $("ctx");
@@ -763,6 +907,7 @@
     else if (op === "rename") renameDialog(r, at.list, at);
     else if (op === "recycle") recycleDialog(r, at.list, at);
     else if (op === "matches") { if (at.ver === S.ver) showMatches(r.id); }
+    else if (op === "replace_text") send({ op: "replace_text" });
     else act(op, r, at.list, at);
     if (!$("veil").hidden) return;
     q.focus();
@@ -773,7 +918,7 @@
   function dialog(title, body, buttons, tag) {
     // (Opened from the right-click menu: back to where the focus was before it.)
     dlgFor = tag; dlgBack = document.activeElement && document.activeElement.closest("#ctx") ? ctxBack : document.activeElement;
-    $("dlg-h").textContent = title;
+    $("dlg-h").replaceChildren(...[].concat(title));
     $("dlg-body").replaceChildren(...body);
     $("dlg-btns").replaceChildren(...buttons);
     $("veil").hidden = false;
@@ -815,7 +960,7 @@
     if (m) {
       body.push(h("p", { class: "sub num" }, T.nMatches(m.count) + (m.lines.length < m.count ? " " + T.firstLines(m.lines.length) : "")), linesEl(m, 1000));
     } else body.push(h("p", { class: "sub" }, T.matchesNone));
-    dialog(T.matchesH(plainName(r)), body, [btn("", I.x, T.close, closeDialog)], "matches:" + id);
+    dialog([T.matchesPre, fileName(r.name.map(([t]) => [t, false]), r.folder, "dname")], body, [btn("", I.x, T.close, closeDialog)], "matches:" + id);
     $("dlg-btns").querySelector("button").focus();
   }
   $("veil").addEventListener("mousedown", (e) => { if (e.target === $("veil")) { closeDialog(); e.preventDefault(); } });
@@ -840,7 +985,7 @@
     const kids = [];
     if (S.history.saved.length) {
       kids.push(h("div", { class: "mh", role: "presentation" }, T.savedH));
-      for (const s of S.history.saved) kids.push(item("", I.star, s.name, [s.content ? T.savedInside : "", s.scoped ? T.savedScoped : ""].filter(Boolean).join(" · "), () => send({ op: "saved", id: s.id })));
+      for (const s of S.history.saved) kids.push(item("", I.star, s.name, [s.content ? T.savedInside : "", s.scoped ? T.savedScoped : ""].filter(Boolean).join(" · "), () => send({ op: "saved", id: s.id, name: s.name })));
       kids.push(h("div", { class: "sep", role: "separator" }));
     }
     kids.push(h("div", { class: "mh", role: "presentation" }, S.history.recent.length ? T.recentH : T.recentEmpty));
@@ -893,10 +1038,17 @@
       h("div", { class: "shead" }, back, h("h2", null, T.settings)),
       lang,
       section(T.sDisplay, sw("digits", T.sDigits),
+        (() => {
+          const on = compactOn();
+          const b = h("button", { class: "sw", type: "button", role: "switch", "aria-checked": String(on), id: "set-compact", "aria-label": T.compact }, h("span", { class: "knob" }));
+          b.addEventListener("click", () => setPref("compact", !compactOn()));
+          return h("div", { class: "srow" }, h("label", { for: "set-compact" }, h("span", null, T.compact), h("small", null, T.compactSub)), b);
+        })(),
         h("div", { class: "srow" }, h("label", { for: "classic-look" }, h("span", null, T.sLook), h("small", null, T.sLookSub)), btn("", I.back, T.classicLook, () => send({ op: "classic_look" }), { id: "classic-look" }))),
       section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
       section(T.sAnywhere, sw("hotkey_quick", T.sHotkey), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
       section(T.sStartup, sw("autostart", T.sAutostart)),
+      section(T.sMore, h("div", { class: "srow" }, h("label", { for: "options-menu" }, h("span", null, T.sMoreRow), h("small", null, T.sMoreSub)), btn("", I.dots, T.moreBtn, () => send({ op: "options_menu" }), { id: "options-menu" }))),
       section(T.sAbout, h("p", { class: "num" }, digits(T.version(st.version))), h("p", { class: "muted" }, T.trust)),
     );
   }
@@ -915,6 +1067,34 @@
   list.addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) { focusList(); select(+r.dataset.i, false); openCtx(+r.dataset.i, null, "results", { left: e.clientX, top: e.clientY }); } });
   list.addEventListener("scroll", () => { if (list.scrollTop + list.clientHeight > list.scrollHeight - FIRST_PAGE_GUARD) askMore(); });
   $("recent").addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) act("open", S.recent[+r.dataset.i], "recent"); });
+  // Dragging a row out (to Explorer, a mail, a chat) is the program's own
+  // drag of the file, as in the classic list: a press on a row that moves a
+  // few pixels with the button down asks for it (once per press). (The
+  // rows' mousedown keeps the focus in the box, so the page itself never
+  // starts a drag.)
+  // The click that ends a drag opens nothing.
+  let press = null, dragged = false;
+  for (const [el, listName] of [[list, "results"], [$("recent"), "recent"]]) {
+    el.addEventListener("mousedown", (e) => {
+      const r = e.button === 0 && e.target.closest(".row");
+      press = r ? { x: e.clientX, y: e.clientY, i: +r.dataset.i, listName } : null;
+      dragged = false;
+    });
+  }
+  document.addEventListener("mousemove", (e) => {
+    if (!press || !(e.buttons & 1)) { press = null; return; }
+    if (Math.abs(e.clientX - press.x) + Math.abs(e.clientY - press.y) < 6) return;
+    const p = press; press = null; dragged = true;
+    setTimeout(() => { dragged = false; }, 300);
+    act("drag", (p.listName === "recent" ? S.recent : S.rows)[p.i], p.listName);
+  });
+  document.addEventListener("mouseup", () => { press = null; });
+  document.addEventListener("click", (e) => { if (dragged) { dragged = false; e.stopPropagation(); e.preventDefault(); } }, true);
+  // The program's drag ends without a mouseup here (Windows' drag loop takes
+  // it), or does not start: the flag is forgotten on the next press, when
+  // the window loses the focus, and shortly after the drag anyway.
+  document.addEventListener("mousedown", () => { if (!press) dragged = false; }, true);
+  window.addEventListener("blur", () => { dragged = false; press = null; });
   $("recent").addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) openCtx(+r.dataset.i, null, "recent", { left: e.clientX, top: e.clientY }); });
   $("sugg").addEventListener("click", (e) => { const s = e.target.closest(".sg"); if (s) applySuggestion(S.sugg[+s.dataset.k]); });
   $("tips").addEventListener("click", (e) => { const c = e.target.closest("code"); if (c) { q.value = c.textContent; q.focus(); runSearch(); } });
@@ -934,6 +1114,8 @@
     if (ctrl && (e.key === "k" || e.key === "K" || e.key === "f" || e.key === "F") || e.key === "F3") { closeSettings(); q.focus(); q.select(); e.preventDefault(); return; }
     if (ctrl && (e.key === "h" || e.key === "H")) { openHistory(); e.preventDefault(); return; }
     if (ctrl && e.key === ",") { S.view === "settings" ? closeSettings() : openSettings(); e.preventDefault(); return; }
+    // Zoom (the browser's own keys are off): Ctrl and + / - / 0, kept for next time.
+    if (ctrl && (e.key === "+" || e.key === "=" || e.key === "-" || e.key === "0")) { zoomBy(e.key === "0" ? 0 : e.key === "-" ? -1 : 1); e.preventDefault(); return; }
     if (e.key === "Escape") {
       if (openMenus().length) closeMenus();
       else if (S.view === "settings") closeSettings();
@@ -961,10 +1143,14 @@
     if (inList && !ctrl && !e.altKey && (e.key.length === 1 || e.key === "Backspace")) { q.focus(); return; }
     if (inList && e.key === "ArrowUp" && S.sel === 0) { q.focus(); e.preventDefault(); return; }
     const row = S.rows[S.sel];
-    const page = Math.max(1, Math.floor(list.clientHeight / 56) - 1);
+    const rowH = (list.querySelector(".row") || { offsetHeight: 56 }).offsetHeight || 56;
+    const page = Math.max(1, Math.floor(list.clientHeight / rowH) - 1);
     const moves = { ArrowDown: 1, ArrowUp: -1, PageDown: page, PageUp: -page };
     if (e.key in moves && (inBox || inList)) { select(S.sel + moves[e.key]); e.preventDefault(); return; }
     if (ctrl && (e.key === "Home" || e.key === "End")) { select(e.key === "Home" ? 0 : S.rows.length - 1); e.preventDefault(); return; }
+    // Enter in the box moves to the list (as the classic window, where it
+    // searched); there Enter opens. Ctrl+Enter opens the folder from both.
+    if (e.key === "Enter" && inBox && !ctrl) { focusList(); select(S.sel); e.preventDefault(); return; }
     if (e.key === "Enter" && (inBox || inList)) { act(ctrl ? "reveal" : "open", row); e.preventDefault(); return; }
     // The keys of the classic list (in the box, only when no text is selected there).
     const noSelection = inList || q.selectionStart === q.selectionEnd;
@@ -984,6 +1170,9 @@
   for (const el of document.querySelectorAll("[data-i18n-title]")) el.title = T[el.dataset.i18nTitle];
   $("tips").replaceChildren(...T.tips.map(([c, s]) => h("div", { class: "tip" }, h("code", { dir: "auto" }, c), h("span", null, s))));
   setView("empty");
+  applyView();
+  applyZoom();
+  applyCols();
   renderChips();
   renderRecent();
   renderStatus();

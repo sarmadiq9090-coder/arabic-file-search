@@ -211,6 +211,9 @@ pub enum Request {
     Rename { list: List, seq: u64, ver: u64, id: u32, name: String },
     /// Move the file of row `id` to the Recycle Bin (the page asked first).
     Recycle { list: List, seq: u64, ver: u64, id: u32 },
+    /// Drag the file of row `id` out of the window (to Explorer, a mail, a
+    /// chat), as the classic list does; the page saw the drag start.
+    Drag { list: List, seq: u64, ver: u64, id: u32 },
     /// Search only in the folder of row `id` (the folder itself for a folder).
     Scope { list: List, seq: u64, ver: u64, id: u32 },
     /// Choose the folder to search in with Windows' folder dialog.
@@ -218,7 +221,7 @@ pub enum Request {
     /// Search all drives again.
     AllDrives {},
     /// Run saved search `id` (its place in the history's saved list).
-    Saved { id: u32 },
+    Saved { id: u32, name: String },
     /// Save the current search (with the folder searched now).
     SaveSearch {
         q: String,
@@ -246,6 +249,17 @@ pub enum Request {
     /// Go back to the classic window, now and from the next start («العودة
     /// إلى الشكل القديم» in the settings).
     ClassicLook {},
+    /// Start app `id` of those offered for search `seq` ([`Outbound::Apps`]).
+    App { seq: u64, id: u32 },
+    /// Export the results listed now to a CSV file (Save dialog).
+    Export {},
+    /// Replace text in the plain-text files among the results listed now.
+    ReplaceText {},
+    /// Folder sizes of the folder of row `id` (the folder itself for a folder).
+    FolderSizes { list: List, seq: u64, ver: u64, id: u32 },
+    /// Open the program's Options menu (the classic window's, with its
+    /// tools, support, updates and quick-search settings) at the pointer.
+    OptionsMenu {},
 }
 
 /// Why a message was refused.
@@ -282,6 +296,7 @@ pub fn parse(body: &str, source: &str, token: &str) -> Result<Request, Rejected>
         Request::Search { q, kind, size, date, .. } => *kind < KINDS.len() && *size < SIZES.len() && *date < DATES.len() && text_ok(q),
         Request::SaveSearch { q, kind, .. } => *kind < KINDS.len() && !q.trim().is_empty() && text_ok(q),
         Request::Web { q } => !q.trim().is_empty() && text_ok(q),
+        Request::Saved { name, .. } => text_ok(name),
         Request::Rename { name, .. } => !name.trim().is_empty() && name.chars().count() <= MAX_NAME,
         _ => true,
     };
@@ -401,6 +416,9 @@ pub enum Outbound {
         /// Write numbers with Arabic-Indic digits.
         digits: bool,
         version: &'static str,
+        /// This start made the new look the default for someone who used
+        /// the classic window: say so once, with the way back.
+        switched: bool,
     },
     Results {
         seq: u64,
@@ -496,9 +514,17 @@ pub enum Outbound {
     },
     /// Put the caret in the search box.
     Focus,
-    /// A short message for the status bar.
+    /// A short message for the status bar; `warn` for a problem (shown
+    /// until the next action, in the warning colour, and read out).
     Notice {
         text: String,
+        warn: bool,
+    },
+    /// The apps search `seq`'s text names strongly (as the classic window's
+    /// app buttons), by title; the page asks for one by its place.
+    Apps {
+        seq: u64,
+        apps: Vec<String>,
     },
 }
 
@@ -528,6 +554,15 @@ pub fn status(loading: bool, ix: Indexing, files: usize, lang: Lang) -> Outbound
         _ => "ready",
     };
     Outbound::Status { state, files, text: indexing_status::progress_text(lang, ix, &indexing_status::group_digits) }
+}
+
+/// Whether a status message of the classic window reports a problem (it
+/// then shows as a warning in the new look): "could not…", "wait…", "was
+/// not…", in Arabic or English.
+pub fn looks_like_a_problem(text: &str) -> bool {
+    let t = text.trim_start();
+    ["تعذر", "تعذّر", "لم ", "انتظر", "خطأ"].iter().any(|p| t.starts_with(p))
+        || ["could not", "couldn't", "cannot", "can't", "wait ", "the file was not", "error", "failed"].iter().any(|p| t.to_lowercase().starts_with(p))
 }
 
 /// The recent and saved searches for the history menu.
@@ -762,11 +797,16 @@ impl Lists {
         ver > self.floor
     }
 
-    /// Keeps `paths` as the recent files listed now; returns their version.
-    pub fn set_recent(&mut self, paths: Vec<String>) -> u64 {
+    /// Keeps `paths` as the recent files listed now; returns their version,
+    /// or `None` when the page already lists these very files (then nothing
+    /// is sent, and a dialog open on one of them keeps working).
+    pub fn set_recent(&mut self, paths: Vec<String>) -> Option<u64> {
+        if self.fresh(self.recent.ver) && self.recent.paths == paths {
+            return None;
+        }
         let ver = self.next_ver();
         self.recent = RecentList { ver, paths };
-        ver
+        Some(ver)
     }
 
     /// The results listed now, if they are version `ver` of search `seq`.
@@ -800,9 +840,18 @@ impl Lists {
     /// one is listed or the page loaded again since it started. Returns
     /// whether to send it to the page (not when a newer search waits, which
     /// the page would drop it for), and the search waiting to run.
-    pub fn finished(&mut self, shown: Shown) -> (bool, Option<Params>) {
+    pub fn finished(&mut self, mut shown: Shown) -> (bool, Option<Params>) {
         let pending = self.pending.take();
         if !self.fresh(shown.ver) || self.shown.as_ref().is_some_and(|s| s.seq > shown.seq) {
+            return (false, pending);
+        }
+        // The same search run again (the index changed elsewhere) found the
+        // very same rows: the page keeps its list and its version, so a
+        // rename or delete dialog open on it still works.
+        if let Some(old) = self.shown.as_ref().filter(|s| s.seq == shown.seq && s.changed.is_empty() && s.params.content == shown.params.content && s.all_paths() == shown.all_paths()) {
+            shown.ver = old.ver;
+            shown.params.ver = old.ver;
+            self.shown = Some(shown);
             return (false, pending);
         }
         let send = pending.as_ref().is_none_or(|p| p.seq == shown.seq);
@@ -856,6 +905,17 @@ pub struct Found {
     pub snippet: String,
     pub count: u32,
     pub lines: Vec<(u32, String)>,
+}
+
+/// A row as "Export results" writes it (the classic window's CSV columns).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportRow {
+    pub path: String,
+    /// `None` for a folder.
+    pub size: Option<u64>,
+    pub mtime: i64,
+    /// The matching text, for a search inside documents.
+    pub snippet: String,
 }
 
 /// The rows a search found, kept to answer the page's later requests.
@@ -997,6 +1057,20 @@ impl Shown {
         }
         let i = *self.hits.get(id as usize)?;
         self.index.entries.get(i as usize).map(|e| &*e.path)
+    }
+
+    /// Every row as "Export results" writes it, in the order shown;
+    /// renamed rows with their new path, rows moved to the Recycle Bin left out.
+    pub fn export_rows(&self) -> Vec<ExportRow> {
+        (0..self.hits.len() as u32)
+            .filter_map(|id| {
+                let path = self.path(id)?.to_string();
+                let hit = *self.hits.get(id as usize)?;
+                let e = self.index.entries.get(hit as usize)?;
+                let snippet = self.found.get(&hit).map(|f| f.snippet.clone()).unwrap_or_default();
+                Some(ExportRow { path, size: (!e.is_dir).then_some(e.size), mtime: e.mtime, snippet })
+            })
+            .collect()
     }
 
     /// Whether row `id` is a folder.
@@ -1308,7 +1382,8 @@ mod tests {
         );
         assert_eq!(req(r#""op":"rename","list":"results","seq":1,"ver":2,"id":0,"name":" ""#), Err(Rejected::Invalid));
         assert_eq!(req(&format!(r#""op":"rename","list":"results","seq":1,"ver":2,"id":0,"name":"{}""#, "a".repeat(MAX_NAME + 1))), Err(Rejected::Invalid));
-        assert_eq!(req(r#""op":"saved","id":2"#), Ok(Request::Saved { id: 2 }));
+        assert_eq!(req(r#""op":"saved","id":2,"name":"عقود""#), Ok(Request::Saved { id: 2, name: "عقود".into() }));
+        assert_eq!(req(r#""op":"saved","id":2"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"save_search","q":"عقد","content":true"#), Ok(Request::SaveSearch { q: "عقد".into(), kind: 0, content: true }));
         assert_eq!(req(r#""op":"save_search","q":"","content":true"#), Err(Rejected::Invalid));
         assert_eq!(req(r#""op":"save_search","q":"a","scope":"D:\\""#), Err(Rejected::Malformed));
@@ -1320,6 +1395,18 @@ mod tests {
         assert_eq!(req(r#""op":"lang","lang":"fr""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"restart""#), Ok(Request::Restart {}));
         assert_eq!(req(r#""op":"classic_look""#), Ok(Request::ClassicLook {}));
+        assert_eq!(req(r#""op":"options_menu""#), Ok(Request::OptionsMenu {}));
+        assert_eq!(req(r#""op":"export""#), Ok(Request::Export {}));
+        assert_eq!(req(r#""op":"export","path":"C:\\x.csv""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"replace_text""#), Ok(Request::ReplaceText {}));
+        assert_eq!(req(r#""op":"folder_sizes","list":"results","seq":1,"ver":2,"id":0"#), Ok(Request::FolderSizes { list: List::Results, seq: 1, ver: 2, id: 0 }));
+        assert_eq!(req(r#""op":"folder_sizes","seq":1,"id":0"#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"app","seq":4,"id":0"#), Ok(Request::App { seq: 4, id: 0 }));
+        assert_eq!(req(r#""op":"app","seq":4,"id":0,"path":"C:\\x.exe""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"app","seq":4"#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"drag","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::Drag { list: List::Results, seq: 2, ver: 3, id: 1 }));
+        assert_eq!(req(r#""op":"drag","list":"results","seq":2,"ver":3,"id":1,"path":"C:\\x""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"options_menu","item":3"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"classic_look","forever":true"#), Err(Rejected::Malformed));
         assert_eq!(parse(r#"{"op":"classic_look"}"#, SRC, TOKEN), Err(Rejected::Token));
         assert_eq!(parse(&format!(r#"{{"t":"{TOKEN}","op":"classic_look"}}"#), "https://evil.example/", TOKEN), Err(Rejected::Origin));
@@ -1754,6 +1841,24 @@ mod tests {
     }
 
     #[test]
+    fn the_same_rows_found_again_keep_their_version() {
+        let mut lists = Lists::default();
+        let (shown, msg) = listed(&mut lists, 7, Sort::Name);
+        let v1 = ver_of(&msg);
+        lists.finished(shown);
+        // Run again in the background with the same rows: not sent, same version.
+        let (again, _) = listed(&mut lists, 7, Sort::Name);
+        assert_eq!(fin(&mut lists, again), (false, None));
+        assert_eq!(lists.shown.as_ref().unwrap().ver, v1);
+        assert!(lists.path(List::Results, 7, v1, 0).is_ok());
+        // A renamed row since: the list is sent again with a new version.
+        lists.shown_at_mut(7, v1).unwrap().changed.insert(0, Some("C:\\x.pdf".into()));
+        let (third, msg) = listed(&mut lists, 7, Sort::Name);
+        assert_eq!(fin(&mut lists, third), (true, None));
+        assert_ne!(ver_of(&msg), v1);
+    }
+
+    #[test]
     fn a_dialog_acts_on_the_list_it_was_opened_for() {
         // The rename dialog is opened on row 0 of version v1; while it is
         // open the list is listed again. Its OK names v1, which is refused.
@@ -1786,11 +1891,13 @@ mod tests {
         let mut lists = Lists::default();
         // Nothing listed yet: version 0 names nothing.
         assert_eq!(lists.path(List::Recent, 0, 0, 0), Err(Miss::Stale));
-        let v1 = lists.set_recent(vec!["C:\\a\\one.txt".into(), "C:\\a\\two.txt".into()]);
+        let v1 = lists.set_recent(vec!["C:\\a\\one.txt".into(), "C:\\a\\two.txt".into()]).unwrap();
+        // The same files again (the window shown again): nothing new, the version stays.
+        assert_eq!(lists.set_recent(vec!["C:\\a\\one.txt".into(), "C:\\a\\two.txt".into()]), None);
         assert_eq!(lists.path(List::Recent, 0, v1, 1), Ok("C:\\a\\two.txt"));
         assert_eq!(lists.path(List::Recent, 0, 0, 1), Err(Miss::Stale));
         // A file opened moves to the top: the list is sent again, and row 1 is another file.
-        let v2 = lists.set_recent(vec!["C:\\a\\two.txt".into(), "C:\\a\\one.txt".into()]);
+        let v2 = lists.set_recent(vec!["C:\\a\\two.txt".into(), "C:\\a\\one.txt".into()]).unwrap();
         assert_ne!(v1, v2);
         assert_eq!(lists.path(List::Recent, 0, v1, 1), Err(Miss::Stale));
         assert_eq!(lists.path(List::Recent, 0, v2, 1), Ok("C:\\a\\one.txt"));
@@ -1854,6 +1961,34 @@ mod tests {
         assert_eq!(lists.used_search(List::Recent), None);
         lists.shown.as_mut().unwrap().params.text = "  ".into();
         assert_eq!(lists.used_search(List::Results), None);
+    }
+
+    #[test]
+    fn problems_are_told_apart() {
+        for p in ["تعذر التحقق من التحديثات.", "لم يُحذف الملف.", "انتظر حتى تكتمل الفهرسة.", "Could not check for updates.", "Wait until indexing is complete.", "The file was not deleted."] {
+            assert!(looks_like_a_problem(p), "{p}");
+        }
+        for ok in ["تم تصدير 12 نتيجة.", "جاري التحقق من التحديثات…", "Exported 12 results.", "Checking for updates…", "Downloading the update… 40%", ""] {
+            assert!(!looks_like_a_problem(ok), "{ok}");
+        }
+    }
+
+    #[test]
+    fn export_rows_follow_the_list() {
+        let idx = index();
+        let mut shown = Shown::documents(idx.clone(), Query::parse("تقرير"), Params { seq: 1, ver: 1, text: "تقرير".into(), content: true, ..Params::default() });
+        shown.absorb(vec![
+            hit(&idx, "C:\\Users\\Sara\\Documents\\تقرير المبيعات 2026.xlsx", "مبيعات الربع", 2),
+            hit(&idx, "D:\\Projects\\تقرير الصيانة", "", 1),
+            hit(&idx, "C:\\Users\\Sara\\Desktop\\notes.txt", "تقرير", 1),
+        ]);
+        // Renamed and recycled rows since they were listed.
+        shown.changed.insert(0, Some("C:\\Users\\Sara\\Documents\\تقرير نهائي.xlsx".into()));
+        shown.changed.insert(2, None);
+        let rows = shown.export_rows();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0], ExportRow { path: "C:\\Users\\Sara\\Documents\\تقرير نهائي.xlsx".into(), size: Some(48_000), mtime: rows[0].mtime, snippet: "مبيعات الربع".into() });
+        assert_eq!((rows[1].path.as_str(), rows[1].size), ("D:\\Projects\\تقرير الصيانة", None));
     }
 
     #[test]

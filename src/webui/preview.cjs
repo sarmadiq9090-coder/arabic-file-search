@@ -91,12 +91,12 @@ function fakeProgram(cfg) {
   const FIELDS = {
     hello: [], search: ["seq", "q", "kind", "size", "date", "content", "sort", "desc"], more: ["seq", "ver", "from"], sort: ["seq", "sort", "desc"], stop: ["seq"],
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
-    rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id"],
-    save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], classic_look: [],
+    rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id", "name"],
+    save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], classic_look: [], options_menu: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
-  const ROW_OPS = ["more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope"];
+  const ROW_OPS = ["more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope", "drag", "folder_sizes"];
   let lastVer = 0, recentVer = 0;
   const nextVer = () => ++lastVer;
   const send = (m) => setTimeout(() => window.__instafind.recv(m), 0);
@@ -143,7 +143,7 @@ function fakeProgram(cfg) {
       }
     }
     if (m.op === "hello") {
-      send({ type: "hello", kinds: KINDS, sizes: SIZES, dates: DATES, kind: 0, sort: "best", desc: false, digits: false, version: "0.9.1" });
+      send({ type: "hello", kinds: KINDS, sizes: SIZES, dates: DATES, kind: 0, sort: "best", desc: false, digits: false, version: "0.9.1", switched: !!cfg.switched });
       send({ type: "scope", path: cfg.scope || "", search: false });
       send(settings); send(status); send(history);
       recentVer = nextVer();
@@ -166,6 +166,8 @@ function fakeProgram(cfg) {
         }, 40);
       }, 40);
     } else if (m.op === "search") {
+      // The apps the text names (the program's catalog, faked).
+      send({ type: "apps", seq: m.seq, apps: /chrome|كروم/i.test(m.q) ? ["Google Chrome"] : [] });
       const words = m.q.trim().split(/\s+/);
       const term = words[0] === "تقرير" ? "تقرير" : words[0];
       let hits = files.filter((f) => f.name.toLowerCase().includes(term.toLowerCase()) && SIZE_OK[m.size || 0](f) && DATE_OK[m.date || 0](f));
@@ -229,7 +231,44 @@ const SHOTS = [
   ["content-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 250], ["key", "ArrowDown"], ["key", "ArrowUp"], ["wait", 250]], { expect: { content: true, rows: 3 } }],
   ["content-en-dark", "en", "dark", [["click", "#chip-content"], ["type", "lease agreement"], ["key", "Enter"], ["wait", 250], ["wait", 250]], { expect: { content: true, rows: 3 } }],
   ["content-running-ar-dark", "ar", "dark", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 250]], { keepRunning: true, expect: { stop: true } }],
-  ["matches-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 300], ["key", "F4"], ["wait", 150]], { expect: { dialog: true } }],
+  ["matches-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 300], ["key", "F4"], ["wait", 150]], { expect: { dialog: true, dlgName: true } }],
+  // Enter in the box moves to the list (as the classic window); Enter there opens.
+  ["enter-en-light", "en", "light", [["type", "report"], ["key", "Enter"]], { expect: { focus: "list", opens: 0 } }],
+  ["enter-twice-en-light", "en", "light", [["type", "report"], ["key", "Enter"], ["key", "Enter"]], { expect: { opens: 1 } }],
+  // The first indexing, nothing found yet: "still indexing", not "nothing in 0 files".
+  ["indexing-nores-ar-light", "ar", "light", [["type", "zzqq"]], { indexing: true, expect: { view: "view-nores", stillIndexing: true } }],
+  // A classic user switched by the update: told once, with the way back.
+  ["switched-ar-light", "ar", "light", [], { switched: true, expect: { switched: true } }],
+  ["switched-back-en-light", "en", "light", [["click", "#switched-back"], ["wait", 50]], { switched: true, expect: { switched: false, lastSent: "classic_look" } }],
+  // A problem stays, in the warning colour, until the next key.
+  ["warn-en-dark", "en", "dark", [["eval", "window.__instafind.recv({ type: 'notice', text: 'Could not open the file: C:\\\\x.txt', warn: true })"], ["wait", 3800]], { expect: { warn: true } }],
+  ["warn-gone-en-dark", "en", "dark", [["eval", "window.__instafind.recv({ type: 'notice', text: 'Could not open the file', warn: true })"], ["key", "Shift"]], { expect: { warn: false } }],
+  // Density: compact rows by themselves in a low window (one line, ≤ 36 px), the preview pane can be hidden,
+  // and the indexing banner shrinks to one line after its first seconds.
+  ["compact-ar-light", "ar", "light", [["type", "تقرير"], ["key", "ArrowDown"]], { height: 700, expect: { compact: true, rowH: true } }],
+  ["roomy-en-light", "en", "light", [["type", "report"]], { height: 900, expect: { compact: false } }],
+  ["compact-chosen-en-dark", "en", "dark", [["type", "report"], ["click", "#view-compact"]], { height: 900, expect: { compact: true, rowH: true } }],
+  ["no-preview-ar-light", "ar", "light", [["type", "تقرير"], ["click", "#view-preview"]], { expect: { preview: false } }],
+  ["banner-slim-ar-light", "ar", "light", [["type", "تقرير"], ["wait", 6500]], { indexing: true, expect: { bannerSlim: true } }],
+  // One-click actions: Export and Update index in the toolbar, labelled History/Settings, the
+  // right-click menu's folder sizes and replace text, and the actions under the list in a narrow window.
+  ["tools-en-light", "en", "light", [["type", "report"], ["click", "#tool-export"]], { expect: { lastSent: "export", labels: true } }],
+  ["ctx-sizes-ar-light", "ar", "light", [["type", "تقرير"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:nth-child(7)"], ["wait", 50]], { expect: { lastSent: "folder_sizes" } }],
+  ["narrow-ar-light", "ar", "light", [["type", "تقرير"], ["key", "ArrowDown"]], { width: 820, expect: { actbar: 4, labels: false } }],
+  ["actbar-no-preview-en-light", "en", "light", [["type", "report"], ["click", "#view-preview"], ["click", "#actbar .btn:nth-child(3)"], ["wait", 50]], { expect: { actbar: 4, lastSent: "copy" } }],
+  // The classic window's terms, and the date with its time in the preview.
+  ["terms-ar-light", "ar", "light", [["type", "تقرير"]], { expect: { termsAr: true, dateTime: true } }],
+  // Zoom with Ctrl and + / 0; off switches readable; paths 13.5 px.
+  ["zoom-en-light", "en", "light", [["type", "report"], ["key", "Control+="], ["key", "Control+="]], { expect: { zoom: "1.25", pathPx: true } }],
+  ["zoom-reset-en-light", "en", "light", [["key", "Control+="], ["key", "Control+0"]], { expect: { zoom: "1" } }],
+  // A document found by its text: its matching lines start above the fold; wide screens.
+  ["content-lines-en-light", "en", "light", [["click", "#chip-content"], ["type", "lease agreement"], ["key", "Enter"], ["wait", 300]], { expect: { linesTop: true } }],
+  ["wide-en-light", "en", "light", [["type", "report"]], { width: 1920, height: 1080, expect: { rows: 11 } }],
+  // Column widths: the edge before the Date header drags (kept in the page's storage).
+  ["col-width-en-light", "en", "light", [["type", "report"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "98px" } }],
+  ["col-width-ar-light", "ar", "light", [["type", "تقرير"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "158px" } }],
+  // A Latin search in the Arabic interface stays at the right.
+  ["latin-query-ar-light", "ar", "light", [["type", "report"]], { expect: { qAlign: "right" } }],
   ["filters-ar-light", "ar", "light", [["chip", "size", 2], ["chip", "date", 4], ["chip", "scope", 1], ["type", "تقرير"], ["wait", 100], ["click", '.colbtn[data-sort="size"]'], ["click", '.colbtn[data-sort="size"]'], ["key", "ArrowDown"]], { expect: { chipsOn: 3 } }],
   ["filters-en-light", "en", "light", [["chip", "kind", 1], ["chip", "date", 3], ["type", "report"], ["chip", "sort", 4], ["key", "ArrowDown"]], { expect: { chipsOn: 2 } }],
   ["sort-menu-en-dark", "en", "dark", [["type", "report"], ["click", "#chip-sort"]], { expect: { menu: true } }],
@@ -253,6 +292,15 @@ const SHOTS = [
   ["settings-en-dark", "en", "dark", [["key", "Control+,"]], { expect: { settings: true } }],
   // «العودة إلى الشكل القديم»: one typed request.
   ["classic-look-ar-light", "ar", "light", [["click", "#set-btn"], ["click", "#classic-look"], ["wait", 50]], { expect: { settings: true, lastSent: "classic_look" } }],
+  // Dragging a row out asks the program to drag that file (once), naming its list version.
+  ["drag-en-light", "en", "light", [["type", "report"], ["drag", "#r1"]], { expect: { drags: 1, dialog: false } }],
+  ["drag-recent-ar-light", "ar", "light", [["drag", "#rr0"]], { expect: { lastSent: "drag", drags: 1 } }],
+  // After a drag the next click elsewhere still works (Windows' drag loop takes the mouseup).
+  ["drag-then-click-en-light", "en", "light", [["type", "report"], ["drag", "#r1"], ["wait", 50], ["click", "#set-btn"]], { expect: { drags: 1, settings: true } }],
+  // A program the search names: a button above the results; a click asks for it by its place.
+  ["apps-ar-light", "ar", "light", [["type", "كروم"], ["wait", 100], ["click", "#apps [data-app=\"0\"]"], ["wait", 50]], { expect: { apps: 1, lastSent: "app" } }],
+  // «فتح قائمة الخيارات…»: the program's Options menu (tools, support, updates).
+  ["options-menu-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#options-menu"], ["wait", 50]], { expect: { settings: true, lastSent: "options_menu" } }],
   // A name split into base and extension keeps its matches marked, in the extension too.
   ["names-split-ar-light", "ar", "light", [["type", "xlsx"]], { expect: { marks: 2, fnames: 2 } }],
 ];
@@ -261,7 +309,7 @@ const SHOTS = [
   const browser = await chromium.launch(exe ? { executablePath: exe } : {});
   const errors = [];
   for (const [name, lang, theme, steps, opts = {}] of SHOTS) {
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, colorScheme: theme, locale: lang === "ar" ? "ar" : "en-US" });
+    const ctx = await browser.newContext({ viewport: { width: opts.width || 1280, height: opts.height || 800 }, deviceScaleFactor: 2, colorScheme: theme, locale: lang === "ar" ? "ar" : "en-US" });
     const pg = await ctx.newPage();
     pg.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
     pg.on("console", (m) => (m.type() === "error" || /Content Security Policy/.test(m.text())) && errors.push(`${name}: console: ${m.text()}`));
@@ -274,7 +322,7 @@ const SHOTS = [
       if (!file.startsWith(ASSETS) || !fs.existsSync(file)) return route.fulfill({ status: 404, headers, body: "" });
       route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || "application/octet-stream", headers, body: fs.readFileSync(file) });
     });
-    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning });
+    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched });
     await pg.goto(ORIGIN + "/");
     await pg.waitForFunction(() => document.querySelector("#menu-kind") && document.querySelector("#menu-kind").children.length > 0);
     for (const [what, a, b] of steps) {
@@ -286,6 +334,14 @@ const SHOTS = [
       else if (what === "chip") { await pg.click(`#chip-${a}`); await pg.click(`#menu-${a} [data-k="${b}"]`); await pg.waitForTimeout(120); }
       else if (what === "wait") await pg.waitForTimeout(a);
       else if (what === "eval") await pg.evaluate(a);
+      else if (what === "drag") {
+        const b = await pg.locator(a).boundingBox();
+        await pg.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+        await pg.mouse.down();
+        await pg.mouse.move(b.x + b.width / 2 + 30, b.y + b.height / 2 + 12, { steps: 5 });
+        await pg.mouse.up();
+        await pg.waitForTimeout(60);
+      }
     }
     await pg.evaluate(() => document.fonts.ready);
     await pg.waitForTimeout(100);
@@ -302,8 +358,11 @@ const SHOTS = [
         const xs = [...p.querySelectorAll(":scope > bdi")].filter((b) => b.getClientRects().length).map((b) => b.getClientRects()[0]);
         for (let i = 1; i < xs.length; i++) if (xs[i].top === xs[i - 1].top && xs[i].left < xs[i - 1].left) bad.push("path segments out of order: " + p.textContent);
       }
+      // The empty search box's hint reads in the page's direction («ابحث باسم الملف…», its ellipsis at the end).
+      const box = document.querySelector("#q");
+      if (!box.value && getComputedStyle(box).direction !== (lang === "ar" ? "rtl" : "ltr")) bad.push("search hint not in the page's direction");
       // Names, snippets and matching lines pick their own direction.
-      for (const el of document.querySelectorAll(".pv-name .t, .row .n3 .sn, .lines .lt, .field input")) if (visible(el) && getComputedStyle(el).unicodeBidi !== "plaintext" && el.tagName !== "BDI" && !(el.classList.contains("fname") && el.dir)) bad.push("text without its own direction: " + el.className);
+      for (const el of document.querySelectorAll(".pv-name .t, .row .n3 .sn, .lines .lt, .field input")) if (visible(el) && getComputedStyle(el).unicodeBidi !== "plaintext" && el.tagName !== "BDI" && !(el.classList.contains("fname") && el.dir) && !el.matches(":placeholder-shown")) bad.push("text without its own direction: " + el.className);
       // File names: the extension (".xlsx") left to right, at the end of the
       // name as it reads: on the left of an Arabic name, on the right of an
       // English one.
@@ -317,6 +376,8 @@ const SHOTS = [
         if (b.width === 0 || Math.abs(b.bottom - x.bottom) > 2) continue; // wrapped: no order on one line
         const rtl = /^[^\p{L}]*[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/u.test(base.textContent);
         if (rtl ? x.right > b.left + 1 : x.left < b.right - 1) bad.push(`extension on the wrong side (${rtl ? "rtl" : "ltr"}): ${el.textContent}`);
+        // A right-to-left base and its extension are not glued together.
+        if (rtl && b.left - x.right < 2) bad.push(`extension glued to the name: ${el.textContent}`);
       }
       // Strings that went missing.
       const text = document.body.innerText;
@@ -342,6 +403,26 @@ const SHOTS = [
         sent: window.__sent.map((m) => m.op), recycles: window.__sent.filter((m) => m.op === "recycle").length,
         stale: window.__stale.length, q: document.querySelector("#q").value, focus: document.activeElement && document.activeElement.id,
         lastSent: window.__sent.length ? window.__sent[window.__sent.length - 1].op : null,
+        drags: window.__sent.filter((m) => m.op === "drag").length,
+        apps: document.querySelectorAll("#apps:not([hidden]) button").length,
+        opens: window.__sent.filter((m) => m.op === "open").length,
+        stillIndexing: document.getElementById("view-nores").classList.contains("indexing"),
+        switched: !document.getElementById("switched").hidden,
+        warn: document.getElementById("status-text").classList.contains("warn"),
+        qAlign: getComputedStyle(document.querySelector("#q")).textAlign,
+        compact: document.body.classList.contains("compact"),
+        dateW: document.body.style.getPropertyValue("--w-date"),
+        linesTop: (() => { const l = document.querySelector(".preview .pv-lines, .preview .snip"); return !!l && l.getBoundingClientRect().top < innerHeight * 0.75; })(),
+        zoom: document.documentElement.style.zoom || "1",
+        pathPx: [...document.querySelectorAll("#list .row .n2")].every((p) => parseFloat(getComputedStyle(p).fontSize) >= 13.5),
+        termsAr: document.getElementById("cols").textContent.includes("تاريخ التعديل") && document.getElementById("status-text").textContent.startsWith("وجدت"),
+        dateTime: /[0-9٠-٩]{1,2}:[0-9٠-٩]{2}/.test([...document.querySelectorAll(".facts dd")].map((d) => d.textContent).join(" ")),
+        actbar: visible(document.getElementById("actbar")) ? document.querySelectorAll("#actbar .btn").length : 0,
+        labels: [...document.querySelectorAll(".hbtn .hlbl")].every((l) => visible(l) && l.textContent.trim()),
+        rowH: [...document.querySelectorAll("#list .row")].every((r) => r.getBoundingClientRect().height <= 36),
+        preview: visible(document.getElementById("preview")),
+        bannerSlim: document.getElementById("banner").classList.contains("slim") && document.getElementById("banner").getBoundingClientRect().height <= 48,
+        dlgName: !!document.querySelector("#dlg-h .fname"),
       };
     }, lang);
     for (const b of check.bad) errors.push(`${name}: ${b}`);

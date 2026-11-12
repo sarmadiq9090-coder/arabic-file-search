@@ -27,7 +27,7 @@ impl App {
             if manual {
                 log(&format!("update: skipped, installed with {}", pm.name()));
                 self.set_status(&trf!("يُحدَّث عبر {}.", "Updated by {}.", pm.name()));
-                nwg::modal_info_message(&self.window, title(), &crate::update::managed_message(pm));
+                self.modal_info(title(), &crate::update::managed_message(pm));
             }
             return;
         }
@@ -90,11 +90,11 @@ impl App {
                     Ok(None) if manual => {
                         let v = env!("CARGO_PKG_VERSION");
                         self.set_status(&trf!("لديك أحدث إصدار ({v}).", "You have the latest version ({v})."));
-                        nwg::modal_info_message(&self.window, title(), &trf!("لديك أحدث إصدار من البرنامج ({v}).", "You have the latest version of the program ({v})."));
+                        self.modal_info(title(), &trf!("لديك أحدث إصدار من البرنامج ({v}).", "You have the latest version of the program ({v})."));
                     }
                     Err(e) if manual => {
                         self.set_status(tr!("تعذر التحقق من التحديثات.", "Could not check for updates."));
-                        nwg::modal_error_message(&self.window, title(), &trf!("تعذر التحقق من التحديثات:\n{e}", "Could not check for updates:\n{e}"));
+                        self.modal_error(title(), &trf!("تعذر التحقق من التحديثات:\n{e}", "Could not check for updates:\n{e}"));
                     }
                     _ => {}
                 }
@@ -125,8 +125,7 @@ impl App {
                         log(&format!("update: the new version did not start ({failed}); rolling back failed: {rb}"));
                         let e = failed;
                         self.update_busy.set(false);
-                        nwg::modal_info_message(
-                            &self.window,
+                        self.modal_info(
                             title(),
                             &trf!("تم تثبيت الإصدار الجديد، لكن تعذرت إعادة التشغيل تلقائياً ({e}).\nأغلق البرنامج وافتحه من جديد.", "The new version is installed, but the program could not restart itself ({e}).\nClose the program and open it again."),
                         );
@@ -137,14 +136,15 @@ impl App {
                 log(&format!("update: install failed: {e}"));
                 self.update_busy.set(false);
                 self.set_status(tr!("تعذر التحديث.", "The update failed."));
-                nwg::modal_error_message(&self.window, title(), &trf!("تعذر تنزيل التحديث أو تثبيته:\n{e}\n\nالإصدار الحالي يعمل كما هو.", "Could not download or install the update:\n{e}\n\nThe current version keeps working as before."));
+                self.modal_error(title(), &trf!("تعذر تنزيل التحديث أو تثبيته:\n{e}\n\nالإصدار الحالي يعمل كما هو.", "Could not download or install the update:\n{e}\n\nThe current version keeps working as before."));
             }
         }
     }
 
     pub(super) fn offer_update(&self, rel: crate::update::Release) {
-        // An automatic check must not pop up over a hidden window; show it.
-        if !self.window.visible() {
+        // An automatic check must not pop up over a hidden window; show the
+        // main window in use (the new look's, or the classic one).
+        if !self.main_shown() {
             self.show_window();
         }
         let current = env!("CARGO_PKG_VERSION");
@@ -160,7 +160,7 @@ impl App {
             buttons: nwg::MessageButtons::YesNo,
             icons: nwg::MessageIcons::Question,
         };
-        if nwg::modal_message(&self.window, &params) != nwg::MessageChoice::Yes {
+        if self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) != nwg::MessageChoice::Yes {
             self.set_status(&trf!("الإصدار {} متاح. يمكنك التحديث لاحقاً من «خيارات».", "Version {} is available. You can update later from “Options”.", rel.version));
             return;
         }
@@ -183,6 +183,16 @@ impl App {
             }
             notice.notice();
         });
+    }
+
+    /// A message box over the main window in use: the new look's when it
+    /// is on screen (the classic window is hidden then), else the classic one.
+    fn modal_info(&self, title: &str, text: &str) {
+        self.with_modal_owner(|owner| nwg::modal_info_message(nwg::ControlHandle::Hwnd(owner), title, text));
+    }
+
+    fn modal_error(&self, title: &str, text: &str) {
+        self.with_modal_owner(|owner| nwg::modal_error_message(nwg::ControlHandle::Hwnd(owner), title, text));
     }
 
     pub(super) fn poll_update_progress(&self) {

@@ -4,6 +4,13 @@
 
 ## غير منشور (Unreleased)
 
+### جديد
+- **الشكل الجديد هو الأصل الآن** حيث يمكن تشغيله (فيه WebView2): للمستخدم الجديد، ومرة واحدة لمن حدّث من 0.10.0. «الإعدادات ← العودة إلى الشكل القديم» يبقى بنقرة واحدة، واختيارك يبقى بعدها دائماً؛ وإذا تعذّر تشغيل الشكل الجديد مرتين متتاليتين يعود البرنامج إلى القديم تلقائياً. / **New look by default** where it can run (WebView2): for new users, and once for those updating from 0.10.0; "Back to the classic look" stays one click away and sticks.
+- **«خيارات أخرى» في الشكل الجديد**: «الإعدادات ← المزيد ← فتح قائمة الخيارات…» يفتح قائمة «خيارات» كاملة: التحقق من التحديثات، الدعم والملاحظات، الملفات المكررة، أحجام المجلدات، استبدال النص، البحث من الهاتف، وإعدادات خانة البحث وAlt+Space. / **More options** in the new look's settings opens the full Options menu.
+- **سحب ملف من نتائج الشكل الجديد** إلى المستكشف أو البريد أو المحادثة، كما في الشكل القديم. / Drag a result out of the new look, as in the classic list.
+- **أزرار البرامج في الشكل الجديد**: «تطبيق: …» فوق النتائج عندما يطابق البحث اسم برنامج، كما في الشكل القديم. / App buttons above the results in the new look.
+- **قائمة «خيارات» تعمل على الشكل الجديد**: التصدير إلى Excel (CSV) والملفات المكررة يأخذان نتائجه، وأحجام المجلدات مجلده، و«إخفاء إلى شريط المهام» يخفيه، ورسائل الحالة (ومنها نسبة تنزيل التحديث) تظهر فيه. / Options items act on the new look (export, duplicates, folder sizes, hide), and their messages show there.
+
 ### أمان
 - **ملف PDF مصمَّم بحلقة لا تنتهي** (نموذج يرسم نفسه، أو صفحة هي أصل نفسها) كان يُغلق البرنامج بعد ثوانٍ من كل تشغيل أثناء فهرسة المحتوى؛ صار يُفحص قبل قراءته ويُتخطّى. / **PDF loops** (a form drawing itself, a page tree that is its own parent) no longer crash the app: such files are checked first and skipped.
 - **ملف Excel (.xlsx) صغير يعلن عن عدد هائل من النصوص** كان يُغلق البرنامج لنفاد الذاكرة؛ صار يُرفض. / A tiny **.xlsx declaring trillions of shared strings** no longer aborts the app.
@@ -61,6 +68,8 @@
 - **الدقائق الأولى لا تبدو متوقفة**: أثناء بناء الفهرس لأول مرة تقول القائمة الفارغة «نجهّز قائمة ملفاتك لأول مرة (دقائق قليلة). ابحث الآن، وتكتمل النتائج عند الانتهاء.»، والبحث داخل المستندات الذي لم يجد شيئاً بعد يقول كم قرأ حتى الآن، و«لا نتائج» صار جملة واضحة فوق أزرار الاقتراحات. / **English:** the empty list explains the first index build and a document search still reading, and "no results" has a plain sentence above its buttons.
 - **ترتيب نتائج نافذة البحث الصغيرة**: بعد التطبيق أو صفحة الإعدادات المقصودة لم تعد تظهر ملفات لا علاقة لها جاءت من تخمين لوحة المفاتيح («المفكرة» ثم mathgl، «رسام» ثم vshelp.h)، وصفحات الإعدادات تسبق الملفات التي تشبه البحث فقط. / **English:** quick search: no unrelated keyboard-layout-guessed files after the app or settings page that was meant; Settings pages before files that only resemble the query.
 - **قارئ الشاشة**: خانة البحث العائمة فوق الساعة لها اسم يُقرأ («خانة بحث سريع — انقرها أو اضغط Ctrl+Alt+F») بدل نافذة بلا اسم. / **English:** the floating search box has a name screen readers announce.
+- **عبارة خانة البحث** في الواجهة العربية تُقرأ من اليمين: «ابحث باسم الملف…» بدل أن تبدأ من اليسار والنقاط في غير مكانها. / The Arabic search hint reads right to left.
+- **رسائل التحديث** تظهر فوق الشكل الجديد بدل النافذة القديمة المخفية، و**حجم النافذة الجديدة ومكان تكبيرها** يُحفظان. / Update messages show over the new look; its window size is saved.
 
 ### إصلاحات البحث
 - **«تقريب:» و«جذر:» في البحث داخل المستندات** كانا يُتجاهلان بصمت؛ الآن تقول رسالة الحالة إنهما يعملان على أسماء الملفات فقط وإن الكلمات بُحث عنها كما كُتبت. / `fuzzy:` and `root:` in a document search now say they apply to file names only.
@@ -73,6 +82,9 @@
 - **التحديد يبقى على ملفه** عند انتهاء «البحث داخل المستندات»: كانت النتائج تُرتَّب والتحديد يبقى على رقم الصف، فيفتح Enter أو يحذف Delete ملفاً آخر. / **The selection stays on its file** when a search inside documents ends and its rows are sorted; Enter or Delete could act on another file.
 - **الأسماء التي تبدأ بنقطة** تُوجد الآن: «`.gitignore`» و«`.env`» و«`.ssh`» (ملفات ومجلدات) و«`.net framework`»، وكان البرنامج يعدّ الكلمة بعد النقطة امتداداً فلا يجد شيئاً. و«`ext:.pdf`» يعمل مثل «`ext:pdf`»، و«`*.*`» يعني كل الأنواع. / **Names that start with a dot** (`.gitignore`, `.env`, `.ssh`, `.net framework`) are found; `ext:.pdf` works like `ext:pdf`, and `*.*` means every type.
 - **`regex:` ونهاية السطر**: «`regex:…$`» داخل المستندات يطابق الآن نهاية السطور المنتهية بـ `\r\n` (أغلب ملفات النصوص في ويندوز)، وكان لا يطابقها أبداً. / `regex:…$` now matches at the end of CRLF lines inside documents.
+
+### الصيانة
+- اختبار الشكل الجديد في CI يغطي المستخدم الجديد (بلا إعدادات)، وإعدادات 0.10.0، وبقاء «العودة إلى الشكل القديم» بعد إعادة التشغيل؛ واختبار «المستخدم الحقيقي» يبقى على الشكل القديم صراحةً. / CI covers the new default and the one-time switch.
 
 ## 0.10.0 — 2026-11-11
 

@@ -360,6 +360,15 @@ fn copy_text(text: &str, buf: *mut u16, max: i32) {
 impl App {
     /// Adds the Options item and the notice. Called from `build_ui` while
     /// the app is still being built.
+    /// The Options item is greyed out while the new look is the main
+    /// window (it switches the classic list's view).
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))]
+    pub(super) fn enable_thumbs_item(&self, on: bool) {
+        if !self.thumbs.menu_item.handle.blank() {
+            self.thumbs.menu_item.set_enabled(on);
+        }
+    }
+
     pub(super) fn build_thumbs(&mut self) -> Result<(), nwg::NwgError> {
         let on = load_enabled();
         nwg::MenuItem::builder()

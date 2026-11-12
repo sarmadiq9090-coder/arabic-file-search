@@ -1,8 +1,8 @@
-//! The new main window (the new interface, opt-in while it is built: «جرّب
-//! الشكل الجديد» in the classic window's Options menu, kept in the settings
-//! as `new_ui`, or `--webui` / `BAHTH_WEBUI=1` for one launch; see
-//! `crate::webui`). Its settings page has «العودة إلى الشكل القديم». Either
-//! way the windows are swapped at once, without a restart.
+//! The new main window (the new interface; the default since 0.10.1, kept in
+//! the settings as `new_ui`, or `--webui` / `BAHTH_WEBUI=1` for one launch;
+//! see `crate::webui`). Its settings page has «العودة إلى الشكل القديم» and
+//! the classic window's Options menu «جرّب الشكل الجديد»; either way the
+//! windows are swapped at once, without a restart.
 //!
 //! The program runs as always (index, drive watcher, tray icon, Ctrl+Alt+F
 //! and its quick popup, the box above the clock, updates); only the main
@@ -80,6 +80,12 @@ mod imp {
         window: nwg::Window,
         /// Wakes the UI thread when a background search finishes.
         notice: nwg::Notice,
+        /// Wakes the UI thread to start a drag the page asked for, right
+        /// after WebView2's message handler returns.
+        drag_notice: nwg::Notice,
+        /// «جارٍ الفتح…» while the page is created (the window shows at once).
+        opening: nwg::Label,
+        opening_font: nwg::Font,
     }
 
     /// A search inside documents running on its own threads.
@@ -134,6 +140,28 @@ mod imp {
         loading_since: Cell<Option<Instant>>,
         /// When the page last said hello, until it fails.
         ready_since: Cell<Option<Instant>>,
+        /// The window is on screen without its page: created on the next tick.
+        host_pending: Cell<bool>,
+        /// The launch-to-window time was logged.
+        shown_logged: Cell<bool>,
+        /// This start made the new look the default for a classic user: the
+        /// page says so once (`Outbound::Hello`).
+        tell_switch: Cell<bool>,
+        /// The apps offered for a search: (its seq, its text, the apps).
+        apps: RefCell<(u64, String, Vec<crate::launcher::Item>)>,
+        /// The file a drag the page started is for, until the drag starts.
+        drag: RefCell<Option<String>>,
+        /// What the page searched last: given back to a page loaded again
+        /// (after a renderer failure) and to the classic window on going back.
+        page_query: RefCell<String>,
+        /// A dialog runs inside the page's own message handler (the folder
+        /// dialog): the timer must not drop or create the page meanwhile.
+        in_page_call: Cell<bool>,
+        /// The page asked for the Options menu: opened on the next tick, not
+        /// inside WebView2's handler (the menu runs a message loop).
+        options_pending: Cell<bool>,
+        /// An Options item may have changed a setting the page shows.
+        settings_stale: Cell<bool>,
         /// The program is restarting from the page's own message handler:
         /// the page is left to the process exit, not dropped inside it.
         exiting: Cell<bool>,
@@ -151,33 +179,34 @@ mod imp {
                 Ok(handlers) => handlers,
                 Err(e) => {
                     log(&format!("webui: {e}; using the classic window"));
-                    self.webui_fall_back();
+                    self.webui_fall_back(!started_hidden());
                     return None;
                 }
             };
-            match self.start_webui() {
-                Ok(()) => {
-                    if !started_hidden() {
-                        self.webui_show();
-                    }
-                    log("webui: main window ready");
-                }
-                // (The window stays, hidden: "Try the new look" can use it later.)
-                Err(e) => {
-                    log(&format!("webui: {e}; using the classic window"));
-                    self.webui_fall_back();
-                }
+            // The window is the main one now; its page is created when it is
+            // first shown (`webui_show`, then the next tick): a start in the
+            // tray creates no WebView2 at all, and a start on screen shows
+            // the window with «جارٍ الفتح…» at once instead of nothing.
+            self.webui.me.replace(Rc::downgrade(self));
+            self.webui.active.set(true);
+            self.webui_titles();
+            log("webui: main window ready");
+            if started_hidden() {
+                log("webui: started in the tray; the page is created when the window is first shown");
+            } else {
+                self.webui_show();
             }
             Some(handlers)
         }
 
         /// The classic window after the new one failed to start (twice),
         /// from now on: the next start must not try a page that fails.
-        fn webui_fall_back(&self) {
+        fn webui_fall_back(&self, show: bool) {
             self.webui.active.set(false);
             self.webui.host.replace(None);
+            self.webui.parts.window.set_visible(false);
             self.webui_titles();
-            if !started_hidden() {
+            if show {
                 self.window.set_visible(true);
             }
             // (Off only after a second launch in a row fails: one bad start,
@@ -206,6 +235,19 @@ mod imp {
                 .build(&mut parts.window)
                 .map_err(|e| e.to_string())?;
             nwg::Notice::builder().parent(&parts.window).build(&mut parts.notice).map_err(|e| e.to_string())?;
+            nwg::Notice::builder().parent(&parts.window).build(&mut parts.drag_notice).map_err(|e| e.to_string())?;
+            nwg::Font::builder().family(super::super::startup::ui_font_family()).size_absolute(20).build(&mut parts.opening_font).map_err(|e| e.to_string())?;
+            let (cw, ch) = parts.window.size();
+            nwg::Label::builder()
+                .parent(&parts.window)
+                .text(tr!("جارٍ الفتح…", "Opening…"))
+                .font(Some(&parts.opening_font))
+                .h_align(nwg::HTextAlign::Center)
+                .v_align(nwg::VTextAlign::Center)
+                .position((0, 0))
+                .size((cw as i32, ch as i32))
+                .build(&mut parts.opening)
+                .map_err(|e| e.to_string())?;
             let hwnd = parts.window.handle.hwnd().ok_or("no window handle")?;
             crate::icon::set_window_icon(hwnd);
             self.webui.parts.set(parts);
@@ -219,6 +261,15 @@ mod imp {
                     let parts = &app.webui.parts;
                     match evt {
                         nwg::Event::OnNotice if h == parts.notice => app.on_webui_found(),
+                        nwg::Event::OnNotice if h == parts.drag_notice => app.webui_drag(),
+                        // An item of the Options menu opened over this window
+                        // (`webui_options_menu`): it acts in the classic
+                        // window's handlers, where every item is wired.
+                        nwg::Event::OnMenuItemSelected => app.webui_forward_menu(h),
+                        nwg::Event::OnResize | nwg::Event::OnWindowMaximize if h == parts.window => {
+                            let (w, ht) = parts.window.size();
+                            parts.opening.set_size(w, ht);
+                        }
                         nwg::Event::OnWindowClose if h == parts.window => {
                             if let nwg::EventData::OnWindowClose(d) = &data {
                                 d.close(false);
@@ -243,10 +294,14 @@ mod imp {
                     if msg == WM_ACTIVATE && (w & 0xFFFF) as u16 != WA_INACTIVE {
                         let app = weak.upgrade()?;
                         // (Not while the page is being created or closed.)
-                        if let Ok(host) = app.webui.host.try_borrow()
-                            && let Some(host) = &*host
-                        {
-                            host.set_idle(false);
+                        if let Ok(host) = app.webui.host.try_borrow() {
+                            match &*host {
+                                Some(host) => host.set_idle(false),
+                                // Brought to the front without a page yet
+                                // (a second launch after a start in the tray).
+                                None if app.webui.active.get() => app.webui.host_pending.set(true),
+                                None => {}
+                            }
                         }
                     }
                     None
@@ -323,6 +378,8 @@ mod imp {
             }
             // The Options menu (the tray's "Settings…" opens it while the new
             // look is on screen too) offers the other look.
+            // The thumbnail view is the classic list's.
+            self.enable_thumbs_item(!active);
             set_menu_text(
                 &self.menu_new_ui,
                 if active { tr!("العودة إلى الشكل القديم", "Back to the classic look") } else { tr!("جرّب الشكل الجديد", "Try the new look") },
@@ -403,11 +460,42 @@ mod imp {
             self.webui.failed.set(None);
             place_like(&self.webui.parts.window, &self.window);
             self.webui.parts.window.set_visible(false);
+            // The classic window goes on with what the page searched.
+            let q = self.webui.page_query.borrow().clone();
+            if !q.trim().is_empty() && self.query.text() != q {
+                self.query.set_text(&q);
+            }
             if show {
                 self.show_window();
             }
             self.state.borrow_mut().settings.new_ui = false;
             self.save_settings();
+        }
+
+        /// Creates the page of the window on screen (from the timer, after
+        /// the window and «جارٍ الفتح…» were painted). When WebView2 can't
+        /// start, the classic window takes over (and the failed start counts).
+        fn webui_create_page(&self) {
+            let Some(app) = self.webui.me.borrow().upgrade() else { return };
+            let visible = self.webui.parts.window.visible();
+            self.webui.switching.set(true);
+            let started = app.start_webui();
+            self.webui.switching.set(false);
+            match started {
+                Ok(()) => {
+                    log(&format!("webui: page created {} ms after launch", super::super::startup::ms_since_process_start()));
+                    if visible {
+                        self.webui_show();
+                    }
+                }
+                Err(e) => {
+                    log(&format!("webui: {e}; using the classic window"));
+                    self.webui_fall_back(visible);
+                    if visible {
+                        self.show_window();
+                    }
+                }
+            }
         }
 
         /// A page that has worked a while (`crate::webui::STABLE`): its
@@ -469,6 +557,23 @@ mod imp {
             ));
         }
 
+        /// Called at start when the one-time switch to the new look changed
+        /// a classic user's setting (`Settings::make_new_look_default`).
+        pub(in super::super) fn webui_tell_switch(&self) {
+            self.webui.tell_switch.set(true);
+        }
+
+        /// The new main window, while it is the one in use.
+        pub(in super::super) fn webui_window(&self) -> Option<&nwg::Window> {
+            self.webui.active.get().then_some(&self.webui.parts.window)
+        }
+
+        /// A page is being created (its WebView2 runs a message loop): the
+        /// first-run questions wait.
+        pub(in super::super) fn webui_busy(&self) -> bool {
+            self.webui.switching.get()
+        }
+
         /// Whether the new main window is the one in use and on screen.
         pub(in super::super) fn webui_visible(&self) -> bool {
             self.webui.active.get() && self.webui.parts.window.visible()
@@ -510,11 +615,25 @@ mod imp {
                         ShowWindow(h, SW_RESTORE);
                     }
                     SetForegroundWindow(h);
+                    winapi::um::winuser::UpdateWindow(h);
+                }
+                if !self.webui.shown_logged.replace(true) {
+                    log(&format!("webui: window on screen {} ms after launch", super::super::startup::ms_since_process_start()));
                 }
             }
-            if let Some(host) = &*self.webui.host.borrow() {
-                host.set_idle(false);
-                host.focus();
+            let has_page = match &*self.webui.host.borrow() {
+                Some(host) => {
+                    host.set_idle(false);
+                    host.focus();
+                    true
+                }
+                None => false,
+            };
+            if !has_page {
+                // «جارٍ الفتح…» is on screen; the page comes on the next tick.
+                self.webui.parts.opening.set_visible(true);
+                self.webui.host_pending.set(true);
+                return true;
             }
             self.webui_hand_over_query();
             self.webui_send_recent();
@@ -576,7 +695,13 @@ mod imp {
         }
 
         fn webui_notice(&self, text: impl Into<String>) {
-            self.webui_send(&Outbound::Notice { text: text.into() });
+            self.webui_send(&Outbound::Notice { text: text.into(), warn: false });
+        }
+
+        /// A problem ("could not…", "wait…"): shown in the warning colour
+        /// until the next key or click, and read out by screen readers.
+        fn webui_warn(&self, text: impl Into<String>) {
+            self.webui_send(&Outbound::Notice { text: text.into(), warn: true });
         }
 
         /// The quick popup's search, when it asked for the full window.
@@ -606,7 +731,8 @@ mod imp {
                     Some((if m.is_dir() { 0 } else { m.len() }, mtime, m.is_dir()))
                 })
             };
-            let ver = self.webui.lists.borrow_mut().set_recent(paths);
+            // (Not again when the page already lists these files.)
+            let Some(ver) = self.webui.lists.borrow_mut().set_recent(paths) else { return };
             self.webui_send(&Outbound::Recent { ver, rows });
         }
 
@@ -665,6 +791,14 @@ mod imp {
                     self.webui_stop_content();
                     self.webui.lists.borrow_mut().reset();
                     self.webui.ready.set(true);
+                    if let Some(t) = self.webui.loading_since.get() {
+                        log(&format!(
+                            "webui: page said hello {} ms after launch ({} ms after it was created)",
+                            super::super::startup::ms_since_process_start(),
+                            t.elapsed().as_millis()
+                        ));
+                    }
+                    self.webui.parts.opening.set_visible(false);
                     self.webui.loading_since.set(None);
                     self.webui.ready_since.set(Some(Instant::now()));
                     self.webui.last_status.replace(String::new());
@@ -679,6 +813,8 @@ mod imp {
                             desc: s.sort_desc,
                             digits: s.arabic_digits,
                             version: env!("CARGO_PKG_VERSION"),
+                            // Once: a page loaded again does not say it again.
+                            switched: self.webui.tell_switch.replace(false),
                         }
                     };
                     self.webui_send(&hello);
@@ -688,16 +824,31 @@ mod imp {
                     self.webui_status(true);
                     self.webui_send_recent();
                     self.webui_send_history();
-                    self.webui.handed.replace(String::new());
-                    self.webui_hand_over_query();
+                    // A page loaded again gets back what it searched (not an
+                    // older text of the classic box); a first page gets the
+                    // classic box's text (the quick popup's search).
+                    let again = self.webui.page_query.borrow().clone();
+                    if again.trim().is_empty() {
+                        self.webui.handed.replace(String::new());
+                        self.webui_hand_over_query();
+                    } else {
+                        self.webui.handed.replace(self.query.text());
+                        self.webui_send(&Outbound::Query { q: again });
+                    }
                 }
                 Request::Search { seq, q, kind, size, date, content, sort, desc } => {
+                    self.webui.page_query.replace(q.clone());
                     {
                         let s = &mut self.state.borrow_mut().settings;
                         s.kind = kind;
                         s.sort_col = sort.column();
                         s.sort_desc = desc;
                     }
+                    // The apps the text names, as the classic window's buttons.
+                    let apps = if content { Vec::new() } else { self.app_matches_for(&q) };
+                    let titles = apps.iter().map(|a| a.title.clone()).collect();
+                    self.webui.apps.replace((seq, q.clone(), apps));
+                    self.webui_send(&Outbound::Apps { seq, apps: titles });
                     let params = self.webui_params(Params { seq, text: q, kind, size, date, content, sort, desc, ..Params::default() });
                     if content {
                         self.webui_content(params);
@@ -744,7 +895,7 @@ mod imp {
                     if let Some(path) = self.webui_path(list, seq, ver, id) {
                         self.webui_note_use(list, &path);
                         if !shell::open(&path) {
-                            self.webui_notice(trf!("تعذر فتح الملف: {}", "Could not open the file: {}", path));
+                            self.webui_warn(trf!("تعذر فتح الملف: {}", "Could not open the file: {}", path));
                         }
                     }
                 }
@@ -803,8 +954,14 @@ mod imp {
                 }
                 Request::PickFolder {} => self.webui_pick_folder(),
                 Request::AllDrives {} => self.webui_set_scope(String::new(), true),
-                Request::Saved { id } => {
-                    let Some(s) = self.state.borrow().history.saved.get(id as usize).cloned() else { return };
+                Request::Saved { id, name } => {
+                    // By its place, checked against its name: the page's list
+                    // may be older than the saved searches now.
+                    let Some(s) = self.state.borrow().history.saved.get(id as usize).filter(|s| s.name == name).cloned() else {
+                        self.webui_missed(bridge::Miss::Stale);
+                        self.webui_send_history();
+                        return;
+                    };
                     self.webui_set_scope(s.scope, false);
                     self.webui_send(&Outbound::Apply { q: s.query, kind: s.kind.min(KINDS.len() - 1), content: s.content });
                 }
@@ -829,7 +986,7 @@ mod imp {
                         self.menu_lang_en.set_checked(chosen == Lang::En);
                         self.webui.next_lang.set(Some(chosen));
                     } else {
-                        self.webui_notice(tr!("تعذر حفظ اللغة.", "Could not save the language."));
+                        self.webui_warn(tr!("تعذر حفظ اللغة.", "Could not save the language."));
                     }
                     self.webui_send_settings();
                 }
@@ -841,14 +998,14 @@ mod imp {
                         self.webui.exiting.set(false);
                         self.webui_notice(tr!("تعذرت إعادة التشغيل: لم تعمل النسخة الجديدة.", "Could not restart: the new copy did not start."));
                     }
-                    Err(e) => self.webui_notice(trf!(
+                    Err(e) => self.webui_warn(trf!(
                         "تعذرت إعادة التشغيل تلقائياً ({e}). أغلق البرنامج وافتحه من جديد.",
                         "The program could not restart itself ({e}). Close the program and open it again."
                     )),
                 },
                 Request::Reindex {} => {
                     if self.webui.content.borrow().is_some() {
-                        self.webui_notice(tr!("انتظر انتهاء البحث داخل المستندات أو أوقفه أولاً.", "Wait for the document search to finish, or stop it first."));
+                        self.webui_warn(tr!("انتظر انتهاء البحث داخل المستندات أو أوقفه أولاً.", "Wait for the document search to finish, or stop it first."));
                         return;
                     }
                     self.start_scan();
@@ -864,11 +1021,52 @@ mod imp {
                 }
                 Request::Web { q } => {
                     if !shell::open(&crate::suggest::web_url(&q)) {
-                        self.webui_notice(tr!("تعذر فتح المتصفح.", "Could not open the browser."));
+                        self.webui_warn(tr!("تعذر فتح المتصفح.", "Could not open the browser."));
                     }
                 }
                 Request::Hide {} => self.webui_hide(),
                 Request::ClassicLook {} => self.webui_leave(true),
+                Request::OptionsMenu {} => self.webui.options_pending.set(true),
+                // The Save dialog runs inside this handler: the timer leaves the page alone meanwhile.
+                Request::Export {} => {
+                    self.webui.in_page_call.set(true);
+                    self.export_csv();
+                    self.webui.in_page_call.set(false);
+                }
+                Request::ReplaceText {} => {
+                    if let Some(app) = self.webui.me.borrow().upgrade()
+                        && app.ensure_replace()
+                    {
+                        app.open_replace();
+                    }
+                }
+                Request::FolderSizes { list, seq, ver, id } => {
+                    let Some(path) = self.webui_path(list, seq, ver, id) else { return };
+                    let folder = if std::path::Path::new(&path).is_dir() { path } else { bridge::parent(&path).to_string() };
+                    if let Some(app) = self.webui.me.borrow().upgrade() {
+                        app.show_disk_usage(folder);
+                    }
+                }
+                Request::App { seq, id } => {
+                    let found = {
+                        let apps = self.webui.apps.borrow();
+                        (apps.0 == seq).then(|| apps.2.get(id as usize).cloned().map(|item| (item, apps.1.clone()))).flatten()
+                    };
+                    if let Some((item, text)) = found
+                        && !self.launch_app_item(&item, &text)
+                    {
+                        self.webui_warn(trf!("تعذر فتح: {}", "Could not open: {}", item.title));
+                    }
+                    self.webui_send_history();
+                }
+                Request::Drag { list, seq, ver, id } => {
+                    // Started right after this handler returns (the drag
+                    // runs its own message loop, not inside WebView2's).
+                    if let Some(path) = self.webui_path(list, seq, ver, id) {
+                        self.webui.drag.replace(Some(path));
+                        self.webui.parts.drag_notice.sender().notice();
+                    }
+                }
             }
         }
 
@@ -882,7 +1080,7 @@ mod imp {
 
         fn webui_missed(&self, miss: Miss) {
             if let Some(text) = miss.message(i18n::current()) {
-                self.webui_notice(text);
+                self.webui_warn(text);
             }
         }
 
@@ -931,14 +1129,14 @@ mod imp {
         fn webui_rename(&self, list: List, seq: u64, ver: u64, id: u32, name: &str) {
             let Some(old) = self.webui_path(list, seq, ver, id) else { return };
             if let Some(why) = self.webui_index_busy() {
-                self.webui_notice(why);
+                self.webui_warn(why);
                 return;
             }
             let new = match bridge::rename_target(&old, name) {
                 Ok(new) => new,
                 Err(bridge::BadName::Unchanged) => return,
                 Err(e) => {
-                    self.webui_notice(e.message(i18n::current()));
+                    self.webui_warn(e.message(i18n::current()));
                     return;
                 }
             };
@@ -948,11 +1146,11 @@ mod imp {
             // fail). Changing only the letter case of the same file is fine.
             let taken = || trf!("يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد.", "Another file named “{new_name}” already exists in this folder.");
             if std::path::Path::new(&new).exists() && new.to_lowercase() != old.to_lowercase() {
-                self.webui_notice(taken());
+                self.webui_warn(taken());
                 return;
             }
             if let Err(e) = shell::rename_no_replace(&old, &new) {
-                self.webui_notice(if shell::already_exists(&e) { taken() } else { trf!("تعذر تغيير الاسم: {e}", "Could not rename: {e}") });
+                self.webui_warn(if shell::already_exists(&e) { taken() } else { trf!("تعذر تغيير الاسم: {e}", "Could not rename: {e}") });
                 return;
             }
             self.update_index(|idx| {
@@ -980,11 +1178,11 @@ mod imp {
         fn webui_recycle(&self, list: List, seq: u64, ver: u64, id: u32) {
             let Some(path) = self.webui_path(list, seq, ver, id) else { return };
             if let Some(why) = self.webui_index_busy() {
-                self.webui_notice(why);
+                self.webui_warn(why);
                 return;
             }
             if !shell::recycle(&path) {
-                self.webui_notice(tr!("لم يُحذف الملف.", "The file was not deleted."));
+                self.webui_warn(tr!("لم يُحذف الملف.", "The file was not deleted."));
                 return;
             }
             self.update_index(|idx| {
@@ -1005,6 +1203,99 @@ mod imp {
             self.webui_notice(tr!("نُقل الملف إلى سلة المحذوفات.", "The file was moved to the Recycle Bin."));
         }
 
+        /// The program's Options menu over the new window, at the pointer
+        /// (the page's "Open the Options menu…", the tray's "Settings…"):
+        /// owned by the window on screen, so the keyboard comes back to the
+        /// page when it closes; the chosen item is passed to the classic
+        /// window's handlers (`webui_forward_menu`), which act on the new
+        /// look while it is in use. False when the new look is not in use.
+        pub(in super::super) fn webui_options_menu(&self) -> bool {
+            use winapi::shared::windef::POINT;
+            use winapi::um::winuser::{GetCursorPos, TrackPopupMenu};
+            if !self.webui.active.get() {
+                return false;
+            }
+            let (Some(owner), Some((_, menu))) = (self.webui.parts.window.handle.hwnd(), self.options_menu.handle.pop_hmenu()) else { return false };
+            let mut pt = POINT { x: 0, y: 0 };
+            unsafe {
+                GetCursorPos(&mut pt);
+                SetForegroundWindow(owner);
+                TrackPopupMenu(menu, 0, pt.x, pt.y, 0, owner, std::ptr::null());
+            }
+            self.webui.settings_stale.set(true);
+            if let Ok(host) = self.webui.host.try_borrow()
+                && let Some(host) = &*host
+            {
+                host.focus();
+            }
+            true
+        }
+
+        /// Passes an item chosen in the Options menu over the new window to
+        /// the classic window, as if chosen there (nwg's WM_MENUCOMMAND).
+        fn webui_forward_menu(&self, item: nwg::ControlHandle) {
+            use winapi::um::winuser::{GetMenuItemCount, GetMenuItemID, PostMessageW, WM_MENUCOMMAND};
+            let (Some((menu, id)), Some(classic)) = (item.hmenu_item(), self.window.handle.hwnd()) else { return };
+            let n = unsafe { GetMenuItemCount(menu) };
+            if let Some(pos) = (0..n.max(0)).find(|&i| unsafe { GetMenuItemID(menu, i) } == id) {
+                unsafe { PostMessageW(classic, WM_MENUCOMMAND, pos as WPARAM, menu as LPARAM) };
+            }
+        }
+
+        /// The new look's results, while it is in use, for the Options
+        /// items that work on "the results" (export, duplicates).
+        pub(in super::super) fn webui_results(&self) -> Option<Vec<bridge::ExportRow>> {
+            self.webui.active.get().then(|| self.webui.lists.borrow().shown.as_ref().map(|s| s.export_rows()).unwrap_or_default())
+        }
+
+        /// The folder the new look searches ("" for all drives), while it is in use.
+        pub(in super::super) fn webui_scope(&self) -> Option<String> {
+            self.webui.active.get().then(|| self.webui.scope.borrow().clone())
+        }
+
+        /// "Hide to the taskbar tray" while the new look is in use.
+        pub(in super::super) fn webui_hide_main(&self) -> bool {
+            if !self.webui.active.get() {
+                return false;
+            }
+            self.webui_hide();
+            true
+        }
+
+        /// A status-bar message of the classic window (from an Options item,
+        /// an update…) shown in the new look while it is on screen.
+        pub(in super::super) fn webui_status_text(&self, text: &str) {
+            if self.webui_visible() && !text.trim().is_empty() {
+                if bridge::looks_like_a_problem(text) {
+                    self.webui_warn(text);
+                } else {
+                    self.webui_notice(text);
+                }
+            }
+        }
+
+        /// Drags the file the page asked for (`Request::Drag`), as the
+        /// classic list does; nothing happens when the mouse button was
+        /// already released.
+        fn webui_drag(&self) {
+            use winapi::shared::windef::POINT;
+            use winapi::um::winuser::{GA_ROOT, GetAncestor, GetAsyncKeyState, GetCursorPos, VK_LBUTTON, WindowFromPoint};
+            let Some(path) = self.webui.drag.take() else { return };
+            let Some(h) = self.webui.parts.window.handle.hwnd() else { return };
+            // Only while the left button is still down and the pointer still
+            // over this window: a drag started after the button came up
+            // would drop the file at once wherever the pointer is.
+            let down = unsafe { GetAsyncKeyState(VK_LBUTTON) } as u16 & 0x8000 != 0;
+            let mut pt = POINT { x: 0, y: 0 };
+            let over = unsafe { GetCursorPos(&mut pt) != 0 && GetAncestor(WindowFromPoint(pt), GA_ROOT) == h };
+            if !down || !over {
+                log(&format!("webui: drag skipped (button down: {down}, over the window: {over})"));
+                return;
+            }
+            log("webui: drag started");
+            crate::dragdrop::drag_files_from(h, std::slice::from_ref(&path));
+        }
+
         /// Windows' folder dialog; the chosen folder becomes the one searched.
         fn webui_pick_folder(&self) {
             let mut dialog = nwg::FileDialog::default();
@@ -1015,8 +1306,12 @@ mod imp {
             if built.is_err() {
                 return;
             }
-            // Nothing is borrowed while it runs: its loop delivers the page's messages.
-            let chosen = if dialog.run(Some(&self.webui.parts.window)) { dialog.get_selected_item().ok() } else { None };
+            // Nothing is borrowed while it runs: its loop delivers the page's
+            // messages, and the timer's (which then leaves the page alone).
+            self.webui.in_page_call.set(true);
+            let ran = dialog.run(Some(&self.webui.parts.window));
+            self.webui.in_page_call.set(false);
+            let chosen = if ran { dialog.get_selected_item().ok() } else { None };
             if let Some(dir) = chosen {
                 let mut dir = dir.to_string_lossy().into_owned();
                 if !dir.ends_with('\\') {
@@ -1039,7 +1334,7 @@ mod imp {
                     if autostart::set_enabled(on) {
                         self.menu_autostart.set_checked(on);
                     } else {
-                        self.webui_notice(tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting."));
+                        self.webui_warn(tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting."));
                     }
                 }
                 Setting::ContentIndex => {
@@ -1245,9 +1540,20 @@ mod imp {
         /// results kept in step with the index (finished scan, files changed
         /// on disk).
         pub(in super::super) fn webui_tick(&self, tick: u32) {
+            // A dialog runs inside the page's handler: no page dropped or
+            // created under it (a failure is handled when it closes).
+            if self.webui.in_page_call.get() {
+                return;
+            }
             if self.webui.leaving.replace(false) {
                 // Back to the classic window: its WebView2 is freed.
                 self.webui.host.replace(None);
+            }
+            if self.webui.host_pending.replace(false) && self.webui.active.get() && !self.webui.switching.get() && self.webui.host.borrow().is_none() {
+                self.webui_create_page();
+            }
+            if self.webui.options_pending.replace(false) && self.webui_visible() {
+                self.webui_options_menu();
             }
             if self.webui.active.get() && !self.webui.switching.get() {
                 if let Some(browser_gone) = self.webui.failed.take() {
@@ -1260,6 +1566,9 @@ mod imp {
             }
             if !self.webui.active.get() || !self.webui.ready.get() {
                 return;
+            }
+            if self.webui.settings_stale.replace(false) {
+                self.webui_send_settings();
             }
             self.webui_poll_content();
             if !tick.is_multiple_of(5) {
@@ -1377,6 +1686,34 @@ mod imp {
         pub(in super::super) fn webui_visible(&self) -> bool {
             false
         }
+
+        pub(in super::super) fn webui_window(&self) -> Option<&nwg::Window> {
+            None
+        }
+
+        pub(in super::super) fn webui_tell_switch(&self) {}
+
+        pub(in super::super) fn webui_busy(&self) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_options_menu(&self) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_results(&self) -> Option<Vec<crate::webui::bridge::ExportRow>> {
+            None
+        }
+
+        pub(in super::super) fn webui_scope(&self) -> Option<String> {
+            None
+        }
+
+        pub(in super::super) fn webui_hide_main(&self) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_status_text(&self, _text: &str) {}
 
         pub(in super::super) fn with_modal_owner<R>(&self, f: impl FnOnce(winapi::shared::windef::HWND) -> R) -> R {
             f(self.window.handle.hwnd().unwrap_or(std::ptr::null_mut()))

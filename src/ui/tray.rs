@@ -189,7 +189,10 @@ impl App {
                 let off = app.state.borrow().settings.floating_mode == FloatingMode::Off;
                 app.set_floating_mode(if off { FloatingMode::Fade } else { FloatingMode::Off });
             } else if handle == app.tray_settings {
-                app.show_menu(&app.options_menu);
+                // Over the new look while it is the main window.
+                if !app.webui_options_menu() {
+                    app.show_menu(&app.options_menu);
+                }
             } else if handle == app.tray_about {
                 app.show_about();
             }

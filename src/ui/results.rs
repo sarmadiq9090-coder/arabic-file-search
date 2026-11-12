@@ -304,7 +304,23 @@ impl App {
     /// comma. A `sep=,` first line is not used: the BOM has to come first,
     /// and Excel then ignores the BOM and shows the Arabic as gibberish.
     pub(super) fn export_csv(&self) {
-        if self.state.borrow().rows.is_empty() {
+        // The results on screen: the new look's while it is the main window.
+        let rows = self.webui_results().unwrap_or_else(|| {
+            let st = self.state.borrow();
+            st.rows
+                .iter()
+                .filter_map(|r| {
+                    let e = st.rows_index.entries.get(r.entry as usize)?;
+                    Some(crate::webui::bridge::ExportRow {
+                        path: e.path.to_string(),
+                        size: (!e.is_dir).then_some(e.size),
+                        mtime: e.mtime,
+                        snippet: r.snippet.clone().unwrap_or_default(),
+                    })
+                })
+                .collect()
+        });
+        if rows.is_empty() {
             self.set_status(tr!("لا توجد نتائج لتصديرها.", "There are no results to export."));
             return;
         }
@@ -324,14 +340,13 @@ impl App {
             slot = Some(d);
         }
         let Some(dialog) = slot.as_ref() else { return };
-        let chosen = if dialog.run(Some(&self.window)) { dialog.get_selected_item().ok() } else { None };
+        let chosen = if self.with_modal_owner(|owner| dialog.run(Some(nwg::ControlHandle::Hwnd(owner)))) { dialog.get_selected_item().ok() } else { None };
         *self.export_dialog.borrow_mut() = slot;
         let Some(path) = chosen else { return };
         let mut path = std::path::PathBuf::from(path);
         if path.extension().is_none() {
             path.set_extension("csv");
         }
-        let st = self.state.borrow();
         let sep = csv_separator(&list_separator());
         let write = || -> std::io::Result<usize> {
             let mut f = std::io::BufWriter::new(std::fs::File::create(&path)?);
@@ -343,23 +358,20 @@ impl App {
                 tr!("النص المطابق", "Matching text"),
             ];
             f.write_all(format!("\u{FEFF}{}", csv_line(&head, sep)).as_bytes())?;
-            let mut n = 0;
-            for r in &st.rows {
-                let Some(e) = st.rows_index.entries.get(r.entry as usize) else { continue };
-                let size = if e.is_dir { String::new() } else { e.size.to_string() };
-                let fields = [e.name(), &e.path, &size, &shell::format_time(e.mtime, false), r.snippet.as_deref().unwrap_or("")];
+            for r in &rows {
+                let name = r.path.rsplit('\\').next().unwrap_or(&r.path);
+                let size = r.size.map(|s| s.to_string()).unwrap_or_default();
+                let fields = [name, &r.path, &size, &shell::format_time(r.mtime, false), &r.snippet];
                 f.write_all(csv_line(&fields, sep).as_bytes())?;
-                n += 1;
             }
             f.flush()?;
-            Ok(n)
+            Ok(rows.len())
         };
-        let result = write();
-        drop(st);
-        match result {
+        match write() {
             Ok(n) => self.set_status(&trf!("تم تصدير {} نتيجة.", "Exported {} results.", fmt_num(n))),
             Err(e) => {
-                nwg::modal_error_message(&self.window, tr!("خطأ", "Error"), &trf!("تعذر حفظ الملف:\n{e}", "Could not save the file:\n{e}"));
+                let text = trf!("تعذر حفظ الملف:\n{e}", "Could not save the file:\n{e}");
+                self.with_modal_owner(|owner| nwg::modal_error_message(nwg::ControlHandle::Hwnd(owner), tr!("خطأ", "Error"), &text));
             }
         }
     }

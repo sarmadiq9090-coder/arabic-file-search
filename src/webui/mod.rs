@@ -8,12 +8,13 @@
 //! - `host` (Windows, MSVC builds only): the WebView2 control (wry) inside a
 //!   Win32 window, serving `assets` through the `instafind://` protocol
 //!
-//! The window itself, wired to the running program, is `ui/webui.rs`. While
-//! the new interface is incomplete it is opt-in ([`chosen`]): «جرّب الشكل
-//! الجديد» in the classic window's Options menu turns it on (the `new_ui`
-//! setting), «العودة إلى الشكل القديم» on its settings page turns it off,
-//! and the classic Win32 window stays the default and the fallback when
-//! WebView2 is missing or fails.
+//! The window itself, wired to the running program, is `ui/webui.rs`. Since
+//! 0.10.1 it is the default where it can run ([`chosen`]; the `new_ui`
+//! setting is turned on once, `Settings::make_new_look_default`):
+//! «العودة إلى الشكل القديم» on its settings page turns it off for good,
+//! «جرّب الشكل الجديد» in the classic window's Options menu on again, and
+//! the classic Win32 window is the fallback when WebView2 is missing or
+//! fails (and in mingw builds).
 
 // Only MSVC builds host the page (see Cargo.toml); elsewhere the shared parts
 // are compiled for their tests and for the opt-in switch alone.

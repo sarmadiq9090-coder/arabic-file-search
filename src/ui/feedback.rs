@@ -55,8 +55,9 @@ impl App {
         let target = if mail { feedback::support_mailto() } else { page.to_string() };
         if !shell::open(&target) {
             log("support: could not open the mail program or the browser");
+            let owner = self.with_modal_owner(|h| h);
             nwg::modal_info_message(
-                &self.window,
+                nwg::ControlHandle::Hwnd(owner),
                 title(),
                 &trf!(
                     "تعذر فتح البريد أو المتصفح. راسلنا على:\n{}\nأو افتح صفحة الدعم:\n{}",

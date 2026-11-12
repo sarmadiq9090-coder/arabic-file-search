@@ -14,31 +14,7 @@ impl App {
     /// results, or none (empty box, document search, catalog not built yet).
     pub(super) fn show_app_matches(&self) {
         let text = self.query.text();
-        let items = if text.trim().is_empty() || self.content_mode() {
-            Vec::new()
-        } else {
-            self.start_catalog_once();
-            match self.catalog_now() {
-                Some(c) => {
-                    let st = self.state.borrow();
-                    let now = crate::index::now_secs();
-                    let history = &st.history;
-                    let launches = move |key: &str| history.launch_count(key, now);
-                    let picks = history.picks_for(&text, now);
-                    let picked = move |key: &str| picks.iter().find(|p| p.0 == key).map_or(0, |p| p.1);
-                    let ctx = launcher::Context {
-                        english: crate::i18n::is_en(),
-                        windows_build: super::surface::windows_build(),
-                        windows: &[],
-                        launches: &launches,
-                        picked: &picked,
-                        today: super::quick::today(),
-                    };
-                    c.strong_apps(&text, &ctx, APP_BUTTONS)
-                }
-                None => Vec::new(),
-            }
-        };
+        let items = if self.content_mode() { Vec::new() } else { self.app_matches_for(&text) };
         let changed = {
             let old = self.app_items.borrow();
             old.len() != items.len() || old.iter().zip(&items).any(|(a, b)| a.action != b.action || a.title != b.title)
@@ -59,6 +35,51 @@ impl App {
         self.layout();
     }
 
+    /// The apps `text` names strongly (at most [`APP_BUTTONS`]), as the
+    /// quick search ranks them; none for an empty text or while the
+    /// catalog is not built yet. Also used by the new look.
+    pub(super) fn app_matches_for(&self, text: &str) -> Vec<launcher::Item> {
+        if text.trim().is_empty() {
+            return Vec::new();
+        }
+        self.start_catalog_once();
+        let Some(c) = self.catalog_now() else { return Vec::new() };
+        let st = self.state.borrow();
+        let now = crate::index::now_secs();
+        let history = &st.history;
+        let launches = move |key: &str| history.launch_count(key, now);
+        let picks = history.picks_for(text, now);
+        let picked = move |key: &str| picks.iter().find(|p| p.0 == key).map_or(0, |p| p.1);
+        let ctx = launcher::Context {
+            english: crate::i18n::is_en(),
+            windows_build: super::surface::windows_build(),
+            windows: &[],
+            launches: &launches,
+            picked: &picked,
+            today: super::quick::today(),
+        };
+        c.strong_apps(text, &ctx, APP_BUTTONS)
+    }
+
+    /// Starts an app offered for `text`, and remembers it as the classic
+    /// buttons and the quick search do. False when it could not be started.
+    pub(super) fn launch_app_item(&self, item: &launcher::Item, text: &str) -> bool {
+        match self.run_action(&item.action, false) {
+            Some(true) => {
+                let now = crate::index::now_secs();
+                let key = launcher::action_key(&item.action);
+                let mut st = self.state.borrow_mut();
+                st.history.record_launch(&key, now);
+                st.history.record_pick(text, &key, now);
+                st.history.add_recent(text);
+                st.history.save();
+                true
+            }
+            Some(false) => false,
+            None => true,
+        }
+    }
+
     /// How many app buttons are shown, for the layout.
     pub(super) fn app_buttons_shown(&self) -> usize {
         self.app_items.borrow().len().min(APP_BUTTONS)
@@ -70,18 +91,8 @@ impl App {
         let Some(i) = self.app_btns.iter().position(|b| b.handle == *handle) else { return false };
         let Some(item) = self.app_items.borrow().get(i).cloned() else { return true };
         let text = self.query.text();
-        match self.run_action(&item.action, false) {
-            Some(true) => {
-                let now = crate::index::now_secs();
-                let key = launcher::action_key(&item.action);
-                let mut st = self.state.borrow_mut();
-                st.history.record_launch(&key, now);
-                st.history.record_pick(&text, &key, now);
-                st.history.add_recent(&text);
-                st.history.save();
-            }
-            Some(false) => self.set_status(&trf!("تعذر فتح: {}", "Could not open: {}", item.title)),
-            None => {}
+        if !self.launch_app_item(&item, &text) {
+            self.set_status(&trf!("تعذر فتح: {}", "Could not open: {}", item.title));
         }
         true
     }

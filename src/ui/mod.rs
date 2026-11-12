@@ -529,11 +529,17 @@ impl App {
 
     fn set_status(&self, text: &str) {
         self.status.set_text(0, text);
+        // (Seen in the new look too while it is the main window.)
+        self.webui_status_text(text);
     }
 
     // ---------------------------------------------------------------- tray & options
 
     fn hide_to_tray(&self) {
+        // "Hide to the taskbar tray" while the new look is the main window.
+        if self.webui_hide_main() {
+            return;
+        }
         self.remember_query();
         // The program may now run for days and end with Windows itself:
         // what was changed up to here (size, columns, options) is kept.
@@ -572,7 +578,8 @@ impl App {
     /// Whether the main window is on screen: the classic one, or the new
     /// one when it replaces it (the first-run offers wait for this).
     fn main_shown(&self) -> bool {
-        self.window.visible() || self.webui_visible()
+        // (Not while the new look's page is being created.)
+        (self.window.visible() || self.webui_visible()) && !self.webui_busy()
     }
 
     fn show_window(&self) {
@@ -607,12 +614,15 @@ impl App {
     }
 
     fn save_settings(&self) {
+        // The size of the main window in use: the new look's while it is
+        // the one (the classic window stays hidden then), else the classic.
+        let main = self.webui_window().unwrap_or(&self.window);
         let mut st = self.state.borrow_mut();
         let s = &mut st.settings;
-        if let Some(h) = self.window.handle.hwnd() {
+        if let Some(h) = main.handle.hwnd() {
             s.maximized = unsafe { IsZoomed(h) } != 0;
-            if !s.maximized && unsafe { IsIconic(h) } == 0 && self.window.visible() {
-                (s.width, s.height) = self.window.size();
+            if !s.maximized && unsafe { IsIconic(h) } == 0 && main.visible() {
+                (s.width, s.height) = main.size();
             }
         }
         // The icon view has no columns to measure.
