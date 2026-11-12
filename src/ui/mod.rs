@@ -695,6 +695,8 @@ impl App {
     fn close(&self, why: Leaving) {
         let budget = why.budget();
         crate::leave::watchdog(budget.deadline, move || {
+            // The files being read now are not crashes (`content_cache`).
+            crate::content_cache::clear_markers_now();
             startup::log(&format!("exit: not done after {} s ({why:?}); ending the process", budget.deadline.as_secs()));
             // Hard: nothing here may wait for a thread that is stuck.
             unsafe {
@@ -707,6 +709,9 @@ impl App {
         self.stop_watching();
         self.cancel_content();
         self.stop_warm();
+        // `process::exit` and `TerminateProcess` follow; with the static C
+        // runtime the `atexit` handler that clears these does not run then.
+        crate::content_cache::clear_markers_now();
         if let Some(job) = &self.state.borrow().scan {
             job.progress.cancel.store(true, Ordering::Relaxed);
         }

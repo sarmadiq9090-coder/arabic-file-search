@@ -302,15 +302,21 @@ static EXIT_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 /// Clears the markers of the store registered with
 /// [`ContentCache::clear_markers_at_exit`]: an extraction cut off by a
 /// normal exit did not crash. Takes no lock, so it is safe however the
-/// other threads stand at exit.
-extern "C" fn clear_markers_now() {
+/// other threads stand at exit. Also called by the program itself before it
+/// leaves with `process::exit` or `TerminateProcess` (after an update, at
+/// logoff, by the exit watchdog), where `atexit` handlers do not run with
+/// the static C runtime: the files being read then were not crashes either.
+pub(crate) extern "C" fn clear_markers_now() {
     EXITING.store(true, Ordering::Relaxed);
     if let Some(dir) = EXIT_DIR.get() {
         clear_markers_in(dir);
     }
 }
 
-fn clear_markers_in(dir: &Path) {
+/// [`clear_markers_now`] for the store in `dir`, from another process: the
+/// new copy after it ended the old one (whose files being read were not
+/// crashes).
+pub(crate) fn clear_markers_in(dir: &Path) {
     for p in marker_files(dir) {
         if let Ok(f) = OpenOptions::new().write(true).open(&p) {
             let _ = write_at(&f, &[0; 4], 0);
@@ -537,7 +543,11 @@ impl ContentCache {
     /// (scanned PDFs found empty before the Arabic OCR language pack was
     /// installed, files an older version could not read) and every image
     /// entry is forgotten, so each is read once more. Files a run died
-    /// reading stay skipped. Returns how many entries were dropped.
+    /// reading are tried once more too (the signature names the program's
+    /// version: a new version may read them, and a file that was only being
+    /// read when the program was ended from outside is not lost for good);
+    /// should one kill the process again, it is skipped again until the
+    /// next version. Returns how many entries were dropped.
     pub fn revalidate(&self, signature: &str) -> usize {
         let file = self.dir.join(SIGNATURE);
         if fs::read_to_string(&file).is_ok_and(|s| s == signature) {
@@ -553,7 +563,7 @@ impl ContentCache {
                     .and_then(|e| e.to_str())
                     .is_some_and(|e| IMAGE_EXTS.contains(&e.to_ascii_lowercase().as_str()));
                 let keep = match m.kind {
-                    Kind::NoText => m.hash == POISONED,
+                    Kind::NoText => false,
                     Kind::Text => !image,
                 };
                 if !keep && m.kind == Kind::Text {
@@ -1930,11 +1940,13 @@ mod tests {
         c.put("C:\\poisoned.pdf", 4, 4, None);
         c.lock().map.get_mut("C:\\poisoned.pdf").unwrap().hash = POISONED;
         assert_eq!(c.revalidate("v2 ocr=en-US"), 0, "same signature: nothing changes");
-        assert_eq!(c.revalidate("v2 ocr=ar-SA,en-US"), 2);
+        assert_eq!(c.revalidate("v2 ocr=ar-SA,en-US"), 3);
         assert_eq!(c.get("C:\\scan.pdf", 1, 1), None);
         assert_eq!(c.get("C:\\photo.JPG", 2, 2), None);
         assert_eq!(c.get("C:\\report.docx", 3, 3), Some(Some(AR.into())));
-        assert_eq!(c.get("C:\\poisoned.pdf", 4, 4), Some(None));
+        // A file a run died reading (or was only ended while reading) is
+        // tried once more with a new version.
+        assert_eq!(c.get("C:\\poisoned.pdf", 4, 4), None);
         // Read again and stored: kept from now on, also after a reopen.
         c.put("C:\\scan.pdf", 1, 1, Some("نص من OCR"));
         c.flush().unwrap();
