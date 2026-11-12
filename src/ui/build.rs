@@ -244,11 +244,11 @@ impl NativeUi<AppUi> for App {
         nwg::MenuItem::builder().text(tr!("نسخ الملف\tCtrl+C", "Copy file\tCtrl+C")).parent(&app.menu).build(&mut app.menu_copy_file)?;
         nwg::MenuItem::builder().text(tr!("نسخ المسار\tCtrl+Shift+C", "Copy path\tCtrl+Shift+C")).parent(&app.menu).build(&mut app.menu_copy)?;
         nwg::MenuItem::builder().text(tr!("نسخ مسارات كل النتائج", "Copy paths of all results")).parent(&app.menu).build(&mut app.menu_copy_all)?;
+        // Here rather than in Options: a narrow window hides the Export button.
+        nwg::MenuItem::builder().text(tr!("تصدير النتائج إلى Excel (CSV)", "Export results to Excel (CSV)")).parent(&app.menu).build(&mut app.menu_export)?;
         nwg::MenuItem::builder().text(tr!("تغيير الاسم\tF2", "Rename\tF2")).parent(&app.menu).build(&mut app.menu_rename)?;
         nwg::MenuItem::builder().text(tr!("نقل إلى سلة المحذوفات\tDelete", "Move to Recycle Bin\tDelete")).parent(&app.menu).build(&mut app.menu_delete)?;
         nwg::MenuItem::builder().text(tr!("عرض كل التطابقات داخل الملف\tF4", "Show all matches in the file\tF4")).parent(&app.menu).build(&mut app.menu_matches)?;
-        nwg::MenuSeparator::builder().parent(&app.menu).build(&mut app.menu_properties_sep)?;
-        nwg::MenuItem::builder().text(tr!("خصائص", "Properties")).parent(&app.menu).build(&mut app.menu_properties)?;
 
         // Window with every matching line of one document (hidden until used).
         nwg::Window::builder()
@@ -269,52 +269,6 @@ impl NativeUi<AppUi> for App {
             .size((704, 444))
             .build(&mut app.matches_text)?;
 
-        nwg::Menu::builder().popup(true).parent(w).build(&mut app.options_menu)?;
-        // The new interface, first so it is seen; not offered without
-        // WebView2 (nor in mingw builds, which can't host it).
-        if super::webui::available() {
-            nwg::MenuItem::builder().text(tr!("جرّب الشكل الجديد", "Try the new look")).parent(&app.options_menu).build(&mut app.menu_new_ui)?;
-            nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.menu_new_ui_sep)?;
-        }
-        nwg::MenuItem::builder()
-            .text(tr!("عرض الأرقام بالعربية (٠١٢٣)", "Show Arabic-Indic digits (٠١٢٣)"))
-            .check(settings.arabic_digits)
-            .parent(&app.options_menu)
-            .build(&mut app.menu_digits)?;
-        nwg::MenuItem::builder()
-            .text(tr!("تحديث الفهرس تلقائياً عند تغيّر الملفات", "Update the index automatically when files change"))
-            .check(settings.auto_index)
-            .parent(&app.options_menu)
-            .build(&mut app.menu_auto_index)?;
-                nwg::MenuItem::builder()
-            .text(tr!("فهرسة محتوى المستندات في الخلفية (بحث أسرع داخل الملفات)", "Index document contents in the background (faster content search)"))
-            .check(settings.content_index)
-            .parent(&app.options_menu)
-            .build(&mut app.menu_content_index)?;
-        nwg::MenuItem::builder()
-            .text(tr!("إخفاء ملفات النظام", "Hide system files"))
-            .check(settings.hide_system)
-            .parent(&app.options_menu)
-            .build(&mut app.menu_hide_system)?;
-        nwg::MenuItem::builder().text(tr!("تصدير النتائج إلى Excel (CSV)", "Export results to Excel (CSV)")).parent(&app.options_menu).build(&mut app.menu_export)?;
-        nwg::MenuItem::builder().text(tr!("إخفاء بجانب الساعة\tEsc", "Hide next to the clock\tEsc")).parent(&app.options_menu).build(&mut app.menu_hide)?;
-        nwg::MenuItem::builder().text(tr!("خروج من البرنامج", "Exit the program")).parent(&app.options_menu).build(&mut app.menu_exit)?;
-        nwg::MenuItem::builder()
-            .text(&trf!("إظهار البرنامج من أي مكان\t{HOTKEY_TEXT}", "Show the program from anywhere\t{HOTKEY_TEXT}"))
-            .parent(&app.options_menu)
-            .build(&mut app.menu_hotkey)?;
-        nwg::MenuItem::builder()
-            .text(&trf!("التحقق من التحديثات (الإصدار {})", "Check for updates (version {})", env!("CARGO_PKG_VERSION")))
-            .parent(&app.options_menu)
-            .build(&mut app.menu_update)?;
-        nwg::MenuItem::builder()
-            .text(tr!("التشغيل مع ويندوز (في الخلفية)", "Start with Windows (in the background)"))
-            .check(autostart::is_enabled())
-            .parent(&app.options_menu)
-            .build(&mut app.menu_autostart)?;
-        super::lang_menu::build(&app.options_menu, &mut app.lang_menu, &mut app.menu_lang_ar, &mut app.menu_lang_en)?;
-        super::feedback::build(&app.options_menu, &mut app.feedback_menu, [&mut app.menu_feedback_bug, &mut app.menu_feedback_idea, &mut app.menu_feedback_talk])?;
-        super::feedback::build_support(&app.options_menu, &mut app.support_menu, [&mut app.menu_support_mail, &mut app.menu_support_page])?;
 
         // Tray icon, so a hidden window comes back instantly: a monochrome
         // magnifier in the taskbar's colours (the app icon if that fails).
@@ -345,15 +299,76 @@ impl NativeUi<AppUi> for App {
         nwg::MenuItem::builder().text(tr!("خروج", "Exit")).parent(&app.tray_menu).build(&mut app.tray_exit)?;
 
         phase("tray");
+        nwg::Menu::builder().popup(true).parent(&app.window).build(&mut app.options_menu)?;
+        // The new interface, first so it is seen; not offered without
+        // WebView2 (nor in mingw builds, which can't host it).
+        if super::webui::available() {
+            nwg::MenuItem::builder().text(tr!("جرّب الشكل الجديد", "Try the new look")).parent(&app.options_menu).build(&mut app.menu_new_ui)?;
+            nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.menu_new_ui_sep)?;
+        }
+        // In groups: look and display, indexing and search, shortcuts and
+        // start-up, tools, help and support; then Hide and Exit, last.
+        // Some builders below also add their item to the result menu.
+        nwg::MenuItem::builder()
+            .text(tr!("عرض الأرقام بالعربية (٠١٢٣)", "Show Arabic-Indic digits (٠١٢٣)"))
+            .check(settings.arabic_digits)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_digits)?;
+        app.build_thumbs()?;
+        super::lang_menu::build(&app.options_menu, &mut app.lang_menu, &mut app.menu_lang_ar, &mut app.menu_lang_en)?;
+        nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[0])?;
+
+        nwg::MenuItem::builder()
+            .text(tr!("تحديث الفهرس تلقائياً عند تغيّر الملفات", "Update the index automatically when files change"))
+            .check(settings.auto_index)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_auto_index)?;
+        nwg::MenuItem::builder()
+            .text(tr!("فهرسة محتوى المستندات في الخلفية (بحث أسرع داخل الملفات)", "Index document contents in the background (faster content search)"))
+            .check(settings.content_index)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_content_index)?;
+        nwg::MenuItem::builder()
+            .text(tr!("إخفاء ملفات النظام", "Hide system files"))
+            .check(settings.hide_system)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_hide_system)?;
+        nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[1])?;
+
+        nwg::MenuItem::builder()
+            .text(&trf!("إظهار البرنامج من أي مكان\t{HOTKEY_TEXT}", "Show the program from anywhere\t{HOTKEY_TEXT}"))
+            .parent(&app.options_menu)
+            .build(&mut app.menu_hotkey)?;
+        app.build_quick_menus(&settings)?;
         app.build_quick_switch_menus()?;
+        nwg::MenuItem::builder()
+            .text(tr!("التشغيل مع ويندوز (في الخلفية)", "Start with Windows (in the background)"))
+            .check(autostart::is_enabled())
+            .parent(&app.options_menu)
+            .build(&mut app.menu_autostart)?;
+        nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[2])?;
+
         app.build_dupes()?;
         app.build_replace_window()?;
         app.build_disk_usage()?;
         app.build_web_ui()?;
-        app.build_thumbs()?;
-        app.build_suggest_bar()?;
+        nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[3])?;
+
+        nwg::MenuItem::builder()
+            .text(&trf!("التحقق من التحديثات (الإصدار {})", "Check for updates (version {})", env!("CARGO_PKG_VERSION")))
+            .parent(&app.options_menu)
+            .build(&mut app.menu_update)?;
+        super::feedback::build(&app.options_menu, &mut app.feedback_menu, [&mut app.menu_feedback_bug, &mut app.menu_feedback_idea, &mut app.menu_feedback_talk])?;
+        super::feedback::build_support(&app.options_menu, &mut app.support_menu, [&mut app.menu_support_mail, &mut app.menu_support_page])?;
         app.build_rating()?;
-        app.build_quick_menus(&settings)?;
+        nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[4])?;
+
+        nwg::MenuItem::builder().text(tr!("إخفاء بجانب الساعة\tEsc", "Hide next to the clock\tEsc")).parent(&app.options_menu).build(&mut app.menu_hide)?;
+        nwg::MenuItem::builder().text(tr!("خروج من البرنامج", "Exit the program")).parent(&app.options_menu).build(&mut app.menu_exit)?;
+        // Last in the result menu, as in Explorer.
+        nwg::MenuSeparator::builder().parent(&app.menu).build(&mut app.menu_properties_sep)?;
+        nwg::MenuItem::builder().text(tr!("خصائص", "Properties")).parent(&app.menu).build(&mut app.menu_properties)?;
+        app.build_suggest_bar()?;
         app.state.get_mut().settings = settings.clone();
         app.state.get_mut().history = History::load();
         let ui = AppUi { inner: Rc::new(app), handlers: Default::default(), raw_handlers: Default::default() };

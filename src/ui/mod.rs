@@ -258,6 +258,8 @@ pub struct App {
     /// «جرّب الشكل الجديد»: only built when WebView2 is there (MSVC builds).
     menu_new_ui: nwg::MenuItem,
     menu_new_ui_sep: nwg::MenuSeparator,
+    /// Between the Options menu's groups (`build.rs`).
+    options_seps: [nwg::MenuSeparator; 5],
     menu_hotkey: nwg::MenuItem,
     menu_digits: nwg::MenuItem,
     menu_content_index: nwg::MenuItem,
@@ -379,7 +381,7 @@ impl App {
         // The narrowest window in which nothing overlaps: the bottom button
         // row, or the scope row when it has a row of its own.
         use style::{GAP, MARGIN};
-        // (Export, also in the Options menu, steps aside when there is no room.)
+        // (Export, also in the result menu, steps aside when there is no room.)
         let bottom = w.bottom.iter().sum::<i32>() - w.bottom[3] + w.options + 5 * GAP + 2 * MARGIN;
         let scope_row =
             w.scope_label + style::MIN_SCOPE_W + w.scope_btn + w.all_btn + w.reindex + 4 * GAP + 2 * MARGIN;
@@ -458,7 +460,7 @@ impl App {
         let status_h = self.status_height();
         let y_btn = h - status_h - GAP - CTRL_H;
         let mut x = M;
-        // Export results is also in the Options menu, so in a narrow window
+        // Export results is also in the result menu, so in a narrow window
         // it gives up its place rather than overlap Options.
         let export_fits = wd.bottom.iter().sum::<i32>() + wd.options + 6 * GAP + 2 * M <= w;
         self.export_btn.set_visible(export_fits);

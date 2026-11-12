@@ -17,6 +17,7 @@
 - **مفاتيح نافذة البحث الصغيرة ظاهرة**: سطر تحت خانة البحث «Enter فتح · Ctrl+Enter المجلد · Tab المزيد · Esc إغلاق». / **English:** the quick popup shows its keys under the box: "Enter open · Ctrl+Enter folder · Tab more · Esc close".
 - **«فتح باستخدام…» و«خصائص»** في قائمة النقر بالزر الأيمن على نتيجة، كما في مستكشف الملفات. / **English:** "Open with…" and "Properties" in the result list's right-click menu.
 - **جواب تحويل العملات**: السطر تحته «سعر تقريبي · التاريخ · Enter للنسخ»، وسطر مصدر الأسعار لم يعد «جواباً» ثانياً تقف عليه الأسهم (يبقى قابلاً للنقر لفتح موقع المصدر). / **English:** currency answers say "approximate rate · date · Enter copies"; the arrow keys pass over the rates source line, which stays clickable.
+- **قائمة «خيارات» مرتّبة في مجموعات** تفصل بينها خطوط: العرض، الفهرسة والبحث، الاختصارات والتشغيل، الأدوات، المساعدة والدعم، ثم «إخفاء بجانب الساعة» و«خروج من البرنامج» في آخرها (كان «خروج» في وسط 21 عنصراً). «تصدير النتائج» انتقل إلى قائمة النقر بالزر الأيمن، و«خصائص» آخر تلك القائمة. / **English:** the Options menu is grouped with separators, Hide and Exit last; "Export results" moved to the result right-click menu.
 
 ## 0.10.0 — 2026-11-11
 
