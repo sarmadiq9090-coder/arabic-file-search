@@ -311,3 +311,33 @@ fn dates_use_the_offset_of_their_own_day() {
     // A fixed offset is unchanged.
     assert_eq!(at("dm:2024-01-15").mtime, Some((day_utc(2024, 1, 15), day_utc(2024, 1, 16))));
 }
+
+// ------------------------------------------------- Arabic filter prefixes
+
+/// Arabic filter prefixes were compared byte for byte: `كلمه:` (ه for ة),
+/// `تأريخ:` (with hamza) or `مُجلد:` became plain search words.
+#[test]
+fn arabic_prefixes_are_compared_normalised() {
+    let words = |q: &Query| q.words.iter().map(|t| t.alts.clone()).collect::<Vec<_>>();
+    assert_eq!(words(&at("كلمه:عقد")), vec![vec!["عقد".to_string()]]);
+    assert_eq!(words(&at("كلمة:عقد")), words(&at("كلمه:عقد")));
+    assert!(at("كلمه:عقد").terms.is_empty());
+    assert_eq!(at("تأريخ:2024").mtime, at("dm:2024").mtime);
+    assert_eq!(at("تـاريخ:اليوم").mtime, at("dm:today").mtime);
+    assert_eq!(at("حَجم:>1م").size, at("size:>1mb").size);
+    let q = at("مُجلد:صور");
+    assert!(q.dirs_only);
+    assert_eq!(q.terms[0].alts, vec!["صور"]);
+    assert!(at("نِظام: x").show_system);
+    assert!(at("تقريب:تقرير").fuzzy && at("جذر:كتب").root && at("فرانكو:3abd").franco);
+    // The value starts right after the prefix, whatever its spelling.
+    assert_eq!(at("كلمه:\"عقد ايجار\"").words[0].alts, vec!["عقد ايجار"]);
+    assert_eq!(at(r#"تأريخ:"هذا الشهر" عقد"#).mtime, at("dm:thismonth").mtime);
+    // Not a prefix: a different word, or the prefix inside a word.
+    assert!(at("كلمات:عقد").words.is_empty());
+    assert!(at("الكلمة:عقد").words.is_empty());
+    assert!(at("كلم:عقد").words.is_empty());
+    assert!(!at("صور:مجلد:").dirs_only);
+    // Latin prefixes ignore case as before.
+    assert_eq!(at("SIZE:>1mb").size, at("size:>1mb").size);
+}

@@ -435,9 +435,28 @@ fn has_dot_word(name: &str, dot: &str) -> bool {
     name.match_indices(dot).any(|(i, _)| i == 0 || name[..i].ends_with(char::is_whitespace))
 }
 
-/// Length of the prefix from `list` that `tok` starts with, if any.
+/// Length of the prefix from `list` that `tok` starts with, if any. Latin
+/// prefixes ignore case; Arabic ones are compared normalised like the
+/// search words, so `كلمه:` is `كلمة:`, `تأريخ:` is `تاريخ:` and diacritics
+/// or tatweel (`مُجلد:`) don't matter.
 fn prefix_len(tok: &str, list: &[&str]) -> Option<usize> {
-    list.iter().find(|p| tok.get(..p.len()).is_some_and(|h| h.eq_ignore_ascii_case(p))).map(|p| p.len())
+    list.iter().find_map(|p| {
+        if tok.get(..p.len()).is_some_and(|h| h.eq_ignore_ascii_case(p)) {
+            return Some(p.len());
+        }
+        if p.is_ascii() {
+            return None;
+        }
+        let want = normalize(p);
+        let mut got = String::new();
+        for (i, c) in tok.char_indices() {
+            got.push_str(&normalize(c.encode_utf8(&mut [0; 4])));
+            if got.len() >= want.len() {
+                return (got == want).then_some(i + c.len_utf8());
+            }
+        }
+        None
+    })
 }
 
 /// Length of the folder prefix `tok` starts with, if any.

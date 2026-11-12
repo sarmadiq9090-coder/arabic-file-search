@@ -5,6 +5,7 @@
 ## غير منشور (Unreleased)
 
 ### إصلاحات البحث
+- **كتابات أخرى لأسماء المرشحات العربية**: «كلمه:» و«تأريخ:» و«مُجلد:» تعمل مثل «كلمة:» و«تاريخ:» و«مجلد:» (الهمزة والتاء المربوطة والتشكيل لا تهم)، وكانت تُعامل ككلمات بحث عادية. / Arabic filter prefixes accept the usual spelling variants (`كلمه:`, `تأريخ:`, `مُجلد:`).
 - **`dm:` والتوقيت الصيفي**: التاريخ يُحسب بتوقيت يومه نفسه (`dm:2024-01-15` في الصيف بتوقيت الشتاء) ويُقرأ عند كل بحث، فيتفق مع عمود «تاريخ التعديل» حتى بعد تغيير الساعة أو المنطقة الزمنية والبرنامج يعمل في شريط المهام. / **`dm:` and daylight saving**: each date uses its own day's offset, read at search time, so it agrees with the Date column.
 - **الذاكرة في البحث داخل المستندات**: كلمة شائعة («في»، «a») في عشرات آلاف المستندات كانت تحجز لكل نتيجة حتى 50 سطراً، فتصل إلى غيغابايتات (وتنهار النسخة 32-بت). الآن تحتفظ أول 1,000 نتيجة فقط بسطورها وتُقرأ سطور الباقي عند فتح «كل التطابقات» (F4)، ويتوقف البحث عند 100,000 نتيجة مع رسالة «تُعرض أول … نتيجة فقط». / **Memory in document search**: only the first 1,000 results keep their matching lines (the rest are read again for “All matches”), and a search lists at most 100,000 results, saying so.
 - **التحديد يبقى على ملفه** عند انتهاء «البحث داخل المستندات»: كانت النتائج تُرتَّب والتحديد يبقى على رقم الصف، فيفتح Enter أو يحذف Delete ملفاً آخر. / **The selection stays on its file** when a search inside documents ends and its rows are sorted; Enter or Delete could act on another file.
