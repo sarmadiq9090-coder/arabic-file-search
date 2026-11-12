@@ -10,6 +10,7 @@
 - **«إفراغ سلة المحذوفات» لا يجمّد البرنامج**: كان الإفراغ يجري في خيط الواجهة، فتتوقف النوافذ عن الاستجابة حتى ينتهي (قد يطول مع سلة كبيرة). الآن يجري في الخلفية بعد التأكيد، وتظهر رسالة إذا فشل. / **English:** emptying the Recycle Bin runs in the background (after the confirmation), so the app no longer freezes.
 - **«مسح السجل والملفات الأخيرة»** (كان «مسح عمليات البحث الأخيرة») يمسح أيضاً الملفات المفتوحة مؤخراً (قائمة «الأخيرة» في نافذة البحث الصغيرة) وسجل ما فُتح من البحث السريع، ومنه عمليات البحث على الويب التي تحفظ النص المكتوب، ويحفظ ذلك فوراً. البحوث المحفوظة والمفضلة تبقى. / **English:** "Clear history and recent files" also forgets recently opened files and quick-search launches (web searches held the typed text); saved searches and pins stay.
 - **المفضلة تحفظ وسائط صفحات الإعدادات القديمة**: تثبيت «الأجهزة والطابعات» (`control printers`) كان يفتح لوحة التحكم العادية ويُخفي الصف الصحيح من النتائج. الآن تُحفظ الوسائط مع المثبّت، وتبقى المفضلة القديمة كما هي. / **English:** pinned classic settings pages keep their arguments ("Devices and Printers" no longer opens plain Control Panel); existing pins still load.
+- **إعداد Alt+Space لا يضيع بصمت**: إذا سبقك برنامج آخر إلى الاختصار عند بدء التشغيل كان الإعداد يُطفأ ويُحفظ مطفأً. الآن يبقى مفعّلاً، ويكتب الخيار في القائمة أن برنامجاً آخر يستخدمه الآن، ويعيد البرنامج المحاولة كل بضع ثوانٍ حتى يتحرر. / **English:** the Alt+Space setting is no longer turned off when another program holds the key at start; the menu says so and it is retried until free.
 
 ## 0.10.0 — 2026-11-11
 

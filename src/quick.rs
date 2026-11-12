@@ -334,6 +334,15 @@ pub fn tray_restore_left(left: u8, worked: bool) -> u8 {
     if worked { 0 } else { left.saturating_sub(1) }
 }
 
+/// Whether to try again, at timer tick `tick`, to register a hotkey that
+/// another program held at tick `since` (ticks are 200 ms): every 5 s for
+/// the first minute (the other program may be starting with Windows too),
+/// then every 30 s.
+pub fn hotkey_retry_due(tick: u32, since: u32) -> bool {
+    let elapsed = tick.wrapping_sub(since);
+    elapsed != 0 && if elapsed <= 300 { elapsed.is_multiple_of(25) } else { elapsed.is_multiple_of(150) }
+}
+
 // ------------------------------------------------------------------ results
 
 /// The sections of the quick-search list, in display order.
@@ -1467,5 +1476,17 @@ mod everyday_tests {
         assert_eq!(tries, TRAY_RESTORE_TRIES);
         assert_eq!(tray_restore_left(TRAY_RESTORE_TRIES, true), 0);
         assert_eq!(tray_restore_left(0, false), 0);
+    }
+
+    /// Alt+Space held by another program at start: retried every 5 s for a
+    /// minute, then every 30 s, never at the tick it failed.
+    #[test]
+    fn hotkey_retries() {
+        let due: Vec<u32> = (2..2 + 1200).filter(|&t| hotkey_retry_due(t, 2)).map(|t| t - 2).collect();
+        assert_eq!(&due[..12], &[25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]);
+        assert_eq!(&due[12..], &[450, 600, 750, 900, 1050]);
+        assert!(!hotkey_retry_due(2, 2));
+        // The tick counter wraps around after about 27 years; no panic.
+        assert!(hotkey_retry_due(24, u32::MAX));
     }
 }

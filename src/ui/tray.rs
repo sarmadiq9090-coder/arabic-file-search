@@ -106,6 +106,19 @@ pub struct QuickState {
     /// Tries left to put the tray icon back after Explorer restarted and
     /// forgot it (`TaskbarCreated`); one try per timer tick.
     tray_restore: Cell<u8>,
+    /// Alt+Space is on but another program held it: the tick it failed at,
+    /// retried from then on (`crate::quick::hotkey_retry_due`). The setting
+    /// stays on, so it is never lost to a race at start.
+    alt_space_since: Cell<Option<u32>>,
+}
+
+/// The Alt+Space menu item, with a note while another program holds it.
+fn alt_space_label(taken: bool) -> &'static str {
+    if taken {
+        tr!("Alt+Space يفتح نافذة البحث الصغيرة (يستخدمه برنامج آخر الآن)", "Alt+Space opens the quick search (another program has it for now)")
+    } else {
+        tr!("Alt+Space يفتح نافذة البحث الصغيرة", "Alt+Space opens the quick search")
+    }
 }
 
 /// Whether this run started with Windows (hidden, in the background).
@@ -133,7 +146,7 @@ impl App {
             &mut q.hotkey_quick,
             &q.menu,
         )?;
-        item(tr!("Alt+Space يفتح نافذة البحث الصغيرة", "Alt+Space opens the quick search"), settings.alt_space, &mut q.alt_space, &q.menu)?;
+        item(alt_space_label(false), settings.alt_space, &mut q.alt_space, &q.menu)?;
         item(tr!("أيقونة بجانب الساعة", "Icon in the notification area"), settings.tray_icon, &mut q.tray_icon, &q.menu)?;
         Ok(())
     }
@@ -301,7 +314,40 @@ impl App {
         }
     }
 
+    /// Notes on the Alt+Space item that another program has it (for this
+    /// run only), or takes the note off.
+    fn set_alt_space_taken(&self, taken: bool) {
+        use winapi::um::winuser::{MENUITEMINFOW, MIIM_STRING, SetMenuItemInfoW};
+        let Some((menu, id)) = self.quick_menu.alt_space.handle.hmenu_item() else { return };
+        let text = shell::wide(alt_space_label(taken));
+        let mut info: MENUITEMINFOW = unsafe { std::mem::zeroed() };
+        info.cbSize = std::mem::size_of::<MENUITEMINFOW>() as UINT;
+        info.fMask = MIIM_STRING;
+        info.dwTypeData = text.as_ptr() as *mut u16;
+        unsafe { SetMenuItemInfoW(menu, id, 0, &info) };
+    }
+
+    /// Alt+Space was held by another program at start: tries again now and
+    /// then, until it is free or the user turns it off.
+    fn retry_alt_space(&self, tick: u32) {
+        let Some(since) = self.quick_state.alt_space_since.get() else { return };
+        if !self.state.borrow().settings.alt_space {
+            self.quick_state.alt_space_since.set(None);
+            self.set_alt_space_taken(false);
+            return;
+        }
+        if crate::quick::hotkey_retry_due(tick, since) && self.register_alt_space() {
+            log("hotkey Alt+Space registered after all");
+            self.quick_state.alt_space_since.set(None);
+            self.set_alt_space_taken(false);
+        }
+    }
+
     fn toggle_alt_space(&self) {
+        // Whatever happens next, the user has decided: no more retries.
+        if self.quick_state.alt_space_since.take().is_some() {
+            self.set_alt_space_taken(false);
+        }
         let on = !self.quick_menu.alt_space.checked();
         if on && !self.register_alt_space() {
             nwg::modal_info_message(
@@ -356,11 +402,15 @@ impl App {
                 self.apply_floating();
             }
             if alt_space && !self.register_alt_space() {
-                log("hotkey Alt+Space is taken by another program");
-                self.quick_menu.alt_space.set_checked(false);
-                self.state.borrow_mut().settings.alt_space = false;
+                // Another program won the race at start. The setting stays
+                // on (it is saved with the others); the item says so for
+                // this run, and the hotkey is tried again from time to time.
+                log("hotkey Alt+Space is taken by another program; trying again later");
+                self.quick_state.alt_space_since.set(Some(tick));
+                self.set_alt_space_taken(true);
             }
         }
+        self.retry_alt_space(tick);
         // Warm the catalog when anything can open the quick search.
         let used = mode != FloatingMode::Off || alt_space || hotkey == HotkeyOpens::Quick;
         if tick == 25 && used {
