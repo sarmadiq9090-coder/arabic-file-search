@@ -18,6 +18,7 @@
 - **«فتح باستخدام…» و«خصائص»** في قائمة النقر بالزر الأيمن على نتيجة، كما في مستكشف الملفات. / **English:** "Open with…" and "Properties" in the result list's right-click menu.
 - **جواب تحويل العملات**: السطر تحته «سعر تقريبي · التاريخ · Enter للنسخ»، وسطر مصدر الأسعار لم يعد «جواباً» ثانياً تقف عليه الأسهم (يبقى قابلاً للنقر لفتح موقع المصدر). / **English:** currency answers say "approximate rate · date · Enter copies"; the arrow keys pass over the rates source line, which stays clickable.
 - **قائمة «خيارات» مرتّبة في مجموعات** تفصل بينها خطوط: العرض، الفهرسة والبحث، الاختصارات والتشغيل، الأدوات، المساعدة والدعم، ثم «إخفاء بجانب الساعة» و«خروج من البرنامج» في آخرها (كان «خروج» في وسط 21 عنصراً). «تصدير النتائج» انتقل إلى قائمة النقر بالزر الأيمن، و«خصائص» آخر تلك القائمة. / **English:** the Options menu is grouped with separators, Hide and Exit last; "Export results" moved to the result right-click menu.
+- **الدقائق الأولى لا تبدو متوقفة**: أثناء بناء الفهرس لأول مرة تقول القائمة الفارغة «نجهّز قائمة ملفاتك لأول مرة (دقائق قليلة). ابحث الآن، وتكتمل النتائج عند الانتهاء.»، والبحث داخل المستندات الذي لم يجد شيئاً بعد يقول كم قرأ حتى الآن، و«لا نتائج» صار جملة واضحة فوق أزرار الاقتراحات. / **English:** the empty list explains the first index build and a document search still reading, and "no results" has a plain sentence above its buttons.
 
 ## 0.10.0 — 2026-11-11
 

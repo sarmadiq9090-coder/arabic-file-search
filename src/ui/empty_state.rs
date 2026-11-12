@@ -17,6 +17,8 @@ const BUTTONS: usize = 5;
 /// is nothing to suggest.
 #[derive(Default)]
 pub(super) struct SuggestBar {
+    /// The plain sentence above the buttons ("No files match your search. Try:").
+    lead: nwg::Label,
     buttons: [nwg::Button; BUTTONS],
     /// What each shown button does, in order.
     list: RefCell<Vec<Suggestion>>,
@@ -35,6 +37,8 @@ pub(super) fn recent_rows(history: &History, index: &Index) -> Vec<Row> {
 
 impl App {
     pub(super) fn build_suggest_bar(&mut self) -> Result<(), nwg::NwgError> {
+        nwg::Label::builder().parent(&self.window).font(Some(&self.font)).text("").build(&mut self.suggest.lead)?;
+        self.suggest.lead.set_visible(false);
         for b in self.suggest.buttons.iter_mut() {
             nwg::Button::builder().parent(&self.window).font(Some(&self.font)).text("").build(b)?;
             b.set_visible(false);
@@ -103,6 +107,10 @@ impl App {
         }
         self.suggest.widths.set(widths);
         let now = !list.is_empty();
+        if now {
+            self.suggest.lead.set_text(crate::indexing_status::nothing_found_lead(crate::i18n::current(), self.indexing()));
+        }
+        self.suggest.lead.set_visible(now);
         *self.suggest.list.borrow_mut() = list;
         if was || now {
             self.layout();
@@ -117,6 +125,10 @@ impl App {
         if n == 0 {
             return y;
         }
+        // The sentence on a line of its own, then the buttons.
+        let line_h = style::line_height(&self.font).min(CTRL_H);
+        style::place(&self.suggest.lead.handle, x, y, w.max(40), line_h);
+        let y = y + line_h + GAP / 2;
         let widths = self.suggest.widths.get();
         let mut at = x;
         for (i, b) in self.suggest.buttons.iter().enumerate() {

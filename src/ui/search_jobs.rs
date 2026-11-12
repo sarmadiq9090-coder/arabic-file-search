@@ -502,6 +502,9 @@ impl App {
         }
         if changed || done {
             self.refresh_list();
+        } else if n == 0 {
+            // The empty list says how far the reading got.
+            self.list.invalidate();
         }
         if done {
             self.stop_btn.set_enabled(false);

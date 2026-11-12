@@ -42,6 +42,22 @@ impl App {
         indexing_status::content_search_text(crate::i18n::current(), self.indexing(), checked, total, &fmt_num)
     }
 
+    /// What the empty result list says, or `None` for nothing: a search
+    /// inside documents still reading with nothing found yet, or the very
+    /// first index being built (no index to search yet).
+    pub(super) fn empty_list_text(&self) -> Option<String> {
+        let lang = crate::i18n::current();
+        let st = self.state.borrow();
+        if !st.rows.is_empty() {
+            return None;
+        }
+        if let Some(job) = &st.content {
+            let p = &job.progress;
+            return Some(indexing_status::reading_text(lang, p.checked.load(Ordering::Relaxed), p.total.load(Ordering::Relaxed), &fmt_num));
+        }
+        (st.scan.is_some() && st.index.entries.is_empty()).then(|| indexing_status::first_scan_text(lang).to_string())
+    }
+
     /// Whether the status bar has the progress part now, and whether it is
     /// the wider one (`indexing_status::status_parts`).
     pub(super) fn indexing_part(&self) -> Option<bool> {
@@ -66,6 +82,8 @@ impl App {
         if appeared_or_went || resized {
             // Two status bar parts or three, and how wide the third is.
             self.layout();
+            // The empty list's sentence about the first index comes or goes.
+            self.list.invalidate();
         }
         if let Some(t) = &text {
             self.status.set_text(STATUS_PART, t);

@@ -581,6 +581,17 @@ impl NativeUi<AppUi> for App {
                     return Some(0);
                 }
                 NM_CUSTOMDRAW => return app.custom_draw(l),
+                winapi::um::commctrl::LVN_GETEMPTYMARKUP => {
+                    // The sentence an empty list shows (the first index, a
+                    // document search still reading).
+                    use winapi::um::commctrl::{EMF_CENTERED, L_MAX_URL_LENGTH, NMLVEMPTYMARKUP};
+                    let Some(text) = app.empty_list_text() else { return Some(0) };
+                    let m = unsafe { &mut *(l as *mut NMLVEMPTYMARKUP) };
+                    let wide = crate::indexing_status::empty_markup(&text, L_MAX_URL_LENGTH);
+                    m.szMarkup[..wide.len()].copy_from_slice(&wide);
+                    m.dwFlags = EMF_CENTERED;
+                    return Some(1);
+                }
                 _ => return None,
             }
             let info = unsafe { &mut *(l as *mut NMLVDISPINFOW) };

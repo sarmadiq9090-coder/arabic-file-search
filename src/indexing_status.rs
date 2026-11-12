@@ -90,6 +90,49 @@ pub fn status_parts(width: i32, progress: Option<bool>) -> Vec<i32> {
     }
 }
 
+/// Shown inside the empty result list while the very first index is being
+/// built, so the first minutes don't look dead.
+pub fn first_scan_text(lang: Lang) -> &'static str {
+    lang.pick(
+        "نجهّز قائمة ملفاتك لأول مرة (دقائق قليلة). ابحث الآن، وتكتمل النتائج عند الانتهاء.",
+        "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.",
+    )
+}
+
+/// Shown inside the empty result list while a search inside documents is
+/// still reading and has found nothing yet: how far it got.
+pub fn reading_text(lang: Lang, checked: usize, total: usize, num: &dyn Fn(usize) -> String) -> String {
+    let (checked, total) = (num(checked.min(total)), num(total));
+    match lang {
+        Lang::Ar => format!("جارٍ البحث داخل المستندات… قرأنا {checked} من {total} حتى الآن، ولم نجد شيئاً بعد."),
+        Lang::En => format!("Still reading inside documents… {checked} of {total} so far, nothing found yet."),
+    }
+}
+
+/// The sentence above the "try" buttons of a search that found nothing:
+/// the plain "nothing found", or while indexing runs that the results may
+/// be incomplete.
+pub fn nothing_found_lead(lang: Lang, state: Indexing) -> &'static str {
+    if state.running() {
+        lang.pick("لا نتائج حتى الآن، وقد تكون ناقصة أثناء الفهرسة. جرّب:", "No results yet; they may be incomplete while indexing. Try:")
+    } else {
+        lang.pick("لم نجد ملفات تطابق بحثك. جرّب:", "No files match your search. Try:")
+    }
+}
+
+/// Text for a Windows list's empty markup (`LVN_GETEMPTYMARKUP`): the
+/// markup's `<` and `&` taken out, at most `max` UTF-16 units, NUL-ended.
+pub fn empty_markup(text: &str, max: usize) -> Vec<u16> {
+    let mut out: Vec<u16> = text.chars().filter(|c| !matches!(c, '<' | '&' | '\0')).collect::<String>().encode_utf16().collect();
+    out.truncate(max.saturating_sub(1));
+    // Never half a surrogate pair at the cut.
+    if out.last().is_some_and(|u| (0xD800..0xDC00).contains(u)) {
+        out.pop();
+    }
+    out.push(0);
+    out
+}
+
 /// Said instead of "no results" while indexing runs.
 pub fn incomplete_text(lang: Lang) -> &'static str {
     lang.pick("قد تكون النتائج ناقصة أثناء الفهرسة", "Results may be incomplete while indexing")
@@ -278,6 +321,29 @@ mod tests {
             let first = t.chars().next().unwrap();
             assert!(('\u{0600}'..='\u{06FF}').contains(&first), "{t}");
         }
+    }
+
+    #[test]
+    fn the_first_minutes_explain_themselves() {
+        assert_eq!(first_scan_text(Lang::Ar), "نجهّز قائمة ملفاتك لأول مرة (دقائق قليلة). ابحث الآن، وتكتمل النتائج عند الانتهاء.");
+        assert_eq!(first_scan_text(Lang::En), "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.");
+        assert_eq!(reading_text(Lang::En, 1_840, 4_210, &num), "Still reading inside documents… 1,840 of 4,210 so far, nothing found yet.");
+        assert_eq!(reading_text(Lang::Ar, 9, 4, &num), "جارٍ البحث داخل المستندات… قرأنا 4 من 4 حتى الآن، ولم نجد شيئاً بعد.");
+        assert_eq!(nothing_found_lead(Lang::En, Indexing::Idle), "No files match your search. Try:");
+        assert!(nothing_found_lead(Lang::Ar, Indexing::Names { found: 3 }).contains("ناقصة"));
+        for t in [first_scan_text(Lang::Ar).to_string(), reading_text(Lang::Ar, 1, 2, &num), nothing_found_lead(Lang::Ar, Indexing::Idle).to_string()] {
+            assert!(t.starts_with(|c| ('\u{0600}'..='\u{06FF}').contains(&c)), "{t}");
+        }
+    }
+
+    #[test]
+    fn empty_list_markup_is_plain_text_that_fits() {
+        let w = |s: &str| s.encode_utf16().chain([0]).collect::<Vec<u16>>();
+        assert_eq!(empty_markup("a<b>&c", 100), w("ab>c"));
+        assert_eq!(empty_markup(first_scan_text(Lang::Ar), 2084), w(first_scan_text(Lang::Ar)));
+        assert_eq!(empty_markup("abcdef", 4), w("abc"));
+        assert_eq!(empty_markup("ab😀", 4), w("ab"));
+        assert_eq!(empty_markup("x", 0), vec![0]);
     }
 
     #[test]
