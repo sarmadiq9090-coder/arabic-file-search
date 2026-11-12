@@ -1,15 +1,20 @@
 //! Test builds only: an allocator that can count, for one thread at a time,
 //! the bytes it allocates that are still alive, whichever thread frees them.
 //! `index_save`'s tests use it to prove how many copies of the index exist.
-//! Outside [`peak_of`] it only passes requests on.
+//! Outside [`peak_of`] it only passes requests on, to the capped counting
+//! allocator of `extract::hostile` (whose child processes refuse to grow past
+//! `BAHTH_TEST_MEM_CAP`), so both kinds of test share one global allocator.
 
-use std::alloc::{GlobalAlloc, Layout, System};
+use std::alloc::{GlobalAlloc, Layout};
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct Counting;
+
+/// Where requests go: the system allocator, with live/peak bytes and the cap.
+const INNER: crate::extract::hostile::Counting = crate::extract::hostile::Counting;
 
 thread_local! {
     /// This thread's allocations are being counted.
@@ -57,18 +62,24 @@ fn removed(p: *mut u8) {
 
 unsafe impl GlobalAlloc for Counting {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let p = unsafe { System.alloc(layout) };
+        let p = unsafe { INNER.alloc(layout) };
+        added(p, layout.size());
+        p
+    }
+
+    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+        let p = unsafe { INNER.alloc_zeroed(layout) };
         added(p, layout.size());
         p
     }
 
     unsafe fn dealloc(&self, p: *mut u8, layout: Layout) {
         removed(p);
-        unsafe { System.dealloc(p, layout) }
+        unsafe { INNER.dealloc(p, layout) }
     }
 
     unsafe fn realloc(&self, p: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        let q = unsafe { System.realloc(p, layout, new_size) };
+        let q = unsafe { INNER.realloc(p, layout, new_size) };
         if !q.is_null() {
             removed(p);
             added(q, new_size);

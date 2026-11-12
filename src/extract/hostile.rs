@@ -24,14 +24,13 @@ use super::*;
 // ---------------------------------------------------------------------------
 
 /// The system allocator, counting live and peak bytes, with an optional cap.
+/// Not the global allocator itself: `crate::test_alloc::Counting` (the one
+/// test builds install, in `main.rs`) passes every request through this.
 pub(crate) struct Counting;
 
 static LIVE: AtomicUsize = AtomicUsize::new(0);
 static PEAK: AtomicUsize = AtomicUsize::new(0);
 static CAP: AtomicUsize = AtomicUsize::new(usize::MAX);
-
-#[global_allocator]
-static ALLOC: Counting = Counting;
 
 /// Accounts for `add` more bytes; false (nothing counted) past the cap.
 fn take(add: usize) -> bool {
