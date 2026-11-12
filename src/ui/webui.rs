@@ -151,6 +151,9 @@ mod imp {
         apps: RefCell<(u64, String, Vec<crate::launcher::Item>)>,
         /// The file a drag the page started is for, until the drag starts.
         drag: RefCell<Option<String>>,
+        /// A dialog runs inside the page's own message handler (the folder
+        /// dialog): the timer must not drop or create the page meanwhile.
+        in_page_call: Cell<bool>,
         /// The page asked for the Options menu: opened on the next tick, not
         /// inside WebView2's handler (the menu runs a message loop).
         options_pending: Cell<bool>,
@@ -1259,8 +1262,12 @@ mod imp {
             if built.is_err() {
                 return;
             }
-            // Nothing is borrowed while it runs: its loop delivers the page's messages.
-            let chosen = if dialog.run(Some(&self.webui.parts.window)) { dialog.get_selected_item().ok() } else { None };
+            // Nothing is borrowed while it runs: its loop delivers the page's
+            // messages, and the timer's (which then leaves the page alone).
+            self.webui.in_page_call.set(true);
+            let ran = dialog.run(Some(&self.webui.parts.window));
+            self.webui.in_page_call.set(false);
+            let chosen = if ran { dialog.get_selected_item().ok() } else { None };
             if let Some(dir) = chosen {
                 let mut dir = dir.to_string_lossy().into_owned();
                 if !dir.ends_with('\\') {
@@ -1489,6 +1496,11 @@ mod imp {
         /// results kept in step with the index (finished scan, files changed
         /// on disk).
         pub(in super::super) fn webui_tick(&self, tick: u32) {
+            // A dialog runs inside the page's handler: no page dropped or
+            // created under it (a failure is handled when it closes).
+            if self.webui.in_page_call.get() {
+                return;
+            }
             if self.webui.leaving.replace(false) {
                 // Back to the classic window: its WebView2 is freed.
                 self.webui.host.replace(None);
