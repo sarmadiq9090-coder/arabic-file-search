@@ -759,6 +759,11 @@ pub fn run() {
     if activate_running_copy(updated || moved) {
         return;
     }
+    // The new version is on trial until its first timer tick; a start that
+    // finds an unfinished trial puts the previous version back and starts it.
+    if crate::update::settle_trial(updated, &|l| startup::log(l)) {
+        return;
+    }
     if let Some(d) = files::test_save_delay() {
         startup::log(&format!("test hook: {} set; every index save waits {} ms", crate::index_save::TEST_SAVE_DELAY_VAR, d.as_millis()));
     }
