@@ -7,6 +7,7 @@
 ### أمان البيانات
 - **الملفات المكررة لا تحذف آخر نسخة**: قبل النقل إلى سلة المحذوفات يُفحص القرص من جديد، ولا يُحذف ملف إلا إذا بقيت منه نسخة غير محددة ما زالت موجودة ومطابقة (الحجم نفسه، والمحتوى نفسه في المقارنة الدقيقة). ما لا يتحقق فيه ذلك يُترك ويُذكر مع السبب. تغيير طريقة المقارنة يمسح القائمة، وفي «نفس الاسم والحجم» يقول التأكيد صراحةً إن المحتوى لم يُقارَن ويطلب تأكيد ذلك. / **Duplicate finder never deletes the last copy:** the disk is re-checked right before the Recycle Bin; a file goes only while an unselected copy still exists and still matches. Skipped files are listed with the reason; changing the mode clears the list; the quick mode's confirmation says contents were not compared.
 - **الملف نفسه بمسارين ليس نسخة مكررة**: الروابط الصلبة (hard links) والوصلات (junctions) وأقراص `subst` تُعرف برقم الملف على القرص، فتُعرض «نفس الملف» دون حساب مساحة مهدرة، ولا يُحذف ملف لأن «نسخته» اسم آخر له. / **The same file under two paths is not a duplicate:** hard links, junctions and `subst` drives are recognised by file ID, shown as "the same file", not counted as wasted, and never deleted as each other's copy.
+- **الاستبدال بالتعبير النمطي لا يحذف نصاً بصمت**: «‎$1em» تعني المجموعة 1 ثم «em» (كانت تُقرأ مجموعة اسمها «1em» فيُستبدل التطابق بلا شيء)، والمجموعة غير الموجودة تُرفض برسالة واضحة، والمعاينة تعرض ما سيُكتب بالضبط. / **Regex replace no longer deletes text silently:** `$1em` is group 1 then "em"; a group that does not exist is refused with a clear message.
 
 ## 0.10.0 — 2026-11-11
 

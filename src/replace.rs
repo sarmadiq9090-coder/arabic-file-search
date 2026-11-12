@@ -131,6 +131,73 @@ pub struct Options {
     pub regex: bool,
 }
 
+/// The replacement rewritten so that the regex crate reads it exactly as a
+/// person means it, or Err with a message for the user.
+///
+/// The crate reads a group name as long as letters, digits and `_` follow
+/// the `$`, so `$1em` is the group "1em" — which does not exist, and an
+/// unknown group expands to nothing: the matched text would silently
+/// vanish. Here `$` and digits name the numbered group (the longest run of
+/// those digits that is a group of the pattern; what follows is text), so
+/// `$1em` is `${1}em` and `$1_new` is `${1}_new`. A name that starts with a
+/// letter or `_` must be a named group of the pattern, and `${…}` an
+/// existing group; anything else is refused. `$$` is a `$` sign, and a `$`
+/// not followed by a name stays a `$`.
+fn group_template(replace: &str, re: &Regex) -> Result<String, String> {
+    let groups = re.captures_len();
+    let named: Vec<&str> = re.capture_names().flatten().collect();
+    let exists = |g: &str| match g.parse::<usize>() {
+        Ok(n) => g.bytes().all(|b| b.is_ascii_digit()) && n < groups,
+        Err(_) => named.contains(&g),
+    };
+    let missing = |typed: &str| {
+        trf!(
+            "المجموعة «{}» غير موجودة في التعبير النمطي، فلن يُكتب مكانها شيء. صحّحها، أو اكتب «$$» لكتابة علامة $ نفسها.",
+            "The group “{}” is not in the regular expression, so nothing would be written in its place. Fix it, or write “$$” for a $ sign itself.",
+            typed
+        )
+    };
+    let is_name = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    let mut out = String::with_capacity(replace.len() + 8);
+    let mut rest = replace;
+    while let Some(i) = rest.find('$') {
+        out.push_str(&rest[..i]);
+        let after = &rest[i + 1..];
+        if let Some(tail) = after.strip_prefix('$') {
+            out.push_str("$$");
+            rest = tail;
+        } else if let Some(braced) = after.strip_prefix('{').and_then(|b| Some((b, b.find('}')?))) {
+            let (name, tail) = (&braced.0[..braced.1], &braced.0[braced.1 + 1..]);
+            if !exists(name) {
+                return Err(missing(&format!("${{{name}}}")));
+            }
+            out.push_str(&format!("${{{name}}}"));
+            rest = tail;
+        } else {
+            let end = after.find(|c: char| !is_name(c)).unwrap_or(after.len());
+            let name = &after[..end];
+            if name.is_empty() {
+                // `$` before a space, a sign or the end: the crate keeps it.
+                out.push_str("$$");
+            } else if name.starts_with(|c: char| c.is_ascii_digit()) {
+                let digits = name.find(|c: char| !c.is_ascii_digit()).unwrap_or(name.len());
+                let Some(n) = (1..=digits).rev().find(|&n| exists(&name[..n])) else {
+                    return Err(missing(&format!("${}", &name[..digits])));
+                };
+                out.push_str(&format!("${{{}}}", &name[..n]));
+                out.push_str(&name[n..]);
+            } else if exists(name) {
+                out.push_str(&format!("${{{name}}}"));
+            } else {
+                return Err(missing(&format!("${name}")));
+            }
+            rest = &after[end..];
+        }
+    }
+    out.push_str(rest);
+    Ok(out)
+}
+
 pub struct Matcher {
     re: Regex,
     replace: String,
@@ -149,7 +216,8 @@ impl Matcher {
             .case_insensitive(o.ignore_case)
             .build()
             .map_err(|e| trf!("التعبير النمطي غير صالح: {e}", "Invalid regular expression: {e}"))?;
-        Ok(Matcher { re, replace: o.replace.clone(), expand: o.regex })
+        let replace = if o.regex { group_template(&o.replace, &re)? } else { o.replace.clone() };
+        Ok(Matcher { re, replace, expand: o.regex })
     }
 
     /// Non-empty matches only: a pattern like `a*` must not insert text
@@ -782,6 +850,34 @@ mod tests {
         // Arabic, unchanged when nothing matches.
         let (out, n) = matcher(&opts("قديم", "جديد")).replace_all("لا شيء");
         assert!(matches!(out, Cow::Borrowed(_)) && n == 0);
+    }
+
+    /// `$1em` was read as the group named "1em", which does not exist, so
+    /// the match was replaced by nothing: text silently deleted.
+    #[test]
+    fn group_numbers_followed_by_letters_keep_the_letters() {
+        let re = |find: &str, replace: &str| Matcher::new(&Options { regex: true, ..opts(find, replace) });
+        let run = |find: &str, replace: &str, text: &str| re(find, replace).unwrap().replace_all(text).0.into_owned();
+        assert_eq!(run(r"(\d+)px", "$1em", "12px"), "12em");
+        assert_eq!(run(r"(\w+)\.txt", "$1_new.txt", "a.txt"), "a_new.txt");
+        assert_eq!(run(r"(\w+)", "${1}x", "ab"), "abx");
+        assert_eq!(run(r"(\d)(\d)", "$2$1", "12"), "21");
+        assert_eq!(run(r"(\d)", "$10", "7"), "70");
+        assert_eq!(run(r"(\d+)", "$$$1", "5"), "$5");
+        assert_eq!(run(r"(\d+)", "$", "5"), "$");
+        assert_eq!(run(r"(\d+)", "$ and $.", "5"), "$ and $.");
+        assert_eq!(run(r"(?P<n>\d+)", "${n}em", "5"), "5em");
+        assert_eq!(run(r"(?P<n>\d+)", "$n.", "5"), "5.");
+        assert_eq!(run(r"(?P<n>\d+)", "<$0>", "5"), "<5>");
+        assert_eq!(run("ب(\\d)", "$1ت", "ب3"), "3ت");
+        // Groups that do not exist are refused with a message, never
+        // replaced by nothing.
+        for bad in ["$2", "${2}", "$nx", "${nope}", "$n_x"] {
+            let e = re(r"(?P<n>\d+)", bad).err().unwrap_or_else(|| panic!("{bad} accepted"));
+            assert!(e.contains('$'), "{bad}: {e}");
+        }
+        // Literal mode is untouched.
+        assert_eq!(matcher(&opts("x", "$1em")).replace_all("x").0, "$1em");
     }
 
     #[test]
