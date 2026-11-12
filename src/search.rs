@@ -730,6 +730,9 @@ impl Clock<'_> {
 
     /// One date as a `[start, end)` range: a calendar word, `2024`,
     /// `2024-05`, `2024-05-12`, or a recent period `7d`, `3w`, `2m`, `1y`.
+    /// A period is the moment that long ago, an empty range `(t, t)`, so the
+    /// comparisons in [`Clock::parse`] read naturally: `>7d` after it (newer,
+    /// like `7d` alone), `<7d` before it (older).
     fn point(&self, v: &str) -> Option<(i64, i64)> {
         let key: String = v.chars().filter(|c| !matches!(c, '_' | '-' | ' ')).collect();
         let is_word = |w: &&str| normalize(w).replace('_', "") == key;
@@ -746,7 +749,7 @@ impl Clock<'_> {
                 b'm' => self.months_ago(n),
                 _ => self.months_ago(n * 12),
             };
-            return Some((from, i64::MAX));
+            return Some((from, from));
         }
         let parts: Vec<&str> = v.split(['-', '/', '.']).collect();
         let num = |i: usize, digits: std::ops::RangeInclusive<usize>| {
@@ -780,6 +783,8 @@ impl Clock<'_> {
             let (op, rest) = split_op(&v);
             let (start, end) = self.point(rest)?;
             match op {
+                // A period alone (`7d`, `=7d`): since then.
+                "" | "=" if start == end => (start, i64::MAX),
                 ">=" => (start, i64::MAX),
                 ">" => (end, i64::MAX),
                 "<=" => (i64::MIN, end),

@@ -341,3 +341,30 @@ fn arabic_prefixes_are_compared_normalised() {
     // Latin prefixes ignore case as before.
     assert_eq!(at("SIZE:>1mb").size, at("size:>1mb").size);
 }
+
+// ------------------------------------------ relative dates with comparisons
+
+/// `dm:>7d` was refused (and searched as text) and `dm:<=7d` matched every
+/// file. A period is the moment that long ago: `>`/`>=` after it, `<`/`<=`
+/// before it, `..` between two.
+#[test]
+fn relative_dates_with_comparisons() {
+    let week_ago = NOW - 7 * DAY;
+    for s in ["dm:7d", "dm:>7d", "dm:>=7d", "dm:=7d", "تاريخ:>7d"] {
+        assert_eq!(at(s).mtime, Some((week_ago, i64::MAX)), "{s}");
+        assert!(at(s).warnings.is_empty() && at(s).terms.is_empty(), "{s}");
+    }
+    for s in ["dm:<7d", "dm:<=7d"] {
+        assert_eq!(at(s).mtime, Some((i64::MIN, week_ago)), "{s}");
+    }
+    assert_eq!(at("dm:30d..7d").mtime, Some((NOW - 30 * DAY, week_ago)));
+    assert_eq!(at("dm:7d..").mtime, Some((week_ago, i64::MAX)));
+    assert_eq!(at("dm:..7d").mtime, Some((i64::MIN, week_ago)));
+    assert_eq!(at("dm:2024-01..7d").mtime, Some((day_utc(2024, 1, 1), week_ago)));
+    assert_eq!(at("dm:>1m").mtime, at("dm:1m").mtime);
+    // The wrong way round is still refused.
+    assert!(at("dm:7d..30d").mtime.is_none());
+    // Calendar dates are unchanged.
+    assert_eq!(at("dm:>2024-01-01").mtime, Some((day_utc(2024, 1, 2), i64::MAX)));
+    assert_eq!(at("dm:<=2023").mtime, Some((i64::MIN, day_utc(2024, 1, 1))));
+}
