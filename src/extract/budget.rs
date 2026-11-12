@@ -105,6 +105,16 @@ pub fn inflate(bytes: u64) -> bool {
     })
 }
 
+/// Moves this file's deadline `by` later: time spent waiting (for the OCR
+/// permit, or while the user is busy) is not the file's own.
+pub fn extend(by: Duration) {
+    STATE.with(|s| {
+        let mut st = s.get();
+        st.deadline = st.deadline.map(|d| d + by);
+        s.set(st);
+    })
+}
+
 /// True when this file went over a budget.
 pub fn exceeded() -> bool {
     STATE.with(|s| {

@@ -69,6 +69,17 @@ impl Drop for Finished {
     }
 }
 
+/// Background OCR waits while this is true: the user typed or clicked in
+/// the last few seconds, or a document search is running.
+fn user_busy() -> bool {
+    use winapi::um::sysinfoapi::GetTickCount;
+    use winapi::um::winuser::{GetLastInputInfo, LASTINPUTINFO};
+    let mut info = LASTINPUTINFO { cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32, dwTime: 0 };
+    // SAFETY: a plain struct with its size set, as the API requires.
+    let typed = unsafe { GetLastInputInfo(&mut info) } != 0 && unsafe { GetTickCount() }.wrapping_sub(info.dwTime) < 3_000;
+    typed || shared().is_some_and(ContentCache::searching)
+}
+
 /// Lowest CPU priority, and low disk priority where Windows supports it.
 fn idle_priority() {
     use winapi::um::processthreadsapi::{GetCurrentThread, SetThreadPriority};
@@ -98,6 +109,7 @@ impl App {
             let finished = Finished(job.clone());
             let (cancel, progress) = (&job.cancel, &job.progress);
             idle_priority();
+            crate::extract::set_ocr_pause(user_busy);
             // Only the documents are needed. Letting go of the index at once
             // matters: while another holder shares it, every change found by
             // the drive watcher has to copy the whole index.

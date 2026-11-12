@@ -81,6 +81,60 @@ fn unchecked(_var: &str) -> bool {
     false
 }
 
+// ---------------------------------------------------------------------------
+// OCR pacing
+// ---------------------------------------------------------------------------
+
+thread_local! {
+    /// This thread fills the content index in the background (the warm-up).
+    static BACKGROUND: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Marks the calling thread as a background (warm-up) thread, whose OCR is
+/// paced by [`paced_ocr`].
+pub fn set_background(on: bool) {
+    BACKGROUND.with(|b| b.set(on));
+}
+
+/// One OCR at a time for all background threads: Windows runs recognition
+/// on its own thread pool at normal priority, whatever the priority of the
+/// thread asking for it, so the warm-up's idle priority does not slow it.
+static OCR_PERMIT: std::sync::Mutex<()> = std::sync::Mutex::new(());
+/// True while background OCR should wait (the user is typing or searching).
+static OCR_PAUSE: std::sync::OnceLock<fn() -> bool> = std::sync::OnceLock::new();
+
+/// Sets what makes background OCR wait (see [`paced_ocr`]). Once.
+#[cfg_attr(not(windows), allow(dead_code))] // only the Windows UI sets it
+pub fn set_ocr_pause(user_busy: fn() -> bool) {
+    let _ = OCR_PAUSE.set(user_busy);
+}
+
+/// Runs the OCR call `f`: at once on a foreground thread (a search the user
+/// is waiting for); on a background thread only with the one permit, and not
+/// while the pause signal says the user is busy. The waiting does not count
+/// against the file's time budget.
+#[cfg_attr(not(windows), allow(dead_code))] // OCR is Windows-only
+fn paced_ocr<R>(f: impl FnOnce() -> R) -> R {
+    paced_with(OCR_PAUSE.get().copied().unwrap_or(|| false), std::time::Duration::from_millis(250), f)
+}
+
+fn paced_with<R>(user_busy: fn() -> bool, poll: std::time::Duration, f: impl FnOnce() -> R) -> R {
+    if !BACKGROUND.with(std::cell::Cell::get) {
+        return f();
+    }
+    let waited = std::time::Instant::now();
+    let permit = OCR_PERMIT.lock().unwrap_or_else(|e| e.into_inner());
+    // At most a minute per image: someone always typing (or a stuck input
+    // signal) slows the warm-up down, it does not stop it.
+    while user_busy() && waited.elapsed() < std::time::Duration::from_secs(60) {
+        std::thread::sleep(poll);
+    }
+    budget::extend(waited.elapsed());
+    let r = f();
+    drop(permit);
+    r
+}
+
 /// Returns true if the extension (lowercase, no dot) is supported for content search.
 pub fn is_supported(ext: &str) -> bool {
     TEXT_EXTS.contains(&ext) || OTHER_EXTS.contains(&ext) || archive::is_archive_ext(ext) || is_ocr_image(ext)
@@ -157,7 +211,7 @@ fn extract_by_ext(path: &Path, ext: &str) -> Option<String> {
         "epub" => epub::extract_epub(path),
         e if archive::is_archive_ext(e) => archive::extract_archive(path),
         #[cfg(windows)]
-        e if is_ocr_image(e) => crate::ocr::ocr_image_file(path),
+        e if is_ocr_image(e) => paced_ocr(|| crate::ocr::ocr_image_file(path)),
         _ => None,
     }
 }
@@ -1721,6 +1775,55 @@ mod tests {
         let sheet = r#"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:XFD1048576"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>مرحبا</t></is></c><c r="B1"><v>42</v></c></row><row r="1048576"><c r="XFD1048576" t="inlineStr"><is><t>تقرير</t></is></c></row></sheetData></worksheet>"#;
         let t = extract_text(&write_xlsx("far.xlsx", sheet)).unwrap();
         assert_eq!(t, "مرحبا\t42\nتقرير\n\n");
+    }
+
+    #[test]
+    fn background_ocr_one_at_a_time_and_not_while_the_user_is_busy() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        use std::time::Duration;
+        static RUNNING: AtomicUsize = AtomicUsize::new(0);
+        static MOST: AtomicUsize = AtomicUsize::new(0);
+        static BUSY: AtomicBool = AtomicBool::new(false);
+        let fake_ocr = || {
+            let now = RUNNING.fetch_add(1, Ordering::SeqCst) + 1;
+            MOST.fetch_max(now, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(20));
+            RUNNING.fetch_sub(1, Ordering::SeqCst);
+        };
+        let busy = || BUSY.load(Ordering::SeqCst);
+        // Four warm-up threads: never two recognitions at once.
+        std::thread::scope(|s| {
+            for _ in 0..4 {
+                s.spawn(move || {
+                    set_background(true);
+                    for _ in 0..3 {
+                        paced_with(busy, Duration::from_millis(5), fake_ocr);
+                    }
+                });
+            }
+        });
+        assert_eq!(MOST.load(Ordering::SeqCst), 1);
+        // While the user is busy a background OCR waits, and the wait is not
+        // charged to the file's time budget.
+        BUSY.store(true, Ordering::SeqCst);
+        let waiter = std::thread::spawn(move || {
+            set_background(true);
+            let _short = budget::with_limit(Duration::from_millis(50));
+            let _b = budget::start();
+            let started = std::time::Instant::now();
+            paced_with(busy, Duration::from_millis(5), || {});
+            (started.elapsed(), budget::exceeded())
+        });
+        std::thread::sleep(Duration::from_millis(150));
+        BUSY.store(false, Ordering::SeqCst);
+        let (waited, over) = waiter.join().unwrap();
+        assert!(waited >= Duration::from_millis(140) && !over, "{waited:?} {over}");
+        // A foreground thread (a search) neither waits nor queues.
+        BUSY.store(true, Ordering::SeqCst);
+        let t = std::time::Instant::now();
+        paced_with(busy, Duration::from_millis(5), || {});
+        assert!(t.elapsed() < Duration::from_millis(100));
+        BUSY.store(false, Ordering::SeqCst);
     }
 
     #[test]

@@ -906,6 +906,8 @@ pub fn warm(
     let last_save = Mutex::new((Instant::now(), 0));
     let big = Mutex::new(());
     let work = || {
+        // Its OCR is paced (one at a time, not while the user is busy).
+        extract::set_background(true);
         loop {
             while cache.searching() && !cancel.load(Ordering::Relaxed) {
                 std::thread::sleep(Duration::from_millis(100));

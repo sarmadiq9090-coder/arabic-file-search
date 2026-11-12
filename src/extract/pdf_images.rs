@@ -393,7 +393,7 @@ pub fn ocr_if_scanned(bytes: &[u8], text: String) -> String {
     }
     let mut out = text;
     for_each_page_image(&doc, MAX_PAGES, |img| {
-        if let Some(t) = crate::ocr::ocr_image_bytes(&img) {
+        if let Some(t) = super::paced_ocr(|| crate::ocr::ocr_image_bytes(&img)) {
             if !out.is_empty() {
                 out.push('\n');
             }

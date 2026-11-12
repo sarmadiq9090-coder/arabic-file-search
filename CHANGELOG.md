@@ -14,6 +14,7 @@
 
 ### إصلاحات
 - **بعد تثبيت حزمة اللغة العربية لقراءة الصور** تُعاد قراءة ملفات PDF الممسوحة والصور التي لم يُعثر فيها على نص، مرة واحدة. / After the **Arabic OCR language pack** is installed, scanned PDFs and images found empty are read once more.
+- **قراءة الصور (OCR) في الخلفية** صارت صورة واحدة في كل مرة، وتتوقف أثناء الكتابة أو البحث، فلا تُثقل الجهاز. / **Background OCR** runs one image at a time and waits while you type or search.
 - **النصوص الأطول من 80 ميجابايت** تُحفظ مقصوصة بدل إعادة قراءتها في كل تشغيل وكل بحث، وملف .xls ليس جدولاً حقيقياً (صفحة ويب محفوظة بهذا الامتداد) لم يعد يُخرج نصه مرتين. / **Texts over 80 MB** are stored cut to the limit instead of being re-read every time; a non-workbook **.xls** no longer yields its text twice.
 
 ## 0.10.0 — 2026-11-11
