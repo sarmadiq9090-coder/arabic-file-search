@@ -1197,6 +1197,10 @@ impl App {
             }
             Action::FocusWindow(h) => shim::focus_window(*h),
             Action::System(cmd) => {
+                if let Some(why) = shim::refusal(cmd) {
+                    self.popup_error(&why);
+                    return None;
+                }
                 if !self.popup_confirm(&shim::confirm_text(cmd)) {
                     return None;
                 }

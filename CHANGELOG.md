@@ -6,6 +6,7 @@
 
 ### إصلاحات
 - **أيقونة شريط المهام تعود بعد إعادة تشغيل Explorer**: إذا تعطّل مستكشف ويندوز أو أُعيد تشغيله كانت الأيقونة بجانب الساعة تختفي نهائياً، ومع إخفاء الخانة العائمة لا يبقى طريق للبرنامج. الآن تُضاف من جديد (بلونها وتلميحها وحالة إظهارها). / **English:** the tray icon comes back after Explorer restarts.
+- **«إنهاء» تطبيق متجر مصغّر لا يغلق كل تطبيقات المتجر**: إذا لم يُعرف برنامج التطبيق (نافذته مصغّرة) كان الأمر ينهي ApplicationFrameHost، فتُغلق كل نوافذ تطبيقات المتجر. الآن يُرفض الأمر برسالة توضح ما تفعله، وأُضيف ApplicationFrameHost إلى عمليات النظام المحمية. / **English:** "End" on a minimized Store app no longer ends ApplicationFrameHost (and every Store app with it); it explains instead.
 
 ## 0.10.0 — 2026-11-11
 
