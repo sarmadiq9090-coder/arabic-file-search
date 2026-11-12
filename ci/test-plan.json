@@ -1,15 +1,1 @@
-{
-  "mem-test": {
-    "exes": [
-      "0.10.0",
-      "branch"
-    ],
-    "scenarios": [
-      "A",
-      "F",
-      "H",
-      "K"
-    ],
-    "save_delay_ms": 90000
-  }
-}
+{}
