@@ -313,6 +313,23 @@ impl History {
         out
     }
 
+    /// Forgets what was searched for and opened: the recent searches, the
+    /// opened files (the quick search's "Recent" list), the quick-search
+    /// launches (web searches among them hold the typed text) and what was
+    /// picked after which letters. Saved searches and pins are kept: the
+    /// user made those on purpose.
+    pub fn clear_activity(&mut self) {
+        self.recent.clear();
+        self.opens.clear();
+        self.launches.clear();
+        self.picks.clear();
+    }
+
+    /// Whether [`History::clear_activity`] has nothing to forget.
+    pub fn activity_is_empty(&self) -> bool {
+        self.recent.is_empty() && self.opens.is_empty() && self.launches.is_empty() && self.picks.is_empty()
+    }
+
     pub fn is_pinned(&self, target: &str) -> bool {
         self.pinned.iter().any(|p| p.target.eq_ignore_ascii_case(target))
     }
@@ -544,6 +561,38 @@ mod tests {
         }
         assert_eq!(h.picks.len(), MAX_PICKS);
         assert!(!h.picks_for(&format!("q{}", MAX_PICKS + 19), now).is_empty());
+    }
+
+    /// "Clear history and recent files" leaves nothing of what was typed or
+    /// opened, also after saving and loading, and keeps saved searches and pins.
+    #[test]
+    fn clearing_activity_forgets_searches_opens_and_launches() {
+        let dir = std::env::temp_dir().join(format!("bahth_hist_clear_{}", std::process::id()));
+        let file = dir.join("history.json");
+        let _ = fs::remove_dir_all(&dir);
+        let web = "uri:https://www.google.com/search?q=عقد الإيجار";
+        let mut h = History::default();
+        assert!(h.activity_is_empty());
+        h.add_recent("عقد الإيجار");
+        h.record_open(r"C:\سري\عقد الإيجار.pdf", 5);
+        h.record_launch(web, 6);
+        h.record_pick("عقد", "launch:c:\\x.lnk", 7);
+        h.add_saved(SavedSearch { name: "عقود".into(), query: "عقد".into(), ..Default::default() });
+        h.toggle_pin(Pin { title: "x".into(), target: r"C:\x.txt".into(), app: false, dir: false });
+        assert!(!h.activity_is_empty());
+        h.clear_activity();
+        assert!(h.activity_is_empty());
+        h.save_to(&file).unwrap();
+        let text = fs::read_to_string(&file).unwrap();
+        assert!(!text.contains("الإيجار"), "{text}");
+        let l = History::load_from(&file);
+        assert!(l.activity_is_empty());
+        assert!(l.recent_opens().is_empty());
+        assert_eq!(l.launch_count(web, 6), 0);
+        assert!(l.picks_for("عقد", 7).is_empty());
+        assert_eq!(l.saved.len(), 1);
+        assert_eq!(l.pinned.len(), 1);
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

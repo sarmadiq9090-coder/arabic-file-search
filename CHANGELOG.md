@@ -8,6 +8,7 @@
 - **أيقونة شريط المهام تعود بعد إعادة تشغيل Explorer**: إذا تعطّل مستكشف ويندوز أو أُعيد تشغيله كانت الأيقونة بجانب الساعة تختفي نهائياً، ومع إخفاء الخانة العائمة لا يبقى طريق للبرنامج. الآن تُضاف من جديد (بلونها وتلميحها وحالة إظهارها). / **English:** the tray icon comes back after Explorer restarts.
 - **«إنهاء» تطبيق متجر مصغّر لا يغلق كل تطبيقات المتجر**: إذا لم يُعرف برنامج التطبيق (نافذته مصغّرة) كان الأمر ينهي ApplicationFrameHost، فتُغلق كل نوافذ تطبيقات المتجر. الآن يُرفض الأمر برسالة توضح ما تفعله، وأُضيف ApplicationFrameHost إلى عمليات النظام المحمية. / **English:** "End" on a minimized Store app no longer ends ApplicationFrameHost (and every Store app with it); it explains instead.
 - **«إفراغ سلة المحذوفات» لا يجمّد البرنامج**: كان الإفراغ يجري في خيط الواجهة، فتتوقف النوافذ عن الاستجابة حتى ينتهي (قد يطول مع سلة كبيرة). الآن يجري في الخلفية بعد التأكيد، وتظهر رسالة إذا فشل. / **English:** emptying the Recycle Bin runs in the background (after the confirmation), so the app no longer freezes.
+- **«مسح السجل والملفات الأخيرة»** (كان «مسح عمليات البحث الأخيرة») يمسح أيضاً الملفات المفتوحة مؤخراً (قائمة «الأخيرة» في نافذة البحث الصغيرة) وسجل ما فُتح من البحث السريع، ومنه عمليات البحث على الويب التي تحفظ النص المكتوب، ويحفظ ذلك فوراً. البحوث المحفوظة والمفضلة تبقى. / **English:** "Clear history and recent files" also forgets recently opened files and quick-search launches (web searches held the typed text); saved searches and pins stay.
 
 ## 0.10.0 — 2026-11-11
 
