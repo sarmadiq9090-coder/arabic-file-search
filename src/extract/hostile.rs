@@ -432,3 +432,97 @@ fn xlsx_huge_unique_count_does_not_kill_the_process() {
     }
     assert!(declared_counts_ok(br#"<sst count="999999999999" uniqueCount="7">"#, 1000));
 }
+
+/// An .xls whose shared string table holds one string of `chars` Latin-1
+/// characters, and whose sheet has `cells` LabelSst records all at A1
+/// pointing at it.
+fn xls_shared_string_bomb(chars: usize, cells: usize) -> Vec<u8> {
+    use super::fuzz::{biff_record, utf16le};
+    let bof = |dt: u16| {
+        let mut d = 0x0600u16.to_le_bytes().to_vec();
+        d.extend(dt.to_le_bytes());
+        d.extend([0u8; 12]);
+        biff_record(0x0809, &d)
+    };
+    // SST: totals, then cch, flags (0: one byte per character), the text,
+    // continued in CONTINUE records that each start with a flags byte.
+    let mut sst = Vec::new();
+    let mut first = (cells as u32).to_le_bytes().to_vec();
+    first.extend(1u32.to_le_bytes());
+    first.extend((chars as u16).to_le_bytes());
+    first.push(0);
+    let text = vec![b'x'; chars];
+    let (head, mut rest) = text.split_at(chars.min(8224 - first.len()));
+    first.extend(head);
+    sst.extend(biff_record(0x00FC, &first));
+    while !rest.is_empty() {
+        let (part, more) = rest.split_at(rest.len().min(8223));
+        let mut cont = vec![0u8];
+        cont.extend(part);
+        sst.extend(biff_record(0x003C, &cont));
+        rest = more;
+    }
+    let mut name = vec![3u8, 1];
+    name.extend(utf16le("ورق"));
+    let codepage = biff_record(0x0042, &1200u16.to_le_bytes());
+    let eof = biff_record(0x000A, &[]);
+    let mut globals = bof(0x0005);
+    let sheet_pos = (globals.len() + codepage.len() + sst.len() + 4 + 6 + name.len() + eof.len()) as u32;
+    globals.extend(codepage);
+    globals.extend(sst);
+    let mut bs = sheet_pos.to_le_bytes().to_vec();
+    bs.extend([0u8, 0]);
+    bs.extend(&name);
+    globals.extend(biff_record(0x0085, &bs));
+    globals.extend(&eof);
+    let mut sheet = bof(0x0010);
+    let mut dim = 0u32.to_le_bytes().to_vec();
+    dim.extend(1u32.to_le_bytes());
+    dim.extend(0u16.to_le_bytes());
+    dim.extend(1u16.to_le_bytes());
+    dim.extend(0u16.to_le_bytes());
+    sheet.extend(biff_record(0x0200, &dim));
+    // LabelSst: row, column, xf, string 0.
+    let label = biff_record(0x00FD, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    for _ in 0..cells {
+        sheet.extend(&label);
+    }
+    sheet.extend(&eof);
+    globals.extend(sheet);
+    // Version 3, as Excel writes (calamine cannot read a large version-4 file).
+    let mut comp = cfb::CompoundFile::create_with_version(cfb::Version::V3, std::io::Cursor::new(Vec::new())).unwrap();
+    comp.create_stream("Workbook").unwrap().write_all(&globals).unwrap();
+    comp.flush().unwrap();
+    comp.into_inner().into_inner()
+}
+
+#[test]
+fn xls_shared_string_copies_are_bounded() {
+    // One 32,000-character string, 20,000 cells using it, all at A1: a 1x1
+    // sheet as far as the cell check goes, but calamine clones the string
+    // into every cell (640 MB here; a 2 MB file came to about 9 GB).
+    let bomb = xls_shared_string_bomb(32_000, 20_000);
+    assert!(bomb.len() < 400_000, "{}", bomb.len());
+    let c = child("sst-unchecked.xls", &bomb, &[UNCHECKED_SHEETS]);
+    assert!(!c.ok && c.text.is_none(), "without the check: {c:?}");
+    // Checked: the raw-bytes fallback, in little memory.
+    let c = child("sst.xls", &bomb, &[]);
+    assert!(c.ok && c.peak.is_some_and(|p| p < 64 * MB), "{c:?}");
+    // The sizes are those calamine reads (the string spans 4 records).
+    let stream = cfb::CompoundFile::open(std::io::Cursor::new(&bomb))
+        .and_then(|mut f| {
+            let mut v = Vec::new();
+            std::io::Read::read_to_end(&mut f.open_stream("Workbook")?, &mut v)?;
+            Ok(v)
+        })
+        .unwrap();
+    let recs: Vec<(u16, &[u8])> = biff_records(&stream).collect();
+    let at = recs.iter().position(|r| r.0 == 0x00FC).unwrap();
+    let cont: Vec<&[u8]> = recs[at + 1..].iter().take_while(|r| r.0 == 0x003C).map(|r| r.1).collect();
+    assert_eq!(cont.len(), 3);
+    assert_eq!(xls_shared_string_sizes(recs[at].1, &cont, true), Some(vec![64_000]));
+    // A few cells sharing it are fine, and read by calamine.
+    let small = xls_shared_string_bomb(32_000, 100);
+    let t = spreadsheet_text(std::io::Cursor::new(&small), "xls").unwrap();
+    assert_eq!(t.len(), 32_000 + 2, "one cell at A1, the last copy wins");
+}

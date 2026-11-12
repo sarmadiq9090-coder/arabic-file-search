@@ -43,6 +43,9 @@ const MAX_WORKBOOK_UNZIPPED: u64 = 256 * 1024 * 1024;
 /// Upper bound for the cells calamine lays out densely (bounding box of each
 /// sheet, summed) when it opens an .xls file.
 const MAX_XLS_CELLS: u64 = 6_000_000;
+/// Upper bound for the shared-string text calamine copies into the cells of
+/// an .xls file: it clones the string for every cell that refers to it.
+const MAX_XLS_SHARED_TEXT: u64 = 64 * 1024 * 1024;
 /// Upper bound for the `uniqueCount` an xlsx shared-strings part may declare
 /// (calamine reserves 24 bytes for each before reading any).
 const MAX_SHARED_STRINGS: u64 = 10_000_000;
@@ -510,7 +513,11 @@ fn spreadsheet_text<R: Read + Seek>(mut r: R, ext: &str) -> Option<String> {
         // cells (`table:number-columns-repeated`) in memory.
         "ods" => return odf_text(zip::ZipArchive::new(r).ok()?),
         "xls" => {
-            if !xls_size_ok(&mut r) {
+            if unchecked("BAHTH_TEST_UNCHECKED_SHEETS") {
+                r.rewind().ok()?;
+                return sheets_text(Sheets::Xls(Xls::new(r).ok()?));
+            }
+            let Some(workbook) = xls_checked_workbook(&mut r) else {
                 // Too big for calamine (or not a readable compound file):
                 // the strings still come out of the raw bytes.
                 r.rewind().ok()?;
@@ -519,9 +526,18 @@ fn spreadsheet_text<R: Read + Seek>(mut r: R, ext: &str) -> Option<String> {
                 let mut text = extract_doc_heuristic(&data);
                 text.push_str(&extract_doc_heuristic(data.get(1..).unwrap_or_default()));
                 return Some(text);
-            }
-            r.rewind().ok()?;
-            Sheets::Xls(Xls::new(r).ok()?)
+            };
+            // calamine gets the very bytes that were checked, in a compound
+            // file of our own: it finds the workbook stream in its own way
+            // (first directory entry of that name, linked or not), which in
+            // a crafted file need not be the stream checked above.
+            // Version 3 (512-byte sectors), as Excel writes: calamine's own
+            // reader does not find the root directory of a large version-4 file.
+            let mut own = cfb::CompoundFile::create_with_version(cfb::Version::V3, std::io::Cursor::new(Vec::new())).ok()?;
+            own.create_stream("Workbook").and_then(|mut s| std::io::Write::write_all(&mut s, &workbook)).ok()?;
+            drop(workbook);
+            own.flush().ok()?;
+            return sheets_text(Sheets::Xls(Xls::new(own.into_inner()).ok()?));
         }
         "xlsx" | "xlsm" | "xlsb" => {
             if !unchecked("BAHTH_TEST_UNCHECKED_SHEETS") && !workbook_zip_ok(&mut r) {
@@ -614,18 +630,79 @@ fn declared_counts_ok(tag: &[u8], max: u64) -> bool {
     true
 }
 
-/// True when calamine can open the .xls compound file in `r` without laying
-/// out more than [`MAX_XLS_CELLS`] cells (see [`xls_stream_size_ok`]).
-fn xls_size_ok<R: Read + Seek>(r: &mut R) -> bool {
-    let Ok(mut comp) = cfb::CompoundFile::open(r) else { return false };
+/// The workbook stream of the .xls compound file in `r`, when calamine can
+/// read it within bounded memory (see [`xls_stream_size_ok`]).
+fn xls_checked_workbook<R: Read + Seek>(r: &mut R) -> Option<Vec<u8>> {
+    let mut comp = cfb::CompoundFile::open(r).ok()?;
     let stream = match comp.open_stream("Workbook") {
         Ok(s) => read_capped(s, MAX_FILE_SIZE),
-        Err(_) => match comp.open_stream("Book") {
-            Ok(s) => read_capped(s, MAX_FILE_SIZE),
-            Err(_) => return false,
-        },
+        Err(_) => read_capped(comp.open_stream("Book").ok()?, MAX_FILE_SIZE),
     };
-    stream.is_some_and(|s| xls_stream_size_ok(&s))
+    stream.filter(|s| xls_stream_size_ok(s))
+}
+
+/// For every string of an .xls shared string table (the `SST` record data
+/// in `first`, continued in the `CONTINUE` records `cont`), an upper bound
+/// of its length in UTF-8 bytes. Walks the table exactly as calamine's
+/// `parse_sst` does, so that string N here is string N there; `None` where
+/// calamine gives up on the table (and so on the file). `utf16`: the
+/// workbook's code page is UTF-16, as BIFF8 requires.
+fn xls_shared_string_sizes(first: &[u8], cont: &[&[u8]], utf16: bool) -> Option<Vec<u32>> {
+    let mut data = first.get(8..)?;
+    let mut cont = cont.iter().copied();
+    let mut sizes = Vec::new();
+    loop {
+        if data.is_empty() {
+            let Some(next) = cont.next() else { break };
+            data = next;
+        }
+        if data.is_empty() {
+            sizes.push(0);
+            continue;
+        }
+        let (cch, flags) = (usize::from(u16::from_le_bytes([data[0], *data.get(1)?])), *data.get(2)?);
+        data = &data[3..];
+        let mut wide = flags & 0x1 != 0;
+        // Formatting runs (4 bytes each) and phonetic data follow the text.
+        let mut after = [0usize; 2];
+        if flags & 0x8 != 0 {
+            after[0] = usize::from(u16::from_le_bytes([*data.first()?, *data.get(1)?])) * 4;
+            data = &data[2..];
+        }
+        if flags & 0x4 != 0 {
+            let cb = i32::from_le_bytes(data.get(..4)?.try_into().ok()?);
+            after[1] = usize::try_from(cb).ok()?;
+            data = &data[4..];
+        }
+        let (mut left, mut size) = (cch, 0u64);
+        while left > 0 {
+            let chars = if wide { data.len() / 2 } else { data.len() }.min(left);
+            // One UTF-16 unit is at most 3 bytes of UTF-8, one compressed
+            // character (U+0000 to U+00FF) at most 2; under any other code
+            // page calamine decodes two bytes per character, 3 bytes each.
+            size += chars as u64 * if !utf16 { 6 } else if wide { 3 } else { 2 };
+            data = &data[if wide { 2 * chars } else { chars }..];
+            left -= chars;
+            if left > 0 {
+                // The text goes on in the next record, after a flags byte.
+                let (&flags, more) = cont.next()?.split_first()?;
+                wide = flags & 0x1 != 0;
+                data = more;
+            }
+        }
+        for mut skip in after {
+            while skip > 0 {
+                if data.is_empty() {
+                    data = cont.next()?;
+                }
+                let n = skip.min(data.len());
+                data = &data[n..];
+                skip -= n;
+            }
+        }
+        sizes.push(u32::try_from(size).unwrap_or(u32::MAX));
+    }
+    Some(sizes)
 }
 
 /// BIFF records of an .xls workbook stream, as calamine walks them:
@@ -644,21 +721,43 @@ fn biff_records(stream: &[u8]) -> impl Iterator<Item = (u16, &[u8])> {
 /// Mirrors how calamine's `Xls::new` sizes its sheets: for every sheet the
 /// `BOUNDSHEET` records point at, the bounding box of its cell records and
 /// the capacity its `DIMENSIONS` record asks for. False when that comes to
-/// more than [`MAX_XLS_CELLS`].
+/// more than [`MAX_XLS_CELLS`], or when the shared strings its cells refer
+/// to (calamine clones the string for each such cell, so one 64 KB string
+/// and a 2 MB run of cells was 9 GB) come to more than
+/// [`MAX_XLS_SHARED_TEXT`].
 fn xls_stream_size_ok(stream: &[u8]) -> bool {
     let u16_at = |d: &[u8], i: usize| d.get(i..i + 2).map_or(0, |b| u32::from(u16::from_le_bytes([b[0], b[1]])));
     let u32_at = |d: &[u8], i: usize| d.get(i..i + 4).map_or(0, |b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]));
 
-    // Sheet positions, from the workbook globals (up to their EOF).
+    // Sheet positions and the shared strings, from the workbook globals (up
+    // to their EOF).
     let mut sheets: Vec<usize> = Vec::new();
-    for (typ, data) in biff_records(stream) {
+    let mut shared: Vec<u32> = Vec::new();
+    let mut utf16 = true;
+    let mut globals = biff_records(stream).peekable();
+    while let Some((typ, data)) = globals.next() {
         match typ {
             0x0085 if data.len() >= 4 => sheets.push(u32_at(data, 0) as usize),
+            // CodePage: 1200 and 1201 are UTF-16.
+            0x0042 => utf16 = matches!(u16_at(data, 0), 1200 | 1201),
+            // SST, with the CONTINUE records right after it; a later table
+            // replaces an earlier one.
+            0x00FC => {
+                let mut cont = Vec::new();
+                while let Some((_, more)) = globals.next_if(|(typ, _)| *typ == 0x003C) {
+                    cont.push(more);
+                }
+                match xls_shared_string_sizes(data, &cont, utf16) {
+                    Some(sizes) => shared = sizes,
+                    None => return false,
+                }
+            }
             0x000A => break,
             _ => {}
         }
     }
     let mut total: u64 = 0;
+    let mut shared_text: u64 = 0;
     for pos in sheets {
         let Some(sheet) = stream.get(pos..) else { continue };
         // (row min, row max, col min, col max) of the cells.
@@ -703,6 +802,13 @@ fn xls_stream_size_ok(stream: &[u8]) -> bool {
                 // Number, Label, RString, BoolErr, Rk, LabelSst, Formula.
                 0x0203 | 0x0204 | 0x00D6 | 0x0205 | 0x027E | 0x00FD | 0x0006 if data.len() >= 4 => {
                     add(u16_at(data, 0), u16_at(data, 2));
+                    // LabelSst: the cell gets its own copy of shared string N.
+                    if typ == 0x00FD && data.len() >= 10 {
+                        shared_text += u64::from(shared.get(u32_at(data, 6) as usize).copied().unwrap_or(0));
+                        if shared_text > MAX_XLS_SHARED_TEXT {
+                            return false;
+                        }
+                    }
                 }
                 // MulRk: one row, a run of columns.
                 0x00BD if data.len() >= 6 => {
@@ -1586,7 +1692,7 @@ mod tests {
         use super::fuzz::xls_with;
         // An ordinary sheet goes through calamine.
         let ok = xls_with((0, 2, 0, 2), &[(0, 0, "خلية"), (1, 1, "ثانية")]);
-        assert!(xls_size_ok(&mut Cursor::new(&ok)));
+        assert!(xls_checked_workbook(&mut Cursor::new(&ok)).is_some());
         assert_eq!(spreadsheet_text(Cursor::new(&ok), "xls").unwrap(), "خلية\nثانية\n\n");
         // calamine reserves DIMENSIONS rows × columns up front, and lays out
         // the cells' bounding box densely: both used to abort the program.
@@ -1595,12 +1701,12 @@ mod tests {
             xls_with((0, 1, 0, 1), &[(0, 0, "خلية"), (65_535, 65_535, "بعيدة")]),
             xls_with((70_000, 1, 0, 1), &[(0, 0, "خلية")]), // first row after the last
         ] {
-            assert!(!xls_size_ok(&mut Cursor::new(&bad)));
+            assert!(xls_checked_workbook(&mut Cursor::new(&bad)).is_none());
             // The text still comes out of the raw bytes.
             let t = spreadsheet_text(Cursor::new(&bad), "xls").unwrap();
             assert!(t.contains("خلية"), "{t:?}");
         }
-        assert!(!xls_size_ok(&mut Cursor::new(b"not a compound file")));
+        assert!(xls_checked_workbook(&mut Cursor::new(b"not a compound file")).is_none());
     }
 
     #[test]
