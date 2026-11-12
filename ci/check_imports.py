@@ -25,7 +25,8 @@ configuration with the standard library only (no dumpbin needed).
 
 3. Exploit mitigations (build.rs passes them explicitly): the PE header must
    mark the exe ASLR-compatible (DYNAMIC_BASE, with its relocations kept),
-   DEP-compatible (NX_COMPAT) and, for a 64-bit exe, HIGH_ENTROPY_VA.
+   DEP-compatible (NX_COMPAT), Control Flow Guard (GUARD_CF) and, for a 64-bit
+   exe, HIGH_ENTROPY_VA.
 
 build.yml runs this on each exe it publishes (jobs `exe` and `exe-arm64`),
 without --mingw-ok. With --mingw-ok, an exe linked by GNU ld (a local mingw
@@ -112,6 +113,7 @@ MITIGATIONS = (
     (0x0040, "DYNAMIC_BASE", "ASLR: loaded at a random address (/DYNAMICBASE)", False),
     (0x0100, "NX_COMPAT", "DEP: data never runs as code (/NXCOMPAT)", False),
     (0x0020, "HIGH_ENTROPY_VA", "ASLR over the whole 64-bit address space (/HIGHENTROPYVA)", True),
+    (0x4000, "GUARD_CF", "Control Flow Guard (-C control-flow-guard in .cargo/config.toml)", False),
 )
 
 
@@ -209,7 +211,7 @@ def check(path, mingw_ok=False):
         if mingw:
             print(f"  {name} missing: note: mingw build (never published).")
         else:
-            print(f"::error::{path}: the PE header lacks {name} ({what}). build.rs must pass it to the linker. "
+            print(f"::error::{path}: the PE header lacks {name} ({what}). build.rs or .cargo/config.toml must turn it on. "
                   "See ci/check_imports.py.")
             ok = False
     return ok
