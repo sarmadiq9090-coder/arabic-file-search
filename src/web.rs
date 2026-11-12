@@ -1186,7 +1186,7 @@ mod tests {
 
     fn entry(path: &str, size: u64, is_dir: bool) -> Entry {
         let mut e = Entry { path: path.into(), size, mtime: 1_700_000_000, is_dir, norm_name: "".into() };
-        e.norm_name = crate::normalize::normalize(e.name()).into();
+        e.norm_name = crate::normalize::name_key(e.name()).into();
         e
     }
 
@@ -1812,5 +1812,24 @@ mod tests {
         let head = String::from_utf8(out).unwrap();
         assert_eq!(head.matches("\r\n\r\n").count(), 1);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The phone search uses the window's matcher: the hamza seat spellings
+    /// of a word find each other.
+    #[test]
+    fn hamza_seat_spellings_on_the_phone() {
+        let s = shared_with(vec![
+            entry("C:\\a\\مسؤول المبيعات.docx", 1, false),
+            entry("C:\\a\\مسئول الحسابات.xlsx", 1, false),
+            entry("C:\\a\\مسوول المخزن.txt", 1, false),
+            entry("C:\\a\\notes.txt", 1, false),
+        ]);
+        for q in ["مسئول", "مسؤول", "مسوول"] {
+            let page = search_page(q, &s.index(), false, false);
+            assert!(page.contains(&trf!("{} نتيجة", "{} results", 3)), "{q}: {page}");
+            for name in ["مسؤول المبيعات.docx", "مسئول الحسابات.xlsx", "مسوول المخزن.txt"] {
+                assert!(page.contains(name), "{q}: {name}");
+            }
+        }
     }
 }

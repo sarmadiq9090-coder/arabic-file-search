@@ -1334,7 +1334,7 @@ mod tests {
 
     fn entry(path: &str, size: u64, mtime: i64, is_dir: bool) -> Entry {
         let name = path.rsplit('\\').next().unwrap();
-        Entry { path: path.into(), size, mtime, is_dir, norm_name: crate::normalize::normalize(name).into() }
+        Entry { path: path.into(), size, mtime, is_dir, norm_name: crate::normalize::name_key(name).into() }
     }
 
     /// Synthetic files, sorted by path as the index keeps them.
@@ -2066,5 +2066,28 @@ mod tests {
         assert_eq!(kept, ["C:\\a\\here.pdf", "D:\\dir"]);
         assert_eq!((rows[0].id, rows[0].dir.as_str(), rows[0].ext.as_str()), (0, "C:\\a", "pdf"));
         assert!(rows[1].folder);
+    }
+
+    /// The hamza seat spellings find each other directly in the new look
+    /// (the same matcher as the window): no fallback note, the word marked.
+    #[test]
+    fn hamza_seat_spellings_are_direct_matches() {
+        let mut entries = vec![
+            entry("C:\\a\\مسؤول المبيعات.docx", 1, 0, false),
+            entry("C:\\a\\المسئول.txt", 1, 0, false),
+            entry("C:\\a\\مَسْؤُول.txt", 1, 0, false),
+            entry("C:\\a\\شئون الطلاب.pdf", 1, 0, false),
+            entry("C:\\a\\رئيس القسم.txt", 1, 0, false),
+        ];
+        entries.sort_by(|a, b| a.path.cmp(&b.path));
+        let index = Arc::new(Index { entries, ..Index::default() });
+        for (text, want) in [("مسئول", 3), ("مسؤول", 3), ("مسوول", 3), ("المسؤول", 3), ("مَسْؤُول", 3), ("شوون", 1), ("شؤون", 1), ("ريس", 1)] {
+            let p = Params { seq: 1, text: text.into(), ..Params::default() };
+            let (shown, msg) = search(index.clone(), p, Lang::Ar);
+            let Outbound::Results { total, ref note, ref rows, .. } = msg else { panic!() };
+            assert_eq!((total, note.clone()), (want, None), "{text}");
+            assert!(shown.marked.terms.iter().all(|t| !t.alts.is_empty()));
+            assert!(rows.iter().all(|r| r.name.iter().any(|(_, marked)| *marked)), "{text}: {:?}", rows.iter().map(name_of).collect::<Vec<_>>());
+        }
     }
 }

@@ -40,7 +40,7 @@ fn regex_end_of_line_matches_crlf_lines() {
 
 fn entry(path: &str, is_dir: bool) -> Entry {
     let name = path.rsplit(['\\', '/']).next().unwrap();
-    Entry { path: path.into(), size: 1, mtime: 0, is_dir, norm_name: normalize(name).into() }
+    Entry { path: path.into(), size: 1, mtime: 0, is_dir, norm_name: crate::normalize::name_key(name).into() }
 }
 
 fn dot_entries() -> Vec<Entry> {
@@ -441,4 +441,138 @@ fn fuzzy_and_root_say_they_do_not_apply_inside_documents() {
     let mut q = at("تقرير franco:");
     q.note_document_search();
     assert!(q.warnings.is_empty());
+}
+
+// ------------------------------------------------ hamza seats: مسئول / مسؤول
+
+/// «مسئول» did not find «مسؤول» (nor the other way round): ئ became ي and ؤ
+/// became و, so the two usual spellings of one word never met. Each seat now
+/// also matches its other spellings, and a word typed without the hamza
+/// (as many people type) still matches directly, both ways.
+#[test]
+fn hamza_seat_spellings_find_each_other() {
+    let entries = vec![
+        entry(r"C:\docs\مسؤول المبيعات.docx", false), // 0
+        entry(r"C:\docs\مسئول الحسابات.xlsx", false), // 1
+        entry(r"C:\docs\مسوول المخزن.txt", false),    // 2 without the hamza
+        entry(r"C:\docs\شؤون الموظفين", true),        // 3
+        entry(r"C:\docs\شئون الطلاب.pdf", false),     // 4
+        entry(r"C:\docs\شوون عامة.txt", false),       // 5
+        entry(r"C:\docs\رئيس القسم.txt", false),      // 6
+        entry(r"C:\docs\رءيس.txt", false),            // 7
+        entry(r"C:\docs\ريس.txt", false),             // 8
+        entry(r"C:\docs\سؤال 1.txt", false),          // 9
+        entry(r"C:\docs\سوال 2.txt", false),          // 10
+        entry(r"C:\docs\مسائل.txt", false),           // 11
+        entry(r"C:\docs\مسايل.txt", false),           // 12
+        entry(r"C:\docs\بيئة العمل.txt", false),      // 13
+        entry(r"C:\docs\بيية.txt", false),            // 14
+        entry(r"C:\docs\مسيول.txt", false),           // 15 a bare ي is not a seat
+        entry(r"C:\docs\سيال.txt", false),            // 16
+    ];
+    let find = |s: &str| {
+        let mut r = search_names(&entries, &at(s), "");
+        r.sort_unstable();
+        r
+    };
+    assert_eq!(find("مسوول"), vec![0, 1, 2]);
+    // With a seat typed, و and ي may differ there: مسئول without the hamza is مسيول.
+    for q in ["مسؤول", "مسئول", "المسؤول", "مَسْؤُول"] {
+        assert_eq!(find(q), vec![0, 1, 2, 15], "{q}");
+    }
+    for q in ["شؤون", "شئون", "شوون"] {
+        assert_eq!(find(q), vec![3, 4, 5], "{q}");
+    }
+    for q in ["رئيس", "رءيس", "ريس"] {
+        assert_eq!(find(q), vec![6, 7, 8], "{q}");
+    }
+    for q in ["سؤال", "سوال"] {
+        assert_eq!(find(q), vec![9, 10], "{q}");
+    }
+    for q in ["مسائل", "مسايل"] {
+        assert_eq!(find(q), vec![11, 12], "{q}");
+    }
+    for q in ["بيئة", "بيية", "بيئه"] {
+        assert_eq!(find(q), vec![13, 14], "{q}");
+    }
+    // و and ي stay different letters where no hamza is involved.
+    assert_eq!(find("مسيول"), vec![1, 15]); // مسئول is مسيول without the hamza
+    assert_eq!(find("سيال"), vec![16]);
+    // Inside documents, a query with a seat finds the other spellings.
+    let text = "اجتماع مع مسؤول المبيعات غداً";
+    assert_eq!(match_text(text, &at("مسئول")).as_deref(), Some(text));
+    assert!(match_text("شئون الطلاب", &at("شؤون")).is_some());
+    assert!(match_text("مسوول المخزن", &at("مسئول")).is_some());
+    // Excluding a spelling excludes the others.
+    assert_eq!(find("txt -مسئول -رئيس -سؤال -مسائل -بيئة -شئون -سيال -مسيول"), Vec::<u32>::new());
+}
+
+/// The name spelled as typed comes before the other spellings when they
+/// match equally well (whole name, then start of the name, as before).
+#[test]
+fn hamza_seat_spelling_as_typed_ranks_first() {
+    let entries = vec![
+        entry(r"C:\a\مسئول.txt", false),   // 0
+        entry(r"C:\a\مسؤول.txt", false),   // 1
+        entry(r"C:\a\مسئولية.txt", false), // 2
+        entry(r"C:\a\مسؤولية.txt", false), // 3
+        entry(r"C:\a\مسوول.txt", false),   // 4
+    ];
+    let find = |s: &str| search_names(&entries, &at(s), "");
+    // As typed first, then the other spellings, shorter names first.
+    assert_eq!(find("مسؤول"), vec![1, 3, 0, 4, 2]);
+    assert_eq!(find("مسئول"), vec![0, 2, 1, 4, 3]);
+    assert_eq!(find("مسوول"), vec![4, 0, 1, 2, 3]);
+    // A whole-name match still comes first, whatever its spelling.
+    assert_eq!(find("مسئول.txt"), vec![0, 1, 4]);
+    assert_eq!(find("مسوول.txt"), vec![4, 0, 1]);
+    // Diacritics and the article do not stop a name counting as typed.
+    assert_eq!(find("المسؤول"), vec![1, 3, 0, 4, 2]);
+    assert_eq!(find("مَسْئُول"), vec![0, 2, 1, 4, 3]);
+    // رئيس / ريس.
+    let entries = vec![entry(r"C:\a\رئيس.txt", false), entry(r"C:\a\ريس.txt", false)];
+    assert_eq!(search_names(&entries, &at("ريس"), ""), vec![1, 0]);
+    assert_eq!(search_names(&entries, &at("رئيس"), ""), vec![0, 1]);
+}
+
+/// The underline covers the word in the name whichever spelling found it.
+#[test]
+fn hamza_seat_matches_are_underlined() {
+    let name = "مسئول ورئيس.txt";
+    let marked = |q: &str| match_ranges(name, &at(q)).into_iter().map(|(s, e)| &name[s..e]).collect::<Vec<_>>();
+    assert_eq!(marked("مسوول"), ["مسئول"]);
+    assert_eq!(marked("مسؤول"), ["مسئول"]);
+    assert_eq!(marked("ريس"), ["رئيس"]);
+    assert_eq!(marked("رءيس"), ["رئيس"]);
+}
+
+/// The other spellings of a name serve `ww:` and proximity searches too,
+/// one spelling at a time, and names with a seat keep their place when no
+/// term ranks them (filters only, Arabizi).
+#[test]
+fn hamza_seats_in_filters_and_order() {
+    let entries = vec![
+        entry(r"C:\a\تقرير مسؤول.txt", false),         // 0
+        entry(r"C:\a\مسوول المخزن.txt", false),        // 1
+        entry(r"C:\a\مسؤولية.txt", false),             // 2
+        entry(r"C:\a\مسئول a b c d رييس", true),      // 3
+        entry(r"C:\a\abcdefghijklmnop.txt", false),    // 4
+    ];
+    let find = |s: &str| {
+        let mut r = search_names(&entries, &at(s), "");
+        r.sort_unstable();
+        r
+    };
+    for q in ["ww:مسئول", "ww:مسؤول", "ww:مسوول"] {
+        assert_eq!(find(q), vec![0, 1, 3], "{q}");
+    }
+    assert_eq!(find(r#""المخزن مسئول"~1"#), vec![1]);
+    // The last word of one spelling is not next to the first of the next.
+    assert_eq!(find(r#""رييس مسوول"~1"#), Vec::<u32>::new());
+    assert_eq!(find(r#""رييس مسوول"~6"#), vec![3]);
+    // Shorter names first, as before, whether or not they have a seat.
+    assert_eq!(search_names(&entries, &at("ext:txt"), ""), vec![2, 0, 1, 4]);
+    let marked = |name: &str, q: &str| match_ranges(name, &at(q)).into_iter().map(|(s, e)| name[s..e].to_string()).collect::<Vec<_>>();
+    assert_eq!(marked("مسئول.txt", "ww:مسوول"), ["مسئول"]);
+    assert_eq!(marked("مسئول.txt", r#""مسؤول txt"~2"#), ["مسئول", "txt"]);
 }

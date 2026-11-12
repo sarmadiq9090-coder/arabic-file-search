@@ -290,7 +290,8 @@ fn closest_word(entries: &[Entry], token: &str, ok: &(impl Fn(&Entry) -> bool + 
         .par_iter()
         .filter(|e| ok(e))
         .fold(fresh, |(mut best, mut chars), e| {
-            for (_, w) in split_words(&e.norm_name) {
+            // The name as spelled, not the other spellings of its hamza seats.
+            for (_, w) in split_words(crate::normalize::primary(&e.norm_name)) {
                 chars.clear();
                 chars.extend(w.chars());
                 let have = letters(&chars);
@@ -395,7 +396,7 @@ mod tests {
 
     fn entry(path: &str) -> Entry {
         let name = path.rsplit(['\\', '/']).next().unwrap();
-        Entry { path: path.into(), size: 1, mtime: 0, is_dir: false, norm_name: normalize(name).into() }
+        Entry { path: path.into(), size: 1, mtime: 0, is_dir: false, norm_name: crate::normalize::name_key(name).into() }
     }
 
     fn entries(paths: &[&str]) -> Vec<Entry> {

@@ -321,8 +321,10 @@ pub fn fuzzy_search_names(entries: &[Entry], q: &Query, scope: &str) -> Vec<u32>
         .enumerate()
         .filter(|(_, e)| q.entry_ok(e) && in_scope(&e.path, &scope_lower))
         .map_init(Scratch::default, |s, (i, e)| {
-            let cost = name_cost(q, &matchers, &e.norm_name, s)?;
-            Some((cost, search::name_rank(q, &e.norm_name), e.norm_name.chars().count() as u32, i as u32))
+            // Not the name as spelled at the end of the key: the forms before it hold its words.
+            let key = e.norm_name.split(crate::normalize::SPELLING_SEP).next().unwrap_or_default();
+            let cost = name_cost(q, &matchers, key, s)?;
+            Some((cost, search::name_rank(q, &e.norm_name), crate::normalize::primary(&e.norm_name).chars().count() as u32, i as u32))
         })
         .flatten()
         .collect();
@@ -441,7 +443,7 @@ mod tests {
 
     fn entry(path: &str) -> Entry {
         let name = path.rsplit(['\\', '/']).next().unwrap();
-        Entry { path: path.into(), size: 1, mtime: 0, is_dir: false, norm_name: normalize(name).into() }
+        Entry { path: path.into(), size: 1, mtime: 0, is_dir: false, norm_name: crate::normalize::name_key(name).into() }
     }
 
     fn entries(names: &[&str]) -> Vec<Entry> {

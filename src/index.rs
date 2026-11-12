@@ -14,7 +14,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::UNIX_EPOCH;
 
-use crate::normalize::normalize;
+use crate::normalize::name_key;
 
 /// Bumped whenever the on-disk format changes.
 const CACHE_VERSION: u32 = 1;
@@ -26,7 +26,9 @@ pub struct Entry {
     /// Modification time, seconds since the Unix epoch.
     pub mtime: i64,
     pub is_dir: bool,
-    /// Normalised file name, rebuilt after loading (not stored).
+    /// What the file name is matched against: [`crate::normalize::name_key`]
+    /// (the normalised name, then the other spellings of its hamza seats).
+    /// Rebuilt after loading (not stored), so changing it needs no format bump.
     #[serde(skip)]
     pub norm_name: Box<str>,
 }
@@ -302,7 +304,7 @@ impl Index {
             let renamed_self = e.path.len() == old.len();
             e.path = format!("{new}{}", &e.path[old.len()..]).into();
             if renamed_self {
-                e.norm_name = normalize(e.name()).into();
+                e.norm_name = name_key(e.name()).into();
             }
         }
         self.remove_path(new);
@@ -424,7 +426,7 @@ impl Index {
                     }
                 }
                 None => {
-                    let norm_name = normalize(file_name(&p)).into();
+                    let norm_name = name_key(file_name(&p)).into();
                     let e = Entry { path: p.into(), size, mtime, is_dir, norm_name };
                     // A folder that just appeared may have been moved in
                     // with contents; the walker would not enter skipped ones.
@@ -523,7 +525,7 @@ fn sort_by_path(entries: &mut [Entry]) {
 
 /// Rebuilds the normalised names, which the cache does not store.
 fn fill_norm_names(entries: &mut [Entry]) {
-    entries.par_iter_mut().for_each(|e| e.norm_name = normalize(e.name()).into());
+    entries.par_iter_mut().for_each(|e| e.norm_name = name_key(e.name()).into());
 }
 
 /// Merges two runs sorted by path in one pass (cheaper than re-sorting).
@@ -651,7 +653,7 @@ mod tests {
                 size: 1,
                 mtime: 0,
                 is_dir: !p.contains('.'),
-                norm_name: normalize(file_name(p)).into(),
+                norm_name: name_key(file_name(p)).into(),
             })
             .collect();
         entries.sort_by(|a, b| a.path.cmp(&b.path));
@@ -1389,7 +1391,7 @@ mod tests {
             expected(disk, Some(dir))
                 .into_iter()
                 .map(|(p, size, mtime, is_dir)| Entry {
-                    norm_name: normalize(file_name(&p)).into(),
+                    norm_name: name_key(file_name(&p)).into(),
                     path: p.into(),
                     size,
                     mtime,
@@ -1499,7 +1501,7 @@ mod tests {
                     idx.entries.iter().map(|e| (e.path.to_string(), e.size, e.mtime, e.is_dir)).collect();
                 assert_eq!(have, expected(&disk, None), "round {round} (queue of {cap:?}), after {changes:#?}, before that {prev:#?}");
                 prev = changes;
-                assert!(idx.entries.iter().all(|e| *e.norm_name == *normalize(e.name())));
+                assert!(idx.entries.iter().all(|e| *e.norm_name == *name_key(e.name())));
             }
             // The small queues did overflow, so the walk path was exercised.
             assert!(cap.is_none_or(|c| c > 6) || overflows > 0, "round {round}: a queue of {cap:?} never overflowed");

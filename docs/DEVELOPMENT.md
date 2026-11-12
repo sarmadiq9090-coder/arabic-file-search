@@ -60,7 +60,7 @@ The updater fails closed: it installs a release only when GitHub publishes a SHA
 | `src/window_fit.rs`, `src/ui/placement.rs` | The main window opens centred in the work area (the monitor without the taskbar) and is pulled back on screen when shown after the screen changed; the default column widths fit the list until the user sets their own; the arithmetic is unit-tested on Linux |
 | `src/watch.rs`, `src/watch_pace.rs` | Live index updates (ReadDirectoryChangesW), with paced rescans after lost events |
 | `src/search.rs`, `src/search/` | Query parsing, name and content search; `members.rs` one result per archive; `robustness.rs` fuzz-style tests |
-| `src/normalize.rs` | Arabic normalisation for matching (hamza, ta marbuta, alef maqsura, diacritics, tatweel, Persian letters, presentation forms) |
+| `src/normalize.rs` | Arabic normalisation for matching (hamza, ta marbuta, alef maqsura, diacritics, tatweel, Persian letters, presentation forms); `name_key`: a file name's normalised form plus the other spellings of its hamza seats (مسئول is also مسوول, رئيس also ريس) and its spelling as typed, rebuilt at load like the normalised name (nothing on disk) |
 | `src/layout.rs`, `src/franco.rs`, `src/fuzzy.rs`, `src/root.rs` | Wrong keyboard layout, Arabizi, typo tolerance and the fallback chain, triliteral roots |
 | `src/extract.rs`, `src/extract/` | Text from documents; mail (eml, msg), epub, reversed-Arabic PDF fix, archives with zip-bomb limits, images of scanned PDF pages |
 | `src/content_cache.rs` | Persistent content index (lz4) in `%LOCALAPPDATA%\BahthSari\content\` |

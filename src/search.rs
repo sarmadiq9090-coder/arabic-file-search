@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
 use crate::content_cache::{self, ContentCache};
 use crate::extract;
 use crate::index::Entry;
-use crate::normalize::{normalize, normalize_with_map};
+use crate::normalize::{FORM_SEP, SPELLING_SEP, forms_with_map, key_extras_at, key_forms, key_spelling, normalize, normalize_spelling, normalize_with_map, primary, query_forms};
 
 mod members;
 #[cfg(test)]
@@ -294,6 +294,14 @@ pub struct Query {
     pub show_system: bool,
     /// Problems found while parsing (in Arabic), for the UI to show.
     pub warnings: Vec<String>,
+    /// The first term's alternatives with ؤ and ئ kept as typed
+    /// ([`normalize_spelling`]). A hamza seat matches its other spellings
+    /// (see [`crate::normalize`]: «مسئول», «مسؤول» and «مسوول» find each
+    /// other); among equally good matches the names spelled as typed come first.
+    pub spelled: Vec<String>,
+    /// True when the first term has a hamza seat ([`Self::spelled`] differs
+    /// from its plain spelling or has other spellings).
+    pub spelled_seat: bool,
 }
 
 /// File-type presets for the type filter: (label, extensions). An empty list
@@ -866,9 +874,14 @@ impl Query {
         for Token { text: tok, quoted, near } in tokenize(input) {
             if let Some(dist) = near {
                 let mut words = Vec::new();
-                for w in split_words(&normalize(&tok)).map(|(_, w)| w) {
+                // Split as spelled (same words as normalised) so each word
+                // also gets the other spellings of its hamza seats.
+                for w in split_words(&normalize_spelling(&tok)).map(|(_, w)| w) {
                     let mut alts = Vec::new();
-                    push_alt(&mut alts, w.to_string(), false);
+                    push_alt(&mut alts, normalize(w), false);
+                    for f in query_forms(w) {
+                        push_alt(&mut alts, f, false);
+                    }
                     words.push(Term { alts });
                 }
                 if words.len() >= 2 {
@@ -912,6 +925,7 @@ impl Query {
                     let n = normalize(word);
                     if !n.trim().is_empty() {
                         q.excludes.push(n);
+                        q.excludes.extend(query_forms(word));
                         join = false;
                         continue;
                     }
@@ -924,6 +938,10 @@ impl Query {
                 let n = normalize(p);
                 if !n.trim().is_empty() {
                     push_alt(&mut alts, n, quoted);
+                    // The other spellings of its hamza seats (مسئول → مسوول).
+                    for f in query_forms(p) {
+                        push_alt(&mut alts, f, quoted);
+                    }
                 }
             }
             let join_prev = join || pieces.first() == Some(&"") && pieces.len() > 1;
@@ -932,11 +950,22 @@ impl Query {
                 join |= join_prev;
                 continue;
             }
+            let joins = join_prev && !q.terms.is_empty();
+            if q.terms.len() == usize::from(joins) {
+                // This is (or joins) the first term: keep its spelling too.
+                for p in &pieces {
+                    let n = normalize_spelling(p);
+                    if !n.trim().is_empty() {
+                        push_alt(&mut q.spelled, n, quoted);
+                    }
+                }
+            }
             match q.terms.last_mut() {
-                Some(last) if join_prev => alts.into_iter().for_each(|a| push_unique(&mut last.alts, a)),
+                Some(last) if joins => alts.into_iter().for_each(|a| push_unique(&mut last.alts, a)),
                 _ => q.terms.push(Term { alts }),
             }
         }
+        q.spelled_seat = q.spelled.iter().any(|a| a.contains(['ؤ', 'ئ']) || !query_forms(a).is_empty());
         if q.franco {
             for t in &mut q.terms {
                 let latin: Vec<String> = t.alts.iter().filter(|a| crate::franco::is_arabizi(a)).cloned().collect();
@@ -1007,8 +1036,11 @@ impl Query {
             }
         } else if let Some(len) = prefix_len(tok, &WORD_PREFIXES) {
             let mut alts = Vec::new();
-            for w in unquote(&tok[len..]).split('|').map(normalize).filter(|w| !w.trim().is_empty()) {
-                push_unique(&mut alts, w);
+            for w in unquote(&tok[len..]).split('|').filter(|w| !normalize(w).trim().is_empty()) {
+                push_unique(&mut alts, normalize(w));
+                for f in query_forms(w) {
+                    push_unique(&mut alts, f);
+                }
             }
             if !alts.is_empty() {
                 self.words.push(Term { alts });
@@ -1122,7 +1154,8 @@ impl Query {
     /// Regex, whole-word and proximity filters on an entry's name.
     fn name_ok(&self, e: &Entry) -> bool {
         self.words.iter().all(|w| w.matches_word(&e.norm_name))
-            && self.near.iter().all(|n| n.find(&e.norm_name).is_some())
+            // Each spelling on its own: words of two copies of the name are not near.
+            && self.near.iter().all(|n| key_forms(&e.norm_name).any(|f| n.find(f).is_some()))
             && self.regexes.iter().all(|r| r.is_match(e.name()))
     }
 
@@ -1171,7 +1204,8 @@ pub fn in_scope(path: &str, scope_lower: &str) -> bool {
 
 /// Returns indices into `entries` whose file name matches every term and
 /// passes the filters, best matches first (exact name, then names starting
-/// with the first term).
+/// with the first term; then the names spelled as typed when a hamza seat
+/// is involved, see [`Query::spelled`]; then shorter names).
 ///
 /// A `fuzzy:` or `root:` query goes to [`crate::fuzzy::fuzzy_search_names`].
 /// With `franco:`, names matching an earlier (more likely) transliteration
@@ -1184,26 +1218,49 @@ pub fn search_names(entries: &[Entry], q: &Query, scope: &str) -> Vec<u32> {
         return Vec::new();
     }
     let scope_lower = scope.to_lowercase();
-    let mut hits: Vec<(u8, u8, u32, u32)> = entries
+    let mut hits: Vec<(u8, u8, bool, u32, u32)> = entries
         .par_iter()
         .enumerate()
         .filter(|(_, e)| q.terms.iter().all(|t| t.matches(&e.norm_name)))
         .filter(|(_, e)| q.entry_ok(e) && in_scope(&e.path, &scope_lower))
         .map(|(i, e)| {
             let alt = if q.franco { alt_rank(q, &e.norm_name) } else { 0 };
-            (name_rank(q, &e.norm_name), alt, e.norm_name.chars().count() as u32, i as u32)
+            let key = &e.norm_name;
+            let extras = key_extras_at(key);
+            let plain = &key[..extras.unwrap_or(key.len())];
+            // Only a seat in the query or in the name can make the spellings differ.
+            // Arabizi has its own order (`alt`) and no spelling to compare.
+            let other_spelling = (q.spelled_seat || extras.is_some()) && !q.franco && !q.spelled.is_empty() && {
+                let spelling = key_spelling(key);
+                !q.spelled.iter().any(|a| spelling.contains(a.as_str()))
+            };
+            (name_rank(q, key), alt, other_spelling, plain.chars().count() as u32, i as u32)
         })
         .collect();
     hits.par_sort_unstable();
-    hits.into_iter().map(|(_, _, _, i)| i).collect()
+    hits.into_iter().map(|(_, _, _, _, i)| i).collect()
 }
 
-/// How `name` matches the first term: 0 is the whole name, 1 its start, 2 elsewhere.
-pub(crate) fn name_rank(q: &Query, name: &str) -> u8 {
-    match q.terms.first() {
-        Some(t) if t.alts.iter().any(|a| name == a) => 0,
-        Some(t) if t.alts.iter().any(|a| name.starts_with(a.as_str())) => 1,
-        _ => 2,
+/// How `key` (a [`crate::normalize::name_key`]) matches the first term: 0 is
+/// the whole name (in any of its spellings), 1 its start, 2 elsewhere.
+pub(crate) fn name_rank(q: &Query, key: &str) -> u8 {
+    let Some(t) = q.terms.first() else { return 2 };
+    if key_extras_at(key).is_none() {
+        return if t.alts.iter().any(|a| key == a) {
+            0
+        } else if t.alts.iter().any(|a| key.starts_with(a.as_str())) {
+            1
+        } else {
+            2
+        };
+    }
+    let forms = || key.split([FORM_SEP, SPELLING_SEP]);
+    if forms().any(|f| t.alts.iter().any(|a| f == a)) {
+        0
+    } else if forms().any(|f| t.alts.iter().any(|a| f.starts_with(a.as_str()))) {
+        1
+    } else {
+        2
     }
 }
 
@@ -1597,7 +1654,7 @@ pub fn sort_hits(entries: &[Entry], hits: &mut [u32], key: SortKey, descending: 
     };
     let key_of = |x: &Entry| -> u128 {
         match key {
-            SortKey::Name => sort_key(x.norm_name.bytes()),
+            SortKey::Name => sort_key(primary(&x.norm_name).bytes()),
             SortKey::Path => sort_key(x.path.as_bytes()[skip..].iter().map(u8::to_ascii_lowercase)),
             SortKey::Size => ((!x.is_dir as u128) << 64) | x.size as u128,
             SortKey::Date => (x.mtime as u64 ^ (1 << 63)) as u128,
@@ -1605,7 +1662,7 @@ pub fn sort_hits(entries: &[Entry], hits: &mut [u32], key: SortKey, descending: 
         }
     };
     let tie: fn(&Entry, &Entry) -> Ordering = match key {
-        SortKey::Name => |a, b| a.norm_name.cmp(&b.norm_name),
+        SortKey::Name => |a, b| primary(&a.norm_name).cmp(primary(&b.norm_name)),
         SortKey::Path => |a, b| cmp_caseless(&a.path, &b.path),
         _ => |_, _| Ordering::Equal,
     };
@@ -1648,8 +1705,8 @@ pub fn sort_rows<R>(
 /// are included so the highlighted word stays whole. Excluded words are not
 /// highlighted.
 pub fn match_ranges(name: &str, q: &Query) -> Vec<(usize, usize)> {
-    let (norm, map) = normalize_with_map(name);
-    let src_end = |last: usize| {
+    let mut forms = forms_with_map(name);
+    let end_in = |map: &[u32], last: usize| {
         let s = map[last] as usize;
         let char_end = s + name[s..].chars().next().map_or(0, char::len_utf8);
         // Characters between this one and the next mapped one were dropped by normalisation.
@@ -1657,21 +1714,29 @@ pub fn match_ranges(name: &str, q: &Query) -> Vec<(usize, usize)> {
         char_end.max(next)
     };
     let mut ranges = Vec::new();
-    for alt in q.terms.iter().flat_map(|t| &t.alts).filter(|a| !a.is_empty()) {
-        let mut from = 0;
-        while let Some(p) = norm[from..].find(alt.as_str()) {
-            let s = from + p;
-            ranges.push((map[s] as usize, src_end(s + alt.len() - 1)));
-            // Step one char so overlapping occurrences are found too.
-            from = s + norm[s..].chars().next().map_or(1, char::len_utf8);
+    // Every spelling of the name's hamza seats (مسئول is also مسوول).
+    for (norm, map) in &forms {
+        for alt in q.terms.iter().flat_map(|t| &t.alts).filter(|a| !a.is_empty()) {
+            let mut from = 0;
+            while let Some(p) = norm[from..].find(alt.as_str()) {
+                let s = from + p;
+                ranges.push((map[s] as usize, end_in(map, s + alt.len() - 1)));
+                // Step one char so overlapping occurrences are found too.
+                from = s + norm[s..].chars().next().map_or(1, char::len_utf8);
+            }
         }
     }
-    for t in q.words.iter() {
-        ranges.extend(t.spans(&norm, true).into_iter().map(|(s, e)| (map[s] as usize, src_end(e - 1))));
+    for (norm, map) in &forms {
+        let src_end = |last: usize| end_in(map, last);
+        for t in q.words.iter() {
+            ranges.extend(t.spans(norm, true).into_iter().map(|(s, e)| (map[s] as usize, src_end(e - 1))));
+        }
+        for t in q.near.iter().flat_map(|n| &n.words) {
+            ranges.extend(t.spans(norm, false).into_iter().map(|(s, e)| (map[s] as usize, src_end(e - 1))));
+        }
     }
-    for t in q.near.iter().flat_map(|n| &n.words) {
-        ranges.extend(t.spans(&norm, false).into_iter().map(|(s, e)| (map[s] as usize, src_end(e - 1))));
-    }
+    let (norm, map) = forms.swap_remove(0);
+    let src_end = |last: usize| end_in(&map, last);
     for r in &q.regexes {
         ranges.extend(r.ranges(name));
     }
@@ -1726,7 +1791,7 @@ mod tests {
 
     fn entry(path: &str, is_dir: bool) -> Entry {
         let name = path.rsplit(['\\', '/']).next().unwrap();
-        Entry { path: path.into(), size: 1, mtime: 0, is_dir, norm_name: normalize(name).into() }
+        Entry { path: path.into(), size: 1, mtime: 0, is_dir, norm_name: crate::normalize::name_key(name).into() }
     }
 
     fn alts(q: &Query) -> Vec<Vec<&str>> {

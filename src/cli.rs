@@ -547,7 +547,7 @@ mod tests {
 
     fn entry(path: &str, size: u64, mtime: i64, is_dir: bool) -> Entry {
         let mut e = Entry { path: path.into(), size, mtime, is_dir, norm_name: "".into() };
-        e.norm_name = crate::normalize::normalize(e.name()).into();
+        e.norm_name = crate::normalize::name_key(e.name()).into();
         e
     }
 
