@@ -13,6 +13,7 @@
 - **سؤال أول تشغيل**: «هل تريد خانة بحث صغيرة فوق شريط المهام؟ يمكنك تغيير ذلك لاحقاً من «خيارات».» (كان يقول «من الإعدادات» والزر اسمه «خيارات»). / **English:** the first-run question now reads "Show a small search box just above the taskbar? You can change this later in Options."
 - **«إخفاء بجانب الساعة»** بدل «إخفاء إلى شريط المهام» في قائمة «خيارات»: النافذة تختفي إلى الأيقونة بجانب الساعة لا إلى شريط المهام. / **English:** the Options item "Hide to the taskbar tray" is now "Hide next to the clock".
 - **مصطلحات موحّدة**: «جارٍ» في كل رسائل الانتظار (بدل «جاري» و«جارِ»)، و«خانة البحث» بدل «المربع» في قائمتَي الأيقونة والخانة العائمة، و«خيارات…» بدل «الإعدادات…» في قائمة الأيقونة لأنها تفتح قائمة «خيارات». / **English:** consistent Arabic terms in status texts and menus; the tray menu's "Settings…" is now "Options…" (it opens the Options menu).
+- **عبارة خانة البحث أبسط**: «اكتب اسم الملف أو جزءاً منه… مثال: تقرير .pdf» بدل أمثلة برموز غير مشروحة (! و|). / **English:** simpler search hint: "Type a file name or part of it… e.g. report .pdf".
 
 ## 0.10.0 — 2026-11-11
 

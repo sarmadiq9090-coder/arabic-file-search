@@ -110,8 +110,8 @@ impl NativeUi<AppUi> for App {
         // never seen), as the quick search's box does.
         if let Some(h) = app.query.handle.hwnd() {
             let cue = shell::wide(tr!(
-                "اكتب اسم الملف أو كلمة للبحث…   أمثلة:  تقرير ‎.pdf   ·   عقد !قديم   ·   صورة|فيديو",
-                "Type a file name or a word…   e.g.  report .pdf   ·   contract !old   ·   photo|video"
+                "اكتب اسم الملف أو جزءاً منه…   مثال: تقرير \u{200E}.pdf",
+                "Type a file name or part of it…   e.g. report .pdf"
             ));
             unsafe { SendMessageW(h, winapi::um::commctrl::EM_SETCUEBANNER, 1, cue.as_ptr() as LPARAM) };
         }
