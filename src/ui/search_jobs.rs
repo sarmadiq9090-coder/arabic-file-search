@@ -393,7 +393,9 @@ impl App {
             return;
         }
         let mut st = self.state.borrow_mut();
-        st.shown_query = Some(self.parse_query(&self.query.text()));
+        let mut shown = self.parse_query(&self.query.text());
+        shown.note_document_search();
+        st.shown_query = Some(shown);
         st.history.add_recent(&self.query.text());
         let index = st.index.clone();
         let scope = st.scope.clone();
@@ -537,6 +539,7 @@ impl App {
         let checked = job.progress.checked.load(Ordering::Relaxed);
         let done = job.progress.done.load(Ordering::Relaxed);
         let cached = job.progress.from_cache.load(Ordering::Relaxed);
+        let capped = job.progress.capped.load(Ordering::Relaxed);
         let changed = !new_hits.is_empty();
         st.rows.extend(new_hits.into_iter().map(|h| Row {
             entry: h.index,
@@ -548,16 +551,24 @@ impl App {
             st.content = None;
         }
         drop(st);
-        if done {
-            self.sort_rows_in_place();
-        }
+        // The end of the search puts the rows in order: the selection goes
+        // with its file, so Enter or Delete never acts on the file that took
+        // its row number.
+        let moved = done.then(|| self.sort_rows_in_place(self.list.selected_item()));
         if changed || done {
             self.refresh_list();
+        }
+        if let Some(row) = moved {
+            self.select_row(row);
         }
         if done {
             self.stop_btn.set_enabled(false);
             let cached = if cached > 0 { trf!(" (من الفهرس: {})", " ({} from the index)", fmt_num(cached)) } else { String::new() };
             let mut status = trf!("انتهى البحث داخل {} مستند: وجدت {} ملف.{}", "Searched {} documents: found {} files.{}", fmt_num(total), fmt_num(n), cached);
+            // More documents match than one search lists.
+            if capped {
+                status = trf!("{status} (تُعرض أول {} نتيجة فقط؛ أضف كلمة أو اختر مجلداً لتضييق البحث.)", "{status} (showing the first {} results only; add a word or pick a folder to narrow the search.)", fmt_num(n));
+            }
             // The drives are still being scanned: documents not in the index
             // yet were not searched. (A finished search did read every
             // document the content index lacked, so its warm-up doesn't count.)

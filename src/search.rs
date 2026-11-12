@@ -14,6 +14,8 @@ use crate::normalize::{normalize, normalize_with_map};
 
 mod members;
 #[cfg(test)]
+mod regressions;
+#[cfg(test)]
 mod robustness;
 
 /// Most match positions collected for each alternative (or regex, or
@@ -119,10 +121,13 @@ impl PartialEq for Pattern {
 
 impl Pattern {
     /// Compiles `source`, with limits so a hostile pattern can't eat memory.
+    /// `^` and `$` match at every line of a document, whether its lines end
+    /// in `\n` or `\r\n` (most Windows text files).
     fn new(source: &str) -> Pattern {
         let re = RegexBuilder::new(source)
             .case_insensitive(true)
             .multi_line(true)
+            .crlf(true)
             .size_limit(1 << 20)
             .dfa_size_limit(4 << 20)
             .build()
@@ -169,48 +174,60 @@ impl Near {
     }
 
     /// For each word of `hay` that contains one of the terms with a non-zero
-    /// `need`: (word number, term number, byte offset of the match), in text order.
-    fn hits(&self, hay: &str, need: &[u32]) -> Vec<(u32, usize, usize)> {
-        let mut hits = Vec::new();
-        for (n, (off, word)) in split_words(hay).enumerate() {
-            for (t, term) in self.words.iter().enumerate().filter(|&(t, _)| need[t] > 0) {
-                if let Some(p) = term.find_in(word) {
-                    hits.push((u32::try_from(n).unwrap_or(u32::MAX), t, off + p));
-                }
-            }
-        }
-        hits
+    /// `need`: (word number, term number, byte offset of the match), in text
+    /// order. Read as the text is walked, never collected whole: a document
+    /// of millions of words would take hundreds of MB.
+    fn hits<'a>(&'a self, hay: &'a str, need: &'a [u32]) -> impl Iterator<Item = (u32, usize, usize)> + 'a {
+        split_words(hay).enumerate().flat_map(move |(n, (off, word))| {
+            let n = u32::try_from(n).unwrap_or(u32::MAX);
+            let wanted = self.words.iter().enumerate().filter(move |&(t, _)| need[t] > 0);
+            wanted.filter_map(move |(t, term)| term.find_in(word).map(|p| (n, t, off + p)))
+        })
     }
 
     /// Byte offset in `hay` of the first window holding every word within
     /// `dist` words, if there is one.
     fn find(&self, hay: &str) -> Option<usize> {
+        self.find_window(hay).0
+    }
+
+    /// [`Near::find`], and the most hits it held at once (for the tests).
+    /// Only hits within `dist` words of the one being read can share a
+    /// window with it, so older ones are dropped on the way.
+    fn find_window(&self, hay: &str) -> (Option<usize>, usize) {
         let need = self.needs();
         let distinct = need.iter().filter(|&&k| k > 0).count();
-        let hits = self.hits(hay, &need);
         let mut counts = vec![0u32; self.words.len()];
-        let (mut covered, mut left) = (0, 0);
-        for &(n, t, _) in &hits {
+        let mut window: std::collections::VecDeque<(u32, usize, usize)> = std::collections::VecDeque::new();
+        let (mut covered, mut most) = (0, 0);
+        for hit in self.hits(hay, &need) {
+            let (n, t, _) = hit;
+            while let Some(&(first, ft, _)) = window.front()
+                && n - first > self.dist
+            {
+                covered -= usize::from(counts[ft] == need[ft]);
+                counts[ft] -= 1;
+                window.pop_front();
+            }
+            window.push_back(hit);
+            most = most.max(window.len());
             counts[t] += 1;
             covered += usize::from(counts[t] == need[t]);
-            while covered == distinct {
-                let (first, lt, off) = hits[left];
-                if n - first <= self.dist {
-                    return Some(off);
-                }
-                covered -= usize::from(counts[lt] == need[lt]);
-                counts[lt] -= 1;
-                left += 1;
+            if covered == distinct {
+                // Every hit left is within `dist` of this one: the first starts the window.
+                return (window.front().map(|&(_, _, off)| off), most);
             }
         }
-        None
+        (None, most)
     }
 
     /// Byte offsets of every word occurrence that has each of the other words
-    /// within `dist` words of it (exact for two words, which is the usual case).
+    /// within `dist` words of it (exact for two words, which is the usual
+    /// case). Only the first [`MAX_SPANS`] occurrences of the words are looked
+    /// at: like every count, this one stops growing there.
     fn all(&self, hay: &str) -> Vec<usize> {
         let need = self.needs();
-        let hits = self.hits(hay, &need);
+        let hits: Vec<(u32, usize, usize)> = self.hits(hay, &need).take(MAX_SPANS).collect();
         let mut by_term: Vec<Vec<u32>> = vec![Vec::new(); self.words.len()];
         for &(n, t, _) in &hits {
             by_term[t].push(n);
@@ -235,6 +252,9 @@ impl Near {
 /// `a|b` (or `a | b`) matches either, `!word` or `-word` excludes, `ext:pdf`,
 /// `*.pdf` or `.pdf` restricts the file type and `folder:` / `مجلد:` keeps
 /// only folders. A leading Arabic article (`ال`, `وال`, `لل`…) is optional.
+/// A name that is all extension (`.gitignore`, the folder `.ssh`) has that
+/// type, and a bare `.word` also finds names with a word starting that way
+/// (`.net framework`), see [`Query::dot_names`].
 ///
 /// Filters: `size:>10mb` / `حجم:` (size), `dm:today` / `تاريخ:` (modified
 /// date), `regex:` / `re:` (regular expression), `ww:` / `كلمة:` (whole word)
@@ -245,6 +265,12 @@ pub struct Query {
     pub terms: Vec<Term>,
     pub excludes: Vec<String>,
     pub exts: Vec<String>,
+    /// The types typed as a bare `.word` (not `ext:` or `*.`), each as the
+    /// normalised `.word`. Typed that way it may as well be the start of a
+    /// dot name, so a name with a word starting with it passes the type
+    /// filter too: `.env` finds `.env.local`, `.net framework` finds
+    /// «Microsoft .NET Framework». Every one is in `exts` as well.
+    pub dot_names: Vec<String>,
     pub dirs_only: bool,
     /// Inclusive size range in bytes from `size:`. Folders never pass it.
     pub size: Option<(u64, u64)>,
@@ -385,17 +411,63 @@ fn tokenize(input: &str) -> Vec<Token> {
     tokens
 }
 
-/// The extension list of an `ext:`, `*.` or `.ext` token.
-fn ext_filter(lower: &str) -> Option<&str> {
-    lower
-        .strip_prefix("ext:")
-        .or_else(|| lower.strip_prefix("*."))
-        .or_else(|| lower.strip_prefix('.').filter(|e| !e.is_empty() && !e.contains('.')))
+/// The extension list of an `ext:`, `*.` or `.ext` token, and whether it is
+/// the bare `.ext` form (which may also be a dot name, [`Query::dot_names`]).
+fn ext_filter(lower: &str) -> Option<(&str, bool)> {
+    let explicit = lower.strip_prefix("ext:").or_else(|| lower.strip_prefix("*."));
+    explicit.map(|list| (list, false)).or_else(|| {
+        let bare = lower.strip_prefix('.').filter(|e| !e.is_empty() && !e.contains('.'));
+        bare.map(|list| (list, true))
+    })
 }
 
-/// Length of the prefix from `list` that `tok` starts with, if any.
+/// The extensions in the list of an `ext:`, `*.` or `.ext` token: split at
+/// `,` and `;`, without a leading `.` or `*.` (`ext:.pdf`, `ext:*.pdf`).
+/// `*` is every type, so `*.*` and `ext:*` list nothing and filter nothing.
+fn ext_items(list: &str) -> impl Iterator<Item = &str> {
+    list.split([',', ';']).map(|e| e.trim_start_matches(['*', '.'])).filter(|e| !e.is_empty())
+}
+
+/// True when a word of `name` (normalised) starts with `dot` (a normalised
+/// `.word`): at the start of the name or after a space. Not inside a word,
+/// so `.doc` is not found in `a.docx` nor `.net` in «Microsoft.NET».
+fn has_dot_word(name: &str, dot: &str) -> bool {
+    name.match_indices(dot).any(|(i, _)| i == 0 || name[..i].ends_with(char::is_whitespace))
+}
+
+/// Length of the prefix from `list` that `tok` starts with, if any. Latin
+/// prefixes ignore case; Arabic ones are compared normalised like the
+/// search words, so `كلمه:` is `كلمة:`, `تأريخ:` is `تاريخ:` and diacritics
+/// or tatweel (`مُجلد:`) don't matter.
 fn prefix_len(tok: &str, list: &[&str]) -> Option<usize> {
-    list.iter().find(|p| tok.get(..p.len()).is_some_and(|h| h.eq_ignore_ascii_case(p))).map(|p| p.len())
+    list.iter().find_map(|p| {
+        if tok.get(..p.len()).is_some_and(|h| h.eq_ignore_ascii_case(p)) {
+            return Some(p.len());
+        }
+        if p.is_ascii() {
+            return None;
+        }
+        let want = normalize(p);
+        let mut got = String::new();
+        for (i, c) in tok.char_indices() {
+            got.push_str(&normalize(c.encode_utf8(&mut [0; 4])));
+            if got.len() >= want.len() {
+                return (got == want).then_some(i + c.len_utf8());
+            }
+        }
+        None
+    })
+}
+
+/// True when the token `tok` is a filter rather than a word: a type
+/// (`ext:`, `*.`), folder, size, date, regex, whole-word, Arabizi, typo,
+/// root or system prefix, in any spelling [`Query::parse`] accepts. (A bare
+/// `.ext` is left to the caller: it may be a word.)
+pub(crate) fn is_filter_token(tok: &str) -> bool {
+    let modes = [&FOLDER_PREFIXES[..], &FRANCO_PREFIXES, &FUZZY_PREFIXES, &ROOT_PREFIXES, &SYSTEM_PREFIXES];
+    value_prefix(tok).is_some()
+        || modes.into_iter().any(|list| prefix_len(tok, list).is_some())
+        || ext_filter(&tok.to_lowercase()).is_some_and(|(_, bare)| !bare)
 }
 
 /// Length of the folder prefix `tok` starts with, if any.
@@ -488,34 +560,65 @@ const DAY: i64 = 86_400;
 /// (the usual start in Arabic calendars).
 const WEEK_START: i64 = 6;
 
-/// Local offset from UTC in seconds for calendar words such as `dm:today`.
+/// A fixed local offset from UTC in seconds, used until
+/// [`init_local_utc_offset`] switches to the system's time zone (and in tests).
 static UTC_OFFSET: AtomicI32 = AtomicI32::new(0);
 
-/// Sets the local time zone's offset from UTC (east positive), used by
-/// [`Query::parse`] to work out where "today", "this week"… start.
+/// Set by [`init_local_utc_offset`]: offsets come from the Windows time zone.
+static SYSTEM_ZONE: AtomicBool = AtomicBool::new(false);
+
+/// Sets a fixed offset from UTC (east positive), used by [`Query::parse`] to
+/// work out where "today", "this week"… start, until [`init_local_utc_offset`].
+#[cfg_attr(not(test), allow(dead_code))] // the tests, and builds for other systems
 pub fn set_utc_offset_secs(secs: i32) {
     UTC_OFFSET.store(secs, Ordering::Relaxed);
 }
 
-/// Reads the Windows time zone (with daylight saving) into
-/// [`set_utc_offset_secs`]. Call once at start-up.
+/// From now on, offsets are those of the Windows time zone, with its
+/// daylight-saving rules, for each date (`dm:2024-01-15` in summer uses the
+/// winter offset, as the Date column does) and read when a query is parsed,
+/// so a clock or time zone change in a long-running tray copy counts. Call
+/// once at start-up. (It read one offset there before 0.10.1.)
 #[cfg(windows)]
 pub fn init_local_utc_offset() {
-    use winapi::um::timezoneapi::{GetTimeZoneInformation, TIME_ZONE_INFORMATION};
-    let mut tzi: TIME_ZONE_INFORMATION = unsafe { std::mem::zeroed() };
-    let bias = match unsafe { GetTimeZoneInformation(&mut tzi) } {
-        1 => tzi.Bias + tzi.StandardBias, // TIME_ZONE_ID_STANDARD
-        2 => tzi.Bias + tzi.DaylightBias, // TIME_ZONE_ID_DAYLIGHT
-        0 => tzi.Bias,                    // no daylight saving
-        _ => return,
-    };
-    // Bias is minutes to add to local time to get UTC.
-    set_utc_offset_secs(-bias * 60);
+    SYSTEM_ZONE.store(true, Ordering::Relaxed);
 }
 
-/// The offset set by [`set_utc_offset_secs`] (0 until it is called).
+/// The local offset from UTC in seconds at Unix time `secs`.
+pub fn utc_offset_at(secs: i64) -> i64 {
+    #[cfg(windows)]
+    if SYSTEM_ZONE.load(Ordering::Relaxed)
+        && let Some(off) = system_offset_at(secs)
+    {
+        return off;
+    }
+    #[cfg(not(windows))]
+    let _ = (secs, &SYSTEM_ZONE);
+    i64::from(UTC_OFFSET.load(Ordering::Relaxed))
+}
+
+/// The Windows time zone's offset at `secs`, the way the Date column turns
+/// a time into local time (`SystemTimeToTzSpecificLocalTime`).
+#[cfg(windows)]
+fn system_offset_at(secs: i64) -> Option<i64> {
+    use winapi::shared::minwindef::FILETIME;
+    use winapi::um::minwinbase::SYSTEMTIME;
+    use winapi::um::timezoneapi::{FileTimeToSystemTime, SystemTimeToTzSpecificLocalTime};
+    let ticks = u64::try_from(secs.checked_add(11_644_473_600)?.checked_mul(10_000_000)?).ok()?;
+    let ft = FILETIME { dwLowDateTime: ticks as u32, dwHighDateTime: (ticks >> 32) as u32 };
+    let (mut utc, mut local): (SYSTEMTIME, SYSTEMTIME) = unsafe { (std::mem::zeroed(), std::mem::zeroed()) };
+    let ok = unsafe { FileTimeToSystemTime(&ft, &mut utc) != 0 && SystemTimeToTzSpecificLocalTime(std::ptr::null(), &utc, &mut local) != 0 };
+    if !ok {
+        return None;
+    }
+    let day = days_from_civil(i64::from(local.wYear), u32::from(local.wMonth), u32::from(local.wDay));
+    let local_secs = day * DAY + i64::from(local.wHour) * 3600 + i64::from(local.wMinute) * 60 + i64::from(local.wSecond);
+    Some(local_secs - secs)
+}
+
+/// The offset from UTC now (see [`utc_offset_at`]).
 pub fn utc_offset_secs() -> i32 {
-    UTC_OFFSET.load(Ordering::Relaxed)
+    i32::try_from(utc_offset_at(now_secs())).unwrap_or(0)
 }
 
 fn now_secs() -> i64 {
@@ -578,20 +681,32 @@ const DATE_WORDS: &[(&[&str], Span)] = &[
     (&["lastyear", "السنة_الماضية", "العام_الماضي"], Span::Year(-1)),
 ];
 
-/// Times are worked out in local time; `off` is the offset from UTC.
-struct Clock {
+/// Times are worked out in local time; `off` gives the offset from UTC at
+/// a Unix time (it changes with daylight saving).
+struct Clock<'a> {
     now: i64,
-    off: i64,
+    off: &'a dyn Fn(i64) -> i64,
 }
 
-impl Clock {
+impl Clock<'_> {
+    /// The Unix time of local time `local` (seconds since 1970-01-01 00:00
+    /// local): the offset is the one in force then, not now.
+    fn to_utc(&self, local: i64) -> i64 {
+        let guess = local - (self.off)(local);
+        local - (self.off)(guess)
+    }
+
     /// Unix time at which local day number `day` starts.
     fn day_start(&self, day: i64) -> i64 {
-        day * DAY - self.off
+        self.to_utc(day * DAY)
+    }
+
+    fn local_now(&self) -> i64 {
+        self.now + (self.off)(self.now)
     }
 
     fn today(&self) -> i64 {
-        (self.now + self.off).div_euclid(DAY)
+        self.local_now().div_euclid(DAY)
     }
 
     /// Unix time at the start of the month `months` after (y, m).
@@ -602,11 +717,11 @@ impl Clock {
 
     /// The same local time `months` months ago, the day clamped to the month.
     fn months_ago(&self, months: i64) -> i64 {
-        let local = self.now + self.off;
+        let local = self.local_now();
         let (y, m, d) = civil_from_days(local.div_euclid(DAY));
         let total = y * 12 + i64::from(m) - 1 - months;
         let (y, m) = (total.div_euclid(12), (total.rem_euclid(12) + 1) as u32);
-        self.day_start(days_from_civil(y, m, d.min(days_in_month(y, m)))) + local.rem_euclid(DAY)
+        self.to_utc(days_from_civil(y, m, d.min(days_in_month(y, m))) * DAY + local.rem_euclid(DAY))
     }
 
     fn span(&self, span: Span) -> (i64, i64) {
@@ -626,6 +741,9 @@ impl Clock {
 
     /// One date as a `[start, end)` range: a calendar word, `2024`,
     /// `2024-05`, `2024-05-12`, or a recent period `7d`, `3w`, `2m`, `1y`.
+    /// A period is the moment that long ago, an empty range `(t, t)`, so the
+    /// comparisons in [`Clock::parse`] read naturally: `>7d` after it (newer,
+    /// like `7d` alone), `<7d` before it (older).
     fn point(&self, v: &str) -> Option<(i64, i64)> {
         let key: String = v.chars().filter(|c| !matches!(c, '_' | '-' | ' ')).collect();
         let is_word = |w: &&str| normalize(w).replace('_', "") == key;
@@ -642,7 +760,7 @@ impl Clock {
                 b'm' => self.months_ago(n),
                 _ => self.months_ago(n * 12),
             };
-            return Some((from, i64::MAX));
+            return Some((from, from));
         }
         let parts: Vec<&str> = v.split(['-', '/', '.']).collect();
         let num = |i: usize, digits: std::ops::RangeInclusive<usize>| {
@@ -676,6 +794,8 @@ impl Clock {
             let (op, rest) = split_op(&v);
             let (start, end) = self.point(rest)?;
             match op {
+                // A period alone (`7d`, `=7d`): since then.
+                "" | "=" if start == end => (start, i64::MAX),
                 ">=" => (start, i64::MAX),
                 ">" => (end, i64::MAX),
                 "<=" => (i64::MIN, end),
@@ -723,16 +843,23 @@ fn push_alt(alts: &mut Vec<String>, alt: String, exact: bool) {
 }
 
 impl Query {
-    /// Parses `input`. Calendar words in `dm:` use the current time and the
-    /// offset from [`set_utc_offset_secs`].
+    /// Parses `input`. Dates in `dm:` use the current time and the local
+    /// time zone of each date ([`utc_offset_at`]).
     pub fn parse(input: &str) -> Query {
-        Query::parse_at(input, now_secs(), utc_offset_secs())
+        Query::parse_zoned(input, now_secs(), &utc_offset_at)
     }
 
     /// Parses `input` as if the time were `now` (Unix seconds) in a time zone
-    /// `utc_offset` seconds east of UTC.
+    /// `utc_offset` seconds east of UTC all year.
+    #[cfg_attr(not(test), allow(dead_code))] // for the tests
     pub fn parse_at(input: &str, now: i64, utc_offset: i32) -> Query {
-        let clock = Clock { now, off: i64::from(utc_offset) };
+        Query::parse_zoned(input, now, &|_| i64::from(utc_offset))
+    }
+
+    /// Parses `input` as if the time were `now`, in a time zone whose offset
+    /// from UTC at a Unix time is `off` of it.
+    pub(crate) fn parse_zoned(input: &str, now: i64, off: &dyn Fn(i64) -> i64) -> Query {
+        let clock = Clock { now, off };
         let mut q = Query::default();
         // Set by a trailing or standalone `|`: the next term joins the last one.
         let mut join = false;
@@ -757,9 +884,13 @@ impl Query {
                     continue;
                 }
                 let lower = tok.to_lowercase();
-                if let Some(ext) = ext_filter(&lower) {
-                    let exts = ext.split([',', ';']).filter(|e| !e.is_empty());
-                    q.exts.extend(exts.map(str::to_string));
+                if let Some((list, bare)) = ext_filter(&lower) {
+                    for ext in ext_items(list) {
+                        q.exts.push(ext.to_string());
+                        if bare {
+                            push_unique(&mut q.dot_names, normalize(&format!(".{ext}")));
+                        }
+                    }
                     // A filter between two words ends any pending `|`.
                     join = false;
                     continue;
@@ -888,6 +1019,18 @@ impl Query {
         true
     }
 
+    /// For a search inside documents: `fuzzy:` and `root:` match file names
+    /// only, and inside a document the words are looked for as typed. Says so
+    /// in [`Query::warnings`] rather than ignoring them silently.
+    pub fn note_document_search(&mut self) {
+        if self.fuzzy || self.root {
+            self.warnings.push(tr!(
+                "«تقريب:» و«جذر:» (fuzzy: وroot:) يعملان على أسماء الملفات فقط؛ داخل المستندات بُحث عن الكلمات كما كُتبت",
+                "fuzzy: and root: work on file names only; inside documents the words were searched as typed"
+            ).to_string());
+        }
+    }
+
     /// True when nothing that narrows the results was typed: no terms,
     /// excludes, extensions or other filters. `dirs_only` alone does not
     /// count, so an empty box never lists the whole disk.
@@ -926,6 +1069,8 @@ impl Query {
                 if preset.is_empty() {
                     return;
                 }
+                // A dot name (`.env`, «.NET Framework») is none of these types.
+                self.dot_names.clear();
                 if self.exts.is_empty() {
                     self.exts = preset.iter().map(|e| e.to_string()).collect();
                 } else {
@@ -939,7 +1084,20 @@ impl Query {
     }
 
     fn ext_ok(&self, e: &Entry) -> bool {
-        self.exts.is_empty() || (!e.is_dir && self.exts.contains(&e.ext()))
+        self.exts.is_empty() || (!e.is_dir && self.exts.contains(&e.ext())) || self.dot_name_ok(e)
+    }
+
+    /// The type filter for names that start with a dot. A name that is all
+    /// extension, the file `.gitignore` or the folder `.ssh`, has none for
+    /// [`Entry::ext`], yet `.gitignore`, `*.gitignore` and `ext:gitignore`
+    /// plainly mean it (as Explorer and `dir *.gitignore` do). And a bare
+    /// `.word` passes names with a word starting with it ([`Query::dot_names`]).
+    fn dot_name_ok(&self, e: &Entry) -> bool {
+        let whole = e.name().strip_prefix('.').is_some_and(|rest| {
+            let rest = rest.to_lowercase();
+            self.exts.contains(&rest)
+        });
+        whole || self.dot_names.iter().any(|d| has_dot_word(&e.norm_name, d))
     }
 
     /// Size and date filters. Folders have no size, so `size:` drops them.
@@ -975,16 +1133,40 @@ impl Query {
     }
 }
 
-/// Case-insensitive "is `path` inside `scope`" check. An empty scope means everything.
+/// Case-insensitive "is `path` inside `scope`" check. An empty scope means
+/// everything. `scope_lower` is the scope lower-cased.
 pub fn in_scope(path: &str, scope_lower: &str) -> bool {
     if scope_lower.is_empty() {
         return true;
     }
+    // Most paths: the scope's length in bytes, ASCII case aside.
     let n = scope_lower.len();
+    let end = if path.get(..n).is_some_and(|h| h.eq_ignore_ascii_case(scope_lower)) {
+        n
+    } else {
+        // Lower case can change the length in bytes (`İ` is 2 bytes, `i̇` 3):
+        // compare character by character, up to the end of the path's
+        // character that completes the scope.
+        let fold = |c: char| if c == 'ς' { 'σ' } else { c };
+        let want: Vec<char> = scope_lower.chars().map(fold).collect();
+        let (mut k, mut end) = (0, None);
+        for (i, c) in path.char_indices() {
+            for l in c.to_lowercase().map(fold) {
+                if want.get(k) != Some(&l) {
+                    return false;
+                }
+                k += 1;
+            }
+            if k == want.len() {
+                end = Some(i + c.len_utf8());
+                break;
+            }
+        }
+        let Some(end) = end else { return false };
+        end
+    };
     // `C:\Docs` covers `C:\Docs` and `C:\Docs\…`, not `C:\Docs2\…`.
-    let whole = scope_lower.ends_with(['\\', '/'])
-        || matches!(path.as_bytes().get(n), None | Some(b'\\') | Some(b'/'));
-    path.len() >= n && path.is_char_boundary(n) && whole && path[..n].to_lowercase() == scope_lower
+    scope_lower.ends_with(['\\', '/']) || matches!(path.as_bytes().get(end), None | Some(b'\\') | Some(b'/'))
 }
 
 /// Returns indices into `entries` whose file name matches every term and
@@ -1039,12 +1221,49 @@ pub struct ContentHit {
     /// How many matches of the query the document holds.
     pub count: u32,
     /// Up to [`MAX_LINES`] matching lines: (1-based line number, the line
-    /// cut to about 200 characters around its first match).
+    /// cut to about 200 characters around its first match). Empty, with
+    /// `count` still set, for the results after the first [`LINED_HITS`] of
+    /// a search: [`document_matches`] reads those again when they are asked for.
     pub lines: Vec<(u32, String)>,
+}
+
+impl ContentHit {
+    /// The bytes this hit keeps in memory (its own size and its texts).
+    #[cfg_attr(not(test), allow(dead_code))] // for the tests' memory bound
+    pub fn retained_bytes(&self) -> usize {
+        std::mem::size_of::<ContentHit>()
+            + self.snippet.capacity()
+            + self.lines.capacity() * std::mem::size_of::<(u32, String)>()
+            + self.lines.iter().map(|(_, l)| l.capacity()).sum::<usize>()
+    }
 }
 
 /// Most matching lines kept per document in [`ContentHit::lines`].
 pub const MAX_LINES: usize = 50;
+
+/// How many results of one search inside documents keep their matching
+/// lines. 50 lines of 200 characters are up to 34 KB for one document, so a
+/// common word («في», `a`) found in tens of thousands of documents held
+/// gigabytes (more than the 32-bit program can have). The later results keep
+/// their snippet and count; their lines are read again on demand.
+pub const LINED_HITS: usize = 1_000;
+
+/// Most results one search inside documents lists. It stops there and sets
+/// [`ContentProgress::capped`]; the window says it shows the first ones.
+pub const MAX_CONTENT_HITS: usize = 100_000;
+
+/// The limits of one search inside documents.
+#[derive(Clone, Copy)]
+struct HitLimits {
+    /// Results that keep their matching lines.
+    lined: usize,
+    /// Results listed at all.
+    hits: usize,
+}
+
+impl HitLimits {
+    const DEFAULT: HitLimits = HitLimits { lined: LINED_HITS, hits: MAX_CONTENT_HITS };
+}
 
 #[derive(Default)]
 pub struct ContentProgress {
@@ -1054,6 +1273,9 @@ pub struct ContentProgress {
     pub done: AtomicBool,
     /// Documents whose text came from the content index instead of the file.
     pub from_cache: AtomicUsize,
+    /// The search stopped at [`MAX_CONTENT_HITS`] results: more documents
+    /// match than are listed.
+    pub capped: AtomicBool,
 }
 
 /// Searches inside every supported document in scope. Hits are pushed into
@@ -1068,6 +1290,30 @@ pub fn search_content(
     hits: &Mutex<Vec<ContentHit>>,
     cache: Option<&ContentCache>,
 ) {
+    // The background warm-up pauses while this runs.
+    let _searching = cache.map(ContentCache::begin_search);
+    // Keyed by the file on disk, not the index entry, which may be stale.
+    let text_of = |e: &Entry| content_cache::text_of(cache, &e.path);
+    search_documents(entries, q, scope, progress, hits, HitLimits::DEFAULT, &text_of);
+    if let Some(c) = cache.filter(|_| q.has_text_criteria()) {
+        let _ = c.flush();
+    }
+    progress.done.store(true, Ordering::Relaxed);
+}
+
+/// [`search_content`] over the texts `text_of` gives (a document's text, and
+/// whether it came from the content index), within `limits`: the first
+/// `limits.lined` results keep their matching lines, and the search stops
+/// at `limits.hits` results. Leaves `progress.done` to the caller.
+fn search_documents(
+    entries: &[Entry],
+    q: &Query,
+    scope: &str,
+    progress: &ContentProgress,
+    hits: &Mutex<Vec<ContentHit>>,
+    limits: HitLimits,
+    text_of: &(dyn Fn(&Entry) -> (Option<String>, bool) + Sync),
+) {
     let scope_lower = scope.to_lowercase();
     let candidates: Vec<u32> = entries
         .par_iter()
@@ -1079,33 +1325,43 @@ pub fn search_content(
     progress.total.store(candidates.len(), Ordering::Relaxed);
 
     if !q.has_text_criteria() {
-        progress.done.store(true, Ordering::Relaxed);
         return;
     }
 
-    // The background warm-up pauses while this runs.
-    let _searching = cache.map(ContentCache::begin_search);
+    // Results found so far, to hand out the places within `limits`.
+    let found = AtomicUsize::new(0);
     // A dedicated pool keeps the global one free for instant filename search.
     let threads = std::thread::available_parallelism().map_or(2, |n| n.get().saturating_sub(1).max(1));
     let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).thread_name(|i| format!("content-{i}")).build();
     let run = || {
         candidates.par_iter().for_each(|&i| {
-            if progress.cancel.load(Ordering::Relaxed) {
+            if progress.cancel.load(Ordering::Relaxed) || progress.capped.load(Ordering::Relaxed) {
                 return;
             }
-            let entry = &entries[i as usize];
-            // Keyed by the file on disk, not the index entry, which may be stale.
-            let (text, from_cache) = content_cache::text_of(cache, &entry.path);
+            let (text, from_cache) = text_of(&entries[i as usize]);
             if from_cache {
                 progress.from_cache.fetch_add(1, Ordering::Relaxed);
             }
             // A bug matching one document (reported by the panic hook)
             // skips that document instead of ending the whole search.
             if let Some(text) = text
-                && let Some(hit) = crate::crash_log::catch(|| content_hit(i, &text, q)).flatten()
-                && let Ok(mut h) = hits.lock()
+                && let Some(mut hit) = crate::crash_log::catch(|| content_hit(i, &text, q)).flatten()
             {
-                h.push(hit);
+                let place = found.fetch_add(1, Ordering::Relaxed);
+                if place >= limits.hits {
+                    // Full: this document and the rest are not listed.
+                    progress.capped.store(true, Ordering::Relaxed);
+                    return;
+                }
+                if place >= limits.lined {
+                    // Count and snippet only; `document_matches` reads the lines again.
+                    hit.lines = Vec::new();
+                }
+                // Built by joining words: often twice the size it needs.
+                hit.snippet.shrink_to_fit();
+                if let Ok(mut h) = hits.lock() {
+                    h.push(hit);
+                }
             }
             progress.checked.fetch_add(1, Ordering::Relaxed);
         })
@@ -1114,10 +1370,16 @@ pub fn search_content(
         Ok(pool) => pool.install(run),
         Err(_) => run(),
     }
-    if let Some(c) = cache {
-        let _ = c.flush();
-    }
-    progress.done.store(true, Ordering::Relaxed);
+}
+
+/// The matches of `q` in the document at `path`, read again now: how many,
+/// and up to [`MAX_LINES`] matching lines. For a result whose lines were not
+/// kept ([`LINED_HITS`]). `None` when the file can't be read any more or no
+/// longer matches.
+pub fn document_matches(path: &str, q: &Query, cache: Option<&ContentCache>) -> Option<(u32, Vec<(u32, String)>)> {
+    let text = content_cache::text_of(cache, path).0?;
+    let hit = content_hit(0, &text, q)?;
+    Some((hit.count, hit.lines))
 }
 
 /// Where `q` matches `text` (whose normalised form is `norm`, with `map`
@@ -1353,6 +1615,31 @@ pub fn sort_hits(entries: &[Entry], hits: &mut [u32], key: SortKey, descending: 
         if descending { o.reverse() } else { o }.then(a.cmp(&b))
     });
     hits.par_iter_mut().zip(keyed.par_iter()).for_each(|(h, &(_, i))| *h = i);
+}
+
+/// Puts the rows of a search inside documents in order `key` (path order for
+/// [`SortKey::Relevance`]: document hits have no score) and returns where the
+/// row at `selected` went. The caller moves the selection there: left on its
+/// old row number it would now be on another file, and Enter or Delete would
+/// act on that one. `entry_of` gives a row's index into `entries`.
+pub fn sort_rows<R>(
+    entries: &[Entry],
+    rows: &mut Vec<R>,
+    entry_of: impl Fn(&R) -> u32,
+    key: SortKey,
+    descending: bool,
+    selected: Option<usize>,
+) -> Option<usize> {
+    let selected = selected.and_then(|i| rows.get(i)).map(&entry_of);
+    let mut hits: Vec<u32> = rows.iter().map(&entry_of).collect();
+    if key == SortKey::Relevance {
+        hits.sort_unstable();
+    } else {
+        sort_hits(entries, &mut hits, key, descending);
+    }
+    let mut by_entry: std::collections::HashMap<u32, R> = rows.drain(..).map(|r| (entry_of(&r), r)).collect();
+    rows.extend(hits.into_iter().filter_map(|entry| by_entry.remove(&entry)));
+    selected.and_then(|entry| rows.iter().position(|r| entry_of(r) == entry))
 }
 
 /// Byte ranges `[start, end)` of `name` (the original, un-normalised name)

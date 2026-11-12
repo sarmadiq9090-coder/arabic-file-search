@@ -2,7 +2,6 @@
 //! virtual list's cell text, icons and match highlighting.
 
 use native_windows_gui as nwg;
-use std::collections::HashMap;
 use std::io::Write;
 
 use winapi::shared::minwindef::LPARAM;
@@ -184,7 +183,7 @@ impl App {
         }
         self.show_sort_arrow();
         if self.content_mode() || self.state.borrow().content.is_some() {
-            self.sort_rows_in_place();
+            self.sort_rows_in_place(None);
             self.clear_selection();
             self.refresh_list();
         } else {
@@ -205,19 +204,23 @@ impl App {
         }
     }
 
-    /// Sorts the current rows (used for document-search results).
-    pub(super) fn sort_rows_in_place(&self) {
+    /// Sorts the current rows (used for document-search results) and
+    /// returns where row `selected` went, for [`App::select_row`].
+    pub(super) fn sort_rows_in_place(&self, selected: Option<usize>) -> Option<usize> {
         let (key, desc) = self.sort_key();
         let mut st = self.state.borrow_mut();
-        let mut hits: Vec<u32> = st.rows.iter().map(|r| r.entry).collect();
-        if key == SortKey::Relevance {
-            // Document hits have no score; path order is the neutral order.
-            hits.sort_unstable();
-        } else {
-            search::sort_hits(&st.rows_index.entries, &mut hits, key, desc);
+        let st = &mut *st;
+        search::sort_rows(&st.rows_index.entries, &mut st.rows, |r: &Row| r.entry, key, desc, selected)
+    }
+
+    /// Moves the selection to `row` (to nothing for `None`) after the rows
+    /// were put in another order, so it stays on the same file.
+    pub(super) fn select_row(&self, row: Option<usize>) {
+        self.clear_selection();
+        if let Some(i) = row {
+            self.list.select_item(i, true);
         }
-        let mut by_entry: HashMap<u32, Row> = st.rows.drain(..).map(|r| (r.entry, r)).collect();
-        st.rows = hits.into_iter().filter_map(|entry| by_entry.remove(&entry)).collect();
+        self.show_selected_path();
     }
 
     /// Opens a window listing every matching line of the selected document.
@@ -226,6 +229,7 @@ impl App {
             self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first."));
             return;
         };
+        self.read_matches_again(row);
         let text = {
             let st = self.state.borrow();
             let (Some(r), Some(e)) = (st.rows.get(row), st.row_entry(row)) else { return };
@@ -247,6 +251,31 @@ impl App {
         self.matches_text.set_text(&text);
         self.matches_window.set_visible(true);
         self.matches_text.set_focus();
+    }
+
+    /// A search inside documents keeps the matching lines of its first
+    /// results only (`search::LINED_HITS`); for a later one they are read
+    /// again from the document (or the content index) and kept in the row.
+    fn read_matches_again(&self, row: usize) {
+        let (path, q, use_index) = {
+            let mut st = self.state.borrow_mut();
+            let Some(m) = st.rows.get(row).and_then(|r| r.matches.as_ref()) else { return };
+            if !m.lines.is_empty() || m.count == 0 {
+                return;
+            }
+            let Some(path) = st.row_entry(row).map(|e| e.path.to_string()) else { return };
+            // Taken out while the file is read (not borrowed meanwhile), put back below.
+            let Some(q) = st.shown_query.take() else { return };
+            (path, q, st.settings.content_index)
+        };
+        let cache = if use_index { super::content_index::shared() } else { None };
+        let found = search::document_matches(&path, &q, cache);
+        let mut st = self.state.borrow_mut();
+        st.shown_query = Some(q);
+        if let (Some(m), Some((count, lines))) = (st.rows.get_mut(row).and_then(|r| r.matches.as_mut()), found) {
+            m.count = count;
+            m.lines = lines;
+        }
     }
 
     /// Saves the result list as a CSV file that Excel opens with Arabic intact.

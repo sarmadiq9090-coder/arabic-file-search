@@ -44,14 +44,15 @@ const KEYS: &[(char, &str)] = &[
 /// Shifted keys that produce Arabic letters, used only for Arabic → Latin.
 const SHIFTED: &[(char, &str)] = &[('T', "لإ"), ('G', "لأ"), ('B', "لآ"), ('Y', "إ"), ('H', "أ"), ('N', "آ")];
 
-/// Tokens that are search filters, not words, and are never converted. A
-/// `.ext` token counts when it is the last one or names a known file type
-/// (`.pdf`), so that `.` typed for ز elsewhere is still converted.
+/// Tokens that are search filters, not words, and are never converted:
+/// every filter the query parser knows (`size:>1mb`, `dm:today`, `ext:`,
+/// `مجلد:`…). A `.ext` token counts when it is the last one or names a known
+/// file type (`.pdf`), so that `.` typed for ز elsewhere is still converted.
 fn is_filter(tok: &str, last: bool) -> bool {
     let lower = tok.to_ascii_lowercase();
-    use crate::search::{FOLDER_PREFIXES, KINDS};
+    use crate::search::KINDS;
     let known = |e: &str| KINDS.iter().any(|(_, exts)| exts.contains(&e));
-    ["ext:", "*."].iter().chain(&FOLDER_PREFIXES).any(|p| lower.starts_with(p))
+    crate::search::is_filter_token(tok)
         || lower
             .strip_prefix('.')
             .is_some_and(|e| !e.is_empty() && e.chars().all(|c| c.is_ascii_alphanumeric()) && (last || known(e)))

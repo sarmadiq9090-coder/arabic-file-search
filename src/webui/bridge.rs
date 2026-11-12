@@ -1012,8 +1012,11 @@ impl Shown {
     /// Every matching line of row `id` (search inside documents only).
     pub fn matches(&self, id: u32) -> Option<Outbound> {
         let f = self.found.get(self.hits.get(id as usize)?)?;
-        let lines = f.lines.iter().map(|(n, l)| (*n, marked(l, &self.marked))).collect();
-        Some(Outbound::Matches { seq: self.seq, ver: self.ver, id, count: f.count, lines })
+        // Only the first results of a search keep their lines (`search::LINED_HITS`): read the others again.
+        let again = (f.lines.is_empty() && f.count > 0).then(|| search::document_matches(self.path(id)?, &self.marked, None)).flatten();
+        let (count, lines) = again.as_ref().map_or((f.count, &f.lines), |(c, l)| (*c, l));
+        let lines = lines.iter().map(|(n, l)| (*n, marked(l, &self.marked))).collect();
+        Some(Outbound::Matches { seq: self.seq, ver: self.ver, id, count, lines })
     }
 
     /// The message with the first rows (sent again when a search inside
@@ -1130,7 +1133,8 @@ pub fn search(index: Arc<Index>, p: Params, lang: Lang) -> (Shown, Outbound) {
 /// The query of a search inside documents, or `None` when it has nothing
 /// to look for in a text (only filters, or nothing typed).
 pub fn content_query(p: &Params) -> Option<Query> {
-    let q = parser(p)(&p.text);
+    let mut q = parser(p)(&p.text);
+    q.note_document_search();
     q.has_text_criteria().then_some(q)
 }
 

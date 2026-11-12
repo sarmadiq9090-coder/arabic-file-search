@@ -132,6 +132,7 @@ scoop install instafind
 | `حجم:فارغ` `صغير` `متوسط` `كبير` `ضخم` | أحجام جاهزة (`empty` `tiny` `small` `medium` `large` `huge` `gigantic`) |
 | `تاريخ:اليوم` `أمس` `هذا_الأسبوع` `هذا_الشهر` `هذه_السنة` | حسب تاريخ التعديل (`dm:today` `yesterday` `thisweek` `thismonth` `thisyear`) |
 | `dm:2024-05` أو `dm:>2024-01-01` أو `dm:7d` | شهر معيّن، أو بعد تاريخ، أو آخر 7 أيام (`3w` `2m` `1y`) |
+| `dm:>7d` أو `dm:<7d` أو `dm:30d..7d` | مع مدة: `>` و`>=` بعد تلك اللحظة (أحدث، مثل `dm:7d`)، و`<` و`<=` قبلها (أقدم من 7 أيام)، و`..` بين لحظتين |
 | `regex:^IMG_\d+` | تعبير منتظم على الاسم (أو النص داخل المستندات) |
 | `كلمة:عقد` أو `ww:عقد` | الكلمة كاملة: «عقد» لا «العقود» |
 | `"عقد إيجار"~5` | الكلمتان وبينهما 5 كلمات على الأكثر |
@@ -304,6 +305,7 @@ InstaFind's second includes starting the command-line tool and loading the index
 | `size:empty` `tiny` `small` `medium` `large` `huge` `gigantic` | size presets |
 | `dm:today` `yesterday` `thisweek` `thismonth` `thisyear` | by date modified |
 | `dm:2024-05`, `dm:>2024-01-01`, `dm:7d` | a month, after a date, the last 7 days (`3w` `2m` `1y`) |
+| `dm:>7d`, `dm:<7d`, `dm:30d..7d` | with a period: `>` and `>=` after that moment (newer, like `dm:7d`), `<` and `<=` before it (older than 7 days), `..` between two |
 | `regex:^IMG_\d+` | regular expression on the name (or document text) |
 | `ww:contract` | whole word only |
 | `"lease contract"~5` | both words within 5 words of each other |
