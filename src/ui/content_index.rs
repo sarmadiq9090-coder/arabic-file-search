@@ -33,6 +33,24 @@ pub(super) fn shared() -> Option<&'static ContentCache> {
                 )),
                 Err(e) => log(&format!("content index open failed: {e}")),
             }
+            if let Ok(c) = &cache {
+                // The last run died reading these: now skipped until they change.
+                for path in c.recovered() {
+                    log(&format!("content index: the last run stopped while reading {path}; skipped until the file changes"));
+                }
+                c.clear_markers_at_exit();
+                // Installing the Arabic OCR language pack (or a newer reader)
+                // makes scanned PDFs and images worth reading once more.
+                let signature = format!(
+                    "extractor {}; ocr {}",
+                    content_cache::EXTRACTOR_VERSION,
+                    crate::ocr::languages().join(",")
+                );
+                let dropped = c.revalidate(&signature);
+                if dropped > 0 {
+                    log(&format!("content index: {dropped} documents to read again ({signature})"));
+                }
+            }
             cache.ok()
         })
         .as_ref()
@@ -55,6 +73,17 @@ impl Drop for Finished {
     fn drop(&mut self) {
         self.0.finished.store(true, Ordering::Relaxed);
     }
+}
+
+/// Background OCR waits while this is true: the user typed or clicked in
+/// the last few seconds, or a document search is running.
+fn user_busy() -> bool {
+    use winapi::um::sysinfoapi::GetTickCount;
+    use winapi::um::winuser::{GetLastInputInfo, LASTINPUTINFO};
+    let mut info = LASTINPUTINFO { cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32, dwTime: 0 };
+    // SAFETY: a plain struct with its size set, as the API requires.
+    let typed = unsafe { GetLastInputInfo(&mut info) } != 0 && unsafe { GetTickCount() }.wrapping_sub(info.dwTime) < 3_000;
+    typed || shared().is_some_and(ContentCache::searching)
 }
 
 /// Lowest CPU priority, and low disk priority where Windows supports it.
@@ -81,11 +110,15 @@ impl App {
         let job = Arc::new(Warm::default());
         st.warm = Some(job.clone());
         let index = st.index.clone();
+        // Deleted documents are forgotten only after a warm-up over a
+        // complete index: not while it loads or a scan is rebuilding it.
+        let index_settled = st.loading.is_none() && st.scan.is_none() && !index.entries.is_empty();
         drop(st);
         crate::crash_log::spawn_named("content-warm", move || {
             let finished = Finished(job.clone());
             let (cancel, progress) = (&job.cancel, &job.progress);
             idle_priority();
+            crate::extract::set_ocr_pause(user_busy);
             // Only the documents are needed. Letting go of the index at once
             // matters: while another holder shares it, every change found by
             // the drive watcher has to copy the whole index.
@@ -107,6 +140,14 @@ impl App {
             let started = Instant::now();
             let threads = content_cache::warm_threads();
             content_cache::warm(&docs, cache, progress, cancel, threads, &idle_priority);
+            if index_settled && !cancel.load(Ordering::Relaxed) {
+                let indexed: std::collections::HashSet<&str> = docs.iter().map(|e| &*e.path).collect();
+                let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64);
+                let gone = cache.evict_missing(&indexed, now);
+                if gone > 0 {
+                    log(&format!("content index: forgot {gone} deleted documents"));
+                }
+            }
             let s = cache.stats();
             log(&format!(
                 "content index warm: {} of {} new documents in {} ms on {threads} threads{}; stored {} ({} with text), {} KB{}",

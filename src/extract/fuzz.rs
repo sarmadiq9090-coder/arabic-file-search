@@ -207,7 +207,7 @@ fn fuzz(ext: &str, sample: &[u8], seed: u64, flips: usize) {
     tally.report(ext);
 }
 
-fn zip_of(entries: &[(&str, &[u8])], stored: bool) -> Vec<u8> {
+pub(super) fn zip_of(entries: &[(&str, &[u8])], stored: bool) -> Vec<u8> {
     let mut zw = zip::ZipWriter::new(Cursor::new(Vec::new()));
     let opts = if stored {
         zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored)
@@ -251,14 +251,14 @@ const SLIDE_XML: &str = r#"<p:sld xmlns:p="p" xmlns:a="a"><p:cSld><p:spTree><p:s
 const ODT_XML: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="o" xmlns:text="t"><office:body><office:text><text:h>عنوان</text:h><text:p>نص<text:s text:c="99999999999999999999"/>x<text:tab/><text:line-break/></text:p><office:annotation><text:p>no</text:p></office:annotation></office:text></office:body></office:document-content>"#;
 const CONTAINER_XML: &str = r#"<?xml version="1.0"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/c%20o.opf"/></rootfiles></container>"#;
 const OPF_XML: &str = r#"<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="a" href="../OEBPS/t/ch1.xhtml#x" media-type="application/xhtml+xml"/><item id="b" href="/t/%D9%81.xhtml"/></manifest><spine><itemref idref="a"/><itemref idref="b"/><itemref idref="a"/></spine></package>"#;
-const XLSX_CT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>"#;
-const XLSX_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#;
-const XLSX_WB: &str = r#"<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="ورقة1" sheetId="1" r:id="rId1"/></sheets></workbook>"#;
-const XLSX_WBRELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#;
-const XLSX_SHEET: &str = r#"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:B2"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>مرحبا</t></is></c><c r="B1"><v>42</v></c></row><row r="2"><c r="XFD1048576" t="inlineStr"><is><t>تقرير</t></is></c></row></sheetData></worksheet>"#;
+pub(super) const XLSX_CT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>"#;
+pub(super) const XLSX_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#;
+pub(super) const XLSX_WB: &str = r#"<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="ورقة1" sheetId="1" r:id="rId1"/></sheets></workbook>"#;
+pub(super) const XLSX_WBRELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#;
+pub(super) const XLSX_SHEET: &str = r#"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:B2"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>مرحبا</t></is></c><c r="B1"><v>42</v></c></row><row r="2"><c r="XFD1048576" t="inlineStr"><is><t>تقرير</t></is></c></row></sheetData></worksheet>"#;
 const ODS_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:spreadsheet><table:table table:name="ورقة"><table:table-row><table:table-cell table:number-columns-repeated="3"><text:p>خلية</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
 
-fn utf16le(s: &str) -> Vec<u8> {
+pub(super) fn utf16le(s: &str) -> Vec<u8> {
     s.encode_utf16().flat_map(|u| u.to_le_bytes()).collect()
 }
 
@@ -284,7 +284,7 @@ fn eml_sample() -> Vec<u8> {
     .into_bytes()
 }
 
-fn cfb_of(streams: &[(&str, Vec<u8>)]) -> Vec<u8> {
+pub(super) fn cfb_of(streams: &[(&str, Vec<u8>)]) -> Vec<u8> {
     let mut comp = cfb::CompoundFile::create(Cursor::new(Vec::new())).unwrap();
     for (name, data) in streams {
         let mut s = comp.create_stream(name).unwrap();
@@ -312,7 +312,7 @@ fn msg_sample() -> Vec<u8> {
     ])
 }
 
-fn biff_record(kind: u16, data: &[u8]) -> Vec<u8> {
+pub(super) fn biff_record(kind: u16, data: &[u8]) -> Vec<u8> {
     let mut r = kind.to_le_bytes().to_vec();
     r.extend((data.len() as u16).to_le_bytes());
     r.extend(data);

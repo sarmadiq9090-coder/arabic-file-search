@@ -23,7 +23,7 @@ use encoding_rs::WINDOWS_1256;
 
 use super::{
     MAX_OUTPUT, MAX_TEXT_READ, OTHER_EXTS, TEXT_EXTS, bidi_fix, decode_bytes, docx_text, epub,
-    extract_doc_heuristic, mail, normalize_arabic_forms, odf_text, pptx_text, rtf_to_text,
+    extract_doc_heuristic, mail, normalize_arabic_forms, odf_text, pdf_text, pptx_text, rtf_to_text,
     spreadsheet_text, strip_html,
 };
 
@@ -178,7 +178,7 @@ impl<'a> Collector<'a> {
 
     /// Counts one more entry; false once the archive should not be read on.
     fn next_entry(&mut self) -> bool {
-        if self.seen >= self.lim.members || self.total >= self.lim.total || self.out_len >= MAX_OUTPUT {
+        if self.seen >= self.lim.members || self.total >= self.lim.total || self.out_len >= MAX_OUTPUT || super::budget::exceeded() {
             return false;
         }
         self.seen += 1;
@@ -198,11 +198,12 @@ impl<'a> Collector<'a> {
 
     /// Reads a member (bounded) and keeps its text.
     fn add(&mut self, name: String, ext: &str, r: impl Read) {
-        let room = self.lim.member_size.min(self.lim.total - self.total);
+        // The members, and the documents inside them, share one budget.
+        let room = super::budget::room(self.lim.member_size.min(self.lim.total - self.total));
         let mut data = Vec::new();
         let read = r.take(room + 1).read_to_end(&mut data);
         self.total += data.len() as u64;
-        if read.is_err() || data.len() as u64 > room {
+        if super::budget::inflate(data.len() as u64) || read.is_err() || data.len() as u64 > room {
             return;
         }
         if let Some(text) = member_text(ext, data) {
@@ -463,10 +464,7 @@ pub(super) fn member_text_inner(ext: &str, mut data: Vec<u8>) -> Option<String> 
         "pptx" => pptx_text(zip(data)?),
         "odt" | "odp" => odf_text(zip(data)?),
         "xlsx" | "xlsm" | "xlsb" | "xls" | "ods" => spreadsheet_text(Cursor::new(data), ext),
-        "pdf" => {
-            let text = pdf_extract::extract_text_from_mem(&data).ok()?;
-            Some(bidi_fix::fix_visual_order(text))
-        }
+        "pdf" => Some(bidi_fix::fix_visual_order(pdf_text(&data).ok()??)),
         "rtf" => Some(rtf_to_text(&data)),
         "doc" => Some(extract_doc_heuristic(&data)),
         "eml" => mail::eml_to_text(&data),

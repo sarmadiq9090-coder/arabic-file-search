@@ -16,6 +16,19 @@
 //!
 //! Reads take a shared lock only, so the parallel content search reads many
 //! documents at once; writes go through one mutex.
+//!
+//! **Crash-loop guard.** A parser bug that ends the process (a stack overflow
+//! or a failed allocation, which no `catch_unwind` stops) would otherwise
+//! hit the same file again at every start, since the warm-up begins with the
+//! newest documents. So while a file is being extracted, its path, size and
+//! mtime sit in a small `inflight-N.bin` file of this folder (one per
+//! extraction running at once, rewritten in place, no fsync: a dying process
+//! still leaves its writes to the OS). Opening the store finds a marker left
+//! behind, remembers that file as "no text" until it changes, and reports it
+//! (`recovered`). A normal exit clears the markers first
+//! (`clear_markers_at_exit`); a kill from outside during an extraction
+//! (Task Manager, the updater, a logoff) also leaves one, and that one file
+//! is then skipped until it changes.
 
 // Only the Windows UI and the tests use this module.
 
@@ -37,7 +50,7 @@ const VERSION: u32 = 1;
 const MAGIC: [u8; 8] = *b"BHTHTXT\0";
 /// Magic, version (u32) and store id (u64).
 const HEADER_LEN: u64 = 20;
-/// Texts longer than this are not stored (they are re-extracted each time).
+/// Texts longer than this are stored cut to this length (on a character).
 /// The extractors stop at about 64 MB of output; this leaves a little slack.
 pub const MAX_TEXT: usize = 80 * 1024 * 1024;
 /// Default cap on the size of `content.dat`.
@@ -45,6 +58,41 @@ pub const DEFAULT_MAX_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 
 const DAT: &str = "content.dat";
 const IDX: &str = "content.idx";
+/// What the extractors could read when the store was filled (see
+/// [`ContentCache::revalidate`]).
+const SIGNATURE: &str = "extractor.txt";
+/// Bumped when an extractor learns to read files it gave no text for
+/// before: their "no text" entries are then dropped once.
+#[cfg_attr(not(windows), allow(dead_code))] // read by the Windows UI
+pub const EXTRACTOR_VERSION: u32 = 2;
+/// When the store last forgot deleted files (unix seconds), see
+/// [`ContentCache::evict_missing`].
+const EVICTED: &str = "evicted.txt";
+/// Deleted files are forgotten at most this often (seconds).
+const EVICT_EVERY: i64 = 24 * 3600;
+/// One pass forgets at most this many entries, or a quarter of the store
+/// if that is more: a glitch can never empty it at once.
+const EVICT_MIN_BATCH: usize = 1000;
+
+/// The root a path lives under, as the OS reaches it: `C:\`, the share of
+/// `\\server\share\…`, or `/`. `None` when there is none to tell.
+fn root_of(path: &str) -> Option<&str> {
+    let b = path.as_bytes();
+    if b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && matches!(b[2], b'\\' | b'/') {
+        return Some(&path[..3]);
+    }
+    if let Some(rest) = path.strip_prefix("\\\\") {
+        // \\server\share\ (the share itself must be reachable).
+        let server = rest.find('\\')?;
+        let share = rest[server + 1..].find('\\').map_or(rest.len(), |s| server + 1 + s);
+        return path.get(..2 + share + 1).or(Some(path));
+    }
+    path.starts_with('/').then_some("/")
+}
+
+/// `Meta::hash` of a "no text" entry that marks a file a run died reading
+/// (unused otherwise for "no text"): kept whatever the signature says.
+const POISONED: u64 = u64::from_le_bytes(*b"POISONED");
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 enum Kind {
@@ -122,6 +170,152 @@ pub struct ContentCache {
     reader: RwLock<Option<File>>,
     /// Content searches running now; the warm-up pauses meanwhile.
     searching: AtomicUsize,
+    /// Markers of the extractions running now (see the module docs).
+    inflight: InFlight,
+    /// Files a previous run died extracting, now stored as "no text".
+    recovered: Vec<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Crash-loop guard: which files are being extracted right now
+// ---------------------------------------------------------------------------
+
+const INFLIGHT_PREFIX: &str = "inflight-";
+const INFLIGHT_MAGIC: [u8; 4] = *b"BHIF";
+/// Markers longer than this are not ours (paths are at most 32k UTF-16 units).
+const MAX_MARKER: u64 = 128 * 1024;
+
+/// Set when the program exits normally: no new markers from then on.
+static EXITING: AtomicBool = AtomicBool::new(false);
+
+#[cfg(unix)]
+fn write_at(f: &File, buf: &[u8], offset: u64) -> io::Result<()> {
+    std::os::unix::fs::FileExt::write_all_at(f, buf, offset)
+}
+
+#[cfg(windows)]
+fn write_at(f: &File, mut buf: &[u8], mut offset: u64) -> io::Result<()> {
+    use std::os::windows::fs::FileExt;
+    while !buf.is_empty() {
+        match f.seek_write(buf, offset) {
+            Ok(0) => return Err(io::ErrorKind::WriteZero.into()),
+            Ok(n) => {
+                buf = &buf[n..];
+                offset += n as u64;
+            }
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
+}
+
+/// A marker: magic, size, mtime, path length, path (UTF-8), then a checksum
+/// of all that, so a write cut short is never read as a marker.
+fn encode_marker(path: &str, size: u64, mtime: i64) -> Vec<u8> {
+    let mut m = INFLIGHT_MAGIC.to_vec();
+    m.extend(size.to_le_bytes());
+    m.extend(mtime.to_le_bytes());
+    m.extend((path.len() as u32).to_le_bytes());
+    m.extend(path.as_bytes());
+    m.extend(fnv(&m).to_le_bytes());
+    m
+}
+
+fn decode_marker(bytes: &[u8]) -> Option<(String, u64, i64)> {
+    let rest = bytes.strip_prefix(&INFLIGHT_MAGIC)?;
+    let size = u64::from_le_bytes(rest.get(..8)?.try_into().ok()?);
+    let mtime = i64::from_le_bytes(rest.get(8..16)?.try_into().ok()?);
+    let len = u32::from_le_bytes(rest.get(16..20)?.try_into().ok()?) as usize;
+    let path = std::str::from_utf8(rest.get(20..20usize.checked_add(len)?)?).ok()?;
+    let end = 4 + 20 + len;
+    (bytes.get(end..end + 8)? == fnv(&bytes[..end]).to_le_bytes()).then(|| (path.to_owned(), size, mtime))
+}
+
+/// The marker files of the store in `dir`.
+fn marker_files(dir: &Path) -> Vec<PathBuf> {
+    let Ok(rd) = fs::read_dir(dir) else { return Vec::new() };
+    rd.flatten()
+        .map(|e| e.path())
+        .filter(|p| p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with(INFLIGHT_PREFIX) && n.ends_with(".bin")))
+        .collect()
+}
+
+/// The marker slots of one store: the open files not in use right now.
+struct InFlight {
+    dir: PathBuf,
+    free: Mutex<Vec<File>>,
+    /// Slot files created so far (the next one is `inflight-{created}.bin`).
+    created: AtomicUsize,
+}
+
+/// One extraction's marker, cleared when dropped.
+pub struct Marker<'a> {
+    owner: &'a InFlight,
+    file: Option<File>,
+}
+
+impl InFlight {
+    fn new(dir: &Path) -> InFlight {
+        InFlight { dir: dir.to_path_buf(), free: Mutex::new(Vec::new()), created: AtomicUsize::new(0) }
+    }
+
+    /// Records that `path` (as `size`, `mtime`) is being extracted, until the
+    /// returned marker is dropped. `None` when it could not be written (the
+    /// extraction goes ahead unguarded) or the program is exiting.
+    fn begin(&self, path: &str, size: u64, mtime: i64) -> Option<Marker<'_>> {
+        if EXITING.load(Ordering::Relaxed) {
+            return None;
+        }
+        let reused = self.free.lock().unwrap_or_else(|e| e.into_inner()).pop();
+        let file = match reused {
+            Some(f) => f,
+            None => {
+                let n = self.created.fetch_add(1, Ordering::Relaxed);
+                let p = self.dir.join(format!("{INFLIGHT_PREFIX}{n}.bin"));
+                OpenOptions::new().write(true).create(true).truncate(true).open(p).ok()?
+            }
+        };
+        let marker = Marker { owner: self, file: Some(file) };
+        // Written in place: a longer marker before it may still follow, but
+        // the checksum ends this one.
+        write_at(marker.file.as_ref()?, &encode_marker(path, size, mtime), 0).ok()?;
+        Some(marker)
+    }
+}
+
+impl Drop for Marker<'_> {
+    fn drop(&mut self) {
+        if let Some(f) = self.file.take() {
+            // A cleared magic is no marker. Not returned to the pool when
+            // even that failed: a new slot is safer than a stale marker.
+            if write_at(&f, &[0; 4], 0).is_ok() {
+                self.owner.free.lock().unwrap_or_else(|e| e.into_inner()).push(f);
+            }
+        }
+    }
+}
+
+/// The store whose markers [`clear_markers_now`] clears at exit.
+static EXIT_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Clears the markers of the store registered with
+/// [`ContentCache::clear_markers_at_exit`]: an extraction cut off by a
+/// normal exit did not crash. Takes no lock, so it is safe however the
+/// other threads stand at exit.
+extern "C" fn clear_markers_now() {
+    EXITING.store(true, Ordering::Relaxed);
+    if let Some(dir) = EXIT_DIR.get() {
+        clear_markers_in(dir);
+    }
+}
+
+fn clear_markers_in(dir: &Path) {
+    for p in marker_files(dir) {
+        if let Ok(f) = OpenOptions::new().write(true).open(&p) {
+            let _ = write_at(&f, &[0; 4], 0);
+        }
+    }
 }
 
 /// Marks a content search as running until dropped.
@@ -170,6 +364,13 @@ fn read_at(f: &File, mut buf: &mut [u8], mut offset: u64) -> io::Result<()> {
         }
     }
     Ok(())
+}
+
+/// At most `cap` bytes of `r`.
+fn read_capped_all(r: impl Read, cap: u64) -> io::Result<Vec<u8>> {
+    let mut v = Vec::new();
+    r.take(cap).read_to_end(&mut v)?;
+    Ok(v)
 }
 
 /// The idx payload, or `None` when the checksum or the encoding is wrong.
@@ -222,7 +423,9 @@ fn worth_storing(path: &Path, before: (u64, i64), has_text: bool, now: i64) -> b
 /// trusted (see `worth_storing`). True when it was stored.
 fn extract_and_store(cache: &ContentCache, path: &str, before: (u64, i64)) -> (Option<String>, bool) {
     let p = Path::new(path);
+    let marker = cache.inflight.begin(path, before.0, before.1);
     let text = extract::extract_text(p);
+    drop(marker);
     let store = worth_storing(p, before, text.is_some(), now_secs());
     if store {
         cache.put(path, before.0, before.1, text.as_deref());
@@ -290,13 +493,169 @@ impl ContentCache {
             Some(loaded) => loaded,
             None => Self::create_fresh(dir)?,
         };
-        Ok(ContentCache {
+        let mut cache = ContentCache {
             dir: dir.to_path_buf(),
             max_bytes,
             inner: Mutex::new(inner),
             reader: RwLock::new(Some(reader)),
             searching: AtomicUsize::new(0),
-        })
+            inflight: InFlight::new(dir),
+            recovered: Vec::new(),
+        };
+        cache.recover();
+        Ok(cache)
+    }
+
+    /// Turns the markers a previous run left behind into "no text" entries
+    /// (for the file as it was then: once it changes it is read again), then
+    /// removes them.
+    fn recover(&mut self) {
+        let files = marker_files(&self.dir);
+        for p in &files {
+            let bytes = File::open(p).and_then(|f| read_capped_all(f, MAX_MARKER)).unwrap_or_default();
+            if let Some((path, size, mtime)) = decode_marker(&bytes) {
+                if stamp(Path::new(&path)) == Some((size, mtime)) {
+                    self.put(&path, size, mtime, None);
+                    if let Some(m) = self.lock().map.get_mut(path.as_str()) {
+                        m.hash = POISONED;
+                    }
+                }
+                self.recovered.push(path);
+            }
+        }
+        if !self.recovered.is_empty() && self.flush().is_err() {
+            return; // keep the markers: the next start tries again
+        }
+        for p in files {
+            let _ = fs::remove_file(p);
+        }
+    }
+
+    /// Drops what may read differently now that the extractors changed:
+    /// when `signature` (the extractor version and the OCR languages, say)
+    /// is not the one the store was filled with, every "no text" entry
+    /// (scanned PDFs found empty before the Arabic OCR language pack was
+    /// installed, files an older version could not read) and every image
+    /// entry is forgotten, so each is read once more. Files a run died
+    /// reading stay skipped. Returns how many entries were dropped.
+    pub fn revalidate(&self, signature: &str) -> usize {
+        let file = self.dir.join(SIGNATURE);
+        if fs::read_to_string(&file).is_ok_and(|s| s == signature) {
+            return 0;
+        }
+        let dropped = {
+            let mut inner = self.lock();
+            let before = inner.map.len();
+            let mut garbage = 0;
+            inner.map.retain(|path, m| {
+                let image = Path::new(&**path)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|e| IMAGE_EXTS.contains(&e.to_ascii_lowercase().as_str()));
+                let keep = match m.kind {
+                    Kind::NoText => m.hash == POISONED,
+                    Kind::Text => !image,
+                };
+                if !keep && m.kind == Kind::Text {
+                    garbage += u64::from(m.len);
+                }
+                keep
+            });
+            inner.garbage += garbage;
+            let dropped = before - inner.map.len();
+            inner.dirty |= dropped > 0;
+            dropped
+        };
+        // The new signature only once the store no longer has the old entries.
+        if self.flush().is_ok() {
+            let _ = fs::write(&file, signature);
+        }
+        dropped
+    }
+
+    /// Forgets the documents that are gone: entries for paths that are not
+    /// in `indexed` (the documents of a complete, current file index) and
+    /// that the disk confirms do not exist, under a root (drive, share) that
+    /// is there right now; then drops their text from `content.dat` when
+    /// any was stored. Their text would otherwise stay on disk for good
+    /// (a privacy issue), and at the size cap no new document would be
+    /// stored. Guarded against a transient glitch wiping the store: nothing
+    /// happens when `indexed` is empty or a pass ran in the last day, an
+    /// unplugged drive or an offline share keeps its entries, and one pass
+    /// forgets at most a quarter of the store (at least 1000). `now`: unix
+    /// seconds. Returns how many entries were forgotten.
+    pub fn evict_missing(&self, indexed: &std::collections::HashSet<&str>, now: i64) -> usize {
+        if indexed.is_empty() {
+            return 0;
+        }
+        let stamp_file = self.dir.join(EVICTED);
+        let last = fs::read_to_string(&stamp_file).ok().and_then(|s| s.trim().parse::<i64>().ok());
+        if last.is_some_and(|t| now >= t && now - t < EVICT_EVERY) {
+            return 0;
+        }
+        // Who is not in the index, without holding the lock while the disk
+        // is asked.
+        let candidates: Vec<Box<str>> =
+            self.lock().map.keys().filter(|p| !indexed.contains(&***p)).cloned().collect();
+        let most = (self.documents() / 4).max(EVICT_MIN_BATCH);
+        let mut roots: HashMap<String, bool> = HashMap::new();
+        let mut gone = Vec::new();
+        for path in candidates {
+            if gone.len() >= most {
+                break;
+            }
+            let Some(root) = root_of(&path) else { continue };
+            let reachable = *roots.entry(root.to_owned()).or_insert_with(|| fs::metadata(root).is_ok_and(|m| m.is_dir()));
+            // Only "not found" counts: denied, busy or offline keeps it.
+            if reachable && fs::symlink_metadata(&*path).is_err_and(|e| e.kind() == io::ErrorKind::NotFound) {
+                gone.push(path);
+            }
+        }
+        let mut texts_gone = false;
+        {
+            let mut inner = self.lock();
+            for path in &gone {
+                if let Some(old) = inner.map.remove(path)
+                    && old.kind == Kind::Text
+                {
+                    inner.garbage += u64::from(old.len);
+                    texts_gone = true;
+                }
+            }
+            inner.full = false;
+            inner.dirty |= !gone.is_empty();
+        }
+        if self.flush().is_ok() {
+            let _ = fs::write(&stamp_file, now.to_string());
+        }
+        // The text of deleted documents must not stay on disk: compacted
+        // now (at most once a day), not only once garbage is half the file.
+        if texts_gone {
+            let _ = self.compact_with(true);
+        }
+        gone.len()
+    }
+
+    /// Files a previous run died extracting (see the module docs): each is
+    /// now stored as "no text" until it changes. For the log.
+    pub fn recovered(&self) -> &[String] {
+        &self.recovered
+    }
+
+    /// Clears this store's markers when the program exits normally (C
+    /// `atexit`, which runs on `exit` and on return from `main`, not on a
+    /// kill from outside). Call once, for the app's own store.
+    #[cfg_attr(not(windows), allow(dead_code))] // only the Windows UI calls it
+    pub fn clear_markers_at_exit(&self) {
+        unsafe extern "C" {
+            fn atexit(f: extern "C" fn()) -> std::ffi::c_int;
+        }
+        if EXIT_DIR.set(self.dir.clone()).is_ok() {
+            // SAFETY: registers a plain function with no arguments.
+            unsafe {
+                atexit(clear_markers_now);
+            }
+        }
     }
 
     fn load(dir: &Path) -> Option<(Inner, File)> {
@@ -384,12 +743,16 @@ impl ContentCache {
     }
 
     /// Stores the extraction result of `path` (`None`: no text or failed).
-    /// Texts over [`MAX_TEXT`] are skipped, and once the store reaches its
+    /// Texts over [`MAX_TEXT`] are cut to it, and once the store reaches its
     /// size cap no new texts are added.
     pub fn put(&self, path: &str, size: u64, mtime: i64, text: Option<&str>) {
         let rec = match text {
-            Some(t) if t.len() > MAX_TEXT => return,
-            Some(t) => Some((lz4_flex::block::compress(t.as_bytes()), t.len() as u32)),
+            // The beginning only: not storing it meant extracting it again
+            // at every start and every search.
+            Some(t) => {
+                let t = &t[..t.floor_char_boundary(MAX_TEXT)];
+                Some((lz4_flex::block::compress(t.as_bytes()), t.len() as u32))
+            }
             None => None,
         };
         let mut inner = self.lock();
@@ -429,10 +792,15 @@ impl ContentCache {
     /// Rewrites `content.dat` without unused records when they are more than
     /// half of it. Returns whether it did.
     pub fn compact(&self) -> io::Result<bool> {
+        self.compact_with(false)
+    }
+
+    /// [`compact`](Self::compact); with `any`, whenever there is garbage.
+    fn compact_with(&self, any: bool) -> io::Result<bool> {
         let mut reader = self.reader.write().unwrap_or_else(|e| e.into_inner());
         let mut inner = self.lock();
         let live = inner.dat_len - HEADER_LEN - inner.garbage;
-        if inner.garbage == 0 || inner.garbage <= live {
+        if inner.garbage == 0 || (!any && inner.garbage <= live) {
             return Ok(false);
         }
         let Some(src) = reader.as_ref() else { return Ok(false) };
@@ -631,6 +999,8 @@ pub fn warm(
     let last_save = Mutex::new((Instant::now(), 0));
     let big = Mutex::new(());
     let work = || {
+        // Its OCR is paced (one at a time, not while the user is busy).
+        extract::set_background(true);
         loop {
             while cache.searching() && !cancel.load(Ordering::Relaxed) {
                 std::thread::sleep(Duration::from_millis(100));
@@ -720,9 +1090,12 @@ mod tests {
         let s = c.stats();
         assert_eq!((s.documents, s.texts, s.no_text, s.full), (2, 1, 1, false));
         assert!(s.garbage > 0 && s.bytes > HEADER_LEN + s.garbage);
-        // Too long a text is not stored at all.
-        c.put("C:\\big.txt", 1, 1, Some(&"x".repeat(MAX_TEXT + 1)));
-        assert_eq!(c.get("C:\\big.txt", 1, 1), None);
+        // Too long a text is stored cut at the limit (on a character),
+        // not left out to be extracted again every time.
+        let long = format!("{}ب", "x".repeat(MAX_TEXT - 1));
+        c.put("C:\\big.txt", 1, 1, Some(&long));
+        assert!(c.is_fresh("C:\\big.txt", 1, 1));
+        assert_eq!(c.get("C:\\big.txt", 1, 1).unwrap().unwrap().len(), MAX_TEXT - 1);
         fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -1432,6 +1805,198 @@ mod tests {
         drop(c);
         let c = ContentCache::open(&dir).unwrap();
         assert_eq!(c.get("c", 1, 1), Some(Some("ج".into())));
+        drop(c);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn markers_round_trip_and_reject_damage() {
+        let m = encode_marker("C:\\تقارير\\ملف.pdf", 1234, -5);
+        assert_eq!(decode_marker(&m), Some(("C:\\تقارير\\ملف.pdf".into(), 1234, -5)));
+        // A longer old marker after it changes nothing; a cut or a flip does.
+        let mut longer = m.clone();
+        longer.extend(b"rest of an older, longer marker");
+        assert!(decode_marker(&longer).is_some());
+        assert_eq!(decode_marker(&m[..m.len() - 1]), None);
+        let mut flipped = m.clone();
+        flipped[10] ^= 1;
+        assert_eq!(decode_marker(&flipped), None);
+        assert_eq!(decode_marker(&[0, 0, 0, 0]), None);
+        assert_eq!(decode_marker(&[]), None);
+        let mut huge = INFLIGHT_MAGIC.to_vec();
+        huge.extend([0u8; 16]);
+        huge.extend(u32::MAX.to_le_bytes());
+        assert_eq!(decode_marker(&huge), None);
+    }
+
+    #[test]
+    fn a_file_the_last_run_died_in_is_skipped_until_it_changes() {
+        let dir = temp_dir("inflight");
+        let doc = dir.with_extension("doc.txt");
+        fs::write(&doc, "نص").unwrap();
+        let st = stamp(&doc).unwrap();
+        let path = doc.to_str().unwrap();
+        {
+            let c = ContentCache::open(&dir).unwrap();
+            // A finished extraction leaves no marker; slots are reused.
+            drop(c.inflight.begin(path, st.0, st.1).unwrap());
+            drop(c.inflight.begin("other", 1, 1).unwrap());
+            assert_eq!(marker_files(&dir).len(), 1);
+            // One that never finishes (the process dies inside it).
+            std::mem::forget(c.inflight.begin(path, st.0, st.1).unwrap());
+            // Two at once use two slots.
+            let _a = c.inflight.begin("a", 1, 1).unwrap();
+            assert_eq!(marker_files(&dir).len(), 2);
+            // Simulates the death: the second marker stays as it is.
+            std::mem::forget(_a);
+        }
+        let c = ContentCache::open(&dir).unwrap();
+        // "a" does not exist: reported, nothing stored for it.
+        assert_eq!(c.recovered().len(), 2);
+        assert!(c.recovered().iter().any(|p| p == path));
+        assert_eq!(c.get(path, st.0, st.1), Some(None));
+        assert_eq!(text_of(Some(&c), path), (None, true));
+        assert!(marker_files(&dir).is_empty());
+        drop(c);
+        // Reported once only; and the file is read again once it changes.
+        let c = ContentCache::open(&dir).unwrap();
+        assert!(c.recovered().is_empty());
+        assert_eq!(c.get(path, st.0, st.1), Some(None));
+        assert_eq!(c.get(path, st.0 + 1, st.1), None);
+        fs::remove_dir_all(&dir).unwrap();
+        fs::remove_file(&doc).unwrap();
+    }
+
+    #[test]
+    fn a_marker_for_a_changed_file_poisons_nothing() {
+        let dir = temp_dir("inflight_changed");
+        let doc = dir.with_extension("changed.txt");
+        fs::write(&doc, "قديم").unwrap();
+        let st = stamp(&doc).unwrap();
+        {
+            let c = ContentCache::open(&dir).unwrap();
+            std::mem::forget(c.inflight.begin(doc.to_str().unwrap(), st.0, st.1).unwrap());
+        }
+        fs::write(&doc, "نص أطول من القديم").unwrap();
+        let c = ContentCache::open(&dir).unwrap();
+        assert_eq!(c.recovered().len(), 1);
+        assert_eq!(c.stats().documents, 0);
+        fs::remove_dir_all(&dir).unwrap();
+        fs::remove_file(&doc).unwrap();
+    }
+
+    #[test]
+    fn markers_cleared_at_a_normal_exit() {
+        let dir = temp_dir("inflight_exit");
+        let c = ContentCache::open(&dir).unwrap();
+        std::mem::forget(c.inflight.begin("cut off by the exit", 1, 1).unwrap());
+        // What the atexit handler does, for this store.
+        clear_markers_in(&dir);
+        drop(c);
+        let c = ContentCache::open(&dir).unwrap();
+        assert!(c.recovered().is_empty());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn marker_overhead() {
+        // Two small in-place writes per document, no fsync.
+        let dir = temp_dir("inflight_cost");
+        let c = ContentCache::open(&dir).unwrap();
+        let path = "C:\\Users\\someone\\Documents\\تقارير ٢٠٢٦\\تقرير المبيعات السنوي.pdf";
+        let n = 20_000;
+        let t = Instant::now();
+        for i in 0..n {
+            drop(c.inflight.begin(path, i, 1));
+        }
+        let per = t.elapsed() / n as u32;
+        eprintln!("marker set + clear: {} ns per document", per.as_nanos());
+        assert!(per < Duration::from_millis(1), "{per:?}");
+        drop(c);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn new_extractor_signature_rereads_no_text_and_images_once() {
+        // Entries were keyed on size and mtime only: a scanned PDF found
+        // empty before the Arabic OCR language pack was installed stayed
+        // "no text" until the file changed.
+        let dir = temp_dir("signature");
+        let c = ContentCache::open(&dir).unwrap();
+        assert_eq!(c.revalidate("v2 ocr=en-US"), 0, "an empty store has nothing to drop");
+        c.put("C:\\scan.pdf", 1, 1, None);
+        c.put("C:\\photo.JPG", 2, 2, Some("صورة"));
+        c.put("C:\\report.docx", 3, 3, Some(AR));
+        c.put("C:\\poisoned.pdf", 4, 4, None);
+        c.lock().map.get_mut("C:\\poisoned.pdf").unwrap().hash = POISONED;
+        assert_eq!(c.revalidate("v2 ocr=en-US"), 0, "same signature: nothing changes");
+        assert_eq!(c.revalidate("v2 ocr=ar-SA,en-US"), 2);
+        assert_eq!(c.get("C:\\scan.pdf", 1, 1), None);
+        assert_eq!(c.get("C:\\photo.JPG", 2, 2), None);
+        assert_eq!(c.get("C:\\report.docx", 3, 3), Some(Some(AR.into())));
+        assert_eq!(c.get("C:\\poisoned.pdf", 4, 4), Some(None));
+        // Read again and stored: kept from now on, also after a reopen.
+        c.put("C:\\scan.pdf", 1, 1, Some("نص من OCR"));
+        c.flush().unwrap();
+        drop(c);
+        let c = ContentCache::open(&dir).unwrap();
+        assert_eq!(c.revalidate("v2 ocr=ar-SA,en-US"), 0);
+        assert_eq!(c.get("C:\\scan.pdf", 1, 1).unwrap().unwrap(), "نص من OCR");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn roots_of_paths() {
+        assert_eq!(root_of("C:\\Users\\a.pdf"), Some("C:\\"));
+        assert_eq!(root_of("d:/x.txt"), Some("d:/"));
+        assert_eq!(root_of("\\\\server\\share\\dir\\a.pdf"), Some("\\\\server\\share\\"));
+        assert_eq!(root_of("\\\\server\\share"), Some("\\\\server\\share"));
+        assert_eq!(root_of("/home/a.txt"), Some("/"));
+        assert_eq!(root_of("relative.txt"), None);
+    }
+
+    #[test]
+    fn deleted_documents_are_forgotten_with_guards() {
+        // Nothing ever removed an entry: the text of deleted files stayed
+        // in content.dat for good, and at 4 GB no new document was stored.
+        let dir = temp_dir("evict");
+        fs::create_dir_all(&dir).unwrap();
+        let file = |n: &str| dir.join(n).to_str().unwrap().to_owned();
+        let (kept, deleted, unindexed) = (file("kept.txt"), file("deleted.txt"), file("exists-not-indexed.txt"));
+        for p in [&kept, &deleted, &unindexed] {
+            fs::write(p, "x").unwrap();
+        }
+        let store = dir.join("store");
+        let c = ContentCache::open(&store).unwrap();
+        for p in [&kept, &deleted, &unindexed] {
+            c.put(p, 1, 1, Some(&AR.repeat(100)));
+        }
+        // Not reachable now: an unplugged drive, an offline share.
+        c.put("Q:\\usb\\report.pdf", 1, 1, Some(AR));
+        c.put("\\\\offline-server\\share\\a.docx", 1, 1, None);
+        fs::remove_file(&deleted).unwrap();
+        let indexed: std::collections::HashSet<&str> = [kept.as_str()].into();
+        let now = 1_900_000_000;
+        // An empty index (still loading, or a failed scan) forgets nothing.
+        assert_eq!(c.evict_missing(&Default::default(), now), 0);
+        assert_eq!(c.evict_missing(&indexed, now), 1);
+        assert_eq!(c.get(&deleted, 1, 1), None);
+        assert!(c.get(&kept, 1, 1).is_some() && c.get(&unindexed, 1, 1).is_some());
+        assert!(c.get("Q:\\usb\\report.pdf", 1, 1).is_some());
+        assert!(c.get("\\\\offline-server\\share\\a.docx", 1, 1).is_some());
+        // Its text is gone from content.dat (compacted at once).
+        assert_eq!(c.stats().garbage, 0);
+        // At most once a day.
+        fs::remove_file(&unindexed).unwrap();
+        assert_eq!(c.evict_missing(&indexed, now + 3600), 0);
+        assert_eq!(c.evict_missing(&indexed, now + EVICT_EVERY), 1);
+        drop(c);
+        // And a quarter of the store at most per pass (at least 1000).
+        let c = ContentCache::open(&store).unwrap();
+        for i in 0..3000 {
+            c.put(&file(&format!("gone{i}.txt")), 1, 1, None);
+        }
+        assert_eq!(c.evict_missing(&indexed, now + 3 * EVICT_EVERY), 1000);
         drop(c);
         fs::remove_dir_all(&dir).unwrap();
     }

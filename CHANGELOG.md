@@ -2,6 +2,22 @@
 
 # سجل التغييرات
 
+## غير منشور (Unreleased)
+
+### أمان
+- **ملف PDF مصمَّم بحلقة لا تنتهي** (نموذج يرسم نفسه، أو صفحة هي أصل نفسها) كان يُغلق البرنامج بعد ثوانٍ من كل تشغيل أثناء فهرسة المحتوى؛ صار يُفحص قبل قراءته ويُتخطّى. / **PDF loops** (a form drawing itself, a page tree that is its own parent) no longer crash the app: such files are checked first and skipped.
+- **ملف Excel (.xlsx) صغير يعلن عن عدد هائل من النصوص** كان يُغلق البرنامج لنفاد الذاكرة؛ صار يُرفض. / A tiny **.xlsx declaring trillions of shared strings** no longer aborts the app.
+- **ملف Excel قديم (.xls) يكرّر نصاً طويلاً في آلاف الخلايا** كان يستهلك جيجابايتات من الذاكرة؛ صار يُقرأ بالطريقة الآمنة الاحتياطية. / An **.xls repeating one long shared string in many cells** (a 2 MB file took ~9 GB) now falls back to the safe raw reader.
+- **حماية من تكرار الانهيار**: إذا أُغلق البرنامج فجأة أثناء قراءة ملف، يتخطّى ذلك الملف في التشغيل التالي (ويذكره في السجل) إلى أن يتغيّر، بدل أن ينهار عند كل تشغيل. / **Crash-loop guard:** a file the app died reading is skipped at the next start (and logged) until it changes.
+- **ملفات مصمَّمة تُبطئ الفهرسة لساعات** (RTF بمئات آلاف الخطوط، رسائل eml بفواصل أو عناوين مشوّهة، PDF بنماذج متشابكة أو آلاف الصور) صارت تُقرأ بسرعة، ولكل ملف حدّ زمني: ما يتجاوزه يُحفظ «بلا نص» ولا يُعاد في كل تشغيل. / **Files crafted to take hours** (huge RTF font tables, eml boundaries and subjects, PDF form webs, thousands of images) are now fast, and every file has a time budget; one that runs over is stored as having no text.
+- **مستند داخل أرشيف أو بمئات الأجزاء المضغوطة** لم يعد يفكّ مئات الميجابايتات: لكل ملف حدّ واحد لما يُفكّ ضغطه، يشمل ما بداخله. / **Nested inflation:** one decompression budget per file, members and their parts included; at most 64 header/footer parts per docx.
+
+### إصلاحات
+- **بعد تثبيت حزمة اللغة العربية لقراءة الصور** تُعاد قراءة ملفات PDF الممسوحة والصور التي لم يُعثر فيها على نص، مرة واحدة. / After the **Arabic OCR language pack** is installed, scanned PDFs and images found empty are read once more.
+- **قراءة الصور (OCR) في الخلفية** صارت صورة واحدة في كل مرة، وتتوقف أثناء الكتابة أو البحث، فلا تُثقل الجهاز. / **Background OCR** runs one image at a time and waits while you type or search.
+- **فهرس المحتوى ينسى الملفات المحذوفة** (مرة يومياً على الأكثر، ويُحذف نصها من القرص)، مع حمايات: لا شيء أثناء تحميل الفهرس أو إعادة بنائه، ولا لقرص مفصول أو مجلد شبكة غير متصل، وربع الفهرس على الأكثر في كل مرة. / The **content index forgets deleted files** (at most daily, their text removed from disk), never while the index loads or rescans, never for an unplugged drive or offline share, at most a quarter per pass.
+- **النصوص الأطول من 80 ميجابايت** تُحفظ مقصوصة بدل إعادة قراءتها في كل تشغيل وكل بحث، وملف .xls ليس جدولاً حقيقياً (صفحة ويب محفوظة بهذا الامتداد) لم يعد يُخرج نصه مرتين. / **Texts over 80 MB** are stored cut to the limit instead of being re-read every time; a non-workbook **.xls** no longer yields its text twice.
+
 ## 0.10.0 — 2026-11-11
 
 ### الرخصة
