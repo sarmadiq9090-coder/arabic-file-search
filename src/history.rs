@@ -60,6 +60,16 @@ pub struct Pin {
     /// A program (opened with `ShellExecute`) rather than a file or folder.
     pub app: bool,
     pub dir: bool,
+    /// A program's arguments: "printers" for `control printers` (Devices and
+    /// Printers). Missing in older pins, which had none.
+    pub args: String,
+}
+
+impl Pin {
+    /// Whether this pin is `target` started with `args` (case ignored).
+    pub fn is(&self, target: &str, args: &str) -> bool {
+        self.target.eq_ignore_ascii_case(target) && self.args.trim().eq_ignore_ascii_case(args.trim())
+    }
 }
 
 /// A usize written by any build: a 64-bit value read by the 32-bit build
@@ -313,8 +323,27 @@ impl History {
         out
     }
 
-    pub fn is_pinned(&self, target: &str) -> bool {
-        self.pinned.iter().any(|p| p.target.eq_ignore_ascii_case(target))
+    /// Forgets what was searched for and opened: the recent searches, the
+    /// opened files (the quick search's "Recent" list), the quick-search
+    /// launches (web searches among them hold the typed text) and what was
+    /// picked after which letters. Saved searches and pins are kept: the
+    /// user made those on purpose.
+    pub fn clear_activity(&mut self) {
+        self.recent.clear();
+        self.opens.clear();
+        self.launches.clear();
+        self.picks.clear();
+    }
+
+    /// Whether [`History::clear_activity`] has nothing to forget.
+    pub fn activity_is_empty(&self) -> bool {
+        self.recent.is_empty() && self.opens.is_empty() && self.launches.is_empty() && self.picks.is_empty()
+    }
+
+    /// Whether `target` started with `args` is pinned (`control` and
+    /// `control printers` are two pins).
+    pub fn is_pinned(&self, target: &str, args: &str) -> bool {
+        self.pinned.iter().any(|p| p.is(target, args))
     }
 
     /// Pins `pin`, or unpins it when its target is already pinned. True when
@@ -323,8 +352,8 @@ impl History {
         if pin.target.is_empty() {
             return false;
         }
-        if self.is_pinned(&pin.target) {
-            self.pinned.retain(|p| !p.target.eq_ignore_ascii_case(&pin.target));
+        if self.is_pinned(&pin.target, &pin.args) {
+            self.pinned.retain(|p| !p.is(&pin.target, &pin.args));
             return false;
         }
         if self.pinned.len() >= MAX_PINS {
@@ -495,11 +524,11 @@ mod tests {
         assert_eq!(h.launches.len(), MAX_LAUNCHES);
         assert!(h.launch_count(&format!("uri:{}", MAX_LAUNCHES + 4), now) > 0);
 
-        let pin = |title: &str, target: &str| Pin { title: title.into(), target: target.into(), app: false, dir: false };
+        let pin = |title: &str, target: &str| Pin { title: title.into(), target: target.into(), ..Pin::default() };
         assert!(h.toggle_pin(pin("التقرير السنوي.docx", r"D:\عمل\التقرير السنوي.docx")));
         assert!(h.toggle_pin(Pin { app: true, ..pin("Google Chrome", r"C:\ProgramData\Chrome.lnk") }));
         assert!(!h.toggle_pin(pin("", "")));
-        assert!(h.is_pinned(r"d:\عمل\التقرير السنوي.docx"));
+        assert!(h.is_pinned(r"d:\عمل\التقرير السنوي.docx", ""));
         // Matching ignores Arabic letter forms and case; every word must match.
         assert_eq!(h.pinned_matching("تقرير").len(), 1);
         assert_eq!(h.pinned_matching("التقریر").len(), 1);
@@ -546,6 +575,67 @@ mod tests {
         assert!(!h.picks_for(&format!("q{}", MAX_PICKS + 19), now).is_empty());
     }
 
+    /// "Clear history and recent files" leaves nothing of what was typed or
+    /// opened, also after saving and loading, and keeps saved searches and pins.
+    #[test]
+    fn clearing_activity_forgets_searches_opens_and_launches() {
+        let dir = std::env::temp_dir().join(format!("bahth_hist_clear_{}", std::process::id()));
+        let file = dir.join("history.json");
+        let _ = fs::remove_dir_all(&dir);
+        let web = "uri:https://www.google.com/search?q=عقد الإيجار";
+        let mut h = History::default();
+        assert!(h.activity_is_empty());
+        h.add_recent("عقد الإيجار");
+        h.record_open(r"C:\سري\عقد الإيجار.pdf", 5);
+        h.record_launch(web, 6);
+        h.record_pick("عقد", "launch:c:\\x.lnk", 7);
+        h.add_saved(SavedSearch { name: "عقود".into(), query: "عقد".into(), ..Default::default() });
+        h.toggle_pin(Pin { title: "x".into(), target: r"C:\x.txt".into(), ..Pin::default() });
+        assert!(!h.activity_is_empty());
+        h.clear_activity();
+        assert!(h.activity_is_empty());
+        h.save_to(&file).unwrap();
+        let text = fs::read_to_string(&file).unwrap();
+        assert!(!text.contains("الإيجار"), "{text}");
+        let l = History::load_from(&file);
+        assert!(l.activity_is_empty());
+        assert!(l.recent_opens().is_empty());
+        assert_eq!(l.launch_count(web, 6), 0);
+        assert!(l.picks_for("عقد", 7).is_empty());
+        assert_eq!(l.saved.len(), 1);
+        assert_eq!(l.pinned.len(), 1);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Classic settings pages differ only in their arguments: each is a pin
+    /// of its own, and pins saved without arguments still load.
+    #[test]
+    fn pins_keep_their_arguments() {
+        let mut h = History::default();
+        let page = |title: &str, args: &str| Pin { title: title.into(), target: "control".into(), app: true, args: args.into(), ..Pin::default() };
+        assert!(h.toggle_pin(page("Devices and Printers", "printers")));
+        assert!(h.is_pinned("control", "printers"));
+        assert!(h.is_pinned("CONTROL", " Printers "));
+        assert!(!h.is_pinned("control", ""));
+        assert!(h.toggle_pin(page("Control Panel", "")));
+        assert_eq!(h.pinned.len(), 2);
+        // Unpinning one keeps the other.
+        assert!(!h.toggle_pin(page("Control Panel", "")));
+        assert_eq!(h.pinned.len(), 1);
+        assert_eq!(h.pinned[0].args, "printers");
+        // An older history.json: no "args", read as none.
+        let dir = std::env::temp_dir().join(format!("bahth_hist_args_{}", std::process::id()));
+        let file = dir.join("history.json");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(&file, r#"{"pinned":[{"title":"Chrome","target":"C:\\Chrome.lnk","app":true,"dir":false}]}"#).unwrap();
+        let old = History::load_from(&file);
+        assert_eq!(old.pinned[0].args, "");
+        assert!(old.is_pinned(r"c:\chrome.lnk", ""));
+        h.save_to(&file).unwrap();
+        assert_eq!(History::load_from(&file).pinned, h.pinned);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
     #[test]
     fn save_and_load() {
         let dir = std::env::temp_dir().join(format!("bahth_hist_{}", std::process::id()));
@@ -563,7 +653,7 @@ mod tests {
         });
         h.record_open(r"C:\x.txt", 5);
         h.record_launch("uri:ms-settings:display", 7);
-        h.toggle_pin(Pin { title: "x".into(), target: r"C:\x.txt".into(), app: false, dir: false });
+        h.toggle_pin(Pin { title: "x".into(), target: r"C:\x.txt".into(), ..Pin::default() });
         h.record_pick("كروم", "launch:chrome.lnk", 9);
         h.save_to(&file).unwrap();
         let l = History::load_from(&file);

@@ -303,6 +303,8 @@ pub struct App {
     mono_icons: tray::MonoIcons,
     /// Options ▸ "Search from anywhere".
     quick_menu: tray::QuickMenu,
+    /// This run's tray-icon state (put back after Explorer restarts).
+    quick_state: tray::QuickState,
     /// The quick search popup (built when it first opens).
     popup: quick::Popup,
     /// What to try when a search finds nothing, above the result list.

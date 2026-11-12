@@ -315,6 +315,49 @@ pub fn hides_for_notification_state(state: i32) -> bool {
     matches!(state, 2..=4)
 }
 
+// ------------------------------------------------------------------ tray icon
+
+/// Whether window message `msg` is the shell's `TaskbarCreated` broadcast:
+/// Explorer restarted (or made its taskbar again) and forgot every tray
+/// icon. `registered` is what `RegisterWindowMessage("TaskbarCreated")`
+/// gave; 0 (it failed) never matches, not even `WM_NULL`.
+pub fn is_taskbar_created(msg: u32, registered: u32) -> bool {
+    registered != 0 && msg == registered
+}
+
+/// How many times the tray icon is put back after `TaskbarCreated`, one try
+/// per timer tick: a shell that is still starting can refuse the first.
+pub const TRAY_RESTORE_TRIES: u8 = 10;
+
+/// The tries left after one that `worked` or not.
+pub fn tray_restore_left(left: u8, worked: bool) -> u8 {
+    if worked { 0 } else { left.saturating_sub(1) }
+}
+
+/// Whether to try again, at timer tick `tick`, to register a hotkey that
+/// another program held at tick `since` (ticks are 200 ms): every 5 s for
+/// the first minute (the other program may be starting with Windows too),
+/// then every 30 s.
+pub fn hotkey_retry_due(tick: u32, since: u32) -> bool {
+    let elapsed = tick.wrapping_sub(since);
+    elapsed != 0 && if elapsed <= 300 { elapsed.is_multiple_of(25) } else { elapsed.is_multiple_of(150) }
+}
+
+/// Tries `attempt` up to `tries` times, calling `wait` between tries; true
+/// as soon as one works. For the clipboard, which another program often
+/// holds open for a few milliseconds.
+pub fn retry_briefly(tries: u32, mut attempt: impl FnMut() -> bool, mut wait: impl FnMut()) -> bool {
+    for i in 0..tries {
+        if i > 0 {
+            wait();
+        }
+        if attempt() {
+            return true;
+        }
+    }
+    false
+}
+
 // ------------------------------------------------------------------ results
 
 /// The sections of the quick-search list, in display order.
@@ -365,6 +408,24 @@ impl Target {
             Target::File { path, .. } => Some(path),
             Target::Launcher(Action::Launch { target, .. }) => Some(target),
             _ => None,
+        }
+    }
+
+    /// The arguments a pin of this target keeps: those of a program
+    /// (`control printers`), none for anything else.
+    pub fn pin_args(&self) -> &str {
+        match self {
+            Target::Launcher(Action::Launch { args, .. }) => args,
+            _ => "",
+        }
+    }
+
+    /// Whether `self` and `other` are the same favourite: the same file or
+    /// program, started with the same arguments (case ignored).
+    pub fn same_pin(&self, other: &Target) -> bool {
+        match (self.pin_target(), other.pin_target()) {
+            (Some(a), Some(b)) => a.eq_ignore_ascii_case(b) && self.pin_args().trim().eq_ignore_ascii_case(other.pin_args().trim()),
+            _ => false,
         }
     }
 
@@ -537,7 +598,7 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
     let query = parts.query.trim().to_string();
     let mut pins: Vec<Row> = parts.pins.into_iter().map(|r| Row { group: Group::Pinned, ..r }).collect();
     pins.truncate(cap(Group::Pinned));
-    let pinned = |t: &Target| pins.iter().any(|p| p.target.pin_target().is_some_and(|a| t.pin_target().is_some_and(|b| a.eq_ignore_ascii_case(b))));
+    let pinned = |t: &Target| pins.iter().any(|p| p.target.same_pin(t));
     // Apps matched strongly (a name or its start, Arabic ones too, or a habit) lead over files.
     let strong: Vec<Target> = parts
         .items
@@ -1285,6 +1346,15 @@ mod tests {
         assert_eq!(Target::Launcher(launch("shell:AppsFolder\\x")).path(), None);
         assert_eq!(Target::Launcher(launch("shell:AppsFolder\\x")).pin_target(), Some("shell:AppsFolder\\x"));
         assert_eq!(Target::Launcher(Action::OpenUri("ms-settings:".into())).pin_target(), None);
+        // "control" and "control printers" are different favourites.
+        let control = |args: &str| Target::Launcher(Action::Launch { target: "control".into(), args: args.into() });
+        assert_eq!(control("printers").pin_args(), "printers");
+        assert!(control("printers").same_pin(&control("Printers")));
+        assert!(!control("printers").same_pin(&control("")));
+        assert!(control("").same_pin(&Target::Launcher(launch("CONTROL"))));
+        let file = Target::File { path: "C:\\a".into(), is_dir: false };
+        assert!(file.same_pin(&Target::File { path: "c:\\A".into(), is_dir: false }));
+        assert!(!file.same_pin(&Target::Launcher(Action::OpenUri("C:\\a".into()))));
         let it = Item { icon_path: Some("C:\\x.exe".into()), ..item(Kind::App, "X", launch("C:\\x.exe")) };
         assert_eq!(Row::from_item(it).icon, Icon::Shell { path: "C:\\x.exe".into(), is_dir: false });
         assert_eq!(Row::from_item(item(Kind::Setting, "S", Action::OpenUri("u".into()))).icon, Icon::Glyph(glyph::SETTINGS));
@@ -1396,5 +1466,58 @@ mod tests {
         // Dark and light palettes differ where it matters.
         assert_ne!(Palette::new(true).text, Palette::new(false).text);
         assert!(has_backdrop(22621) && !has_backdrop(22000) && has_round_corners(22000) && !has_round_corners(19045));
+    }
+}
+
+#[cfg(test)]
+mod everyday_tests {
+    use super::*;
+
+    /// Explorer restarted: only the registered `TaskbarCreated` message puts
+    /// the tray icon back, and a few tries are made while the shell starts.
+    #[test]
+    fn tray_icon_after_explorer_restart() {
+        assert!(is_taskbar_created(0xC123, 0xC123));
+        assert!(!is_taskbar_created(0xC124, 0xC123));
+        // Registration failed: WM_NULL (0), which the program posts to itself, is not it.
+        assert!(!is_taskbar_created(0, 0));
+        assert!(!is_taskbar_created(0x001A, 0));
+        let mut left = TRAY_RESTORE_TRIES;
+        let mut tries = 0;
+        while left > 0 {
+            tries += 1;
+            left = tray_restore_left(left, false);
+        }
+        assert_eq!(tries, TRAY_RESTORE_TRIES);
+        assert_eq!(tray_restore_left(TRAY_RESTORE_TRIES, true), 0);
+        assert_eq!(tray_restore_left(0, false), 0);
+    }
+
+    /// A clipboard held by another program for a moment: tried again a few
+    /// times, waiting only between tries; a real failure is reported.
+    #[test]
+    fn brief_retries() {
+        let (mut calls, mut waits) = (0, 0);
+        assert!(retry_briefly(5, || { calls += 1; calls == 3 }, || waits += 1));
+        assert_eq!((calls, waits), (3, 2));
+        let (mut calls, mut waits) = (0, 0);
+        assert!(!retry_briefly(5, || { calls += 1; false }, || waits += 1));
+        assert_eq!((calls, waits), (5, 4));
+        let (mut calls, mut waits) = (0, 0);
+        assert!(retry_briefly(5, || { calls += 1; true }, || waits += 1));
+        assert_eq!((calls, waits), (1, 0));
+        assert!(!retry_briefly(0, || true, || {}));
+    }
+
+    /// Alt+Space held by another program at start: retried every 5 s for a
+    /// minute, then every 30 s, never at the tick it failed.
+    #[test]
+    fn hotkey_retries() {
+        let due: Vec<u32> = (2..2 + 1200).filter(|&t| hotkey_retry_due(t, 2)).map(|t| t - 2).collect();
+        assert_eq!(&due[..12], &[25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]);
+        assert_eq!(&due[12..], &[450, 600, 750, 900, 1050]);
+        assert!(!hotkey_retry_due(2, 2));
+        // The tick counter wraps around after about 27 years; no panic.
+        assert!(hotkey_retry_due(24, u32::MAX));
     }
 }

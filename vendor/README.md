@@ -20,6 +20,19 @@ are kept. Changes against the published crate:
   `rich-textbox` feature, which InstaFind does not enable) is loaded with
   `LoadLibraryExW(..., LOAD_LIBRARY_SEARCH_SYSTEM32)` instead of
   `LoadLibraryW`, so never from the program's own folder.
+- `src/controls/tray_notification.rs`, new `TrayNotification::restore()`:
+  adds the icon to the tray again (`NIM_ADD` with the builder's callback
+  message, icon, tooltip and visibility; `NIM_MODIFY` if it is still there).
+  Upstream only ever adds the icon in the builder and modifies it afterwards,
+  so after Explorer restarts (`TaskbarCreated`) the icon was gone for good.
+  Called from `src/ui/tray.rs`.
+- `src/win32/clipboard.rs`, `Clipboard::set_data_text()`: returns whether
+  the text is on the clipboard (`bool`, upstream `()`). Upstream ignored a
+  failed `OpenClipboard` (another program holding the clipboard for a few
+  milliseconds is common) and then emptied and set nothing, so a copy was
+  reported as done and the user pasted the old content. It now frees its
+  allocation and returns false; `src/ui/shell.rs` `copy_text` retries.
 
 To update: copy the new published crate over this folder and re-apply the
-changes above (search for `ReleaseDC` and `LOAD_LIBRARY_SEARCH_SYSTEM32`).
+changes above (search for `ReleaseDC`, `LOAD_LIBRARY_SEARCH_SYSTEM32`, `pub fn restore`
+and `-> bool` in `clipboard.rs`).

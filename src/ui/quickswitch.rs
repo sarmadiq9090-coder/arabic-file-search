@@ -17,8 +17,8 @@ use winapi::shared::winerror::ERROR_SUCCESS;
 use winapi::um::winnt::REG_DWORD;
 use winapi::um::winreg::{RegQueryValueExW, RegSetValueExW};
 use winapi::um::winuser::{
-    BM_CLICK, EnumChildWindows, GA_ROOTOWNER, GetAncestor, GetClassNameW, GetDlgCtrlID, GetDlgItem,
-    GetForegroundWindow, GetLastActivePopup, IDOK, IsWindow, IsWindowEnabled, IsWindowVisible, MOD_ALT, MOD_CONTROL,
+    BM_CLICK, EnumChildWindows, GA_ROOTOWNER, GW_CHILD, GW_HWNDNEXT, GetAncestor, GetClassNameW, GetDlgCtrlID, GetDlgItem,
+    GetForegroundWindow, GetLastActivePopup, GetWindow, IDOK, IsWindow, IsWindowEnabled, IsWindowVisible, MOD_ALT, MOD_CONTROL,
     MOD_NOREPEAT, PostMessageW, RegisterHotKey, SendMessageTimeoutW, SMTO_ABORTIFHUNG, SetForegroundWindow,
     UnregisterHotKey, WM_COMMAND, WM_GETTEXT, WM_GETTEXTLENGTH, WM_HOTKEY, WM_SETTEXT,
 };
@@ -34,11 +34,10 @@ pub(super) const HOTKEY_TEXT: &str = "Ctrl+Alt+G";
 /// On/off switch, a DWORD under `HKCU\Software\BahthSari`.
 const REG_VALUE: &str = "QuickSwitch";
 
-/// Control ids of the file-name box in the common file dialogs: the combo
-/// box (cmb13) of the Vista-style and newer old-style dialogs, and the plain
-/// edit (edt1) of the oldest ones.
-const ID_FILENAME_COMBO: i32 = 0x47C;
-const ID_FILENAME_EDIT: i32 = 0x480;
+// Control ids of the file-name box in the common file dialogs: the combo
+// box (cmb13) of the Vista-style and newer old-style dialogs, and the plain
+// edit (edt1) of the oldest ones.
+use crate::file_dialog::{ID_FILENAME_COMBO, ID_FILENAME_EDIT};
 
 fn hint() -> &'static str {
     tr!(
@@ -164,13 +163,29 @@ fn filename_edit(dialog: HWND) -> Option<HWND> {
     all.into_iter().find(|&h| id(h) == ID_FILENAME_EDIT && class_name(h).eq_ignore_ascii_case("Edit"))
 }
 
-/// Whether `h` is a common Open / Save As dialog: a dialog-class window
-/// with a file-name box, or with the Vista-style dialog's DirectUI view.
+/// `h` and its child windows as `crate::file_dialog` reads them, at most
+/// `budget` windows and 16 levels deep (a dialog has a few dozen).
+fn describe(h: HWND, depth: u32, budget: &mut u32) -> crate::file_dialog::Node {
+    let mut node = crate::file_dialog::Node { class: class_name(h), id: unsafe { GetDlgCtrlID(h) }, children: Vec::new() };
+    if depth < 16 {
+        let mut c = unsafe { GetWindow(h, GW_CHILD) };
+        while !c.is_null() && *budget > 0 {
+            *budget -= 1;
+            node.children.push(describe(c, depth + 1, budget));
+            c = unsafe { GetWindow(c, GW_HWNDNEXT) };
+        }
+    }
+    node
+}
+
+/// Whether `h` is a common Open / Save As dialog: a file-name box and a
+/// view of the files (`crate::file_dialog`), not just any dialog with an
+/// edt1 box (Find, Print) or a DirectUI child.
 pub(super) fn is_file_dialog(h: HWND) -> bool {
     if h.is_null() || unsafe { IsWindow(h) } == 0 || class_name(h) != "#32770" {
         return false;
     }
-    filename_edit(h).is_some() || descendants(h).into_iter().any(|c| class_name(c) == "DirectUIHWND")
+    crate::file_dialog::is_file_dialog(&describe(h, 0, &mut 2000))
 }
 
 /// The file dialog the user is looking at: the foreground window, or the

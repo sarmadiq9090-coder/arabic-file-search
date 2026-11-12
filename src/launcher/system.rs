@@ -37,8 +37,32 @@ const END_VERBS: &[&str] = &["إنهاء", "انهاء", "اغلاق", "إغلا
 const COMPUTER_WORDS: &[&str] = &["الجهاز", "الكمبيوتر", "الحاسوب", "الحاسب", "computer", "pc"];
 
 /// Processes Windows needs; ending them would crash or log off the session.
-pub const CRITICAL: &[&str] =
-    &["csrss", "wininit", "winlogon", "lsass", "smss", "services", "system", "registry", "svchost", "dwm", "fontdrvhost"];
+/// ApplicationFrameHost draws the frame of every Microsoft Store app: ending
+/// it closes all of them at once.
+pub const CRITICAL: &[&str] = &[
+    "csrss", "wininit", "winlogon", "lsass", "smss", "services", "system", "registry", "svchost", "dwm", "fontdrvhost",
+    "applicationframehost",
+];
+
+/// The host of Store apps' frames ([`CRITICAL`]). A Store app's window
+/// belongs to it when the app's own process could not be found (a minimized
+/// Store app has no content window inside its frame).
+const FRAME_HOST: &str = "applicationframehost";
+
+/// Why `cmd` must not run, as the message shown instead of the question:
+/// "end" on a Store app whose own process is unknown would end the host of
+/// every Store app's window.
+pub fn refusal(cmd: &SystemCommand, english: bool) -> Option<String> {
+    let SystemCommand::EndProcess { name, .. } = cmd else { return None };
+    if exe_stem(name) != FRAME_HOST {
+        return None;
+    }
+    Some(if english {
+        "This is a Microsoft Store app whose own program can't be found while its window is minimized, and ending its frame would close every Store app. Restore its window and try again, or close it from its own window.".into()
+    } else {
+        "هذا تطبيق من متجر Microsoft لا يمكن معرفة برنامجه وهو مصغّر، وإنهاء إطاره يغلق كل تطبيقات المتجر معاً. أعد نافذته إلى الشاشة ثم جرّب مرة أخرى، أو أغلقه من نافذته.".into()
+    })
+}
 
 /// [`COMMANDS`] with the words normalised once.
 fn command_words() -> &'static [(SystemCommand, Vec<String>)] {
@@ -147,6 +171,18 @@ pub fn confirm_text(cmd: &SystemCommand, english: bool) -> String {
     }
 }
 
+/// Whether `cmd` runs on a background thread: emptying a large Recycle Bin
+/// takes seconds to minutes, and the window must keep answering meanwhile.
+/// The others return at once (or end the session).
+pub fn runs_in_background(cmd: &SystemCommand) -> bool {
+    matches!(cmd, SystemCommand::EmptyRecycleBin)
+}
+
+/// The message when `cmd` failed.
+pub fn failed_text(cmd: &SystemCommand, english: bool) -> String {
+    if english { format!("Could not do this: {}.", title(cmd, true)) } else { format!("تعذر تنفيذ: {}.", title(cmd, false)) }
+}
+
 fn item(cmd: SystemCommand, subtitle: String, score: u32, english: bool) -> Item {
     Item { kind: Kind::Command, title: title(&cmd, english), subtitle, action: Action::System(cmd), score, icon_path: None, strong: false }
 }
@@ -186,10 +222,14 @@ pub fn commands(query: &str, ctx: &Context) -> Vec<Item> {
             if w.pid == own || w.pid == 0 || seen.contains(&w.pid) {
                 continue;
             }
-            if CRITICAL.contains(&exe_stem(&w.exe).as_str()) {
+            let stem = exe_stem(&w.exe);
+            // A Store app whose own process is unknown: offered by its title,
+            // and refused with an explanation (`refusal`) when chosen.
+            let frame = stem == FRAME_HOST;
+            if CRITICAL.contains(&stem.as_str()) && !frame {
                 continue;
             }
-            let p = program_match(target, &w.exe);
+            let p = if frame { 0 } else { program_match(target, &w.exe) };
             let t = norm(&w.title).contains(target);
             if p == 0 && !t {
                 continue;
@@ -198,7 +238,11 @@ pub fn commands(query: &str, ctx: &Context) -> Vec<Item> {
             let name = if w.exe.is_empty() { w.title.clone() } else { w.exe.clone() };
             let cmd = SystemCommand::EndProcess { pid: w.pid, name };
             let score = if p >= 2 { 600 } else { 450 };
-            out.push(item(cmd, w.title.trim().to_string(), score, en));
+            let mut it = item(cmd, w.title.trim().to_string(), score, en);
+            if frame {
+                it.title = if en { format!("End {}", w.title.trim()) } else { format!("إنهاء {}", w.title.trim()) };
+            }
+            out.push(it);
         }
     }
     out
@@ -469,6 +513,39 @@ mod tests {
         assert_eq!(items[0].kind, Kind::Command);
     }
 
+    /// A minimized Store app: its frame belongs to ApplicationFrameHost and
+    /// its own process is unknown. It is offered by its title but refused,
+    /// never ending the host of every Store app; a restored one (its own exe
+    /// found) is ended as usual.
+    #[test]
+    fn store_app_frames_are_never_ended() {
+        let wins = vec![
+            OpenWindow { hwnd: 1, title: "Calculator".into(), exe: "ApplicationFrameHost.exe".into(), pid: 90 },
+            OpenWindow { hwnd: 2, title: "Photos".into(), exe: "ApplicationFrameHost.exe".into(), pid: 90 },
+            OpenWindow { hwnd: 3, title: "Microsoft Store".into(), exe: "WinStore.App.exe".into(), pid: 91 },
+        ];
+        let items = |q: &str, en: bool| commands(q, &ctx_with(en, &wins));
+        let calc = items("end calculator", true);
+        assert_eq!(calc.len(), 1);
+        assert_eq!(calc[0].title, "End Calculator");
+        let Action::System(cmd) = &calc[0].action else { panic!("{:?}", calc[0].action) };
+        assert!(refusal(cmd, true).is_some_and(|m| m.contains("Store app")));
+        assert!(refusal(cmd, false).is_some_and(|m| m.contains("المتجر")));
+        assert_eq!(items("انهاء calculator", false)[0].title, "إنهاء Calculator");
+        // Not by the host's own name.
+        assert!(items("kill applicationframehost", true).is_empty());
+        assert!(items("end frame", true).is_empty());
+        // The app's own process: ended as usual, no refusal.
+        let store = items("end store", true);
+        assert_eq!(store.len(), 1);
+        let Action::System(cmd) = &store[0].action else { panic!() };
+        assert_eq!(*cmd, EndProcess { pid: 91, name: "WinStore.App.exe".into() });
+        assert!(refusal(cmd, true).is_none());
+        assert!(refusal(&Shutdown, true).is_none());
+        assert!(refusal(&EndProcess { pid: 5, name: "chrome.exe".into() }, false).is_none());
+        assert!(CRITICAL.contains(&"applicationframehost"));
+    }
+
     #[test]
     fn titles_and_confirmations() {
         let i = commands("shutdown", &ctx_with(true, &[])).remove(0);
@@ -486,6 +563,16 @@ mod tests {
         assert!(confirm_text(&ex, true).contains("taskbar"));
         assert!(confirm_text(&ex, false).contains("شريط المهام"));
         assert!(commands("shutdown", &ctx_with(false, &[]))[0].score > commands("shut", &ctx_with(false, &[]))[0].score);
+    }
+
+    #[test]
+    fn only_slow_commands_leave_the_ui_thread() {
+        assert!(runs_in_background(&EmptyRecycleBin));
+        for c in [Shutdown, Restart, Sleep, Lock, SignOut, EndProcess { pid: 1, name: "a.exe".into() }] {
+            assert!(!runs_in_background(&c), "{c:?}");
+        }
+        assert_eq!(failed_text(&EmptyRecycleBin, true), "Could not do this: Empty Recycle Bin.");
+        assert_eq!(failed_text(&EmptyRecycleBin, false), "تعذر تنفيذ: إفراغ سلة المحذوفات.");
     }
 
     #[test]

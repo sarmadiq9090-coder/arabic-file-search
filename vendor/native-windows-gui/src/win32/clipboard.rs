@@ -151,9 +151,12 @@ impl Clipboard {
         The data use the `ClipboardFormat::UnicodeText` format.
 
         This is a high level function that handles `open` and `close`
+
+        Returns false when the text is not on the clipboard: another program
+        has it open (they often do, for a few milliseconds), or Windows refused.
     */
-    pub fn set_data_text<'a, C: Into<ControlHandle>>(handle: C, text: &'a str) {
-        use winapi::um::winuser::SetClipboardData;
+    pub fn set_data_text<'a, C: Into<ControlHandle>>(handle: C, text: &'a str) -> bool {
+        use winapi::um::winuser::{OpenClipboard, SetClipboardData};
         use winapi::um::stringapiset::MultiByteToWideChar;
         use winapi::um::winnls::CP_UTF8;
         use winapi::shared::basetsd::SIZE_T;
@@ -165,11 +168,14 @@ impl Clipboard {
         };
 
         if size == 0 {
-            return;
+            return false;
         }
 
         let alloc_size = (mem::size_of::<u16>() * (size as usize + 1)) as SIZE_T;
         let alloc = unsafe { GlobalAlloc(GMEM_MOVEABLE, alloc_size) };
+        if alloc.is_null() {
+            return false;
+        }
 
         unsafe {
             let locked_ptr = GlobalLock(alloc) as *mut u16;
@@ -179,16 +185,24 @@ impl Clipboard {
             GlobalUnlock(alloc);
         }
 
-        Clipboard::open(handle);
+        let owner = handle.into().hwnd().expect("Control should be a window");
+        if unsafe { OpenClipboard(owner) } == 0 {
+            unsafe { GlobalFree(alloc); }
+            return false;
+        }
         Clipboard::empty();
 
-        unsafe {
+        let set = unsafe {
             if SetClipboardData(CF_UNICODETEXT, alloc as _).is_null() {
                 GlobalFree(alloc);
+                false
+            } else {
+                true
             }
-        }
+        };
 
         Clipboard::close();
+        set
     }
 
     /**

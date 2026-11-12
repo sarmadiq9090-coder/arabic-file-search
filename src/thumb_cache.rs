@@ -132,9 +132,100 @@ impl ThumbCache {
     }
 }
 
+/// How many file types get an icon slot of their own in the thumbnail
+/// view; the types seen after that share one generic file icon. Each slot
+/// is a 96 px tile kept for the whole run, and each is made on the UI thread.
+pub const MAX_TYPE_SLOTS: usize = 64;
+
+/// The image-list slot of a file-type icon.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypeSlot {
+    /// Already drawn there.
+    Known(i32),
+    /// A new slot: draw the icon of this type into it ("" is the generic
+    /// file icon, "/" the folder).
+    New { slot: i32, ext: String },
+}
+
+/// Which file-type icon is in which pinned slot of the thumbnail view's
+/// image list: at most [`MAX_TYPE_SLOTS`] types (folders always have their
+/// own), then one shared slot for every other type.
+pub struct TypeSlots {
+    slots: HashMap<String, i32>,
+    max: usize,
+    generic: Option<i32>,
+}
+
+impl Default for TypeSlots {
+    fn default() -> Self {
+        TypeSlots::new(MAX_TYPE_SLOTS)
+    }
+}
+
+impl TypeSlots {
+    pub fn new(max: usize) -> Self {
+        TypeSlots { slots: HashMap::new(), max, generic: None }
+    }
+
+    /// The slot for the icon of extension `ext` ("/" for folders), pinning
+    /// a new one from `cache` when needed.
+    pub fn slot(&mut self, ext: &str, cache: &mut ThumbCache) -> TypeSlot {
+        if let Some(&s) = self.slots.get(ext) {
+            return TypeSlot::Known(s);
+        }
+        if ext == "/" || self.slots.len() < self.max {
+            let s = cache.pin_slot();
+            self.slots.insert(ext.to_string(), s);
+            return TypeSlot::New { slot: s, ext: ext.to_string() };
+        }
+        match self.generic {
+            Some(s) => TypeSlot::Known(s),
+            None => {
+                let s = cache.pin_slot();
+                self.generic = Some(s);
+                TypeSlot::New { slot: s, ext: String::new() }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Type icons: one slot per type up to the cap, then one shared generic
+    /// slot; folders always their own; slots never collide with thumbnails.
+    #[test]
+    fn type_icon_slots_are_capped() {
+        let mut cache = ThumbCache::new(4, 10);
+        let mut t = TypeSlots::new(3);
+        assert_eq!(t.slot("pdf", &mut cache), TypeSlot::New { slot: 0, ext: "pdf".into() });
+        assert_eq!(t.slot("pdf", &mut cache), TypeSlot::Known(0));
+        assert_eq!(t.slot("docx", &mut cache), TypeSlot::New { slot: 1, ext: "docx".into() });
+        let thumb = cache.insert_image("a".into());
+        assert_eq!(thumb, 2);
+        assert_eq!(t.slot("xlsx", &mut cache), TypeSlot::New { slot: 3, ext: "xlsx".into() });
+        // Past the cap: one generic slot, made once, shared by every other type.
+        assert_eq!(t.slot("zip", &mut cache), TypeSlot::New { slot: 4, ext: String::new() });
+        for ext in ["7z", "mp4", "zip", "", "x".repeat(300).as_str()] {
+            assert_eq!(t.slot(ext, &mut cache), TypeSlot::Known(4), "{ext}");
+        }
+        // Folders are never shared.
+        assert_eq!(t.slot("/", &mut cache), TypeSlot::New { slot: 5, ext: "/".into() });
+        assert_eq!(t.slot("/", &mut cache), TypeSlot::Known(5));
+        // Known types keep their slots; a thumbnail gets a fresh one.
+        assert_eq!(t.slot("docx", &mut cache), TypeSlot::Known(1));
+        assert_eq!(cache.insert_image("b".into()), 6);
+        // A thousand types pin at most cap + generic + folder slots.
+        let mut cache = ThumbCache::new(4, 10);
+        let mut t = TypeSlots::default();
+        let pinned: std::collections::HashSet<i32> = (0..1000)
+            .map(|i| match t.slot(&format!("e{i}"), &mut cache) {
+                TypeSlot::Known(s) | TypeSlot::New { slot: s, .. } => s,
+            })
+            .collect();
+        assert_eq!(pinned.len(), MAX_TYPE_SLOTS + 1);
+    }
 
     #[test]
     fn slots_are_handed_out_in_order_and_reused() {

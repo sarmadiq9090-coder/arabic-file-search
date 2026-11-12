@@ -63,7 +63,7 @@ impl App {
         sep(&mut hm);
         let has_query = !self.query.text().trim().is_empty();
         add(&mut hm, tr!("حفظ البحث الحالي", "Save the current search"), HistoryAction::SaveCurrent, !has_query);
-        add(&mut hm, tr!("مسح عمليات البحث الأخيرة", "Clear recent searches"), HistoryAction::ClearRecent, st.history.recent.is_empty());
+        add(&mut hm, tr!("مسح السجل والملفات الأخيرة", "Clear history and recent files"), HistoryAction::ClearRecent, st.history.activity_is_empty());
         add(&mut hm, tr!("حذف كل البحوث المحفوظة", "Delete all saved searches"), HistoryAction::ClearSaved, st.history.saved.is_empty());
         drop(st);
         // The menu shown last stays borrowed while it is open (its loop
@@ -112,9 +112,23 @@ impl App {
                 self.set_status(&trf!("حُفظ البحث «{text}». تجده في قائمة «السجل».", "Saved the search “{text}”. Find it in the “History” menu."));
             }
             HistoryAction::ClearRecent => {
+                // Also the opened files (the quick search's "Recent" list and
+                // the empty box's suggestions) and the quick-search launches,
+                // whose web searches hold what was typed.
                 let mut st = self.state.borrow_mut();
-                st.history.recent.clear();
+                st.history.clear_activity();
                 st.history.save();
+                // The empty box's list of files opened lately goes too.
+                let recent_shown = st.shown_query.is_none() && st.content.is_none() && self.query.text().trim().is_empty();
+                if recent_shown {
+                    st.rows.clear();
+                }
+                drop(st);
+                if recent_shown {
+                    self.clear_selection();
+                    self.refresh_list();
+                }
+                self.set_status(tr!("مُسح السجل والملفات الأخيرة.", "History and recent files cleared."));
             }
             HistoryAction::ClearSaved => {
                 let mut st = self.state.borrow_mut();

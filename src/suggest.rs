@@ -59,7 +59,7 @@ pub fn drive_letter(path: &str) -> Option<char> {
 pub fn empty_rows(pins: Vec<Row>, recent: Vec<Row>) -> Vec<Row> {
     let mut rows: Vec<Row> = pins.into_iter().take(FAVOURITE_ROWS).map(|r| Row { group: Group::Pinned, ..r }).collect();
     let pinned = |t: &Target| {
-        rows.iter().any(|p| p.target.pin_target().zip(t.pin_target()).is_some_and(|(a, b)| a.eq_ignore_ascii_case(b)))
+        rows.iter().any(|p| p.target.same_pin(t))
     };
     let recent: Vec<Row> =
         recent.into_iter().filter(|r| !pinned(&r.target)).take(RECENT_ROWS).map(|r| Row { group: Group::Recent, ..r }).collect();

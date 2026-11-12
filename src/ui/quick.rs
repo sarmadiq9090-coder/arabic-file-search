@@ -35,10 +35,10 @@ use winapi::um::winuser::*;
 
 use super::launcher_shim as shim;
 use super::startup::{background_priority, log};
-use super::surface::{self, Canvas, Font, KIND_POPUP, WM_APP_CATALOG, WM_APP_FILES};
+use super::surface::{self, Canvas, Font, KIND_POPUP, WM_APP_CATALOG, WM_APP_FILES, WM_APP_SYSTEM};
 use super::{App, shell, title};
 use crate::feedback::{self, SystemInfo};
-use crate::launcher::{self, Action, Catalog, windows::OpenWindow};
+use crate::launcher::{self, Action, Catalog, SystemCommand, windows::OpenWindow};
 use crate::quick::{self, Anchor, FeedbackKind, Group, Icon, ListMetrics, Palette, Parts, Rect, Row, Slot, SlotKind, Target, px};
 
 /// Width of the popup, logical px.
@@ -111,6 +111,10 @@ pub struct Popup {
     no_files: Cell<bool>,
     /// The drive scan is not done, so name results may be incomplete.
     names_incomplete: Cell<bool>,
+    /// A system command running in the background (emptying the Recycle
+    /// Bin), and its result for the UI thread: the command and whether it worked.
+    system_running: Cell<bool>,
+    system_slot: Arc<Mutex<Option<(SystemCommand, bool)>>>,
 }
 
 /// File rows of the latest finished search.
@@ -827,6 +831,10 @@ impl App {
                 self.popup_files_found();
                 Some(0)
             }
+            WM_APP_SYSTEM => {
+                self.popup_system_done();
+                Some(0)
+            }
             WM_APP_CATALOG => {
                 if self.quick_visible() {
                     self.popup_refresh();
@@ -1108,7 +1116,11 @@ impl App {
             },
             (t, How::CopyPath) => match t.path() {
                 Some(p) => {
-                    nwg::Clipboard::set_data_text(&self.window, p);
+                    // Not copied: the popup stays, saying why.
+                    if !shell::copy_text(&self.window, p) {
+                        self.popup_error(shell::copy_failed_text());
+                        return;
+                    }
                     true
                 }
                 None => return,
@@ -1194,13 +1206,24 @@ impl App {
             },
             Action::OpenUri(uri) => shell::open(uri),
             Action::CopyText(text) => {
-                nwg::Clipboard::set_data_text(&self.window, text);
+                // Not copied: back to the list (the popup stays), saying why.
+                if !shell::copy_text(&self.window, text) {
+                    self.popup_error(shell::copy_failed_text());
+                    return None;
+                }
                 true
             }
             Action::FocusWindow(h) => shim::focus_window(*h),
             Action::System(cmd) => {
+                if let Some(why) = shim::refusal(cmd) {
+                    self.popup_error(&why);
+                    return None;
+                }
                 if !self.popup_confirm(&shim::confirm_text(cmd)) {
                     return None;
+                }
+                if shim::runs_in_background(cmd) && self.popup_system_in_background(cmd) {
+                    return Some(true);
                 }
                 let ok = shim::run_system(cmd);
                 if !ok {
@@ -1211,6 +1234,49 @@ impl App {
         })
     }
 
+    /// Starts a slow system command (emptying the Recycle Bin) on a
+    /// background thread, after the user confirmed it; the result comes back
+    /// as `WM_APP_SYSTEM` (`popup_system_done`). False when no thread could
+    /// be started (then it runs here, as before).
+    fn popup_system_in_background(&self, cmd: &SystemCommand) -> bool {
+        // Already running: the second request has nothing left to do.
+        if self.popup.system_running.replace(true) {
+            return true;
+        }
+        let (slot, post_to, cmd) = (self.popup.system_slot.clone(), self.popup.post_to.clone(), cmd.clone());
+        let started = crate::crash_log::spawn_named("system-command", move || {
+            // The shell's Recycle Bin wants COM on its thread.
+            unsafe { winapi::um::combaseapi::CoInitializeEx(std::ptr::null_mut(), winapi::um::objbase::COINIT_APARTMENTTHREADED) };
+            let ok = crate::crash_log::catch(|| shim::run_system(&cmd)).unwrap_or(false);
+            unsafe { winapi::um::combaseapi::CoUninitialize() };
+            if let Ok(mut s) = slot.lock() {
+                *s = Some((cmd, ok));
+            }
+            let h = post_to.load(Ordering::Relaxed);
+            if h != 0 {
+                unsafe { PostMessageW(h as HWND, WM_APP_SYSTEM, 0, 0) };
+            }
+        });
+        if started.is_none() {
+            self.popup.system_running.set(false);
+        }
+        started.is_some()
+    }
+
+    /// A system command run in the background ended: says so when it failed.
+    fn popup_system_done(&self) {
+        self.popup.system_running.set(false);
+        let Some((cmd, ok)) = self.popup.system_slot.lock().ok().and_then(|mut s| s.take()) else { return };
+        if ok {
+            if cmd == SystemCommand::EmptyRecycleBin {
+                self.set_status(tr!("أُفرغت سلة المحذوفات.", "The Recycle Bin is empty."));
+            }
+        } else {
+            log(&format!("quick search: system command {cmd:?} failed"));
+            self.popup_error(&shim::failed_text(&cmd));
+        }
+    }
+
     fn popup_toggle_pin(&self, row: &Row, target: &Target) {
         let Some(t) = target.pin_target() else { return };
         let pin = crate::history::Pin {
@@ -1218,9 +1284,10 @@ impl App {
             target: t.to_string(),
             app: matches!(target, Target::Launcher(_)),
             dir: matches!(target, Target::File { is_dir: true, .. }),
+            args: target.pin_args().to_string(),
         };
         let mut st = self.state.borrow_mut();
-        let was = st.history.is_pinned(t);
+        let was = st.history.is_pinned(t, target.pin_args());
         let now = st.history.toggle_pin(pin);
         st.history.save();
         drop(st);
@@ -1270,7 +1337,7 @@ impl App {
             Target::Launcher(Action::Launch { target, .. }) => runs_as_admin(target),
             _ => false,
         };
-        let pinned = row.target.pin_target().map(|t| self.state.borrow().history.is_pinned(t));
+        let pinned = row.target.pin_target().map(|t| self.state.borrow().history.is_pinned(t, row.target.pin_args()));
         let mut items: Vec<(How, String)> = vec![(How::Open, tr!("فتح\tEnter", "Open\tEnter").to_string())];
         if admin {
             items.push((How::Admin, tr!("تشغيل كمسؤول", "Run as administrator").to_string()));
@@ -1417,7 +1484,7 @@ fn pin_row(p: &crate::history::Pin) -> Row {
             group: Group::Pinned,
             title: p.title.clone(),
             subtitle: tr!("تطبيق", "App").to_string(),
-            target: Target::Launcher(Action::Launch { target: p.target.clone(), args: String::new() }),
+            target: Target::Launcher(Action::Launch { target: p.target.clone(), args: p.args.clone() }),
             icon: if shell_app { Icon::Glyph(quick::glyph::APPS) } else { Icon::Shell { path: p.target.clone(), is_dir: false } },
         }
     } else {
