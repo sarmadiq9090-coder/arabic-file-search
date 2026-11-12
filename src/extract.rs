@@ -43,6 +43,9 @@ const MAX_WORKBOOK_UNZIPPED: u64 = 256 * 1024 * 1024;
 /// Upper bound for the cells calamine lays out densely (bounding box of each
 /// sheet, summed) when it opens an .xls file.
 const MAX_XLS_CELLS: u64 = 6_000_000;
+/// Upper bound for the `uniqueCount` an xlsx shared-strings part may declare
+/// (calamine reserves 24 bytes for each before reading any).
+const MAX_SHARED_STRINGS: u64 = 10_000_000;
 
 const TEXT_EXTS: &[&str] = &[
     "txt", "md", "csv", "tsv", "log", "json", "xml", "html", "htm", "ini", "cfg", "yaml", "yml",
@@ -521,7 +524,7 @@ fn spreadsheet_text<R: Read + Seek>(mut r: R, ext: &str) -> Option<String> {
             Sheets::Xls(Xls::new(r).ok()?)
         }
         "xlsx" | "xlsm" | "xlsb" => {
-            if !workbook_zip_ok(&mut r) {
+            if !unchecked("BAHTH_TEST_UNCHECKED_SHEETS") && !workbook_zip_ok(&mut r) {
                 return None;
             }
             r.rewind().ok()?;
@@ -536,11 +539,13 @@ fn spreadsheet_text<R: Read + Seek>(mut r: R, ext: &str) -> Option<String> {
     sheets_text(book)
 }
 
-/// True when no member of a zip-based workbook is a zip bomb and all of them
-/// together declare at most [`MAX_WORKBOOK_UNZIPPED`].
+/// True when no member of a zip-based workbook is a zip bomb, all of them
+/// together declare at most [`MAX_WORKBOOK_UNZIPPED`], and no shared-strings
+/// part declares more strings than it can hold (see [`shared_strings_count_ok`]).
 fn workbook_zip_ok<R: Read + Seek>(r: &mut R) -> bool {
     let Ok(mut zip) = zip::ZipArchive::new(r) else { return false };
     let mut total = 0u64;
+    let mut shared_strings = Vec::new();
     for i in 0..zip.len() {
         let Ok(f) = zip.by_index_raw(i) else { return false };
         if !zip_ratio_ok(f.size(), f.compressed_size()) {
@@ -548,12 +553,65 @@ fn workbook_zip_ok<R: Read + Seek>(r: &mut R) -> bool {
         }
         // Sheets are streamed cell by cell; only the other members (shared
         // strings above all) are read whole, so only they count.
-        let name = f.name().map(|n| n.to_ascii_lowercase()).unwrap_or_default();
+        let name = f.name().map(|n| n.replace('\\', "/").to_ascii_lowercase()).unwrap_or_default();
         if !(name.starts_with("xl/worksheets/") && (name.ends_with(".xml") || name.ends_with(".bin"))) {
             total = total.saturating_add(f.size());
         }
+        // Whatever folder the workbook is in (calamine looks names up
+        // without regard to case or the kind of slash).
+        if name.ends_with("sharedstrings.xml") {
+            shared_strings.push((i, f.size()));
+        }
     }
     total <= MAX_WORKBOOK_UNZIPPED
+        && shared_strings.into_iter().all(|(i, size)| zip.by_index(i).is_ok_and(|f| shared_strings_count_ok(f, size)))
+}
+
+/// False when the shared-strings part in `part` (`size` bytes unpacked)
+/// declares a `uniqueCount` it cannot hold: calamine reserves memory for
+/// that many strings before reading one, and `uniqueCount="10000000000000"`
+/// in a 300-byte file made the allocation fail, which ends the process.
+/// Every string takes at least `<si/>` (5 bytes), and [`MAX_SHARED_STRINGS`]
+/// bounds the reservation whatever the size. Reads only up to the `<sst>` tag.
+fn shared_strings_count_ok(part: impl Read, size: u64) -> bool {
+    let mut xml = quick_xml::Reader::from_reader(std::io::BufReader::new(part.take(MAX_ZIP_ENTRY)));
+    // As calamine reads it.
+    let config = xml.config_mut();
+    config.check_end_names = false;
+    config.check_comments = false;
+    let mut buf = Vec::new();
+    loop {
+        buf.clear();
+        match xml.read_event_into(&mut buf) {
+            Ok(Event::Start(e) | Event::Empty(e)) if e.local_name().as_ref() == "sst" => {
+                return declared_counts_ok(AsRef::<str>::as_ref(&e).as_bytes(), size.min(MAX_SHARED_STRINGS * 5) / 5);
+            }
+            // Without an `<sst>` calamine reserves nothing (and gives up).
+            Ok(Event::Eof) | Err(_) => return true,
+            Ok(_) => {}
+        }
+    }
+}
+
+/// True when every `uniqueCount` in the raw text of the tag `tag` is a
+/// plain number of at most `max`. Read from the bytes, not through an
+/// attribute parser, so that no other reading of the tag can see a number
+/// this one missed; anything but `uniqueCount="digits"` is refused.
+fn declared_counts_ok(tag: &[u8], max: u64) -> bool {
+    const KEY: &[u8] = b"uniqueCount";
+    let mut rest = tag;
+    while let Some(at) = rest.windows(KEY.len()).position(|w| w == KEY) {
+        rest = &rest[at + KEY.len()..];
+        let Some(value) = rest.trim_ascii_start().strip_prefix(b"=").map(<[u8]>::trim_ascii_start) else { return false };
+        let Some((&quote @ (b'"' | b'\''), value)) = value.split_first() else { return false };
+        let Some(end) = value.iter().position(|&b| b == quote) else { return false };
+        let digits = &value[..end];
+        let number = std::str::from_utf8(digits).ok().filter(|d| !d.is_empty() && d.len() <= 12 && d.bytes().all(|b| b.is_ascii_digit()));
+        if !number.and_then(|d| d.parse::<u64>().ok()).is_some_and(|n| n <= max) {
+            return false;
+        }
+    }
+    true
 }
 
 /// True when calamine can open the .xls compound file in `r` without laying

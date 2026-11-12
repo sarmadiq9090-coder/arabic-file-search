@@ -239,6 +239,8 @@ pub(crate) fn pdf_stream(dict: &str, content: &str) -> String {
 
 /// Turns the PDF check off in the child (see `extract::unchecked`).
 const UNCHECKED_PDF: (&str, &str) = ("BAHTH_TEST_UNCHECKED_PDF", "1");
+/// Turns the spreadsheet checks off in the child.
+const UNCHECKED_SHEETS: (&str, &str) = ("BAHTH_TEST_UNCHECKED_SHEETS", "1");
 
 const CATALOG: &str = "<< /Type /Catalog /Pages 2 0 R >>";
 const PAGES: &str = "<< /Type /Pages /Kids [3 0 R] /Count 1 >>";
@@ -379,3 +381,54 @@ fn pdf_parent_loop_does_not_kill_or_hang_the_process() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Spreadsheets: allocations calamine cannot survive
+// ---------------------------------------------------------------------------
+
+/// A one-sheet xlsx (the shared fuzz sample) with `sst` as its shared strings.
+fn xlsx_with_shared_strings(sst: &str) -> Vec<u8> {
+    use super::fuzz::{XLSX_CT, XLSX_RELS, XLSX_SHEET, XLSX_WB, XLSX_WBRELS, zip_of};
+    zip_of(
+        &[
+            ("[Content_Types].xml", XLSX_CT.as_bytes()),
+            ("_rels/.rels", XLSX_RELS.as_bytes()),
+            ("xl/workbook.xml", XLSX_WB.as_bytes()),
+            ("xl/_rels/workbook.xml.rels", XLSX_WBRELS.as_bytes()),
+            ("xl/worksheets/sheet1.xml", XLSX_SHEET.as_bytes()),
+            ("xl/sharedStrings.xml", sst.as_bytes()),
+        ],
+        false,
+    )
+}
+
+#[test]
+fn xlsx_huge_unique_count_does_not_kill_the_process() {
+    // calamine reserves `uniqueCount` strings (24 bytes each) before reading
+    // one: 10^13 in a file of a few hundred bytes is a failed allocation,
+    // which aborts.
+    let bomb = xlsx_with_shared_strings(r#"<sst xmlns="x" uniqueCount="10000000000000"><si><t>a</t></si></sst>"#);
+    let c = child("count-unchecked.xlsx", &bomb, &[UNCHECKED_SHEETS]);
+    assert!(!c.ok && c.text.is_none(), "without the check: {c:?}");
+    let c = child("count.xlsx", &bomb, &[]);
+    assert!(c.ok && c.text == Some(None), "{c:?}");
+    // An honest count, and none at all, still read.
+    for sst in [
+        r#"<sst xmlns="x" count="2" uniqueCount="1"><si><t>مشترك</t></si></sst>"#,
+        r#"<sst xmlns="x"><si><t>مشترك</t></si></sst>"#,
+    ] {
+        let p = temp_file("honest.xlsx", &xlsx_with_shared_strings(sst));
+        assert!(extract_text(&p).is_some_and(|t| t.contains("مرحبا")), "{sst}");
+    }
+    // Spellings another reader of the tag could take for a smaller number.
+    for tag in [
+        r#"<sst uniqueCount = "10000000000000">"#,
+        r#"<sst uniqueCount='10000000000000'>"#,
+        r#"<sst uniqueCount="+1">"#,
+        r#"<sst uniqueCount="1" uniqueCount="10000000000000">"#,
+        r#"<sst uniqueCount="9999999999999999999999">"#,
+        r#"<sst uniqueCount>"#,
+    ] {
+        assert!(!declared_counts_ok(tag.as_bytes(), 1000), "{tag}");
+    }
+    assert!(declared_counts_ok(br#"<sst count="999999999999" uniqueCount="7">"#, 1000));
+}

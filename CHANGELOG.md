@@ -6,6 +6,7 @@
 
 ### أمان
 - **ملف PDF مصمَّم بحلقة لا تنتهي** (نموذج يرسم نفسه، أو صفحة هي أصل نفسها) كان يُغلق البرنامج بعد ثوانٍ من كل تشغيل أثناء فهرسة المحتوى؛ صار يُفحص قبل قراءته ويُتخطّى. / **PDF loops** (a form drawing itself, a page tree that is its own parent) no longer crash the app: such files are checked first and skipped.
+- **ملف Excel (.xlsx) صغير يعلن عن عدد هائل من النصوص** كان يُغلق البرنامج لنفاد الذاكرة؛ صار يُرفض. / A tiny **.xlsx declaring trillions of shared strings** no longer aborts the app.
 
 ## 0.10.0 — 2026-11-11
 
