@@ -2,13 +2,18 @@
 //!
 //! Off unless the user turns it on (Options ▸ "Search from phone"). Safety
 //! comes first:
+//! - by itself it runs only on the home network: the one the user turned
+//!   it on at, while Windows marks it private ([`net`]); it stops when the
+//!   PC moves to another network;
 //! - it listens only on private LAN addresses (10/8, 172.16/12, 192.168/16,
 //!   169.254/16) and 127.0.0.1, and drops any connection whose peer or local
 //!   address is not private;
 //! - every request needs the secret token, either as the `?t=` of the link
 //!   shown in the window or as a cookie set after typing the PIN; both are
 //!   made by the OS random generator and compared in constant time, and
-//!   wrong guesses lock the PIN out for a growing time;
+//!   wrong PINs lock that device out for a growing time (with a small
+//!   ceiling for all devices together); wrong links are never counted (128
+//!   random bits), so no web page can lock anyone out with them;
 //! - the `Host` header must be an IP address or `localhost` (no DNS rebinding);
 //! - it only searches names and lists results; downloading a result is a
 //!   separate switch, off by default, and only serves a path that is in the
@@ -31,6 +36,8 @@ use std::time::{Duration, Instant};
 use crate::index::{Entry, Index};
 use crate::search::{Query, search_names};
 
+pub mod net;
+
 #[cfg_attr(not(windows), allow(dead_code))]
 pub const DEFAULT_PORT: u16 = 8765;
 /// Connections handled at the same time; more are closed at once.
@@ -47,8 +54,14 @@ const MAX_RESULTS: usize = 200;
 /// Longest query, in characters.
 const MAX_QUERY: usize = 300;
 const COOKIE: &str = "bahth_t";
-/// Wrong PINs or tokens allowed before a lock-out.
+/// Wrong PINs allowed from one device before it is locked out.
 const MAX_FAILURES: u32 = 5;
+/// Wrong PINs allowed from all devices together (a device that keeps
+/// changing its address) before the PIN is locked for everyone; the direct
+/// link still works.
+const MAX_GLOBAL_FAILURES: u32 = 20;
+/// Devices remembered by the limiter; idle ones are forgotten first.
+const MAX_TRACKED: usize = 256;
 const FIRST_LOCKOUT: Duration = Duration::from_secs(30);
 const MAX_LOCKOUT: Duration = Duration::from_secs(3600);
 /// Failures older than this are forgotten, counted from the end of the
@@ -686,17 +699,32 @@ autocomplete=\"off\" autofocus><button type=\"submit\">{}</button></form>",
 
 // ---------------------------------------------------------------- auth and routing
 
-/// Lock-out after repeated wrong PINs or tokens. One counter for the whole
-/// server, so changing address does not buy more guesses.
-#[derive(Default)]
+/// Lock-out after repeated wrong PINs, with lock-outs that grow.
 pub struct Limiter {
+    /// Failures before a lock-out.
+    max: u32,
     failures: u32,
     strikes: u32,
     last_failure: Option<Instant>,
     locked_until: Option<Instant>,
 }
 
+impl Default for Limiter {
+    fn default() -> Limiter {
+        Limiter::new(MAX_FAILURES)
+    }
+}
+
 impl Limiter {
+    pub fn new(max: u32) -> Limiter {
+        Limiter { max, failures: 0, strikes: 0, last_failure: None, locked_until: None }
+    }
+
+    /// Nothing to remember: not locked, no recent failure.
+    fn idle(&self, now: Instant) -> bool {
+        self.locked_until.is_none_or(|u| now >= u) && self.last_failure.is_none_or(|t| now.duration_since(t) > FAILURE_MEMORY)
+    }
+
     /// `Err(remaining)` while locked out.
     pub fn check(&mut self, now: Instant) -> Result<(), Duration> {
         if let Some(until) = self.locked_until {
@@ -716,7 +744,7 @@ impl Limiter {
     pub fn fail(&mut self, now: Instant) {
         self.failures += 1;
         self.last_failure = Some(now);
-        if self.failures >= MAX_FAILURES {
+        if self.failures >= self.max {
             self.failures = 0;
             let lock = FIRST_LOCKOUT.saturating_mul(1u32 << self.strikes.min(16)).min(MAX_LOCKOUT);
             self.strikes += 1;
@@ -726,9 +754,43 @@ impl Limiter {
             self.last_failure = self.locked_until;
         }
     }
+}
 
-    pub fn success(&mut self) {
-        *self = Limiter::default();
+/// One [`Limiter`] per device (peer address), and one for all of them.
+pub struct Limiters {
+    per_peer: std::collections::HashMap<IpAddr, Limiter>,
+    global: Limiter,
+}
+
+impl Default for Limiters {
+    fn default() -> Limiters {
+        Limiters { per_peer: Default::default(), global: Limiter::new(MAX_GLOBAL_FAILURES) }
+    }
+}
+
+impl Limiters {
+    /// `Err(remaining)` while this device, or every device, is locked out.
+    pub fn check(&mut self, peer: IpAddr, now: Instant) -> Result<(), Duration> {
+        self.global.check(now)?;
+        self.per_peer.get_mut(&peer).map_or(Ok(()), |l| l.check(now))
+    }
+
+    pub fn fail(&mut self, peer: IpAddr, now: Instant) {
+        self.global.fail(now);
+        if self.per_peer.len() >= MAX_TRACKED && !self.per_peer.contains_key(&peer) {
+            self.per_peer.retain(|_, l| !l.idle(now));
+            if self.per_peer.len() >= MAX_TRACKED {
+                // Every remembered device is busy: the global limit holds.
+                return;
+            }
+        }
+        self.per_peer.entry(peer).or_default().fail(now);
+    }
+
+    /// The right PIN: this device starts afresh. The global count is kept
+    /// (it fades with time), so another device's guesses don't restart.
+    pub fn success(&mut self, peer: IpAddr) {
+        self.per_peer.remove(&peer);
     }
 }
 
@@ -745,7 +807,7 @@ pub struct Shared {
     /// The "hide system files" option is off: results include them.
     pub show_system: AtomicBool,
     index: RwLock<Arc<Index>>,
-    limiter: Mutex<Limiter>,
+    limiter: Mutex<Limiters>,
 }
 
 impl Shared {
@@ -755,7 +817,7 @@ impl Shared {
             allow_download: AtomicBool::new(allow_download),
             show_system: AtomicBool::new(false),
             index: RwLock::new(Arc::default()),
-            limiter: Mutex::new(Limiter::default()),
+            limiter: Mutex::new(Limiters::default()),
         }
     }
 
@@ -784,7 +846,7 @@ impl Shared {
         (s.token, s.pin)
     }
 
-    fn limiter(&self) -> std::sync::MutexGuard<'_, Limiter> {
+    fn limiter(&self) -> std::sync::MutexGuard<'_, Limiters> {
         self.limiter.lock().unwrap_or_else(|e| e.into_inner())
     }
 }
@@ -861,7 +923,7 @@ pub fn handle(req: &Request, peer: IpAddr, shared: &Shared, now: Instant) -> Res
         if cross_site(req) {
             return Response::html(403, login_page(Some(tr!("طلب من موقع آخر.", "Request from another site."))));
         }
-        if let Err(wait) = shared.limiter().check(now) {
+        if let Err(wait) = shared.limiter().check(peer, now) {
             return locked_response(wait);
         }
         let form = parse_form(&String::from_utf8_lossy(&req.body));
@@ -871,26 +933,20 @@ pub fn handle(req: &Request, peer: IpAddr, shared: &Shared, now: Instant) -> Res
             .map(|(_, v)| v.chars().filter(|c| !c.is_whitespace()).map(arabic_digit_to_ascii).collect())
             .unwrap_or_default();
         if ct_eq(typed.as_bytes(), secrets.pin.as_bytes()) {
-            shared.limiter().success();
+            shared.limiter().success(peer);
             return Response::redirect("/".into(), Some(session_cookie(&secrets.token)));
         }
-        shared.limiter().fail(now);
+        shared.limiter().fail(peer, now);
         return Response::html(401, login_page(Some(tr!("الرمز السري غير صحيح.", "Wrong PIN."))));
     }
 
     if let Some(t) = req.param("t") {
-        if let Err(wait) = shared.limiter().check(now) {
-            return locked_response(wait);
-        }
+        // Never counted nor locked: the token is 128 random bits, so wrong
+        // ones are not guesses worth counting, and any web page can make a
+        // browser send them (an <img>), over plain HTTP without the
+        // `Sec-Fetch-Site` that would tell them apart.
         if ct_eq(t.as_bytes(), secrets.token.as_bytes()) {
-            shared.limiter().success();
             return Response::redirect(after_login(req), Some(session_cookie(&secrets.token)));
-        }
-        // A wrong token from another site's page is not a guess worth
-        // counting (128 random bits), and counting it would let any page
-        // lock the phone out.
-        if !cross_site(req) {
-            shared.limiter().fail(now);
         }
         return Response::html(401, login_page(Some(tr!("الرابط قديم أو غير صحيح.", "The link is old or wrong."))));
     }
@@ -1060,14 +1116,9 @@ pub struct Server {
 
 #[cfg_attr(not(windows), allow(dead_code))]
 impl Server {
-    /// Listens on `port` of every private LAN address and of 127.0.0.1.
+    /// Listens on `port` of each of `ips` that is private (the caller
+    /// passes the LAN addresses [`net::plan`] allows, and 127.0.0.1).
     /// Fails if none of them can be bound (e.g. the port is taken).
-    pub fn start(port: u16, shared: Arc<Shared>) -> io::Result<Server> {
-        let mut ips: Vec<Ipv4Addr> = lan_addresses();
-        ips.push(Ipv4Addr::LOCALHOST);
-        Server::start_on(&ips, port, shared)
-    }
-
     pub fn start_on(ips: &[Ipv4Addr], port: u16, shared: Arc<Shared>) -> io::Result<Server> {
         let stop = Arc::new(AtomicBool::new(false));
         let active = Arc::new(AtomicUsize::new(0));
@@ -1310,10 +1361,67 @@ mod tests {
         assert_eq!(r.header("Location"), Some("/"));
     }
 
-    fn login(s: &Shared, pin: &str, now: Instant) -> Response {
+    fn login_from(s: &Shared, peer: IpAddr, pin: &str, now: Instant) -> Response {
         let b = format!("pin={}", percent_encode(pin));
         let r = req(&format!("POST /login HTTP/1.1\r\nHost: 127.0.0.1:8765\r\nContent-Length: {}\r\n\r\n{b}", b.len()));
-        handle(&r, LAN, s, now)
+        handle(&r, peer, s, now)
+    }
+
+    fn login(s: &Shared, pin: &str, now: Instant) -> Response {
+        login_from(s, LAN, pin, now)
+    }
+
+    /// Another device on the same network.
+    fn lan(last: u8) -> IpAddr {
+        IpAddr::V4(Ipv4Addr::new(192, 168, 1, last))
+    }
+
+    /// Wrong `?t=` links are what any web page can make a browser send
+    /// (`<img src="http://192.168.1.5:8765/?t=x">`), and over plain HTTP the
+    /// browser adds no `Sec-Fetch-Site`: they must never lock anyone out.
+    #[test]
+    fn wrong_links_never_lock_anyone_out() {
+        let s = shared_with(vec![]);
+        let now = Instant::now();
+        for _ in 0..MAX_FAILURES * 20 {
+            assert_eq!(handle(&get("/?t=bad", None), LAN, &s, now).status, 401);
+            assert_eq!(handle(&get("/?t=0123456789abcdef0123456789abcdee", None), lan(77), &s, now).status, 401);
+        }
+        // The PIN and the real link still work, for that device and others.
+        assert_eq!(login(&s, PIN, now).status, 303);
+        assert_eq!(login_from(&s, lan(30), PIN, now).status, 303);
+        assert_eq!(handle(&get(&format!("/?t={TOKEN}"), None), LAN, &s, now).status, 303);
+    }
+
+    /// The PIN limit is per device: one that keeps guessing locks itself
+    /// out, not the owner's phone, and never the direct link.
+    #[test]
+    fn one_device_cannot_lock_the_owner_out() {
+        let s = shared_with(vec![]);
+        let now = Instant::now();
+        let (guesser, owner) = (lan(66), lan(20));
+        for _ in 0..MAX_FAILURES {
+            assert_eq!(login_from(&s, guesser, "00000000", now).status, 401);
+        }
+        assert_eq!(login_from(&s, guesser, PIN, now).status, 429, "the guesser waits");
+        assert_eq!(login_from(&s, owner, PIN, now).status, 303, "the owner does not");
+        // The link is 128 random bits: it is never locked, even for the guesser.
+        assert_eq!(handle(&get(&format!("/?t={TOKEN}"), None), guesser, &s, now).status, 303);
+        // Many devices together reach the global ceiling: the PIN waits for
+        // everyone, the link still works.
+        for i in 0..MAX_GLOBAL_FAILURES {
+            login_from(&s, lan(100 + i as u8), "00000000", now);
+        }
+        assert_eq!(login_from(&s, owner, PIN, now).status, 429);
+        assert_eq!(handle(&get(&format!("/?t={TOKEN}"), None), owner, &s, now).status, 303);
+        // Idle devices are forgotten; the map stays small.
+        let later = now + MAX_LOCKOUT + FAILURE_MEMORY + Duration::from_secs(1);
+        let mut l = Limiters::default();
+        for i in 0..(MAX_TRACKED as u32 * 3) {
+            let t = later + MAX_LOCKOUT.saturating_mul(i) * 2;
+            l.fail(IpAddr::V4(Ipv4Addr::from(0x0A00_0000 + i)), t);
+        }
+        assert!(l.per_peer.len() <= MAX_TRACKED);
     }
 
     #[test]
@@ -1332,7 +1440,8 @@ mod tests {
         let r = login(&s, PIN, now);
         assert_eq!(r.status, 429);
         assert!(r.header("Retry-After").is_some());
-        assert_eq!(handle(&get(&format!("/?t={TOKEN}"), None), LAN, &s, now).status, 429);
+        // The direct link is never locked.
+        assert_eq!(handle(&get(&format!("/?t={TOKEN}"), None), LAN, &s, now).status, 303);
         // After the lock-out it works again; the next lock-out is longer.
         let later = now + FIRST_LOCKOUT + Duration::from_secs(1);
         for _ in 0..MAX_FAILURES {
@@ -1340,12 +1449,6 @@ mod tests {
         }
         assert_eq!(login(&s, PIN, later + FIRST_LOCKOUT + Duration::from_secs(1)).status, 429);
         assert_eq!(login(&s, PIN, later + 2 * FIRST_LOCKOUT + Duration::from_secs(1)).status, 303);
-        // Wrong tokens count as failures too.
-        let t = now + Duration::from_secs(10_000);
-        for _ in 0..MAX_FAILURES {
-            assert_eq!(handle(&get("/?t=bad", None), LAN, &s, t).status, 401);
-        }
-        assert_eq!(login(&s, PIN, t).status, 429);
     }
 
     #[test]
@@ -1497,6 +1600,38 @@ mod tests {
         server.stop();
         std::thread::sleep(Duration::from_millis(50));
         assert!(TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_err(), "stopped");
+    }
+
+    /// Turning it off and on again, as the window does: the listener is
+    /// closed, and with the new secrets set on the same `Shared` the old
+    /// cookie and link no longer work.
+    #[test]
+    fn off_closes_and_new_secrets_end_old_sessions() {
+        let shared = Arc::new(shared_with(vec![entry(r"C:\docs\report.pdf", 10, false)]));
+        let mut server = Server::start_on(&[Ipv4Addr::LOCALHOST], 0, shared.clone()).unwrap();
+        let addr = server.addrs[0];
+        let fetch = |addr: SocketAddr, cookie: &str| {
+            let mut s = TcpStream::connect(addr).unwrap();
+            s.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            s.write_all(format!("GET /?q=report HTTP/1.1\r\nHost: {addr}\r\nCookie: {COOKIE}={cookie}\r\n\r\n").as_bytes()).unwrap();
+            let mut out = String::new();
+            let _ = s.read_to_string(&mut out);
+            out
+        };
+        assert!(fetch(addr, TOKEN).starts_with("HTTP/1.1 200"));
+        server.stop();
+        std::thread::sleep(Duration::from_millis(50));
+        assert!(TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_err(), "listener closed");
+        let new = "f".repeat(32);
+        shared.set_secrets(new.clone(), "87654321".into());
+        let server = Server::start_on(&[Ipv4Addr::LOCALHOST], 0, shared.clone()).unwrap();
+        let addr = server.addrs[0];
+        assert!(fetch(addr, TOKEN).starts_with("HTTP/1.1 401"), "old cookie");
+        assert_eq!(handle(&get(&format!("/?t={TOKEN}"), None), LAN, &shared, Instant::now()).status, 401, "old link");
+        assert!(fetch(addr, &new).starts_with("HTTP/1.1 200"));
+        // The session cookie stays out of scripts and other sites.
+        let c = session_cookie(TOKEN);
+        assert!(c.contains("; Path=/;") && c.contains("HttpOnly") && c.contains("SameSite=Strict"), "{c}");
     }
 
     /// A tiny xorshift generator: the same cases on every run.
