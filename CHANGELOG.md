@@ -5,6 +5,7 @@
 ## غير منشور (Unreleased)
 
 ### إصلاحات البحث
+- **«تقريب:» و«جذر:» في البحث داخل المستندات** كانا يُتجاهلان بصمت؛ الآن تقول رسالة الحالة إنهما يعملان على أسماء الملفات فقط وإن الكلمات بُحث عنها كما كُتبت. / `fuzzy:` and `root:` in a document search now say they apply to file names only.
 - **تصحيح لغة لوحة المفاتيح مع المرشحات**: «`hgjrvdv size:>1mb`» يصبح «التقرير size:>1mb» بدل تحويل المرشح أيضاً إلى حروف عربية؛ كل المرشحات (الحجم، التاريخ، regex، كلمة، نظام…) تبقى كما كُتبت. / The wrong-keyboard-layout fallback keeps every filter (`size:`, `dm:`, `regex:`…) as typed.
 - **البحث داخل مجلد اسمه فيه حروف مثل «İ»** (`C:\Users\İbrahim`): كان لا يجد شيئاً لأن الحرف الصغير أطول من الكبير؛ المقارنة الآن حرفاً حرفاً. / Searching in a folder whose name has letters like `İ` works.
 - **المدد مع المقارنة في `dm:`**: «`dm:>7d`» كان يُرفض ويُبحث عنه كنص، و«`dm:<=7d`» كان يطابق كل الملفات. الآن `>` و`>=` تعني بعد تلك اللحظة (أحدث، مثل `dm:7d`)، و`<` و`<=` قبلها (أقدم)، و`dm:30d..7d` بين لحظتين؛ وهي مشروحة في جدول README. / `dm:>7d` and `dm:<=7d` now mean newer / older than 7 days ago, and `dm:30d..7d` works; documented in the README.

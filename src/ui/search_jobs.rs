@@ -357,7 +357,9 @@ impl App {
             return;
         }
         let mut st = self.state.borrow_mut();
-        st.shown_query = Some(self.parse_query(&self.query.text()));
+        let mut shown = self.parse_query(&self.query.text());
+        shown.note_document_search();
+        st.shown_query = Some(shown);
         st.history.add_recent(&self.query.text());
         let index = st.index.clone();
         let scope = st.scope.clone();

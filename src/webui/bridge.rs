@@ -1081,7 +1081,8 @@ pub fn search(index: Arc<Index>, p: Params, lang: Lang) -> (Shown, Outbound) {
 /// The query of a search inside documents, or `None` when it has nothing
 /// to look for in a text (only filters, or nothing typed).
 pub fn content_query(p: &Params) -> Option<Query> {
-    let q = parser(p)(&p.text);
+    let mut q = parser(p)(&p.text);
+    q.note_document_search();
     q.has_text_criteria().then_some(q)
 }
 

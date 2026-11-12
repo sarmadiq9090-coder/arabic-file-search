@@ -1019,6 +1019,18 @@ impl Query {
         true
     }
 
+    /// For a search inside documents: `fuzzy:` and `root:` match file names
+    /// only, and inside a document the words are looked for as typed. Says so
+    /// in [`Query::warnings`] rather than ignoring them silently.
+    pub fn note_document_search(&mut self) {
+        if self.fuzzy || self.root {
+            self.warnings.push(tr!(
+                "«تقريب:» و«جذر:» (fuzzy: وroot:) يعملان على أسماء الملفات فقط؛ داخل المستندات بُحث عن الكلمات كما كُتبت",
+                "fuzzy: and root: work on file names only; inside documents the words were searched as typed"
+            ).to_string());
+        }
+    }
+
     /// True when nothing that narrows the results was typed: no terms,
     /// excludes, extensions or other filters. `dirs_only` alone does not
     /// count, so an empty box never lists the whole disk.

@@ -418,3 +418,27 @@ fn layout_fallback_keeps_every_filter() {
     assert_eq!(q.size, at("size:>1mb").size);
     assert_eq!(q.terms[0].alts[0], "التقرير");
 }
+
+// ----------------------------------------- fuzzy: and root: inside documents
+
+/// `fuzzy:` and `root:` changed nothing in a search inside documents and
+/// said nothing: the words were looked for as typed. Now the search says so.
+#[test]
+fn fuzzy_and_root_say_they_do_not_apply_inside_documents() {
+    for s in ["fuzzy: تقرير", "root:كتب", "تقريب:تقرير", "جذر: كتب"] {
+        let mut q = at(s);
+        assert!(q.warnings.is_empty(), "{s}");
+        q.note_document_search();
+        assert_eq!(q.warnings.len(), 1, "{s}");
+        assert!(q.warnings[0].contains("fuzzy:") && q.warnings[0].contains("root:"), "{s}");
+    }
+    // The words are still searched as typed.
+    let mut q = at("fuzzy: تقرير");
+    q.note_document_search();
+    assert!(match_text("هذا تقرير", &q).is_some());
+    assert!(match_text("هذا تقريير", &q).is_none());
+    // Nothing to say for other queries.
+    let mut q = at("تقرير franco:");
+    q.note_document_search();
+    assert!(q.warnings.is_empty());
+}
