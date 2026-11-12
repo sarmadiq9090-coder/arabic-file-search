@@ -89,6 +89,9 @@ pub fn missing_digest_message() -> String {
 pub enum PackageManager {
     Scoop,
     Winget,
+    Chocolatey,
+    /// The Microsoft Store (an MSIX package): Windows updates it.
+    Store,
 }
 
 impl PackageManager {
@@ -96,14 +99,20 @@ impl PackageManager {
         match self {
             PackageManager::Scoop => "Scoop",
             PackageManager::Winget => "winget",
+            PackageManager::Chocolatey => "Chocolatey",
+            PackageManager::Store => "Microsoft Store",
         }
     }
 
-    /// The command that updates InstaFind (`bucket/instafind.json`, `Sarmad.InstaFind`).
-    pub fn update_command(self) -> &'static str {
+    /// The command that updates InstaFind (`bucket/instafind.json`,
+    /// `Sarmad.InstaFind`, the Chocolatey package `instafind`); none for the
+    /// Store, which updates its apps by itself.
+    pub fn update_command(self) -> Option<&'static str> {
         match self {
-            PackageManager::Scoop => "scoop update instafind",
-            PackageManager::Winget => "winget upgrade Sarmad.InstaFind",
+            PackageManager::Scoop => Some("scoop update instafind"),
+            PackageManager::Winget => Some("winget upgrade Sarmad.InstaFind"),
+            PackageManager::Chocolatey => Some("choco upgrade instafind"),
+            PackageManager::Store => None,
         }
     }
 }
@@ -115,6 +124,10 @@ impl PackageManager {
 /// - winget: `Packages\` (portable installs) or `Links\` (their command
 ///   shims) under `%LOCALAPPDATA%\Microsoft\WinGet`, and the machine-wide
 ///   `%ProgramFiles%\WinGet` / `%ProgramFiles(x86)%\WinGet`.
+/// - Chocolatey: `lib\` (packages) or `bin\` (shims) under
+///   `%ChocolateyInstall%` or `%ProgramData%\chocolatey`.
+///
+/// (A Store copy is told by its package, see `managed_by`.)
 pub fn package_manager_for(exe: &str, var: impl Fn(&str) -> Option<String>) -> Option<PackageManager> {
     fn norm(p: &str) -> String {
         let p = p.replace('/', "\\");
@@ -147,17 +160,49 @@ pub fn package_manager_for(exe: &str, var: impl Fn(&str) -> Option<String>) -> O
     if winget.iter().any(|r| below(r, "Packages") || below(r, "Links")) {
         return Some(PackageManager::Winget);
     }
+    let choco = [var("ChocolateyInstall"), var("ProgramData").map(|d| format!("{d}\\chocolatey"))];
+    if choco.iter().any(|r| below(r, "lib") || below(r, "bin")) {
+        return Some(PackageManager::Chocolatey);
+    }
     None
+}
+
+/// Whether this copy can replace its own exe: a file can be created in its
+/// folder (not in Program Files without admin rights, a read-only share...).
+/// The probe file is removed again.
+pub fn folder_writable(dir: &std::path::Path) -> bool {
+    let probe = dir.join(format!("bahth.write-test.{}", std::process::id()));
+    let ok = std::fs::OpenOptions::new().write(true).create_new(true).open(&probe).is_ok();
+    if ok {
+        let _ = std::fs::remove_file(&probe);
+    }
+    ok
+}
+
+/// What the user is told instead of a self-update when this copy's folder
+/// cannot be written to.
+pub fn read_only_message(dir: &str) -> String {
+    trf!(
+        "لا يستطيع البرنامج تحديث نفسه في مكانه الحالي ({dir}) لأن الكتابة فيه غير مسموحة.\nنزّل الإصدار الجديد من fastkiwi.app أو انقل البرنامج إلى مجلد تملكه.",
+        "The program cannot update itself where it is ({dir}): that folder cannot be written to.\nDownload the new version from fastkiwi.app, or move the program to a folder of your own."
+    )
 }
 
 /// What the user is told instead of a self-update when a package manager
 /// installed this copy.
 pub fn managed_message(pm: PackageManager) -> String {
+    let Some(command) = pm.update_command() else {
+        return tr!(
+            "هذه النسخة من متجر Microsoft، والمتجر يحدّثها تلقائياً. للتحديث الآن افتح المتجر ثم «المكتبة» واضغط «الحصول على التحديثات».",
+            "This copy is from the Microsoft Store, which updates it by itself. To update now, open the Store, go to Library and choose Get updates."
+        )
+        .to_string();
+    };
     trf!(
         "هذه النسخة مثبّتة عبر {0}، لذلك يحدّثها {0} ولا يحدّث البرنامج نفسه بنفسه.\nللتحديث، شغّل هذا الأمر في الطرفية (Terminal):\n{1}",
         "This copy was installed with {0}, so it is updated by {0}, not by the program itself.\nTo update, run this in a terminal:\n{1}",
         pm.name(),
-        pm.update_command()
+        command
     )
 }
 
@@ -670,11 +715,21 @@ mod win {
             let var = |k: &str| std::env::var(k).ok();
             let started = std::env::current_exe().ok();
             let resolved = original_exe().ok().map(Path::to_path_buf);
+            if crate::rating::is_packaged() {
+                return Some(PackageManager::Store);
+            }
             started
                 .into_iter()
                 .chain(resolved)
                 .find_map(|p| package_manager_for(&p.to_string_lossy(), var))
         })
+    }
+
+    /// The folder of this copy when it cannot be written to (so a
+    /// self-update cannot work there).
+    pub fn read_only_folder() -> Option<String> {
+        let dir = original_exe().ok()?.parent()?;
+        (!folder_writable(dir)).then(|| dir.display().to_string())
     }
 
     /// GETs a small JSON document of at most `max` bytes (the exchange rates
@@ -702,6 +757,9 @@ mod win {
     pub fn download_and_install(rel: &Release, progress: impl Fn(u64, u64)) -> Result<(), String> {
         if let Some(pm) = managed_by() {
             return Err(managed_message(pm));
+        }
+        if let Some(dir) = read_only_folder() {
+            return Err(read_only_message(&dir));
         }
         // Found through the web page (API rate-limited): ask the API once
         // more, for this release only, for the checksum. Without it, refuse.
@@ -996,11 +1054,50 @@ mod tests {
 
     #[test]
     fn managed_message_names_the_update_command() {
-        for (pm, cmd) in [(PackageManager::Scoop, "scoop update instafind"), (PackageManager::Winget, "winget upgrade Sarmad.InstaFind")] {
+        for (pm, cmd) in [
+            (PackageManager::Scoop, "scoop update instafind"),
+            (PackageManager::Winget, "winget upgrade Sarmad.InstaFind"),
+            (PackageManager::Chocolatey, "choco upgrade instafind"),
+        ] {
             let m = managed_message(pm);
             assert!(m.contains(pm.name()) && m.contains(cmd), "{m}");
-            assert_eq!(pm.update_command(), cmd);
+            assert_eq!(pm.update_command(), Some(cmd));
         }
+        assert_eq!(PackageManager::Store.update_command(), None);
+        let store = managed_message(PackageManager::Store);
+        assert!(store.contains("متجر Microsoft") || store.contains("Microsoft Store"), "{store}");
+    }
+
+    #[test]
+    fn chocolatey_copies_are_recognised() {
+        let env = |k: &str| match k {
+            "ProgramData" => Some(r"C:\ProgramData".to_string()),
+            "ChocolateyInstall" => Some(r"D:\tools\choco".to_string()),
+            _ => None,
+        };
+        let pm = |exe: &str| package_manager_for(exe, env);
+        assert_eq!(pm(r"C:\ProgramData\chocolatey\lib\instafind\tools\bahth.exe"), Some(PackageManager::Chocolatey));
+        assert_eq!(pm(r"C:\ProgramData\chocolatey\bin\bahth.exe"), Some(PackageManager::Chocolatey));
+        assert_eq!(pm(r"D:\tools\choco\lib\instafind\tools\bahth.exe"), Some(PackageManager::Chocolatey));
+        assert_eq!(pm(r"C:\ProgramData\chocolatey\bahth.exe"), None);
+        assert_eq!(pm(r"C:\Users\sara\Downloads\bahth.exe"), None);
+    }
+
+    #[test]
+    fn a_folder_that_cannot_be_written_to_is_seen() {
+        let dir = std::env::temp_dir().join(format!("bahth_writable_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(folder_writable(&dir));
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0, "the probe is removed");
+        assert!(!folder_writable(&dir.join("missing")));
+        // A file in place of the folder (cannot hold a new file either).
+        let file = dir.join("file");
+        std::fs::write(&file, b"").unwrap();
+        assert!(!folder_writable(&file));
+        let m = read_only_message(r"C:\Program Files\InstaFind");
+        assert!(m.contains(r"C:\Program Files\InstaFind"), "{m}");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
