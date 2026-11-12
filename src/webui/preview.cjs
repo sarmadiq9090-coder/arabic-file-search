@@ -236,7 +236,7 @@ const SHOTS = [
   ["enter-en-light", "en", "light", [["type", "report"], ["key", "Enter"]], { expect: { focus: "list", opens: 0 } }],
   ["enter-twice-en-light", "en", "light", [["type", "report"], ["key", "Enter"], ["key", "Enter"]], { expect: { opens: 1 } }],
   // The first indexing, nothing found yet: "still indexing", not "nothing in 0 files".
-  ["indexing-nores-ar-light", "ar", "light", [["type", "zzqq"]], { indexing: true, expect: { view: "view-nores", stillIndexing: true } }],
+  ["indexing-nores-ar-light", "ar", "light", [["type", "zzqq"]], { indexing: true, expect: { view: "view-nores", stillIndexing: true, tagline: false } }],
   // A classic user switched by the update: told once, with the way back.
   ["switched-ar-light", "ar", "light", [], { switched: true, expect: { switched: true } }],
   ["switched-back-en-light", "en", "light", [["click", "#switched-back"], ["wait", 50]], { switched: true, expect: { switched: false, lastSent: "classic_look" } }],
@@ -411,6 +411,7 @@ const SHOTS = [
         warn: document.getElementById("status-text").classList.contains("warn"),
         qAlign: getComputedStyle(document.querySelector("#q")).textAlign,
         compact: document.body.classList.contains("compact"),
+        tagline: visible(document.querySelector("#view-nores .tagline")),
         dateW: document.body.style.getPropertyValue("--w-date"),
         linesTop: (() => { const l = document.querySelector(".preview .pv-lines, .preview .snip"); return !!l && l.getBoundingClientRect().top < innerHeight * 0.75; })(),
         zoom: document.documentElement.style.zoom || "1",

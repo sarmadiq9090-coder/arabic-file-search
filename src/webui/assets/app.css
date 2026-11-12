@@ -296,6 +296,8 @@ ol.lines .lt { text-align: start; overflow-wrap: anywhere; }
 .sg .tx span { color: var(--muted); font-size: 12.5px; }
 .tagline { margin-top: 18px; color: var(--muted); font-size: 12.5px; }
 .tagline b { color: var(--text); font-weight: 600; }
+/* Still indexing: nothing was missed yet, so no "nothing gets lost" line. */
+#view-nores.indexing .tagline { display: none; }
 
 /* ---------- settings ---------- */
 .settings { height: 100%; overflow-y: auto; padding: 18px 28px 28px; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; align-content: start; }
