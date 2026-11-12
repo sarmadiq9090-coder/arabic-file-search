@@ -2296,7 +2296,7 @@ function Scenario-F([string]$V, [bool]$Hook = $false) {
     [void](Remove-Tree $root 120)
     $free = Free-GB $dataRoot
     # The three downloads grow to this size each, then start again.
-    $cap = [int64][Math]::Max(256MB, [Math]::Min(3GB * $SizeScale, ($free - 14) * 1GB / 4))
+    $cap = [int64][Math]::Max([int64]256MB, [Math]::Min([int64](3GB * $SizeScale), [int64](($free - 14) * 1GB / 4)))
     if ($free -lt 20) { Warn ("$scn ({0}): only {1:N0} GB free on {2}; the growing files are capped at {3:N0} MB each" -f $V, $free, $dataRoot, ($cap / 1MB)) }
     $churnSecs = Plan-Seconds 900 'F churn' 800
     Say ("churn in {0} for {1} s: 3 renderers at 15 MB/s, 2 Library threads at 350 files/s, downloads at 30 MB/s growing to {2:N0} MB, documents at 40 saves/s; {3:N0} GB free" -f $root, $churnSecs, ($cap / 1MB), $free)
