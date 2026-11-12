@@ -140,7 +140,7 @@ fn save_enabled(on: bool) {
 // ---------------------------------------------------------------- pictures
 
 /// The 32-bit pixels of a bitmap, top row first.
-fn bitmap_pixels(hbm: HBITMAP) -> Option<(i32, i32, Vec<u32>)> {
+pub(super) fn bitmap_pixels(hbm: HBITMAP) -> Option<(i32, i32, Vec<u32>)> {
     if hbm.is_null() {
         return None;
     }
@@ -281,7 +281,7 @@ fn type_icon_handle(ext: &str) -> HICON {
 
 /// The shell's thumbnail of a file as an `n`×`n` tile, or null when it has
 /// none (or the shell can't make thumbnails, as under Wine).
-fn shell_thumbnail(path: &str, n: i32) -> HBITMAP {
+pub(super) fn shell_thumbnail(path: &str, n: i32) -> HBITMAP {
     unsafe extern "system" {
         fn SHCreateItemFromParsingName(path: *const u16, bc: *mut c_void, riid: *const GUID, out: *mut *mut c_void) -> HRESULT;
     }

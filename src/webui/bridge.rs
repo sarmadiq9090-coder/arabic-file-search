@@ -40,6 +40,8 @@ pub const MAX_MESSAGE: usize = 16 * 1024;
 pub const MAX_QUERY: usize = 1000;
 /// Longest new file name accepted, in characters (Windows' own limit).
 pub const MAX_NAME: usize = 255;
+/// Thumbnails asked for in one request (the tiles that came into view).
+pub const MAX_THUMBS: usize = 64;
 /// Recent searches listed in the history menu.
 pub const RECENT_SEARCHES: usize = 15;
 
@@ -257,6 +259,9 @@ pub enum Request {
     ReplaceText {},
     /// Folder sizes of the folder of row `id` (the folder itself for a folder).
     FolderSizes { list: List, seq: u64, ver: u64, id: u32 },
+    /// One-time keys for the thumbnails of rows `ids` of version `ver` of
+    /// search `seq` (the grid view; at most [`MAX_THUMBS`] at a time).
+    Thumbs { seq: u64, ver: u64, ids: Vec<u32> },
     /// Open the program's Options menu (the classic window's, with its
     /// tools, support, updates and quick-search settings) at the pointer.
     OptionsMenu {},
@@ -297,6 +302,7 @@ pub fn parse(body: &str, source: &str, token: &str) -> Result<Request, Rejected>
         Request::SaveSearch { q, kind, .. } => *kind < KINDS.len() && !q.trim().is_empty() && text_ok(q),
         Request::Web { q } => !q.trim().is_empty() && text_ok(q),
         Request::Saved { name, .. } => text_ok(name),
+        Request::Thumbs { ids, .. } => !ids.is_empty() && ids.len() <= MAX_THUMBS,
         Request::Rename { name, .. } => !name.trim().is_empty() && name.chars().count() <= MAX_NAME,
         _ => true,
     };
@@ -519,6 +525,13 @@ pub enum Outbound {
     Notice {
         text: String,
         warn: bool,
+    },
+    /// The thumbnail keys of rows of version `ver` of search `seq`: the page
+    /// loads `/thumb/<key>` for each (rows it no longer lists get none).
+    Thumbs {
+        seq: u64,
+        ver: u64,
+        keys: Vec<(u32, String)>,
     },
     /// The apps search `seq`'s text names strongly (as the classic window's
     /// app buttons), by title; the page asks for one by its place.
@@ -1073,6 +1086,14 @@ impl Shown {
             .collect()
     }
 
+    /// Row `id`'s file for its thumbnail: (path, size, date, is a folder);
+    /// a renamed row by its new path, none for a row sent to the Recycle Bin.
+    pub fn thumb_entry(&self, id: u32) -> Option<(&str, u64, i64, bool)> {
+        let path = self.path(id)?;
+        let e = self.index.entries.get(*self.hits.get(id as usize)? as usize)?;
+        Some((path, e.size, e.mtime, e.is_dir))
+    }
+
     /// Whether row `id` is a folder.
     pub fn is_dir(&self, id: u32) -> bool {
         self.hits.get(id as usize).and_then(|&i| self.index.entries.get(i as usize)).is_some_and(|e| e.is_dir)
@@ -1411,6 +1432,12 @@ mod tests {
         assert_eq!(req(r#""op":"restart""#), Ok(Request::Restart {}));
         assert_eq!(req(r#""op":"classic_look""#), Ok(Request::ClassicLook {}));
         assert_eq!(req(r#""op":"options_menu""#), Ok(Request::OptionsMenu {}));
+        assert_eq!(req(r#""op":"thumbs","seq":3,"ver":4,"ids":[0,1,2]"#), Ok(Request::Thumbs { seq: 3, ver: 4, ids: vec![0, 1, 2] }));
+        assert_eq!(req(r#""op":"thumbs","seq":3,"ver":4,"ids":[]"#), Err(Rejected::Invalid));
+        let many: Vec<String> = (0..=MAX_THUMBS).map(|i| i.to_string()).collect();
+        assert_eq!(req(&format!(r#""op":"thumbs","seq":3,"ver":4,"ids":[{}]"#, many.join(","))), Err(Rejected::Invalid));
+        assert_eq!(req(r#""op":"thumbs","seq":3,"ids":[0]"#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"thumbs","seq":3,"ver":4,"ids":[0],"path":"C:\\a.jpg""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"export""#), Ok(Request::Export {}));
         assert_eq!(req(r#""op":"export","path":"C:\\x.csv""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"replace_text""#), Ok(Request::ReplaceText {}));
@@ -2016,6 +2043,11 @@ mod tests {
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0], ExportRow { path: "C:\\Users\\Sara\\Documents\\تقرير نهائي.xlsx".into(), size: Some(48_000), mtime: rows[0].mtime, snippet: "مبيعات الربع".into() });
         assert_eq!((rows[1].path.as_str(), rows[1].size), ("D:\\Projects\\تقرير الصيانة", None));
+        // Thumbnails: by row, the renamed row by its new path, none for the recycled one or past the end.
+        assert_eq!(shown.thumb_entry(0).map(|e| (e.0, e.1, e.3)), Some(("C:\\Users\\Sara\\Documents\\تقرير نهائي.xlsx", 48_000, false)));
+        assert!(shown.thumb_entry(1).is_some_and(|e| e.3));
+        assert_eq!(shown.thumb_entry(2), None);
+        assert_eq!(shown.thumb_entry(99), None);
     }
 
     #[test]

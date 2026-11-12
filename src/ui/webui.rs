@@ -151,6 +151,8 @@ mod imp {
         apps: RefCell<(u64, String, Vec<crate::launcher::Item>)>,
         /// The file a drag the page started is for, until the drag starts.
         drag: RefCell<Option<String>>,
+        /// The grid view's thumbnails: one-time keys and the pictures.
+        thumbs: super::super::webui_thumbs::ThumbBroker,
         /// What the page searched last: given back to a page loaded again
         /// (after a renderer failure) and to the classic window on going back.
         page_query: RefCell<String>,
@@ -353,7 +355,8 @@ mod imp {
                         app.on_webui_message(body, source);
                     }
                 };
-                Host::create(hwnd as isize, crate::i18n::current(), &token, dark, on_message, on_failed)
+                let broker = self.webui.thumbs.clone();
+                Host::create(hwnd as isize, crate::i18n::current(), &token, dark, on_message, on_failed, move |key: &str, reply| broker.serve(key, reply))
             };
             // A WebView2 that fails to start once (its browser process
             // crashed, a busy profile) often starts the second time.
@@ -561,6 +564,11 @@ mod imp {
         /// a classic user's setting (`Settings::make_new_look_default`).
         pub(in super::super) fn webui_tell_switch(&self) {
             self.webui.tell_switch.set(true);
+        }
+
+        /// The memory guard: the grid's made thumbnails go (made again).
+        pub(in super::super) fn webui_shed_thumbs(&self) {
+            self.webui.thumbs.shed();
         }
 
         /// The new main window, while it is the one in use.
@@ -790,6 +798,7 @@ mod imp {
                     // acted on or sent to it.
                     self.webui_stop_content();
                     self.webui.lists.borrow_mut().reset();
+                    self.webui.thumbs.forget_keys();
                     self.webui.ready.set(true);
                     if let Some(t) = self.webui.loading_since.get() {
                         log(&format!(
@@ -1045,6 +1054,16 @@ mod imp {
                 Request::Hide {} => self.webui_hide(),
                 Request::ClassicLook {} => self.webui_leave(true),
                 Request::OptionsMenu {} => self.webui.options_pending.set(true),
+                // The grid view: a one-time key per row still listed (rows
+                // of another version get none; the page never names a path).
+                Request::Thumbs { seq, ver, ids } => {
+                    let keys: Vec<(u32, String)> = {
+                        let lists = self.webui.lists.borrow();
+                        let Ok(shown) = lists.shown_at(seq, ver) else { return };
+                        ids.iter().filter_map(|&id| shown.thumb_entry(id).map(|(path, size, mtime, _)| (id, self.webui.thumbs.register(path, size, mtime)))).collect()
+                    };
+                    self.webui_send(&Outbound::Thumbs { seq, ver, keys });
+                }
                 // The Save dialog runs inside this handler: the timer leaves the page alone meanwhile.
                 Request::Export {} => {
                     self.webui.in_page_call.set(true);
@@ -1719,6 +1738,8 @@ mod imp {
         }
 
         pub(in super::super) fn webui_tell_switch(&self) {}
+
+        pub(in super::super) fn webui_shed_thumbs(&self) {}
 
         pub(in super::super) fn webui_busy(&self) -> bool {
             false

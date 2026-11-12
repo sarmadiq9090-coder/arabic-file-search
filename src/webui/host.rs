@@ -37,6 +37,18 @@ const _: () = assert!(COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED.0 
 const _: () = assert!(COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED.0 == super::failed_kind::RENDER_PROCESS_EXITED);
 const _: () = assert!(COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE.0 == super::failed_kind::RENDER_PROCESS_UNRESPONSIVE);
 
+/// How the program answers a thumbnail request: the PNG, or none (404).
+pub type Thumb = Box<dyn FnOnce(Option<std::sync::Arc<Vec<u8>>>) + Send>;
+
+/// The HTTP response for `reply`, with the page's security headers.
+fn response(reply: assets::Reply) -> Response<Cow<'static, [u8]>> {
+    let mut response = Response::builder().status(reply.status).header("Content-Type", reply.mime);
+    for (name, value) in assets::HEADERS {
+        response = response.header(*name, *value);
+    }
+    response.body(reply.body).unwrap_or_else(|_| Response::new(Cow::Borrowed(&b""[..])))
+}
+
 /// The page inside a window.
 pub struct Host {
     webview: WebView,
@@ -72,6 +84,7 @@ impl Host {
         dark: bool,
         on_message: impl Fn(&str, &str) + 'static,
         on_failed: impl Fn(bool) + 'static,
+        thumbs: impl Fn(&str, Thumb) + Send + Sync + 'static,
     ) -> Result<Host, String> {
         let parent = Parent(NonZeroIsize::new(hwnd).ok_or("no window")?);
         let page = assets::page(lang, token).ok_or("bad token")?;
@@ -81,13 +94,24 @@ impl Host {
         let mut context = WebContext::new(Some(data));
         let background = if dark { (15, 26, 31, 255) } else { (247, 250, 242, 255) };
         let webview = WebViewBuilder::new_with_web_context(&mut context)
-            .with_custom_protocol(assets::SCHEME.to_string(), move |_id, request: Request<Vec<u8>>| {
-                let reply = assets::serve(request.method().as_str(), request.uri().path(), &page);
-                let mut response = Response::builder().status(reply.status).header("Content-Type", reply.mime);
-                for (name, value) in assets::HEADERS {
-                    response = response.header(*name, *value);
+            // The page and its files at once; a thumbnail (`/thumb/<key>`)
+            // when a worker has made it (`thumbs` answers through `Thumb`).
+            .with_asynchronous_custom_protocol(assets::SCHEME.to_string(), move |_id, request: Request<Vec<u8>>, responder| {
+                let path = request.uri().path();
+                if request.method() == "GET"
+                    && let Some(key) = assets::thumb_key(path)
+                {
+                    let answer: Thumb = Box::new(move |png| {
+                        let reply = match png {
+                            Some(png) => assets::Reply { status: 200, mime: "image/png", body: Cow::Owned(png.to_vec()) },
+                            None => assets::Reply { status: 404, mime: "text/plain; charset=utf-8", body: Cow::Borrowed(b"") },
+                        };
+                        responder.respond(response(reply));
+                    });
+                    let _ = crate::crash_log::catch(|| thumbs(key, answer));
+                    return;
                 }
-                response.body(reply.body).unwrap_or_else(|_| Response::new(Cow::Borrowed(&b""[..])))
+                responder.respond(response(assets::serve(request.method().as_str(), path, &page)));
             })
             .with_url(assets::START_URL)
             .with_ipc_handler(move |request: Request<String>| {
