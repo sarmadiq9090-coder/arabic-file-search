@@ -79,6 +79,12 @@ if (Test-Path (Join-Path $data 'log.txt')) { Write-Host '--- log.txt ---'; Get-C
 if (Test-Path $index) {
     $r = Run-Cli @('-s', 'تقرير مالي')
     if ($r.Code -ne 0 -or $r.Out -notmatch 'bahth-smoke') { Fail 'Arabic name search did not find the test file' }
+    # Nothing matches as typed, so the window's fallbacks apply: the wrong
+    # keyboard layout and Arabizi for «تقرير مالي» (scoped to the test folder).
+    foreach ($q in @('jrvdv lhgd', 'ta2rer mali')) {
+        $r = Run-Cli @('-s', $q, '--scope', $docs)
+        if ($r.Code -ne 0 -or $r.Out -notmatch 'bahth-smoke') { Fail "'$q' (wrong layout / Arabizi) did not find the test file" }
+    }
     $r = Run-Cli @('-s', 'émoji 😀 report', '--json')
     if ($r.Code -ne 0 -or $r.Out -notmatch 'bahth-smoke') { Fail 'Unicode name search failed' }
     $r = Run-Cli @('-s', 'longxxxxxxxxxx')
