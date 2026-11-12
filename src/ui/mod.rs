@@ -45,6 +45,7 @@ mod lang_menu;
 mod keys;
 mod launcher_shim; // thin glue to crate::launcher, see the file
 mod lazy;
+mod memory;
 mod quick;
 mod quickswitch;
 mod rating;
@@ -186,6 +187,16 @@ impl State {
     }
 }
 
+/// The memory guard's state in the window (see `memory.rs`).
+#[derive(Default)]
+struct MemoryWatch {
+    guard: RefCell<crate::mem_guard::Guard>,
+    sampled: Cell<Option<std::time::Instant>>,
+    lined: Cell<Option<std::time::Instant>>,
+    /// After shedding: when to watch the drives again.
+    resume_at: Cell<Option<std::time::Instant>>,
+}
+
 #[derive(Default)]
 pub struct App {
     window: nwg::Window,
@@ -226,6 +237,8 @@ pub struct App {
     /// Wakes the UI thread when the drive watcher has a batch of changes.
     watch_notice: nwg::Notice,
     watch_inbox: Arc<Mutex<watching::Inbox>>,
+    /// The memory guard (`memory.rs`).
+    mem: MemoryWatch,
     /// The saved index misses changes of the last session (its marker file
     /// was found): scan the drives again once it is loaded.
     reconcile: Cell<bool>,

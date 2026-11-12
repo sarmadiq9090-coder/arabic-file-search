@@ -259,7 +259,7 @@ impl App {
     }
 
     /// A walk of a whole root after lost events, paced by `RescanPace`.
-    fn request_rescan(&self, root: String) {
+    pub(super) fn request_rescan(&self, root: String) {
         let mut st = self.state.borrow_mut();
         let busy = st.subtree_scans.iter().any(|j| j.dir == root) || walk_must_wait();
         // The walk of the whole root covers the folders in it that wait.

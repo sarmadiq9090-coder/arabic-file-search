@@ -12,8 +12,14 @@ use crate::index::{self, Entry};
 
 /// The store in `%LOCALAPPDATA%\BahthSari\content\`, opened on first use
 /// (always from a background thread). `None` when it can't be opened.
+static CACHE: OnceLock<Option<ContentCache>> = OnceLock::new();
+
+/// The store, only if it is open already (never opens it: no disk access).
+pub(super) fn opened() -> Option<&'static ContentCache> {
+    CACHE.get()?.as_ref()
+}
+
 pub(super) fn shared() -> Option<&'static ContentCache> {
-    static CACHE: OnceLock<Option<ContentCache>> = OnceLock::new();
     CACHE
         .get_or_init(|| {
             let started = Instant::now();

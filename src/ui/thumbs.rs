@@ -107,7 +107,7 @@ pub struct Thumbs {
     images: Cell<usize>,
     /// Tile edge in physical pixels.
     size: Cell<i32>,
-    cache: RefCell<Option<ThumbCache>>,
+    pub(super) cache: RefCell<Option<ThumbCache>>,
     /// Image-list slot of the file-type icon of each extension ("/" folders).
     type_icons: RefCell<HashMap<String, i32>>,
     /// Number of results last arranged.

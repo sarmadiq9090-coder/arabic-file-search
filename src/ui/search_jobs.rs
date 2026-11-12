@@ -465,6 +465,7 @@ impl App {
         let t = self.ticks.get().wrapping_add(1);
         self.ticks.set(t);
         self.poll_indexing(t);
+        self.memory_tick();
         self.webui_tick(t);
         if t % 18_000 == 50 {
             self.maybe_check_for_update();

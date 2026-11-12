@@ -224,7 +224,6 @@ impl ChangeQueue {
     }
 
     /// Changes waiting (a collapsed root counts as one).
-    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.changes.len() + self.collapsed.len()
     }
