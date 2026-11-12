@@ -558,8 +558,8 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
 
     // The best result, unless pinned favourites already lead.
     let mut best: Option<Row> = None;
+    let starts = |r: &Row| crate::normalize::normalize(&r.title).starts_with(&nq) || strong.contains(&r.target);
     if pins.is_empty() && !query.is_empty() {
-        let starts = |r: &Row| crate::normalize::normalize(&r.title).starts_with(&nq) || strong.contains(&r.target);
         let has_app = items.iter().any(|r| r.group == Group::Apps);
         if let Some(i) = items.iter().position(|r| r.group == Group::Answers) {
             best = Some(items.remove(i));
@@ -575,10 +575,27 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
         }
     }
 
+    // Files whose names don't hold the query were found only by guessing
+    // (the other keyboard layout, Arabizi, typos): «المفكرة» found Notepad
+    // and then "mathgl", «رسام» Paint and then "vshelp.h". Behind an app
+    // or a settings page that is surely what was meant they are noise, and
+    // otherwise they come after the settings pages.
+    let loose = |r: &Row| !names_query(&r.title, &query);
+    let sure = best.as_ref().is_some_and(|b| strong.contains(&b.target) || (b.group == Group::Settings && starts(b)));
+    if sure {
+        files.retain(|r| !loose(r));
+    }
+    let files_loose = !files.is_empty() && files.iter().all(loose);
+    let order = if files_loose {
+        [Group::Windows, Group::Apps, Group::Settings, Group::Files, Group::Answers, Group::Commands, Group::Web]
+    } else {
+        [Group::Windows, Group::Apps, Group::Files, Group::Settings, Group::Answers, Group::Commands, Group::Web]
+    };
+
     let mut sections: Vec<Vec<Row>> = Vec::new();
     sections.push(pins);
     sections.push(best.into_iter().map(|r| Row { group: Group::Best, ..r }).collect());
-    for g in [Group::Windows, Group::Apps, Group::Files, Group::Settings, Group::Answers, Group::Commands, Group::Web] {
+    for g in order {
         let mut v: Vec<Row> = if g == Group::Files {
             std::mem::take(&mut files)
         } else {
@@ -1169,6 +1186,60 @@ mod tests {
         Action::Launch { target: t.into(), args: String::new() }
     }
 
+    fn parts(query: &str, items: Vec<Item>, files: &[&str]) -> Parts {
+        Parts { query: query.into(), pins: vec![], items, files: files.iter().map(|f| Row::file(f, false)).collect(), files_done: true }
+    }
+
+    #[test]
+    fn guessed_files_are_dropped_behind_the_app_that_was_meant() {
+        // «المفكرة» is Notepad; the file search found nothing named so and
+        // fell back to the other keyboard layout.
+        let notepad = Item { strong: true, ..item(Kind::App, "المفكرة (Notepad)", launch("notepad.exe")) };
+        let rows = arrange(parts("المفكرة", vec![notepad], &["C:\\libs\\mathgl.dll", "C:\\x\\mathgl-2.4"]));
+        assert_eq!(rows[0].group, Group::Best);
+        assert_eq!(rows[0].target, Target::Launcher(launch("notepad.exe")));
+        assert!(rows.iter().all(|r| r.group != Group::Files), "{rows:?}");
+        let paint = Item { strong: true, ..item(Kind::App, "الرسام (Paint)", launch("mspaint.exe")) };
+        let rows = arrange(parts("رسام", vec![paint], &["C:\\VS\\include\\vshelp.h"]));
+        assert!(rows.iter().all(|r| !r.title.contains("vshelp")), "{rows:?}");
+        // A settings page named with the query does the same.
+        let display = item(Kind::Setting, "Display", Action::OpenUri("ms-settings:display".into()));
+        let rows = arrange(parts("display", vec![display], &["C:\\x\\dsiplya.txt"]));
+        assert_eq!(rows[0].target, Target::Launcher(Action::OpenUri("ms-settings:display".into())));
+        assert!(rows.iter().all(|r| r.group != Group::Files), "{rows:?}");
+    }
+
+    #[test]
+    fn files_named_with_the_query_stay_after_the_app() {
+        let notepad = Item { strong: true, ..item(Kind::App, "Notepad", launch("notepad.exe")) };
+        let rows = arrange(parts("notepad", vec![notepad], &["C:\\notes\\notepad tips.txt"]));
+        assert_eq!(rows[0].group, Group::Best);
+        assert!(rows.iter().any(|r| r.group == Group::Files && r.title == "notepad tips.txt"), "{rows:?}");
+        // An Arabic file is found and leads when no app is meant.
+        let rows = arrange(parts("تقرير مالي", vec![], &["C:\\docs\\تقرير مالي 2026.xlsx"]));
+        assert_eq!((rows[0].group, rows[0].title.as_str()), (Group::Best, "تقرير مالي 2026.xlsx"));
+    }
+
+    #[test]
+    fn settings_pages_come_before_files_that_only_resemble_the_query() {
+        // A weak app (a typo) is best; the files were found with typos too.
+        let items = vec![
+            item(Kind::App, "Notepad", launch("notepad.exe")),
+            item(Kind::Setting, "Notifications", Action::OpenUri("ms-settings:notifications".into())),
+        ];
+        let rows = arrange(parts("notepda", items, &["C:\\x\\notepad.txt"]));
+        assert_eq!(rows[0].target, Target::Launcher(launch("notepad.exe")));
+        let settings = rows.iter().position(|r| r.group == Group::Settings).expect("settings row");
+        let files = rows.iter().position(|r| r.group == Group::Files).expect("the typo'd file is kept");
+        assert!(settings < files, "{rows:?}");
+        // Files named with the query keep their place before the settings.
+        let items = vec![item(Kind::Setting, "Sound", Action::OpenUri("ms-settings:sound".into()))];
+        let rows = arrange(parts("report", items, &["C:\\a\\report.pdf", "C:\\a\\report 2.pdf"]));
+        let settings = rows.iter().position(|r| r.group == Group::Settings).unwrap();
+        let files = rows.iter().position(|r| r.group == Group::Files).unwrap();
+        assert!(files < settings, "{rows:?}");
+    }
+
     fn groups(rows: &[Row]) -> Vec<Group> {
         rows.iter().map(|r| r.group).collect()
     }
@@ -1241,7 +1312,7 @@ mod tests {
     #[test]
     fn caps_and_limit() {
         let items: Vec<Item> = (0..10).map(|i| item(Kind::App, &format!("zapp{i}"), launch(&format!("a{i}")))).chain((0..10).map(|i| item(Kind::Setting, &format!("zset{i}"), Action::OpenUri(format!("s{i}"))))).collect();
-        let files: Vec<Row> = (0..20).map(|i| Row::file(&format!(r"C:\f{i}.txt"), false)).collect();
+        let files: Vec<Row> = (0..20).map(|i| Row::file(&format!(r"C:\q{i}.txt"), false)).collect();
         let rows = arrange(Parts { query: "q".into(), pins: vec![], items, files, files_done: true });
         let n = |g| rows.iter().filter(|r| r.group == g).count();
         assert_eq!(rows.iter().filter(|r| r.group != Group::More).count(), MAX_RESULTS);
