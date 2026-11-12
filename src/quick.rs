@@ -387,6 +387,24 @@ impl Target {
         }
     }
 
+    /// The arguments a pin of this target keeps: those of a program
+    /// (`control printers`), none for anything else.
+    pub fn pin_args(&self) -> &str {
+        match self {
+            Target::Launcher(Action::Launch { args, .. }) => args,
+            _ => "",
+        }
+    }
+
+    /// Whether `self` and `other` are the same favourite: the same file or
+    /// program, started with the same arguments (case ignored).
+    pub fn same_pin(&self, other: &Target) -> bool {
+        match (self.pin_target(), other.pin_target()) {
+            (Some(a), Some(b)) => a.eq_ignore_ascii_case(b) && self.pin_args().trim().eq_ignore_ascii_case(other.pin_args().trim()),
+            _ => false,
+        }
+    }
+
     /// A file system path whose folder can be opened.
     pub fn path(&self) -> Option<&str> {
         match self {
@@ -556,7 +574,7 @@ pub fn arrange(parts: Parts) -> Vec<Row> {
     let query = parts.query.trim().to_string();
     let mut pins: Vec<Row> = parts.pins.into_iter().map(|r| Row { group: Group::Pinned, ..r }).collect();
     pins.truncate(cap(Group::Pinned));
-    let pinned = |t: &Target| pins.iter().any(|p| p.target.pin_target().is_some_and(|a| t.pin_target().is_some_and(|b| a.eq_ignore_ascii_case(b))));
+    let pinned = |t: &Target| pins.iter().any(|p| p.target.same_pin(t));
     // Apps matched strongly (a name or its start, Arabic ones too, or a habit) lead over files.
     let strong: Vec<Target> = parts
         .items
@@ -1304,6 +1322,15 @@ mod tests {
         assert_eq!(Target::Launcher(launch("shell:AppsFolder\\x")).path(), None);
         assert_eq!(Target::Launcher(launch("shell:AppsFolder\\x")).pin_target(), Some("shell:AppsFolder\\x"));
         assert_eq!(Target::Launcher(Action::OpenUri("ms-settings:".into())).pin_target(), None);
+        // "control" and "control printers" are different favourites.
+        let control = |args: &str| Target::Launcher(Action::Launch { target: "control".into(), args: args.into() });
+        assert_eq!(control("printers").pin_args(), "printers");
+        assert!(control("printers").same_pin(&control("Printers")));
+        assert!(!control("printers").same_pin(&control("")));
+        assert!(control("").same_pin(&Target::Launcher(launch("CONTROL"))));
+        let file = Target::File { path: "C:\\a".into(), is_dir: false };
+        assert!(file.same_pin(&Target::File { path: "c:\\A".into(), is_dir: false }));
+        assert!(!file.same_pin(&Target::Launcher(Action::OpenUri("C:\\a".into()))));
         let it = Item { icon_path: Some("C:\\x.exe".into()), ..item(Kind::App, "X", launch("C:\\x.exe")) };
         assert_eq!(Row::from_item(it).icon, Icon::Shell { path: "C:\\x.exe".into(), is_dir: false });
         assert_eq!(Row::from_item(item(Kind::Setting, "S", Action::OpenUri("u".into()))).icon, Icon::Glyph(glyph::SETTINGS));

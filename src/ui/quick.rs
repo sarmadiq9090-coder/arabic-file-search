@@ -1274,9 +1274,10 @@ impl App {
             target: t.to_string(),
             app: matches!(target, Target::Launcher(_)),
             dir: matches!(target, Target::File { is_dir: true, .. }),
+            args: target.pin_args().to_string(),
         };
         let mut st = self.state.borrow_mut();
-        let was = st.history.is_pinned(t);
+        let was = st.history.is_pinned(t, target.pin_args());
         let now = st.history.toggle_pin(pin);
         st.history.save();
         drop(st);
@@ -1326,7 +1327,7 @@ impl App {
             Target::Launcher(Action::Launch { target, .. }) => runs_as_admin(target),
             _ => false,
         };
-        let pinned = row.target.pin_target().map(|t| self.state.borrow().history.is_pinned(t));
+        let pinned = row.target.pin_target().map(|t| self.state.borrow().history.is_pinned(t, row.target.pin_args()));
         let mut items: Vec<(How, String)> = vec![(How::Open, tr!("فتح\tEnter", "Open\tEnter").to_string())];
         if admin {
             items.push((How::Admin, tr!("تشغيل كمسؤول", "Run as administrator").to_string()));
@@ -1473,7 +1474,7 @@ fn pin_row(p: &crate::history::Pin) -> Row {
             group: Group::Pinned,
             title: p.title.clone(),
             subtitle: tr!("تطبيق", "App").to_string(),
-            target: Target::Launcher(Action::Launch { target: p.target.clone(), args: String::new() }),
+            target: Target::Launcher(Action::Launch { target: p.target.clone(), args: p.args.clone() }),
             icon: if shell_app { Icon::Glyph(quick::glyph::APPS) } else { Icon::Shell { path: p.target.clone(), is_dir: false } },
         }
     } else {
