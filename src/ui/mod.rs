@@ -193,6 +193,16 @@ impl State {
     }
 }
 
+/// Matching lines read again from a document on a background thread (they
+/// can take long: a big file is extracted again), for the classic window's
+/// row (by path) or a row of the new look's list.
+enum MatchesRead {
+    Classic { path: String, found: Option<(u32, Vec<(u32, String)>)> },
+    // (Only the MSVC build has the new look.)
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))]
+    Web { seq: u64, ver: u64, id: u32, found: Option<(u32, Vec<(u32, String)>)> },
+}
+
 /// The memory guard's state in the window (see `memory.rs`).
 #[derive(Default)]
 struct MemoryWatch {
@@ -240,6 +250,9 @@ pub struct App {
     /// Wakes the UI thread when an update check or download finishes.
     update_notice: nwg::Notice,
     update_result: Arc<Mutex<Option<UpdateEvent>>>,
+    /// Wakes the UI thread when matches read again in the background are ready.
+    matches_notice: nwg::Notice,
+    matches_read: Arc<Mutex<Vec<MatchesRead>>>,
     /// Wakes the UI thread when the drive watcher has a batch of changes.
     watch_notice: nwg::Notice,
     watch_inbox: Arc<Mutex<watching::Inbox>>,

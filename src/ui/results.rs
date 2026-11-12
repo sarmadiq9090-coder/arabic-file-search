@@ -248,7 +248,16 @@ impl App {
             self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first."));
             return;
         };
-        self.read_matches_again(row);
+        // Lines not kept for this result are read again in the background,
+        // and the window opens when they are there (`on_matches_read`).
+        if self.read_matches_again(row) {
+            self.set_status(tr!("جارٍ قراءة التطابقات من الملف…", "Reading the matches from the file…"));
+            return;
+        }
+        self.show_matches_of(row);
+    }
+
+    fn show_matches_of(&self, row: usize) {
         let text = {
             let st = self.state.borrow();
             let (Some(r), Some(e)) = (st.rows.get(row), st.row_entry(row)) else { return };
@@ -274,26 +283,55 @@ impl App {
 
     /// A search inside documents keeps the matching lines of its first
     /// results only (`search::LINED_HITS`); for a later one they are read
-    /// again from the document (or the content index) and kept in the row.
-    fn read_matches_again(&self, row: usize) {
+    /// again from the document (or the content index) on a background
+    /// thread, never on this one: a big document can take a long time. True
+    /// when that read was started.
+    fn read_matches_again(&self, row: usize) -> bool {
         let (path, q, use_index) = {
-            let mut st = self.state.borrow_mut();
-            let Some(m) = st.rows.get(row).and_then(|r| r.matches.as_ref()) else { return };
+            let st = self.state.borrow();
+            let Some(m) = st.rows.get(row).and_then(|r| r.matches.as_ref()) else { return false };
             if !m.lines.is_empty() || m.count == 0 {
-                return;
+                return false;
             }
-            let Some(path) = st.row_entry(row).map(|e| e.path.to_string()) else { return };
-            // Taken out while the file is read (not borrowed meanwhile), put back below.
-            let Some(q) = st.shown_query.take() else { return };
+            let Some(path) = st.row_entry(row).map(|e| e.path.to_string()) else { return false };
+            let Some(q) = st.shown_query.clone() else { return false };
             (path, q, st.settings.content_index)
         };
-        let cache = if use_index { super::content_index::shared() } else { None };
-        let found = search::document_matches(&path, &q, cache);
-        let mut st = self.state.borrow_mut();
-        st.shown_query = Some(q);
-        if let (Some(m), Some((count, lines))) = (st.rows.get_mut(row).and_then(|r| r.matches.as_mut()), found) {
-            m.count = count;
-            m.lines = lines;
+        let slot = self.matches_read.clone();
+        let notice = self.matches_notice.sender();
+        crate::crash_log::spawn_named("matches-read", move || {
+            let cache = if use_index { super::content_index::shared() } else { None };
+            let found = crate::crash_log::catch(|| search::document_matches(&path, &q, cache)).flatten();
+            if let Ok(mut s) = slot.lock() {
+                s.push(super::MatchesRead::Classic { path, found });
+            }
+            notice.notice();
+        })
+        .is_some()
+    }
+
+    /// Matches read again in the background: kept with their row, and shown
+    /// (classic window: when that row is still the selected one).
+    pub(super) fn on_matches_read(&self) {
+        let done = self.matches_read.lock().map(|mut s| std::mem::take(&mut *s)).unwrap_or_default();
+        for read in done {
+            match read {
+                super::MatchesRead::Classic { path, found } => {
+                    let row = {
+                        let mut st = self.state.borrow_mut();
+                        let Some(row) = (0..st.rows.len()).find(|&r| st.row_entry(r).is_some_and(|e| *e.path == *path)) else { continue };
+                        if let (Some(m), Some((count, lines))) = (st.rows.get_mut(row).and_then(|r| r.matches.as_mut()), found) {
+                            m.count = count;
+                            m.lines = lines;
+                        }
+                        row
+                    };
+                    if self.list.selected_item() == Some(row) {
+                        self.show_matches_of(row);
+                    }
+                }
+                super::MatchesRead::Web { seq, ver, id, found } => self.webui_matches_read(seq, ver, id, found),
+            }
         }
     }
 

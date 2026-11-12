@@ -1083,11 +1083,26 @@ impl Shown {
         (0..self.hits.len() as u32).filter_map(|id| self.path(id)).collect()
     }
 
-    /// Every matching line of row `id` (search inside documents only).
-    pub fn matches(&self, id: u32) -> Option<Outbound> {
+    /// Row `id`'s matching lines were not kept (only the first results of a
+    /// search keep theirs, `search::LINED_HITS`): the file and the query to
+    /// read them again with. That read can take long (a big document), so
+    /// the window does it on another thread and answers with
+    /// [`matches_read`](Self::matches_read).
+    pub fn matches_to_read(&self, id: u32) -> Option<(String, Query)> {
         let f = self.found.get(self.hits.get(id as usize)?)?;
-        // Only the first results of a search keep their lines (`search::LINED_HITS`): read the others again.
-        let again = (f.lines.is_empty() && f.count > 0).then(|| search::document_matches(self.path(id)?, &self.marked, None)).flatten();
+        (f.lines.is_empty() && f.count > 0).then(|| Some((self.path(id)?.to_string(), self.marked.clone()))).flatten()
+    }
+
+    /// Every matching line of row `id` (search inside documents only), as
+    /// kept with the row.
+    pub fn matches(&self, id: u32) -> Option<Outbound> {
+        self.matches_read(id, None)
+    }
+
+    /// [`matches`](Self::matches) with what reading the document again found
+    /// (`again`; the kept count and lines when `None`).
+    pub fn matches_read(&self, id: u32, again: Option<(u32, Vec<(u32, String)>)>) -> Option<Outbound> {
+        let f = self.found.get(self.hits.get(id as usize)?)?;
         let (count, lines) = again.as_ref().map_or((f.count, &f.lines), |(c, l)| (*c, l));
         let lines = lines.iter().map(|(n, l)| (*n, marked(l, &self.marked))).collect();
         Some(Outbound::Matches { seq: self.seq, ver: self.ver, id, count, lines })
@@ -1579,6 +1594,18 @@ mod tests {
         let Some(Outbound::Matches { count, lines, seq, id, .. }) = shown.matches(0) else { panic!() };
         assert_eq!((count, seq, id, lines.len(), lines[1].0), (4, 11, 0, 2, 9));
         assert!(shown.matches(5).is_none());
+        // Kept lines are answered at once; a row whose lines were not kept
+        // names the file to read again (on another thread), and the answer
+        // built from that read carries what it found.
+        assert!(shown.matches_to_read(0).is_none());
+        let entry = shown.hits[1];
+        shown.found.get_mut(&entry).unwrap().lines.clear();
+        let (path, q) = shown.matches_to_read(1).unwrap();
+        assert_eq!(Some(path.as_str()), shown.path(1));
+        assert_eq!(q, shown.marked);
+        let Some(Outbound::Matches { count, lines, .. }) = shown.matches_read(1, Some((7, vec![(2, "عقد إيجار".into())]))) else { panic!() };
+        assert_eq!((count, lines.len()), (7, 1));
+        assert!(shown.matches_to_read(9).is_none());
         // At the end, best match is path order, as in the classic window.
         shown.done = true;
         shown.resort(Sort::Best, false);
