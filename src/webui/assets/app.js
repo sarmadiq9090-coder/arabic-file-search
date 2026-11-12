@@ -533,6 +533,14 @@
     document.body.classList.toggle("compact", compactOn());
     $("view-results").classList.toggle("nopreview", !previewOn());
   }
+  const ZOOMS = [0.8, 0.9, 1, 1.1, 1.25, 1.4, 1.6];
+  function applyZoom() { document.documentElement.style.zoom = String(ZOOMS.includes(PREF.zoom) ? PREF.zoom : 1); }
+  function zoomBy(step) {
+    const i = ZOOMS.indexOf(ZOOMS.includes(PREF.zoom) ? PREF.zoom : 1);
+    PREF.zoom = step === 0 ? 1 : ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, i + step))];
+    savePref(); applyZoom();
+  }
+  document.addEventListener("wheel", (e) => { if (e.ctrlKey) { zoomBy(e.deltaY < 0 ? 1 : -1); e.preventDefault(); } }, { passive: false });
   function setPref(key, on) { PREF[key] = on; savePref(); applyView(); renderChips(); if (S.view === "settings") renderSettings(); }
   function viewButtons() {
     const b = (id, ic, on, label, click) => {
@@ -1076,6 +1084,8 @@
     if (ctrl && (e.key === "k" || e.key === "K" || e.key === "f" || e.key === "F") || e.key === "F3") { closeSettings(); q.focus(); q.select(); e.preventDefault(); return; }
     if (ctrl && (e.key === "h" || e.key === "H")) { openHistory(); e.preventDefault(); return; }
     if (ctrl && e.key === ",") { S.view === "settings" ? closeSettings() : openSettings(); e.preventDefault(); return; }
+    // Zoom (the browser's own keys are off): Ctrl and + / - / 0, kept for next time.
+    if (ctrl && (e.key === "+" || e.key === "=" || e.key === "-" || e.key === "0")) { zoomBy(e.key === "0" ? 0 : e.key === "-" ? -1 : 1); e.preventDefault(); return; }
     if (e.key === "Escape") {
       if (openMenus().length) closeMenus();
       else if (S.view === "settings") closeSettings();
@@ -1131,6 +1141,7 @@
   $("tips").replaceChildren(...T.tips.map(([c, s]) => h("div", { class: "tip" }, h("code", { dir: "auto" }, c), h("span", null, s))));
   setView("empty");
   applyView();
+  applyZoom();
   renderChips();
   renderRecent();
   renderStatus();

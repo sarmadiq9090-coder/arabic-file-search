@@ -176,7 +176,7 @@ html[dir="rtl"] .field input { text-align: right; }
 .row .n1 .fname { display: inline-flex; min-width: 0; }
 .row .n1 .fname .base { overflow: hidden; text-overflow: ellipsis; white-space: pre; min-width: 0; }
 .row .n1 .fname .ext { flex: none; white-space: pre; }
-.row .n2 { display: block; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; }
+.row .n2 { display: block; font-size: 13.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; }
 .row .sz, .row .dt { text-align: end; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
 .row.doc { min-height: 76px; padding-block: 6px; }
 .row .n3 { display: block; font-size: 12.5px; color: var(--text); opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; }
@@ -291,8 +291,9 @@ ol.lines .lt { text-align: start; overflow-wrap: anywhere; }
 .srow { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 40px; }
 .srow label { display: flex; flex-direction: column; cursor: pointer; }
 .srow small { color: var(--muted); font-size: 12px; }
-.sw { flex: none; width: 42px; height: 24px; border-radius: 99px; border: 1px solid var(--line-2); background: var(--surface-3); position: relative; cursor: pointer; padding: 0; }
-.sw .knob { position: absolute; top: 2px; inset-inline-start: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-sm); transition: inset-inline-start .15s; }
+.sw { flex: none; width: 42px; height: 24px; border-radius: 99px; border: 1.5px solid var(--muted); background: var(--surface-3); position: relative; cursor: pointer; padding: 0; }
+/* An off switch reads as off (its knob in the text's grey, not white on grey). */
+.sw .knob { position: absolute; top: 1.5px; inset-inline-start: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--muted); box-shadow: var(--shadow-sm); transition: inset-inline-start .15s; }
 .sw[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
 .sw[aria-checked="true"] .knob { inset-inline-start: 20px; background: var(--accent-text); }
 .segs { display: inline-flex; gap: 6px; }
@@ -313,5 +314,8 @@ ol.lines .lt { text-align: start; overflow-wrap: anywhere; }
 @media (forced-colors: active) {
   .row[aria-selected="true"], .sg[aria-selected="true"] { outline: 2px solid Highlight; }
   .sw[aria-checked="true"], .seg.on, .chip.on { outline: 2px solid Highlight; }
+  .sw { border-color: ButtonText; }
+  .sw .knob { forced-color-adjust: none; background: ButtonText; }
+  .sw[aria-checked="true"] .knob { background: Highlight; }
   mark { forced-color-adjust: none; background: Mark; color: MarkText; }
 }
