@@ -100,22 +100,51 @@ pub fn sibling(exe: &Path, suffix: &str) -> PathBuf {
     exe.with_file_name(name)
 }
 
+/// How often each rename of a roll-back is tried, and the pause between: an
+/// antivirus that blocked the new program may hold its file for a moment.
+pub const ROLLBACK_TRIES: u32 = 10;
+pub const ROLLBACK_PAUSE: Duration = Duration::from_millis(300);
+
 /// An update was installed but the new program did not start: puts the old
 /// program (`old`, the running one) back as `exe`, the new one going to
-/// `exe.new` (removed at a later start). On failure `exe` is left as it was.
+/// `exe.new` (removed at a later start). Each rename is tried
+/// [`ROLLBACK_TRIES`] times. On failure `exe` is left as it was and the
+/// caller keeps the old copy running.
 pub fn roll_back(exe: &Path, old: &Path) -> Result<(), String> {
-    use std::fs;
+    roll_back_with(exe, old, &|a, b| std::fs::rename(a, b), ROLLBACK_TRIES, ROLLBACK_PAUSE)
+}
+
+fn roll_back_with(
+    exe: &Path,
+    old: &Path,
+    rename: &dyn Fn(&Path, &Path) -> std::io::Result<()>,
+    tries: u32,
+    pause: Duration,
+) -> Result<(), String> {
+    let again = |from: &Path, to: &Path| {
+        let mut last = Ok(());
+        for i in 0..tries.max(1) {
+            if i > 0 {
+                std::thread::sleep(pause);
+            }
+            last = rename(from, to);
+            if last.is_ok() {
+                break;
+            }
+        }
+        last
+    };
     if !old.is_file() {
         return Err(format!("the previous version is not there ({})", old.display()));
     }
     let aside = sibling(exe, ".new");
-    let _ = fs::remove_file(&aside);
+    let _ = std::fs::remove_file(&aside);
     if exe.exists() {
-        fs::rename(exe, &aside).map_err(|e| format!("cannot move the new version aside: {e}"))?;
+        again(exe, &aside).map_err(|e| format!("cannot move the new version aside after {tries} tries: {e}"))?;
     }
-    if let Err(e) = fs::rename(old, exe) {
-        let _ = fs::rename(&aside, exe);
-        return Err(format!("cannot put the previous version back: {e}"));
+    if let Err(e) = again(old, exe) {
+        let _ = again(&aside, exe);
+        return Err(format!("cannot put the previous version back after {tries} tries: {e}"));
     }
     Ok(())
 }
@@ -261,6 +290,42 @@ mod tests {
         // The leftovers then go, bahth.exe stays.
         assert_eq!(remove_leftovers(&exe, 1, Duration::ZERO).as_deref(), Some("update leftovers: removed bahth.exe.new"));
         assert!(exe.is_file());
+    }
+
+    /// The blocked new program is held by an antivirus for a while: the
+    /// roll-back tries again and gets through; held for good, it fails with
+    /// bahth.exe untouched (the old copy then keeps running).
+    #[test]
+    fn a_roll_back_retries_a_file_that_is_held() {
+        let t = TempDir::new("rollback_held");
+        let exe = t.0.join("bahth.exe");
+        let old = sibling(&exe, ".old");
+        fs::write(&exe, b"v2").unwrap();
+        fs::write(&old, b"v1").unwrap();
+        let held = Cell::new(3);
+        let flaky = |a: &Path, b: &Path| {
+            if held.get() > 0 {
+                held.set(held.get() - 1);
+                return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "in use"));
+            }
+            fs::rename(a, b)
+        };
+        roll_back_with(&exe, &old, &flaky, 5, Duration::from_millis(1)).unwrap();
+        assert_eq!(fs::read(&exe).unwrap(), b"v1");
+        const { assert!(ROLLBACK_TRIES >= 5) };
+        // Held for good: refused, and the new program is still in place.
+        fs::write(&old, b"v1").unwrap();
+        fs::write(&exe, b"v2").unwrap();
+        let tries = Cell::new(0);
+        let never = |_: &Path, _: &Path| {
+            tries.set(tries.get() + 1);
+            Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "in use"))
+        };
+        let e = roll_back_with(&exe, &old, &never, 4, Duration::ZERO).unwrap_err();
+        assert!(e.contains("after 4 tries") && e.contains("in use"), "{e}");
+        assert_eq!(tries.get(), 4);
+        assert_eq!(fs::read(&exe).unwrap(), b"v2");
+        assert!(old.is_file());
     }
 
     #[test]
