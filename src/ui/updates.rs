@@ -91,15 +91,29 @@ impl App {
             }
             UpdateEvent::Installed(Ok(())) => {
                 self.set_status(tr!("اكتمل التحديث. جاري إعادة التشغيل…", "Update complete. Restarting…"));
-                match crate::update::restart_new_version() {
-                    Ok(()) => {
-                        // Save everything, then leave at once so the new copy
-                        // gets the single-instance lock without waiting for
-                        // the index to be freed.
-                        self.close_for_restart();
-                        std::process::exit(0);
+                // Leaves only when the new version runs; otherwise the old
+                // program file goes back in place, so the install always has
+                // a program that starts.
+                let failed = match crate::update::restart_new_version() {
+                    Ok(child) => {
+                        self.hand_over(child, "update");
+                        tr!("الإصدار الجديد لم يعمل (ربما أوقفه برنامج الحماية).", "The new version did not start (perhaps blocked by security software).").to_string()
                     }
-                    Err(e) => {
+                    Err(e) => e,
+                };
+                match crate::update::roll_back_update() {
+                    Ok(()) => {
+                        log(&format!("update: rolled back to {} ({failed})", env!("CARGO_PKG_VERSION")));
+                        self.update_busy.set(false);
+                        nwg::modal_error_message(
+                            &self.window,
+                            title(),
+                            &trf!("تعذر تطبيق التحديث: {failed}\nأُعيد الإصدار الحالي ({}) وهو يعمل كما هو.", "The update could not be applied: {failed}\nThe current version ({}) was put back and keeps working.", env!("CARGO_PKG_VERSION")),
+                        );
+                    }
+                    Err(rb) => {
+                        log(&format!("update: the new version did not start ({failed}); rolling back failed: {rb}"));
+                        let e = failed;
                         self.update_busy.set(false);
                         nwg::modal_info_message(
                             &self.window,

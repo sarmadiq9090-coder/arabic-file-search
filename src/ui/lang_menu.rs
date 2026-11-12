@@ -57,13 +57,17 @@ impl App {
             ));
             return true;
         }
-        match crate::update::restart_new_version() {
-            Ok(()) => {
-                // Same as after an update: save everything and leave at once
-                // so the new copy gets the single-instance lock.
-                self.close_for_restart();
-                std::process::exit(0);
+        let started = crate::update::restart_new_version();
+        let failed = match started {
+            // Leaves when the new copy runs; keeps running otherwise.
+            Ok(child) => {
+                self.hand_over(child, "language");
+                Err(lang.pick("لم تعمل النسخة الجديدة", "the new copy did not start").to_string())
             }
+            Err(e) => Err(e),
+        };
+        match failed {
+            Ok(()) => {}
             Err(e) => {
                 nwg::modal_error_message(&self.window, title(), &trf!(
                     "تعذرت إعادة التشغيل تلقائياً ({e}).\nأغلق البرنامج وافتحه من جديد.",

@@ -96,8 +96,8 @@ use watching::SubtreeScan;
 const WS_EX_LAYOUTRTL: u32 = 0x0040_0000;
 
 /// The window title; also how a second copy of the program finds the first.
-const TITLE: &str = "بحث سريع";
-const TITLE_EN: &str = "InstaFind";
+pub(super) const TITLE: &str = "بحث سريع";
+pub(super) const TITLE_EN: &str = "InstaFind";
 
 /// The window title in the interface language.
 fn title() -> &'static str {
@@ -594,6 +594,25 @@ impl App {
         self.close(Leaving::Exit);
     }
 
+    /// The new copy was started: watches it for `handover::TAKEOVER_GRACE`
+    /// and leaves if it keeps running (it ends this copy itself if this one
+    /// is slow to go). False when it ended at once: the handover failed and
+    /// this copy keeps running.
+    fn hand_over(&self, mut child: std::process::Child, what: &str) -> bool {
+        let pid = child.id();
+        match crate::handover::took_over(|| child.try_wait().ok().flatten().map(|s| s.code().unwrap_or(-1)), crate::handover::TAKEOVER_GRACE) {
+            Ok(()) => {
+                startup::log(&format!("handover ({what}): new copy (pid {pid}) is running; leaving"));
+                self.close_for_restart();
+                std::process::exit(0);
+            }
+            Err(code) => {
+                startup::log(&format!("handover ({what}): new copy (pid {pid}) ended at once with code {code}; this copy keeps running"));
+                false
+            }
+        }
+    }
+
     /// Leaving to start again (after an update, a move to the permanent
     /// place, a change of language): the new copy is already waiting.
     fn close_for_restart(&self) {
@@ -662,26 +681,27 @@ pub fn run() {
     crate::search::init_local_utc_offset();
     let updated = std::env::args().any(|a| a == "--updated");
     let moved = std::env::args().any(|a| a == crate::relocate::MOVED_ARG);
-    if moved {
-        // Started from the new place by the copy that is now exiting.
-        for _ in 0..6 {
-            crate::update::wait_for_previous_instance_exit();
+    if moved || updated {
+        // Started by the copy that is now leaving: it goes first, ended if
+        // it does not (`handover`), and then this copy is the only one.
+        let prev = crate::handover::previous_pid(std::env::args(), std::process::id());
+        startup::end_previous_copy(prev);
+        crate::update::wait_for_previous_instance_exit();
+        if moved {
+            startup::log("start: relaunched from the permanent place");
+        } else {
+            startup::log(&format!("start: relaunched after updating to {}", env!("CARGO_PKG_VERSION")));
         }
-        startup::log("start: relaunched from the permanent place");
-    }
-    if updated {
-        // The previous version is still closing; let it go first. A big
-        // index can take a while to free, so wait up to a minute.
-        for _ in 0..6 {
-            crate::update::wait_for_previous_instance_exit();
-        }
-        startup::log(&format!("start: relaunched after updating to {}", env!("CARGO_PKG_VERSION")));
     }
     if activate_running_copy(updated || moved) {
         return;
     }
-    // Only the copy that keeps running tidies up after an update.
-    crate::update::cleanup_old();
+    // An interrupted update that left only bahth.exe.old: it is put back.
+    // The leftovers of an update are deleted once this copy has shown that it
+    // runs (`on_tick`), never before.
+    if crate::update::restore_old_if_missing() {
+        startup::log("start: put bahth.exe.old back as bahth.exe (an update had been interrupted)");
+    }
     // Temp files of index saves that never finished (a copy closed or
     // killed in the middle), unless written to in the last two minutes.
     let stale = crate::index::remove_stale_tmp(&crate::index::cache_path(), std::time::Duration::from_secs(120));

@@ -834,12 +834,12 @@ mod imp {
                     self.webui_send_settings();
                 }
                 Request::Restart {} => match crate::update::restart_new_version() {
-                    Ok(()) => {
-                        // As after an update: save everything and leave at
-                        // once, so the new copy gets the single-instance lock.
+                    Ok(child) => {
+                        // Leaves when the new copy runs; keeps running otherwise.
                         self.webui.exiting.set(true);
-                        self.close_for_restart();
-                        std::process::exit(0);
+                        self.hand_over(child, "language");
+                        self.webui.exiting.set(false);
+                        self.webui_notice(tr!("تعذرت إعادة التشغيل: لم تعمل النسخة الجديدة.", "Could not restart: the new copy did not start."));
                     }
                     Err(e) => self.webui_notice(trf!(
                         "تعذرت إعادة التشغيل تلقائياً ({e}). أغلق البرنامج وافتحه من جديد.",

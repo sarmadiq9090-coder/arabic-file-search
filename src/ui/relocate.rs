@@ -114,13 +114,18 @@ impl App {
             log("move offer: could not point start-with-Windows at the new place");
         }
         log(&format!("move offer: copied to {}; restarting from there", target.display()));
-        match restart_from(&target) {
-            Ok(()) => {
-                // As after an update: save everything and leave at once, so
-                // the new copy gets the single-instance lock.
-                self.close_for_restart();
-                std::process::exit(0);
+        let started = restart_from(&target).map_err(|e| e.to_string());
+        let failed = match started {
+            // Leaves when the copy in the new place runs; keeps running here
+            // otherwise (the original download is left where it is).
+            Ok(child) => {
+                self.hand_over(child, "move");
+                Err(tr!("لم تعمل النسخة الجديدة", "the new copy did not start").to_string())
             }
+            Err(e) => Err(e),
+        };
+        match failed {
+            Ok(()) => {}
             Err(e) => {
                 log(&format!("move offer: restart failed: {e}"));
                 self.move_message(
@@ -171,17 +176,20 @@ fn copy_to(exe: &Path, dir: &Path) -> io::Result<PathBuf> {
     copied.map(|()| target)
 }
 
-/// Starts `exe` with [`relocate::MOVED_ARG`], detached from this process.
-fn restart_from(exe: &Path) -> io::Result<()> {
+/// Starts `exe` with [`relocate::MOVED_ARG`] and this process's id,
+/// detached from this process.
+fn restart_from(exe: &Path) -> io::Result<std::process::Child> {
     use std::os::windows::process::CommandExt;
     const DETACHED_PROCESS: u32 = 0x0000_0008;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
     let mut cmd = std::process::Command::new(exe);
-    cmd.arg(relocate::MOVED_ARG).creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+    cmd.arg(relocate::MOVED_ARG)
+        .arg(crate::handover::prev_pid_arg(std::process::id()))
+        .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
     if let Some(dir) = exe.parent() {
         cmd.current_dir(dir);
     }
-    cmd.spawn().map(drop)
+    cmd.spawn()
 }
 
 /// Releases a COM interface when dropped.

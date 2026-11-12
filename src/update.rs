@@ -6,7 +6,7 @@
 //! file system of the installed program is Windows-only.
 //!
 //! All Windows functions block; call them from a background thread except
-//! `cleanup_old` and `wait_for_previous_instance_exit`, which are meant for
+//! `restore_old_if_missing` and `wait_for_previous_instance_exit`, which are meant for
 //! startup.
 
 
@@ -402,23 +402,6 @@ fn swap_in(exe: &std::path::Path, new: &std::path::Path, old: &std::path::Path) 
     Ok(())
 }
 
-/// What is left by an update next to `exe`. The old copy is only deleted
-/// while `exe` itself is there: if an interrupted update left nothing but
-/// `bahth.exe.old`, it is the user's only working program, so it is put
-/// back instead.
-#[cfg_attr(not(windows), allow(dead_code))]
-fn cleanup_beside(exe: &std::path::Path) {
-    use std::fs;
-    let (old, new) = (sibling(exe, ".old"), sibling(exe, ".new"));
-    if !exe.exists() && old.is_file() {
-        let _ = fs::rename(&old, exe).or_else(|_| fs::copy(&old, exe).map(drop));
-    }
-    if exe.is_file() {
-        let _ = fs::remove_file(&old);
-        let _ = fs::remove_file(&new);
-    }
-}
-
 #[cfg(windows)]
 pub use win::*;
 
@@ -443,7 +426,7 @@ mod win {
     }
 
     /// Path of the installed program, captured the first time it is asked for
-    /// (at startup, through `cleanup_old`), before any rename can happen.
+    /// (at startup, through `restore_old_if_missing`), before any rename can happen.
     fn original_exe() -> Result<&'static Path, String> {
         static EXE: OnceLock<Option<PathBuf>> = OnceLock::new();
         EXE.get_or_init(|| {
@@ -794,19 +777,30 @@ mod win {
         validate_pe(&head)
     }
 
-    /// Starts the (new) program at its original path with `--updated`. The
-    /// caller should exit right after a successful return.
-    pub fn restart_new_version() -> Result<(), String> {
+    /// Starts the (new) program at its original path with `--updated` and
+    /// this process's id (`handover::PREV_PID_ARG`), and returns it so the
+    /// caller can see that it keeps running (`handover::took_over`) before
+    /// it leaves.
+    pub fn restart_new_version() -> Result<std::process::Child, String> {
         use std::os::windows::process::CommandExt;
         const DETACHED_PROCESS: u32 = 0x0000_0008;
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
         let exe = original_exe()?;
         let mut cmd = std::process::Command::new(exe);
-        cmd.arg("--updated").creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+        cmd.arg("--updated")
+            .arg(crate::handover::prev_pid_arg(std::process::id()))
+            .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
         if let Some(dir) = exe.parent() {
             cmd.current_dir(dir);
         }
-        cmd.spawn().map(drop).map_err(|e| format!("cannot start the new version: {e}"))
+        cmd.spawn().map_err(|e| format!("cannot start the new version: {e}"))
+    }
+
+    /// The new version did not start: puts the running (old) program back
+    /// as the installed one (`handover::roll_back`).
+    pub fn roll_back_update() -> Result<(), String> {
+        let exe = original_exe()?;
+        crate::handover::roll_back(exe, &sibling(exe, ".old"))
     }
 
     /// Call at startup, before the single-instance check, when the program was
@@ -834,12 +828,19 @@ mod win {
         }
     }
 
-    /// Deletes a `bahth.exe.old` (and a stale `.new`) left by an update.
-    /// Call at every startup; errors are ignored.
-    pub fn cleanup_old() {
-        if let Ok(exe) = original_exe() {
-            cleanup_beside(exe);
-        }
+    /// At start: an interrupted update that left only `bahth.exe.old` gets
+    /// it back as `bahth.exe`. (Nothing is deleted here: see
+    /// [`remove_update_leftovers`].)
+    pub fn restore_old_if_missing() -> bool {
+        original_exe().is_ok_and(crate::handover::restore_if_missing)
+    }
+
+    /// Once this copy has shown it runs (its first timer tick): deletes
+    /// `bahth.exe.old` and `bahth.exe.new` left by an update, with a few
+    /// tries; one still locked is deleted at a later start. Blocks for a few
+    /// seconds at most; the line for the log, if there was anything.
+    pub fn remove_update_leftovers() -> Option<String> {
+        crate::handover::remove_leftovers(original_exe().ok()?, 5, Duration::from_millis(500))
     }
 }
 
@@ -1291,24 +1292,5 @@ mod tests {
         assert_eq!(std::fs::read(&exe).unwrap(), b"v2");
         assert_eq!(std::fs::read(&old).unwrap(), b"v1");
         assert!(!new.exists());
-    }
-
-    #[test]
-    fn cleanup_keeps_the_only_program() {
-        let t = TempDir::new("cleanup");
-        let exe = t.0.join("bahth.exe");
-        let (new, old) = (sibling(&exe, ".new"), sibling(&exe, ".old"));
-        // Normal start after an update: leftovers go.
-        std::fs::write(&exe, b"v2").unwrap();
-        std::fs::write(&old, b"v1").unwrap();
-        std::fs::write(&new, b"half").unwrap();
-        cleanup_beside(&exe);
-        assert!(exe.exists() && !old.exists() && !new.exists());
-        // An interrupted update left only the old copy: it is put back.
-        std::fs::remove_file(&exe).unwrap();
-        std::fs::write(&old, b"v1").unwrap();
-        cleanup_beside(&exe);
-        assert_eq!(std::fs::read(&exe).unwrap(), b"v1");
-        assert!(!old.exists());
     }
 }
