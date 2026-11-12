@@ -308,6 +308,7 @@ impl NativeUi<AppUi> for App {
         nwg::MenuItem::builder().text(tr!("النافذة الكاملة", "Full window")).parent(&app.tray_menu).build(&mut app.tray_show)?;
         nwg::MenuItem::builder().text(tr!("خيارات…", "Options…")).parent(&app.tray_menu).build(&mut app.tray_settings)?;
         nwg::MenuItem::builder().text(tr!("حول InstaFind", "About InstaFind")).parent(&app.tray_menu).build(&mut app.tray_about)?;
+        app.build_report_tray_item()?;
         app.build_rating_tray_item()?;
         nwg::MenuItem::builder().text(tr!("خروج", "Exit")).parent(&app.tray_menu).build(&mut app.tray_exit)?;
 
@@ -373,6 +374,7 @@ impl NativeUi<AppUi> for App {
             .build(&mut app.menu_update)?;
         super::feedback::build(&app.options_menu, &mut app.feedback_menu, [&mut app.menu_feedback_bug, &mut app.menu_feedback_idea, &mut app.menu_feedback_talk])?;
         super::feedback::build_support(&app.options_menu, &mut app.support_menu, [&mut app.menu_support_mail, &mut app.menu_support_page])?;
+        app.build_report_item()?;
         app.build_rating()?;
         nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[4])?;
 
@@ -646,6 +648,7 @@ impl NativeUi<AppUi> for App {
         ui.handlers.borrow_mut().push(ui.inner.setup_dupes());
         ui.handlers.borrow_mut().push(ui.inner.setup_replace_window());
         ui.handlers.borrow_mut().push(ui.inner.setup_disk_usage());
+        ui.handlers.borrow_mut().push(ui.inner.setup_report());
         ui.handlers.borrow_mut().push(ui.inner.setup_web());
         let (handler, raw) = ui.inner.setup_thumbs()?;
         ui.handlers.borrow_mut().push(handler);

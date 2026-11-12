@@ -394,6 +394,12 @@ impl App {
         shared.show_system.store(!self.state.borrow().settings.hide_system, Ordering::Relaxed);
     }
 
+    /// Search from phone: switched on, and running now (for the problem
+    /// report).
+    pub(super) fn web_switch_state(&self) -> (bool, bool) {
+        (self.web.wanted.get(), self.web.server.borrow().is_some())
+    }
+
     /// The running server's shared state, if any.
     pub(super) fn web_running_shared(&self) -> Option<Arc<web::Shared>> {
         self.web.shared.borrow().clone()

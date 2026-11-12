@@ -574,6 +574,12 @@ mod imp {
             self.webui.switching.get()
         }
 
+        /// Whether the new main window is the one in use (on screen or
+        /// hidden to the tray).
+        pub(in super::super) fn webui_in_use(&self) -> bool {
+            self.webui.active.get()
+        }
+
         /// Whether the new main window is the one in use and on screen.
         pub(in super::super) fn webui_visible(&self) -> bool {
             self.webui.active.get() && self.webui.parts.window.visible()
@@ -1711,6 +1717,10 @@ mod imp {
         pub(in super::super) fn webui_menu_item(self: &Rc<Self>) {}
 
         pub(in super::super) fn webui_visible(&self) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_in_use(&self) -> bool {
             false
         }
 

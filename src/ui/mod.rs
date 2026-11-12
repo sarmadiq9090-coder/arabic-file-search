@@ -53,6 +53,7 @@ mod quickswitch;
 mod rating;
 mod relocate;
 mod replace_window;
+mod report;
 mod results;
 mod search_jobs;
 mod shell;
@@ -367,6 +368,8 @@ pub struct App {
     replace: replace_window::ReplaceWindow,
     /// Folder sizes: the Size column of folders and the folder-sizes window.
     disk: disk_usage::DiskUsage,
+    /// Options ▸ "Report a problem…": the window and its menu items.
+    report: report::ReportWindow,
     /// Searching from a phone over the home network (off by default).
     web: web_server::WebUi,
     /// The thumbnail view of the results (Ctrl+T).

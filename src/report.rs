@@ -154,6 +154,21 @@ pub fn log_tail(log: &str, n: usize, names: &[&str]) -> String {
     out
 }
 
+/// The names this account and computer are known by (`USERNAME`, `USER`,
+/// the profile folder's own name, `COMPUTERNAME`, `USERDOMAIN`), hidden
+/// wherever they stand in the report.
+pub fn local_names() -> Vec<String> {
+    let mut names: Vec<String> = ["USERNAME", "USER", "COMPUTERNAME", "USERDOMAIN"].iter().filter_map(|v| std::env::var(v).ok()).collect();
+    names.extend(["USERPROFILE", "HOME"].iter().filter_map(|v| {
+        let p = std::env::var(v).ok()?;
+        Some(p.trim_end_matches(['\\', '/']).rsplit(['\\', '/']).next()?.to_string())
+    }));
+    names.retain(|n| !n.trim().is_empty());
+    names.sort();
+    names.dedup();
+    names
+}
+
 /// [`crate::feedback::anonymize_with`], then [`scrub`].
 pub fn clean(text: &str, names: &[&str]) -> String {
     scrub(&crate::feedback::anonymize_with(text, names))

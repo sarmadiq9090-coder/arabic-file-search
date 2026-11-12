@@ -10,9 +10,16 @@ use super::startup::log;
 use crate::mem_guard::{self, Sample};
 
 /// Private bytes of this process (`PrivateUsage`), if Windows says.
-/// `K32GetProcessMemoryInfo` lives in kernel32 (Windows 7 and later), so the
-/// exe does not import PSAPI.DLL (`ci/check_imports.py` allows system DLLs only).
 fn private_bytes() -> Option<u64> {
+    private_and_peak().map(|(now, _)| now)
+}
+
+/// Private bytes of this process now and at their peak (`PrivateUsage`,
+/// `PeakPagefileUsage`: the commit charge, which is the private bytes), if
+/// Windows says. `K32GetProcessMemoryInfo` lives in kernel32 (Windows 7 and
+/// later), so the exe does not import PSAPI.DLL (`ci/check_imports.py`
+/// allows system DLLs only).
+pub(super) fn private_and_peak() -> Option<(u64, u64)> {
     #[repr(C)]
     #[allow(non_snake_case)]
     struct Counters {
@@ -36,7 +43,7 @@ fn private_bytes() -> Option<u64> {
     let mut pmc: Counters = unsafe { std::mem::zeroed() };
     pmc.cb = std::mem::size_of::<Counters>() as u32;
     let ok = unsafe { K32GetProcessMemoryInfo(GetCurrentProcess(), &mut pmc, pmc.cb) } != 0;
-    ok.then_some(pmc.PrivateUsage as u64)
+    ok.then_some((pmc.PrivateUsage as u64, (pmc.PeakPagefileUsage as u64).max(pmc.PrivateUsage as u64)))
 }
 
 impl App {
