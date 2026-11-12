@@ -54,6 +54,7 @@ mod results;
 mod search_jobs;
 mod shell;
 mod startup;
+pub(crate) use startup::this_copy_arg;
 mod style;
 mod surface;
 mod thumbs;

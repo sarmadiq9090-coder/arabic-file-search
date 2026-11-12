@@ -788,7 +788,7 @@ mod win {
         let exe = original_exe()?;
         let mut cmd = std::process::Command::new(exe);
         cmd.arg("--updated")
-            .arg(crate::handover::prev_pid_arg(std::process::id()))
+            .arg(crate::ui::this_copy_arg())
             .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
         if let Some(dir) = exe.parent() {
             cmd.current_dir(dir);

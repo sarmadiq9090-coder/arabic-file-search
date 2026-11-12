@@ -19,23 +19,43 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-/// `--prev-pid=<id>`: the process id of the copy that started this one.
+/// `--prev-pid=<id>:<created>`: the process id of the copy that started
+/// this one and when that process was created (FILETIME, 100 ns steps). Ids
+/// are reused: a new copy that starts late must not wait for, or end, an
+/// unrelated process that got the same id, so both must match.
 pub const PREV_PID_ARG: &str = "--prev-pid";
 /// How long the new copy waits for the old one to end by itself.
 pub const OLD_COPY_WAIT: Duration = Duration::from_secs(10);
 /// How long the old copy watches the new one before it leaves.
 pub const TAKEOVER_GRACE: Duration = Duration::from_secs(3);
 
-/// The argument that passes `pid` on.
-pub fn prev_pid_arg(pid: u32) -> String {
-    format!("{PREV_PID_ARG}={pid}")
+/// The copy that started this one: its process id and creation time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PrevCopy {
+    pub pid: u32,
+    pub created: u64,
 }
 
-/// The process id given with [`PREV_PID_ARG`], if any (never 0 or our own).
-pub fn previous_pid(args: impl IntoIterator<Item = String>, own: u32) -> Option<u32> {
+/// The argument that passes this copy on.
+pub fn prev_pid_arg(pid: u32, created: u64) -> String {
+    format!("{PREV_PID_ARG}={pid}:{created}")
+}
+
+/// The copy given with [`PREV_PID_ARG`], if any (never id 0 or our own; a
+/// pid without its creation time is not trusted).
+pub fn previous_pid(args: impl IntoIterator<Item = String>, own: u32) -> Option<PrevCopy> {
     args.into_iter()
-        .find_map(|a| a.strip_prefix(PREV_PID_ARG)?.strip_prefix('=')?.parse::<u32>().ok())
-        .filter(|&p| p != 0 && p != own)
+        .find_map(|a| {
+            let (pid, created) = a.strip_prefix(PREV_PID_ARG)?.strip_prefix('=')?.split_once(':')?;
+            Some(PrevCopy { pid: pid.parse().ok()?, created: created.parse().ok()? })
+        })
+        .filter(|p| p.pid != 0 && p.pid != own && p.created != 0)
+}
+
+/// Whether the process found under the id is the copy that was named: it was
+/// created exactly then (`actual`: its creation time, `None` if unknown).
+pub fn is_that_copy(expected: &PrevCopy, actual: Option<u64>) -> bool {
+    actual == Some(expected.created)
 }
 
 /// What became of the old copy.
@@ -220,14 +240,27 @@ mod tests {
     }
 
     #[test]
-    fn the_previous_pid_is_passed_and_read_back() {
+    fn the_previous_copy_is_passed_and_read_back() {
         let args = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        assert_eq!(prev_pid_arg(4321), "--prev-pid=4321");
-        assert_eq!(previous_pid(args(&["bahth.exe", "--updated", "--prev-pid=4321"]), 9), Some(4321));
+        let arg = prev_pid_arg(4321, 133_000_000_000_000_000);
+        assert_eq!(arg, "--prev-pid=4321:133000000000000000");
+        let got = previous_pid(args(&["bahth.exe", "--updated", &arg]), 9);
+        assert_eq!(got, Some(PrevCopy { pid: 4321, created: 133_000_000_000_000_000 }));
         assert_eq!(previous_pid(args(&["bahth.exe", "--moved"]), 9), None);
-        for bad in ["--prev-pid", "--prev-pid=", "--prev-pid=x", "--prev-pid=0", "--prev-pid=9", "--prev-pidx=5"] {
+        // A bare pid (no creation time) is not trusted, nor id 0, nor our own.
+        for bad in ["--prev-pid", "--prev-pid=", "--prev-pid=4321", "--prev-pid=x:1", "--prev-pid=0:5", "--prev-pid=9:5", "--prev-pid=7:0", "--prev-pid=7:y", "--prev-pidx=5:1"] {
             assert_eq!(previous_pid(args(&["bahth.exe", bad]), 9), None, "{bad}");
         }
+    }
+
+    /// Process ids are reused: only the process created at the given time
+    /// is the old copy; any other process with that id is left alone.
+    #[test]
+    fn a_reused_process_id_is_not_the_old_copy() {
+        let prev = PrevCopy { pid: 4321, created: 1000 };
+        assert!(is_that_copy(&prev, Some(1000)));
+        assert!(!is_that_copy(&prev, Some(2000)), "another process got the id");
+        assert!(!is_that_copy(&prev, None), "unknown: hands off");
     }
 
     #[test]

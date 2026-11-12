@@ -184,7 +184,7 @@ fn restart_from(exe: &Path) -> io::Result<std::process::Child> {
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
     let mut cmd = std::process::Command::new(exe);
     cmd.arg(relocate::MOVED_ARG)
-        .arg(crate::handover::prev_pid_arg(std::process::id()))
+        .arg(super::startup::this_copy_arg())
         .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
     if let Some(dir) = exe.parent() {
         cmd.current_dir(dir);

@@ -148,21 +148,31 @@ pub(super) fn window_pid(hwnd: winapi::shared::windef::HWND) -> Option<u32> {
 /// Started by the copy that is now leaving (`--updated`, `--moved`): waits
 /// for that process to end, at most `handover::OLD_COPY_WAIT`, and ends it
 /// if it is still there. So exactly one copy runs afterwards, and never
-/// none. `pid` comes with `--prev-pid`; a copy of 0.10.0 or older does not
-/// pass it, and is then found by its window.
-pub(super) fn end_previous_copy(pid: Option<u32>) {
+/// none. The old copy comes with `--prev-pid` (id and creation time, both
+/// checked: ids are reused); a copy of 0.10.0 or older does not pass it,
+/// and is then found by its window.
+pub(super) fn end_previous_copy(prev: Option<crate::handover::PrevCopy>) {
     use winapi::um::handleapi::CloseHandle;
     use winapi::um::processthreadsapi::{OpenProcess, TerminateProcess};
     use winapi::um::synchapi::WaitForSingleObject;
     use winapi::um::winbase::WAIT_OBJECT_0;
-    use winapi::um::winnt::{PROCESS_TERMINATE, SYNCHRONIZE};
-    let Some(pid) = pid.or_else(|| other_copy_window().and_then(window_pid)) else {
+    use winapi::um::winnt::{PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE, SYNCHRONIZE};
+    let named = prev.map(|p| p.pid);
+    let Some(pid) = named.or_else(|| other_copy_window().and_then(window_pid)) else {
         log("handover: no previous copy found");
         return;
     };
-    let h = unsafe { OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE, 0, pid) };
+    let h = unsafe { OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
     if h.is_null() {
         log(&format!("handover: previous copy (pid {pid}) had already ended"));
+        return;
+    }
+    // Ids are reused: the process under it must be the one that was named.
+    if let Some(p) = prev
+        && !crate::handover::is_that_copy(&p, process_created(h))
+    {
+        unsafe { CloseHandle(h) };
+        log(&format!("handover: pid {pid} is now another process (the previous copy had ended); left alone"));
         return;
     }
     let (_, line) = crate::handover::end_previous(
@@ -172,6 +182,22 @@ pub(super) fn end_previous_copy(pid: Option<u32>) {
     );
     unsafe { CloseHandle(h) };
     log(&line);
+}
+
+/// When the process `h` was created (FILETIME), if Windows says.
+pub(super) fn process_created(h: winapi::um::winnt::HANDLE) -> Option<u64> {
+    use winapi::shared::minwindef::FILETIME;
+    let z = || FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+    let (mut created, mut exited, mut kernel, mut user) = (z(), z(), z(), z());
+    let ok = unsafe { winapi::um::processthreadsapi::GetProcessTimes(h, &mut created, &mut exited, &mut kernel, &mut user) } != 0;
+    let t = (u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime);
+    (ok && t != 0).then_some(t)
+}
+
+/// The argument naming this copy for the one it starts (`--prev-pid`).
+pub(crate) fn this_copy_arg() -> String {
+    let created = process_created(unsafe { winapi::um::processthreadsapi::GetCurrentProcess() }).unwrap_or(0);
+    crate::handover::prev_pid_arg(std::process::id(), created)
 }
 
 /// If the program is already running, brings its window forward and returns true.
