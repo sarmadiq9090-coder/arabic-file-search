@@ -4,7 +4,9 @@
 //! (see [`crate::extract::is_plain_text`]); documents such as docx or pdf
 //! never are. Safety comes first:
 //! - The encoding is detected (UTF-8 with or without BOM, UTF-16 LE/BE with
-//!   a BOM, else windows-1256) and kept, BOM included. A file is only
+//!   a BOM, else windows-1256 when the text reads as Arabic, see
+//!   [`looks_arabic`]) and kept, BOM included. Anything else (Shift-JIS,
+//!   GBK, Big5, …) is an unknown encoding and is never changed. A file is only
 //!   edited when decoding and encoding it again gives back the very same
 //!   bytes, so nothing but the matches can change; line endings and every
 //!   other byte stay as they were.
@@ -89,8 +91,29 @@ pub fn decode(bytes: &[u8]) -> Option<(String, TextEncoding)> {
     if let Ok(s) = std::str::from_utf8(bytes) {
         return Some((s.to_owned(), TextEncoding::Utf8));
     }
+    // windows-1256 decodes any byte, so it only means something when the
+    // result reads as Arabic; multi-byte encodings whose second bytes can
+    // be ASCII would otherwise be broken by an ASCII replace.
     let text = WINDOWS_1256.decode_without_bom_handling_and_without_replacement(bytes)?;
-    Some((text.into_owned(), TextEncoding::Windows1256))
+    looks_arabic(&text).then(|| (text.into_owned(), TextEncoding::Windows1256))
+}
+
+/// Whether text decoded as windows-1256 reads as Arabic: at least 80% of
+/// its non-ASCII characters are Arabic letters or marks, or the joiners,
+/// direction marks, no-break space and «» that Arabic text uses. Text in
+/// another encoding read as windows-1256 is mostly symbols (° ± ¤ ‚ •),
+/// Latin letters (é ç î) and ASCII second bytes: about half Arabic or less. The 80% line leaves a margin on both sides.
+/// A real windows-1256 file with many symbols or French words is refused
+/// too: that leaves a file unchanged, never broken.
+fn looks_arabic(text: &str) -> bool {
+    let (mut other, mut arabic) = (0usize, 0usize);
+    for c in text.chars().filter(|c| !c.is_ascii()) {
+        match c {
+            '\u{0600}'..='\u{06FF}' | '\u{200C}'..='\u{200F}' | '\u{00A0}' | '«' | '»' => arabic += 1,
+            _ => other += 1,
+        }
+    }
+    arabic > 0 && arabic >= 4 * other
 }
 
 /// Encodes text back, BOM included. None when a character has no place in
@@ -265,8 +288,11 @@ pub enum Skip {
     ReadOnly,
     /// A symbolic link or something other than a regular file.
     NotRegular,
-    /// Zero bytes or malformed text: binary or an unknown encoding.
+    /// Zero bytes or malformed UTF-8 or UTF-16: binary content.
     Binary,
+    /// Neither UTF-8, UTF-16 with a BOM nor Arabic windows-1256 text
+    /// (e.g. Shift-JIS, GBK, Big5): replacing in it could break characters.
+    UnknownEncoding,
     /// Decoding and re-encoding would not give back the same bytes.
     Lossy,
     /// The replacement has characters the file's encoding can't hold.
@@ -284,6 +310,7 @@ impl Skip {
             Skip::ReadOnly => tr!("للقراءة فقط", "Read-only").into(),
             Skip::NotRegular => tr!("ليس ملفاً عادياً (اختصار أو رابط)", "Not a regular file (link)").into(),
             Skip::Binary => tr!("ترميز غير معروف أو محتوى ثنائي", "Unknown encoding or binary content").into(),
+            Skip::UnknownEncoding => tr!("ترميز غير معروف — لم يُغيَّر", "Unknown encoding — not changed").into(),
             Skip::Lossy => tr!("لا يمكن حفظه دون تغيير بايتات أخرى", "Can't be saved without changing other bytes").into(),
             Skip::Unencodable => {
                 tr!("نص الاستبدال يحوي أحرفاً لا يدعمها ترميز الملف", "The replacement has characters the file's encoding can't hold").into()
@@ -334,7 +361,10 @@ fn load(path: &Path) -> Result<Loaded, Skip> {
     if bytes.len() as u64 > MAX_FILE_SIZE {
         return Err(Skip::TooBig);
     }
-    let (text, enc) = decode(&bytes).ok_or(Skip::Binary)?;
+    let (text, enc) = decode(&bytes).ok_or_else(|| {
+        let malformed = bytes.contains(&0) || [&[0xEF, 0xBB, 0xBF][..], &[0xFF, 0xFE], &[0xFE, 0xFF]].iter().any(|b| bytes.starts_with(b));
+        if malformed { Skip::Binary } else { Skip::UnknownEncoding }
+    })?;
     if encode(&text, enc).as_deref() != Some(&bytes[..]) {
         return Err(Skip::Lossy);
     }
@@ -824,6 +854,62 @@ mod tests {
         assert_eq!(decode(&[0xFF, 0xFE, 0x00, 0xD8]), None);
         // UTF-8 BOM followed by invalid UTF-8.
         assert_eq!(decode(&[0xEF, 0xBB, 0xBF, 0xFF]), None);
+    }
+
+    /// Files in Shift-JIS, GBK, Big5 or EUC-KR are not UTF-8, and windows-1256
+    /// decodes any byte, so they were edited as if they were Arabic text. Their
+    /// second bytes can be plain ASCII (`\\` is the second byte of «表» in
+    /// Shift-JIS): an ASCII replace then broke the characters.
+    #[test]
+    fn other_multibyte_encodings_are_never_edited() {
+        use encoding_rs::{BIG5, EUC_KR, GBK, SHIFT_JIS};
+        let t = TempDir::new("cjk");
+        let cases = [
+            (SHIFT_JIS, "表示の設定\\フォルダ C:\\データ\r\nこれは日本語の文章です。\r\n"),
+            (GBK, "这是一个中文文件，包含路径 C:\\数据\\表格。\r\n"),
+            (BIG5, "這是一個中文檔案，包含路徑 C:\\資料\\許功蓋。\r\n"),
+            (EUC_KR, "이것은 한국어 문서입니다. 경로 C:\\자료\r\n"),
+        ];
+        let o = opts("\\", "/");
+        let m = matcher(&o);
+        for (i, (enc, text)) in cases.iter().enumerate() {
+            let bytes = enc.encode(text).0.into_owned();
+            assert!(std::str::from_utf8(&bytes).is_err(), "{}", enc.name());
+            let p = t.0.join(format!("{i}.txt"));
+            fs::write(&p, &bytes).unwrap();
+            let ps = p.to_string_lossy().into_owned();
+            let report = apply(std::slice::from_ref(&ps), &m, &o, &t.0.join("bk"), &|_| {}).unwrap();
+            assert_eq!(fs::read(&p).unwrap(), bytes, "{} was changed", enc.name());
+            assert_eq!(report.skipped, [(ps.clone(), Skip::UnknownEncoding)], "{}", enc.name());
+            assert!(matches!(preview_file(&p, &m), Outcome::Skipped(Skip::UnknownEncoding)));
+        }
+        // Arabic windows-1256 text, with the punctuation and marks it uses,
+        // is still read and edited.
+        let ar = "«تقرير» المبيعات، الربع الأول؛ هل انتهى؟\u{200F} نعم\u{00A0}١\r\nC:\\بيانات\\ملف\r\n";
+        let p = t.0.join("ar.txt");
+        fs::write(&p, WINDOWS_1256.encode(ar).0).unwrap();
+        assert!(matches!(preview_file(&p, &m), Outcome::Matches(FilePreview { count: 2, encoding: TextEncoding::Windows1256, .. })));
+        // A few symbols or French words among Arabic are fine; mostly not is not.
+        assert!(looks_arabic("تقرير المبيعات “السنوي” – ٢٠٢٦ café"));
+        assert!(!looks_arabic("°±²³ é è ç تقرير"));
+        assert!(!looks_arabic("ascii only"));
+    }
+
+    /// UTF-16 with a BOM keeps the BOM and every line ending, whatever they
+    /// are; only the replaced text changes.
+    #[test]
+    fn utf16_keeps_bom_and_line_endings() {
+        let t = TempDir::new("utf16");
+        let text = "قديم\r\nold\nقديم\rend قديم";
+        let o = opts("قديم", "جديد");
+        for enc in [TextEncoding::Utf16Le, TextEncoding::Utf16Be] {
+            let p = t.0.join(format!("{enc:?}.txt"));
+            fs::write(&p, encode(text, enc).unwrap()).unwrap();
+            let ps = p.to_string_lossy().into_owned();
+            let report = apply(&[ps], &matcher(&o), &o, &t.0.join("bk"), &|_| {}).unwrap();
+            assert_eq!(report.done.len(), 1);
+            assert_eq!(fs::read(&p).unwrap(), encode("جديد\r\nold\nجديد\rend جديد", enc).unwrap(), "{enc:?}");
+        }
     }
 
     #[test]
