@@ -198,11 +198,12 @@ impl<'a> Collector<'a> {
 
     /// Reads a member (bounded) and keeps its text.
     fn add(&mut self, name: String, ext: &str, r: impl Read) {
-        let room = self.lim.member_size.min(self.lim.total - self.total);
+        // The members, and the documents inside them, share one budget.
+        let room = super::budget::room(self.lim.member_size.min(self.lim.total - self.total));
         let mut data = Vec::new();
         let read = r.take(room + 1).read_to_end(&mut data);
         self.total += data.len() as u64;
-        if read.is_err() || data.len() as u64 > room {
+        if super::budget::inflate(data.len() as u64) || read.is_err() || data.len() as u64 > room {
             return;
         }
         if let Some(text) = member_text(ext, data) {

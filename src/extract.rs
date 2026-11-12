@@ -331,8 +331,22 @@ fn read_zip_entry<R: Read + Seek>(zip: &mut zip::ZipArchive<R>, name: &str) -> O
     if !zip_ratio_ok(entry.size(), entry.compressed_size()) {
         return None; // zip bomb
     }
-    Some(decode_bytes(&read_capped(entry, MAX_ZIP_ENTRY)?))
+    Some(decode_bytes(&read_inflated(entry, MAX_ZIP_ENTRY)?))
 }
+
+/// [`read_capped`] for decompressed data, charged to the file's inflation
+/// budget (see [`budget`]): `None`, and the file over its budget, once the
+/// file as a whole (its parts, archive members and the parts of documents
+/// inside them) unpacks to more than [`budget::INFLATE`].
+fn read_inflated(r: impl Read, cap: u64) -> Option<Vec<u8>> {
+    let room = budget::room(cap);
+    let data = read_capped(r, if room < cap { room + 1 } else { cap })?;
+    (!budget::inflate(data.len() as u64)).then_some(data)
+}
+
+/// Header and footer parts of a docx read, at most (Word writes up to
+/// three per section).
+const MAX_HEADER_PARTS: usize = 64;
 
 /// False for a zip member that expands suspiciously much (the same bound as
 /// for members of archives). The zip crate never reads past a member's
@@ -450,7 +464,10 @@ fn docx_text<R: Read + Seek>(mut zip: zip::ZipArchive<R>) -> Option<String> {
 
     // Secondary parts: headers, footers, notes, comments.
     let mut extra = numbered_entries(&zip, "word/header");
-    extra.extend(numbered_entries(&zip, "word/footer"));
+    extra.truncate(MAX_HEADER_PARTS);
+    let mut footers = numbered_entries(&zip, "word/footer");
+    footers.truncate(MAX_HEADER_PARTS);
+    extra.extend(footers);
     extra.extend(
         [
             "word/footnotes.xml",
@@ -588,7 +605,9 @@ fn workbook_zip_ok<R: Read + Seek>(r: &mut R) -> bool {
             shared_strings.push((i, f.size()));
         }
     }
+    // calamine unpacks those parts: charged to the file's budget.
     total <= MAX_WORKBOOK_UNZIPPED
+        && !budget::inflate(total)
         && shared_strings.into_iter().all(|(i, size)| zip.by_index(i).is_ok_and(|f| shared_strings_count_ok(f, size)))
 }
 

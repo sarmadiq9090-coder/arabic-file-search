@@ -138,3 +138,60 @@ fn a_file_over_its_time_budget_gives_no_text() {
     assert_eq!(t, None);
     let _ = std::fs::remove_file(&p);
 }
+
+/// A docx whose 1 KB-per-megabyte parts unpack to `headers` MB of headers.
+fn docx_with_headers(headers: usize) -> Vec<u8> {
+    let part = format!("<w:hdr xmlns:w=\"w\"><w:p>{}</w:p></w:hdr>", "<w:r><w:t>ترويسة</w:t></w:r>".repeat(1 << 15));
+    let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let opts = zip::write::SimpleFileOptions::default();
+    zw.start_file("word/document.xml", opts).unwrap();
+    std::io::Write::write_all(&mut zw, "<w:document xmlns:w=\"w\"><w:body><w:p><w:r><w:t>المتن</w:t></w:r></w:p></w:body></w:document>".as_bytes()).unwrap();
+    for i in 1..=headers {
+        zw.start_file(format!("word/header{i}.xml"), opts).unwrap();
+        std::io::Write::write_all(&mut zw, part.as_bytes()).unwrap();
+    }
+    zw.finish().unwrap().into_inner()
+}
+
+#[test]
+fn nested_documents_share_one_inflation_budget() {
+    // 600 headers of 1 MB each (every part under the 1 MB floor of the
+    // ratio check) unpack to 600 MB from a few megabytes; inside an archive
+    // every member could do it again. About 90 s in a debug build before
+    // (all 600 read), under 10 s now (64 headers).
+    let docx = docx_with_headers(600);
+    eprintln!("docx with headers: {} bytes", docx.len());
+    assert!(docx.len() < 16 << 20, "{}", docx.len());
+    let p = std::env::temp_dir().join(format!("bahth_slow_{}.docx", std::process::id()));
+    std::fs::write(&p, &docx).unwrap();
+    let q = p.clone();
+    let t = within("docx headers", Duration::from_secs(40), move || extract_text(&q));
+    // The body and some headers come out; most of the headers do not.
+    let t = t.unwrap();
+    assert!(t.contains("المتن") && t.contains("ترويسة"));
+    assert!(t.len() < 100 << 20, "{}", t.len());
+    let _ = std::fs::remove_file(&p);
+}
+
+#[test]
+fn inflation_budget_spans_archive_members() {
+    // Members (30 MB each, stored, no text in them) are charged to the same
+    // budget as the parts of documents inside them.
+    let member = vec![b' '; 30 << 20];
+    let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    for i in 0..20 {
+        zw.start_file(format!("m{i}.txt"), opts).unwrap();
+        std::io::Write::write_all(&mut zw, &member).unwrap();
+    }
+    let zip = zw.finish().unwrap().into_inner();
+    let p = std::env::temp_dir().join(format!("bahth_slow_{}.zip", std::process::id()));
+    std::fs::write(&p, &zip).unwrap();
+    drop(zip);
+    let _b = budget::start();
+    let members = archive::archive_texts(&p);
+    // MAX_ARCHIVE_TOTAL (300 MB) stops it first here; the budget is charged.
+    assert!(members.is_empty());
+    assert!(budget::room(u64::MAX) <= budget::INFLATE - (290 << 20));
+    let _ = std::fs::remove_file(&p);
+}
