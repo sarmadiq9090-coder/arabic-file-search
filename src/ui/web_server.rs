@@ -636,7 +636,7 @@ fn off_reason(refusal: Option<Refusal>, seen: &[net::Candidate], failed: bool) -
             "Phone search did not start: no network connection. It starts by itself when you join your home network."
         ),
         None if failed => "",
-        None => tr!("جارِ التحقق من الشبكة…", "Checking the network…"),
+        None => tr!("جارٍ التحقق من الشبكة…", "Checking the network…"),
     });
     let names: Vec<&str> = seen.iter().filter_map(|c| c.network.as_ref()).map(|n| n.name.as_str()).filter(|n| !n.is_empty()).collect();
     if !names.is_empty() && refusal.is_some() {
