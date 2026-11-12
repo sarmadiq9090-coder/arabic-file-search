@@ -268,3 +268,46 @@ fn proximity_search_memory_is_bounded() {
     assert_eq!(near.all(&text).len(), MAX_SPANS);
     assert_eq!(all_matches(&text, &at(r#""a a"~2"#), 1).0, MAX_SPANS as u32);
 }
+
+// ------------------------------------------------ dm: and daylight saving
+
+/// A zone one hour east of UTC in winter and two in summer (daylight saving
+/// from 31 March to 27 October 2024, 01:00 UTC, as in central Europe).
+fn cet(t: i64) -> i64 {
+    let summer = days_from_civil(2024, 3, 31) * DAY + 3600..days_from_civil(2024, 10, 27) * DAY + 3600;
+    if summer.contains(&t) { 7200 } else { 3600 }
+}
+
+fn day_utc(y: i64, m: u32, d: u32) -> i64 {
+    days_from_civil(y, m, d) * DAY
+}
+
+/// `dm:` used the one offset read at start-up for every date: in summer
+/// (+2), `dm:2024-01-15` started at 22:00 UTC instead of 23:00, so a file the
+/// Date column shows on 15 January late in the evening was not found.
+#[test]
+fn dates_use_the_offset_of_their_own_day() {
+    // NOW is 15 May (summer, +2).
+    let q = |s: &str| Query::parse_zoned(s, NOW, &cet).mtime.unwrap();
+    assert_eq!(q("dm:2024-01-15"), (day_utc(2024, 1, 15) - 3600, day_utc(2024, 1, 16) - 3600));
+    let late_on_the_15th = day_utc(2024, 1, 15) + 22 * 3600 + 1800; // 23:30 local
+    let (from, to) = q("dm:2024-01-15");
+    assert!((from..to).contains(&late_on_the_15th));
+    // Summer dates and today keep the summer offset.
+    assert_eq!(q("dm:2024-05-12"), (day_utc(2024, 5, 12) - 7200, day_utc(2024, 5, 13) - 7200));
+    assert_eq!(q("dm:today"), (day_utc(2024, 5, 15) - 7200, day_utc(2024, 5, 16) - 7200));
+    // A range across the change: each end with its own offset; the change day is 23 hours long.
+    assert_eq!(q("dm:2024-03"), (day_utc(2024, 3, 1) - 3600, day_utc(2024, 4, 1) - 7200));
+    assert_eq!(q("dm:2024-03-31"), (day_utc(2024, 3, 31) - 3600, day_utc(2024, 4, 1) - 7200));
+    let (from, to) = q("dm:2024-10-27");
+    assert_eq!(to - from, 25 * 3600);
+    // "Today" follows the clock at parse time: in January the winter offset.
+    let winter_now = day_utc(2024, 1, 20) + 23 * 3600 + 1800; // 00:30 on the 21st, local
+    let (from, _) = Query::parse_zoned("dm:today", winter_now, &cet).mtime.unwrap();
+    assert_eq!(from, day_utc(2024, 1, 21) - 3600);
+    // `1m` a month back from summer lands in winter: same local time of day.
+    let (from, _) = Query::parse_zoned("dm:2m", NOW, &cet).mtime.unwrap();
+    assert_eq!(from, day_utc(2024, 3, 15) + 12 * 3600 - 3600);
+    // A fixed offset is unchanged.
+    assert_eq!(at("dm:2024-01-15").mtime, Some((day_utc(2024, 1, 15), day_utc(2024, 1, 16))));
+}

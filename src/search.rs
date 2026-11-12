@@ -530,34 +530,65 @@ const DAY: i64 = 86_400;
 /// (the usual start in Arabic calendars).
 const WEEK_START: i64 = 6;
 
-/// Local offset from UTC in seconds for calendar words such as `dm:today`.
+/// A fixed local offset from UTC in seconds, used until
+/// [`init_local_utc_offset`] switches to the system's time zone (and in tests).
 static UTC_OFFSET: AtomicI32 = AtomicI32::new(0);
 
-/// Sets the local time zone's offset from UTC (east positive), used by
-/// [`Query::parse`] to work out where "today", "this week"… start.
+/// Set by [`init_local_utc_offset`]: offsets come from the Windows time zone.
+static SYSTEM_ZONE: AtomicBool = AtomicBool::new(false);
+
+/// Sets a fixed offset from UTC (east positive), used by [`Query::parse`] to
+/// work out where "today", "this week"… start, until [`init_local_utc_offset`].
+#[cfg_attr(not(test), allow(dead_code))] // the tests, and builds for other systems
 pub fn set_utc_offset_secs(secs: i32) {
     UTC_OFFSET.store(secs, Ordering::Relaxed);
 }
 
-/// Reads the Windows time zone (with daylight saving) into
-/// [`set_utc_offset_secs`]. Call once at start-up.
+/// From now on, offsets are those of the Windows time zone, with its
+/// daylight-saving rules, for each date (`dm:2024-01-15` in summer uses the
+/// winter offset, as the Date column does) and read when a query is parsed,
+/// so a clock or time zone change in a long-running tray copy counts. Call
+/// once at start-up. (It read one offset there before 0.10.1.)
 #[cfg(windows)]
 pub fn init_local_utc_offset() {
-    use winapi::um::timezoneapi::{GetTimeZoneInformation, TIME_ZONE_INFORMATION};
-    let mut tzi: TIME_ZONE_INFORMATION = unsafe { std::mem::zeroed() };
-    let bias = match unsafe { GetTimeZoneInformation(&mut tzi) } {
-        1 => tzi.Bias + tzi.StandardBias, // TIME_ZONE_ID_STANDARD
-        2 => tzi.Bias + tzi.DaylightBias, // TIME_ZONE_ID_DAYLIGHT
-        0 => tzi.Bias,                    // no daylight saving
-        _ => return,
-    };
-    // Bias is minutes to add to local time to get UTC.
-    set_utc_offset_secs(-bias * 60);
+    SYSTEM_ZONE.store(true, Ordering::Relaxed);
 }
 
-/// The offset set by [`set_utc_offset_secs`] (0 until it is called).
+/// The local offset from UTC in seconds at Unix time `secs`.
+pub fn utc_offset_at(secs: i64) -> i64 {
+    #[cfg(windows)]
+    if SYSTEM_ZONE.load(Ordering::Relaxed)
+        && let Some(off) = system_offset_at(secs)
+    {
+        return off;
+    }
+    #[cfg(not(windows))]
+    let _ = (secs, &SYSTEM_ZONE);
+    i64::from(UTC_OFFSET.load(Ordering::Relaxed))
+}
+
+/// The Windows time zone's offset at `secs`, the way the Date column turns
+/// a time into local time (`SystemTimeToTzSpecificLocalTime`).
+#[cfg(windows)]
+fn system_offset_at(secs: i64) -> Option<i64> {
+    use winapi::shared::minwindef::FILETIME;
+    use winapi::um::minwinbase::SYSTEMTIME;
+    use winapi::um::timezoneapi::{FileTimeToSystemTime, SystemTimeToTzSpecificLocalTime};
+    let ticks = u64::try_from(secs.checked_add(11_644_473_600)?.checked_mul(10_000_000)?).ok()?;
+    let ft = FILETIME { dwLowDateTime: ticks as u32, dwHighDateTime: (ticks >> 32) as u32 };
+    let (mut utc, mut local): (SYSTEMTIME, SYSTEMTIME) = unsafe { (std::mem::zeroed(), std::mem::zeroed()) };
+    let ok = unsafe { FileTimeToSystemTime(&ft, &mut utc) != 0 && SystemTimeToTzSpecificLocalTime(std::ptr::null(), &utc, &mut local) != 0 };
+    if !ok {
+        return None;
+    }
+    let day = days_from_civil(i64::from(local.wYear), u32::from(local.wMonth), u32::from(local.wDay));
+    let local_secs = day * DAY + i64::from(local.wHour) * 3600 + i64::from(local.wMinute) * 60 + i64::from(local.wSecond);
+    Some(local_secs - secs)
+}
+
+/// The offset from UTC now (see [`utc_offset_at`]).
 pub fn utc_offset_secs() -> i32 {
-    UTC_OFFSET.load(Ordering::Relaxed)
+    i32::try_from(utc_offset_at(now_secs())).unwrap_or(0)
 }
 
 fn now_secs() -> i64 {
@@ -620,20 +651,32 @@ const DATE_WORDS: &[(&[&str], Span)] = &[
     (&["lastyear", "السنة_الماضية", "العام_الماضي"], Span::Year(-1)),
 ];
 
-/// Times are worked out in local time; `off` is the offset from UTC.
-struct Clock {
+/// Times are worked out in local time; `off` gives the offset from UTC at
+/// a Unix time (it changes with daylight saving).
+struct Clock<'a> {
     now: i64,
-    off: i64,
+    off: &'a dyn Fn(i64) -> i64,
 }
 
-impl Clock {
+impl Clock<'_> {
+    /// The Unix time of local time `local` (seconds since 1970-01-01 00:00
+    /// local): the offset is the one in force then, not now.
+    fn to_utc(&self, local: i64) -> i64 {
+        let guess = local - (self.off)(local);
+        local - (self.off)(guess)
+    }
+
     /// Unix time at which local day number `day` starts.
     fn day_start(&self, day: i64) -> i64 {
-        day * DAY - self.off
+        self.to_utc(day * DAY)
+    }
+
+    fn local_now(&self) -> i64 {
+        self.now + (self.off)(self.now)
     }
 
     fn today(&self) -> i64 {
-        (self.now + self.off).div_euclid(DAY)
+        self.local_now().div_euclid(DAY)
     }
 
     /// Unix time at the start of the month `months` after (y, m).
@@ -644,11 +687,11 @@ impl Clock {
 
     /// The same local time `months` months ago, the day clamped to the month.
     fn months_ago(&self, months: i64) -> i64 {
-        let local = self.now + self.off;
+        let local = self.local_now();
         let (y, m, d) = civil_from_days(local.div_euclid(DAY));
         let total = y * 12 + i64::from(m) - 1 - months;
         let (y, m) = (total.div_euclid(12), (total.rem_euclid(12) + 1) as u32);
-        self.day_start(days_from_civil(y, m, d.min(days_in_month(y, m)))) + local.rem_euclid(DAY)
+        self.to_utc(days_from_civil(y, m, d.min(days_in_month(y, m))) * DAY + local.rem_euclid(DAY))
     }
 
     fn span(&self, span: Span) -> (i64, i64) {
@@ -765,16 +808,23 @@ fn push_alt(alts: &mut Vec<String>, alt: String, exact: bool) {
 }
 
 impl Query {
-    /// Parses `input`. Calendar words in `dm:` use the current time and the
-    /// offset from [`set_utc_offset_secs`].
+    /// Parses `input`. Dates in `dm:` use the current time and the local
+    /// time zone of each date ([`utc_offset_at`]).
     pub fn parse(input: &str) -> Query {
-        Query::parse_at(input, now_secs(), utc_offset_secs())
+        Query::parse_zoned(input, now_secs(), &utc_offset_at)
     }
 
     /// Parses `input` as if the time were `now` (Unix seconds) in a time zone
-    /// `utc_offset` seconds east of UTC.
+    /// `utc_offset` seconds east of UTC all year.
+    #[cfg_attr(not(test), allow(dead_code))] // for the tests
     pub fn parse_at(input: &str, now: i64, utc_offset: i32) -> Query {
-        let clock = Clock { now, off: i64::from(utc_offset) };
+        Query::parse_zoned(input, now, &|_| i64::from(utc_offset))
+    }
+
+    /// Parses `input` as if the time were `now`, in a time zone whose offset
+    /// from UTC at a Unix time is `off` of it.
+    pub(crate) fn parse_zoned(input: &str, now: i64, off: &dyn Fn(i64) -> i64) -> Query {
+        let clock = Clock { now, off };
         let mut q = Query::default();
         // Set by a trailing or standalone `|`: the next term joins the last one.
         let mut join = false;
