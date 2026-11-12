@@ -1,0 +1,180 @@
+name: torture-test
+
+# Hunts for crashes, hangs, a corrupt index and runaway memory on real
+# Windows before a release: ci/torture-test.ps1 with hostile file names,
+# folder shapes, change storms, damaged state files, many instances,
+# document bombs and a 30-minute soak. One job for each group.
+#
+# Which groups run is decided by ci/test-plan.json on the pushed branch:
+#   { "torture-test": { "groups": ["names", "tree", "churn", "state",
+#                                  "instances", "content", "soak"] } }
+# A group that is not listed is skipped; no file, no "torture-test" key or
+# an empty list means a push runs nothing (so one group can be run again by
+# pushing a plan that lists only it). The file is shared with the other
+# test suites, each under its own key.
+#
+# Kept small on purpose (GitHub's runners are shared):
+#   - a new push to the same branch cancels the run before it;
+#   - at most three groups at a time, each at most 45 minutes, and the
+#     script stops itself before that (its watchdog);
+#   - read-only token, no secrets, no cache, no network use by the tests;
+#   - the tests only touch scratch folders, the program's own data folder
+#     and a scratch VHD / subst drive, and clean up after themselves.
+# Worst case for a full round: 5 + 30 + 7 x 45 = 350 job-minutes; a usual
+# round is about 250.
+
+on:
+  push:
+    branches: ["claude/mem-test**", "claude/torture**"]
+  workflow_dispatch:
+    inputs:
+      groups:
+        description: "Groups to run, separated by spaces (empty: those in ci/test-plan.json, or all when it lists none)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: torture-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Reads ci/test-plan.json and builds the list of groups to run.
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      groups: ${{ steps.plan.outputs.groups }}
+      run: ${{ steps.plan.outputs.run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Read ci/test-plan.json
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          WANTED: ${{ inputs.groups }}
+        run: |
+          python3 - <<'EOF'
+          import json
+          import os
+
+          ALL = ["names", "tree", "churn", "state", "instances", "content", "soak"]
+          event = os.environ.get("EVENT", "")
+          wanted = os.environ.get("WANTED", "").replace(",", " ").split()
+
+          listed = None
+          try:
+              with open("ci/test-plan.json", encoding="utf-8-sig") as f:
+                  entry = json.load(f).get("torture-test")
+              if isinstance(entry, dict) and isinstance(entry.get("groups"), list):
+                  listed = [g for g in entry["groups"] if isinstance(g, str)]
+              else:
+                  print("ci/test-plan.json has no torture-test.groups list")
+          except (OSError, ValueError, AttributeError) as e:
+              print(f"no usable ci/test-plan.json: {e}")
+
+          if event == "workflow_dispatch":
+              # A manual run: the groups typed in, else the plan, else all.
+              asked = wanted or listed or ALL
+          else:
+              # A push runs only what the plan lists.
+              asked = listed or []
+          # Known names only, in a fixed order, each once.
+          groups = [g for g in ALL if g in asked]
+          unknown = sorted({g for g in asked if g not in ALL})
+          if unknown:
+              print(f"::warning::unknown torture-test groups ignored: {' '.join(unknown)}")
+          print(f"event {event}: groups to run: {' '.join(groups) or '(none)'}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"groups={json.dumps(groups)}\n")
+              out.write(f"run={'true' if groups else 'false'}\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write(f"Torture test groups for this run: {', '.join(groups) or 'none (ci/test-plan.json lists none)'}\n")
+          EOF
+
+  # The x64 exe of this branch, built exactly as build.yml's `exe` job
+  # builds the published one: MSVC, static C runtime (.cargo/config.toml),
+  # no build cache.
+  build:
+    needs: plan
+    if: needs.plan.outputs.run == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      # Before the ten-minute build: a typo in the test script or its C#
+      # helpers fails here, in seconds, with Windows PowerShell 5.1 itself.
+      - name: Check the test script and its helpers
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tokens = $null; $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path ci/torture-test.ps1).Path, [ref]$tokens, [ref]$errors)
+          foreach ($e in @($errors)) { Write-Host ("::error file=ci/torture-test.ps1,line={0}::{1}" -f $e.Extent.StartLineNumber, $e.Message) }
+          if (@($errors).Count) { exit 1 }
+          Add-Type -TypeDefinition ([IO.File]::ReadAllText((Resolve-Path ci/torture-test.cs).Path)) -ReferencedAssemblies 'System.IO.Compression.dll' -IgnoreWarnings
+          Write-Host ("ci/torture-test.ps1 parses and ci/torture-test.cs compiles; {0} hostile name patterns" -f [TN]::Catalogue().Count)
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+      - name: Build bahth.exe
+        shell: bash
+        run: |
+          cargo build --release --target x86_64-pc-windows-msvc
+          cp target/x86_64-pc-windows-msvc/release/bahth.exe bahth.exe
+      - name: Check the imported DLLs
+        run: python ci/check_imports.py bahth.exe
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: torture-bahth-exe
+          path: bahth.exe
+          retention-days: 3
+
+  torture:
+    needs: [plan, build]
+    if: needs.plan.outputs.run == 'true'
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        group: ${{ fromJSON(needs.plan.outputs.groups) }}
+    name: torture (${{ matrix.group }})
+    runs-on: windows-latest
+    # The script ends itself after 39 minutes (43 for the soak).
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: torture-bahth-exe
+      - name: Torture test
+        shell: powershell
+        env:
+          GROUP: ${{ matrix.group }}
+        run: ./ci/torture-test.ps1 -Exe ./bahth.exe -Group $env:GROUP -Out "$env:RUNNER_TEMP/torture-$env:GROUP"
+      - name: Report
+        if: always()
+        shell: powershell
+        env:
+          GROUP: ${{ matrix.group }}
+        run: |
+          $report = Join-Path $env:RUNNER_TEMP "torture-$env:GROUP/report.md"
+          if (Test-Path $report) { $text = [IO.File]::ReadAllText($report, [Text.Encoding]::UTF8) }
+          else { $text = "## Torture test, group $env:GROUP`n`nNo report was written: the script did not get that far (see the job log).`n" }
+          [IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, $text, (New-Object Text.UTF8Encoding $false))
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: torture-${{ matrix.group }}
+          path: ${{ runner.temp }}/torture-${{ matrix.group }}
+          retention-days: 7
+          if-no-files-found: warn
