@@ -548,9 +548,10 @@ fn spreadsheet_text<R: Read + Seek>(mut r: R, ext: &str) -> Option<String> {
                 // the strings still come out of the raw bytes.
                 r.rewind().ok()?;
                 let data = read_capped(r, MAX_FILE_SIZE)?;
-                // BIFF strings are not word-aligned: try both alignments.
+                // BIFF strings are not word-aligned: UTF-16 runs at both
+                // alignments, 8-bit runs once (they are the same either way).
                 let mut text = extract_doc_heuristic(&data);
-                text.push_str(&extract_doc_heuristic(data.get(1..).unwrap_or_default()));
+                text.push_str(&doc_runs_text(data.get(1..).unwrap_or_default(), false));
                 return Some(text);
             };
             // calamine gets the very bytes that were checked, in a compound
@@ -1381,6 +1382,11 @@ fn runs_where<T: Copy>(items: &[T], keep: impl Fn(T) -> bool) -> impl Iterator<I
 /// Best-effort text recovery from a binary Word 97-2003 file: collects runs of
 /// UTF-16LE text and runs of printable 8-bit text (decoded as windows-1256).
 fn extract_doc_heuristic(data: &[u8]) -> String {
+    doc_runs_text(data, true)
+}
+
+/// [`extract_doc_heuristic`], with the 8-bit runs only when `byte_runs`.
+fn doc_runs_text(data: &[u8], byte_runs: bool) -> String {
     let mut runs: Vec<(usize, String)> = Vec::new();
 
     // UTF-16LE runs (Word stores Unicode text pieces this way, word-aligned).
@@ -1411,7 +1417,7 @@ fn extract_doc_heuristic(data: &[u8]) -> String {
 
     // Single-byte runs (Word "compressed" pieces), decoded as windows-1256.
     let is_byte_text = |b: u8| matches!(b, 0x09 | 0x0D | 0x20..=0x7E | 0x80..=0xFF);
-    for Range { start, end } in runs_where(data, is_byte_text) {
+    for Range { start, end } in runs_where(if byte_runs { data } else { &[] }, is_byte_text) {
         if end - start >= 5 {
             let (s, _) = WINDOWS_1256.decode_without_bom_handling(&data[start..end]);
             let total = s.chars().count();
@@ -1715,6 +1721,21 @@ mod tests {
         let sheet = r#"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:XFD1048576"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>مرحبا</t></is></c><c r="B1"><v>42</v></c></row><row r="1048576"><c r="XFD1048576" t="inlineStr"><is><t>تقرير</t></is></c></row></sheetData></worksheet>"#;
         let t = extract_text(&write_xlsx("far.xlsx", sheet)).unwrap();
         assert_eq!(t, "مرحبا\t42\nتقرير\n\n");
+    }
+
+    #[test]
+    fn xls_raw_fallback_gives_each_text_once() {
+        // Not a workbook at all (a web page saved as .xls, common): the raw
+        // fallback read both byte alignments, and so gave all 8-bit text twice.
+        let page = "<html><body>تقرير المبيعات Sales report 2026</body></html>\n".repeat(20_000);
+        let (bytes, _, _) = WINDOWS_1256.encode(&page);
+        let t = spreadsheet_text(Cursor::new(bytes.as_ref()), "xls").unwrap();
+        assert_eq!(t.matches("Sales report").count(), 20_000, "{}", t.len());
+        assert!(t.contains("تقرير المبيعات"));
+        // UTF-16 text at an odd offset is still found.
+        let mut odd = vec![0u8];
+        odd.extend("نص بترميز يونيكود".encode_utf16().flat_map(u16::to_le_bytes));
+        assert!(spreadsheet_text(Cursor::new(odd), "xls").unwrap().contains("نص بترميز يونيكود"));
     }
 
     #[test]

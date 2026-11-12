@@ -50,7 +50,7 @@ const VERSION: u32 = 1;
 const MAGIC: [u8; 8] = *b"BHTHTXT\0";
 /// Magic, version (u32) and store id (u64).
 const HEADER_LEN: u64 = 20;
-/// Texts longer than this are not stored (they are re-extracted each time).
+/// Texts longer than this are stored cut to this length (on a character).
 /// The extractors stop at about 64 MB of output; this leaves a little slack.
 pub const MAX_TEXT: usize = 80 * 1024 * 1024;
 /// Default cap on the size of `content.dat`.
@@ -600,12 +600,16 @@ impl ContentCache {
     }
 
     /// Stores the extraction result of `path` (`None`: no text or failed).
-    /// Texts over [`MAX_TEXT`] are skipped, and once the store reaches its
+    /// Texts over [`MAX_TEXT`] are cut to it, and once the store reaches its
     /// size cap no new texts are added.
     pub fn put(&self, path: &str, size: u64, mtime: i64, text: Option<&str>) {
         let rec = match text {
-            Some(t) if t.len() > MAX_TEXT => return,
-            Some(t) => Some((lz4_flex::block::compress(t.as_bytes()), t.len() as u32)),
+            // The beginning only: not storing it meant extracting it again
+            // at every start and every search.
+            Some(t) => {
+                let t = &t[..t.floor_char_boundary(MAX_TEXT)];
+                Some((lz4_flex::block::compress(t.as_bytes()), t.len() as u32))
+            }
             None => None,
         };
         let mut inner = self.lock();
@@ -936,9 +940,12 @@ mod tests {
         let s = c.stats();
         assert_eq!((s.documents, s.texts, s.no_text, s.full), (2, 1, 1, false));
         assert!(s.garbage > 0 && s.bytes > HEADER_LEN + s.garbage);
-        // Too long a text is not stored at all.
-        c.put("C:\\big.txt", 1, 1, Some(&"x".repeat(MAX_TEXT + 1)));
-        assert_eq!(c.get("C:\\big.txt", 1, 1), None);
+        // Too long a text is stored cut at the limit (on a character),
+        // not left out to be extracted again every time.
+        let long = format!("{}ب", "x".repeat(MAX_TEXT - 1));
+        c.put("C:\\big.txt", 1, 1, Some(&long));
+        assert!(c.is_fresh("C:\\big.txt", 1, 1));
+        assert_eq!(c.get("C:\\big.txt", 1, 1).unwrap().unwrap().len(), MAX_TEXT - 1);
         fs::remove_dir_all(&dir).unwrap();
     }
 

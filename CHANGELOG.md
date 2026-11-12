@@ -12,6 +12,9 @@
 - **ملفات مصمَّمة تُبطئ الفهرسة لساعات** (RTF بمئات آلاف الخطوط، رسائل eml بفواصل أو عناوين مشوّهة، PDF بنماذج متشابكة أو آلاف الصور) صارت تُقرأ بسرعة، ولكل ملف حدّ زمني: ما يتجاوزه يُحفظ «بلا نص» ولا يُعاد في كل تشغيل. / **Files crafted to take hours** (huge RTF font tables, eml boundaries and subjects, PDF form webs, thousands of images) are now fast, and every file has a time budget; one that runs over is stored as having no text.
 - **مستند داخل أرشيف أو بمئات الأجزاء المضغوطة** لم يعد يفكّ مئات الميجابايتات: لكل ملف حدّ واحد لما يُفكّ ضغطه، يشمل ما بداخله. / **Nested inflation:** one decompression budget per file, members and their parts included; at most 64 header/footer parts per docx.
 
+### إصلاحات
+- **النصوص الأطول من 80 ميجابايت** تُحفظ مقصوصة بدل إعادة قراءتها في كل تشغيل وكل بحث، وملف .xls ليس جدولاً حقيقياً (صفحة ويب محفوظة بهذا الامتداد) لم يعد يُخرج نصه مرتين. / **Texts over 80 MB** are stored cut to the limit instead of being re-read every time; a non-workbook **.xls** no longer yields its text twice.
+
 ## 0.10.0 — 2026-11-11
 
 ### الرخصة
