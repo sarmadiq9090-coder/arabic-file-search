@@ -787,11 +787,16 @@ impl Lists {
         ver > self.floor
     }
 
-    /// Keeps `paths` as the recent files listed now; returns their version.
-    pub fn set_recent(&mut self, paths: Vec<String>) -> u64 {
+    /// Keeps `paths` as the recent files listed now; returns their version,
+    /// or `None` when the page already lists these very files (then nothing
+    /// is sent, and a dialog open on one of them keeps working).
+    pub fn set_recent(&mut self, paths: Vec<String>) -> Option<u64> {
+        if self.fresh(self.recent.ver) && self.recent.paths == paths {
+            return None;
+        }
         let ver = self.next_ver();
         self.recent = RecentList { ver, paths };
-        ver
+        Some(ver)
     }
 
     /// The results listed now, if they are version `ver` of search `seq`.
@@ -825,9 +830,18 @@ impl Lists {
     /// one is listed or the page loaded again since it started. Returns
     /// whether to send it to the page (not when a newer search waits, which
     /// the page would drop it for), and the search waiting to run.
-    pub fn finished(&mut self, shown: Shown) -> (bool, Option<Params>) {
+    pub fn finished(&mut self, mut shown: Shown) -> (bool, Option<Params>) {
         let pending = self.pending.take();
         if !self.fresh(shown.ver) || self.shown.as_ref().is_some_and(|s| s.seq > shown.seq) {
+            return (false, pending);
+        }
+        // The same search run again (the index changed elsewhere) found the
+        // very same rows: the page keeps its list and its version, so a
+        // rename or delete dialog open on it still works.
+        if let Some(old) = self.shown.as_ref().filter(|s| s.seq == shown.seq && s.changed.is_empty() && s.params.content == shown.params.content && s.all_paths() == shown.all_paths()) {
+            shown.ver = old.ver;
+            shown.params.ver = old.ver;
+            self.shown = Some(shown);
             return (false, pending);
         }
         let send = pending.as_ref().is_none_or(|p| p.seq == shown.seq);
@@ -1659,6 +1673,24 @@ mod tests {
     }
 
     #[test]
+    fn the_same_rows_found_again_keep_their_version() {
+        let mut lists = Lists::default();
+        let (shown, msg) = listed(&mut lists, 7, Sort::Name);
+        let v1 = ver_of(&msg);
+        lists.finished(shown);
+        // Run again in the background with the same rows: not sent, same version.
+        let (again, _) = listed(&mut lists, 7, Sort::Name);
+        assert_eq!(fin(&mut lists, again), (false, None));
+        assert_eq!(lists.shown.as_ref().unwrap().ver, v1);
+        assert!(lists.path(List::Results, 7, v1, 0).is_ok());
+        // A renamed row since: the list is sent again with a new version.
+        lists.shown_at_mut(7, v1).unwrap().changed.insert(0, Some("C:\\x.pdf".into()));
+        let (third, msg) = listed(&mut lists, 7, Sort::Name);
+        assert_eq!(fin(&mut lists, third), (true, None));
+        assert_ne!(ver_of(&msg), v1);
+    }
+
+    #[test]
     fn a_dialog_acts_on_the_list_it_was_opened_for() {
         // The rename dialog is opened on row 0 of version v1; while it is
         // open the list is listed again. Its OK names v1, which is refused.
@@ -1691,11 +1723,13 @@ mod tests {
         let mut lists = Lists::default();
         // Nothing listed yet: version 0 names nothing.
         assert_eq!(lists.path(List::Recent, 0, 0, 0), Err(Miss::Stale));
-        let v1 = lists.set_recent(vec!["C:\\a\\one.txt".into(), "C:\\a\\two.txt".into()]);
+        let v1 = lists.set_recent(vec!["C:\\a\\one.txt".into(), "C:\\a\\two.txt".into()]).unwrap();
+        // The same files again (the window shown again): nothing new, the version stays.
+        assert_eq!(lists.set_recent(vec!["C:\\a\\one.txt".into(), "C:\\a\\two.txt".into()]), None);
         assert_eq!(lists.path(List::Recent, 0, v1, 1), Ok("C:\\a\\two.txt"));
         assert_eq!(lists.path(List::Recent, 0, 0, 1), Err(Miss::Stale));
         // A file opened moves to the top: the list is sent again, and row 1 is another file.
-        let v2 = lists.set_recent(vec!["C:\\a\\two.txt".into(), "C:\\a\\one.txt".into()]);
+        let v2 = lists.set_recent(vec!["C:\\a\\two.txt".into(), "C:\\a\\one.txt".into()]).unwrap();
         assert_ne!(v1, v2);
         assert_eq!(lists.path(List::Recent, 0, v1, 1), Err(Miss::Stale));
         assert_eq!(lists.path(List::Recent, 0, v2, 1), Ok("C:\\a\\one.txt"));

@@ -720,7 +720,8 @@ mod imp {
                     Some((if m.is_dir() { 0 } else { m.len() }, mtime, m.is_dir()))
                 })
             };
-            let ver = self.webui.lists.borrow_mut().set_recent(paths);
+            // (Not again when the page already lists these files.)
+            let Some(ver) = self.webui.lists.borrow_mut().set_recent(paths) else { return };
             self.webui_send(&Outbound::Recent { ver, rows });
         }
 
