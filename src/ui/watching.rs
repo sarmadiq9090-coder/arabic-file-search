@@ -162,6 +162,12 @@ impl App {
                 st.live.waiting_since = None;
                 return;
             }
+        }
+        // A list of the new look that points into this index keeps its own
+        // rows from here on, so it is no reason to copy.
+        self.webui_release_index();
+        {
+            let mut st = self.state.borrow_mut();
             if self.index_shared(&st) {
                 // Copying a big index for every one-second batch would keep
                 // the UI thread busy; gather them instead (the tick brings

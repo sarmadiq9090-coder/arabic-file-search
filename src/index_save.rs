@@ -498,10 +498,28 @@ impl Drop for Worker<'_> {
 /// Takes the index out of `slot` to change it: without copying when `slot`
 /// is its only owner, as a copy when something else still holds it. True
 /// when it was copied; `slot` then still holds the old snapshot.
+///
+/// `Weak` pointers do not count: the folder-size cache keeps one per
+/// snapshot it computed (`folder_sizes`), and with `Arc::get_mut`, which
+/// refuses while one exists, every change found on disk copied the whole
+/// index once folder sizes had been shown. `Arc::try_unwrap` is used
+/// instead. Why that is safe:
+/// - it is the standard, safe way to take the value out: it succeeds only
+///   when no other strong reference exists (an atomic check), so nothing
+///   can be reading the index while it is changed, and a `Weak::upgrade`
+///   racing with it fails; `folder_sizes` never upgrades anyway, it only
+///   compares addresses and reads `strong_count`;
+/// - the `Weak` keeps the old allocation alive (its address cannot be given
+///   to the new snapshot), so the cache can never take the changed index for
+///   the one it computed: the new snapshot is a cache miss, computed afresh.
 pub fn take_for_edit(slot: &mut Arc<Index>) -> (Index, bool) {
-    match Arc::get_mut(slot) {
-        Some(index) => (std::mem::take(index), false),
-        None => (Index { entries: slot.entries.clone(), roots: slot.roots.clone(), built_at: slot.built_at }, true),
+    match Arc::try_unwrap(std::mem::take(slot)) {
+        Ok(index) => (index, false),
+        Err(shared) => {
+            let copy = Index { entries: shared.entries.clone(), roots: shared.roots.clone(), built_at: shared.built_at };
+            *slot = shared;
+            (copy, true)
+        }
     }
 }
 
@@ -948,6 +966,28 @@ mod tests {
         let (owned, copied) = take_for_edit(&mut index);
         assert!(!copied);
         assert_eq!(owned.entries.as_ptr(), at);
+    }
+
+    /// The folder sizes shown in the Size column keep a `Weak` of the
+    /// snapshot they were computed for: edits still change the index in
+    /// place (no copy), and the changed index is never served the old sizes.
+    #[test]
+    fn folder_sizes_do_not_make_edits_copy() {
+        let queue = queue_with(Box::new(|_| Ok(())));
+        let mut index = Arc::new(index_of(50));
+        for i in 0..50u64 {
+            let sizes = crate::folder_sizes::for_index(&index);
+            assert!(crate::folder_sizes::cached(&index).is_some());
+            assert!(Arc::weak_count(&index) >= 1);
+            drop(sizes);
+            let at = index.entries.as_ptr();
+            let done = edit(&queue, &mut index, |idx| { idx.entries[0].size = i + 7; true }, None);
+            assert!(!done.copied, "edit {i} copied the index");
+            assert_eq!(index.entries.as_ptr(), at, "the entries were moved, not copied");
+            // A new snapshot: the sizes of the old one are not taken for its.
+            assert!(crate::folder_sizes::cached(&index).is_none(), "edit {i}: stale sizes served");
+            assert_eq!(crate::folder_sizes::for_index(&index).total(0), i + 7);
+        }
     }
 
     /// At rest, what is on disk is what is in memory: after a burst of edits

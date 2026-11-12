@@ -1282,6 +1282,21 @@ mod imp {
             }
         }
 
+        /// The window's index is about to change: a results list that
+        /// points into it keeps its own rows from here on (`Shown::detach`;
+        /// every row id still gives the same file, or nothing), so the index
+        /// has one owner and is changed in place instead of copied, also
+        /// while the window is hidden. The list then counts as out of date
+        /// and `webui_tick` searches again once the window shows.
+        pub(in super::super) fn webui_release_index(&self) {
+            let (Ok(st), Ok(mut lists)) = (self.state.try_borrow(), self.webui.lists.try_borrow_mut()) else { return };
+            if let Some(shown) = lists.shown.as_mut()
+                && Arc::ptr_eq(&shown.index, &st.index)
+            {
+                shown.detach();
+            }
+        }
+
         fn webui_status(&self, force: bool) {
             let ix = self.indexing();
             let msg = {
@@ -1378,5 +1393,7 @@ mod imp {
         pub(in super::super) fn webui_close(&self) {}
 
         pub(in super::super) fn webui_tick(&self, _tick: u32) {}
+
+        pub(in super::super) fn webui_release_index(&self) {}
     }
 }

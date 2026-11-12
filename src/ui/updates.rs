@@ -20,8 +20,9 @@ impl App {
     /// Looks for a newer release on GitHub in the background. The automatic
     /// check runs at most once a day and stays silent unless it finds one.
     pub(super) fn check_for_update(&self, manual: bool) {
-        // Installed with winget or Scoop: they update it, never the program
-        // itself (that would break their records of the file).
+        // Installed with winget, Scoop or Chocolatey, or from the Store: they
+        // update it, never the program itself (that would break their
+        // records of the file, or cannot work at all).
         if let Some(pm) = crate::update::managed_by() {
             if manual {
                 log(&format!("update: skipped, installed with {}", pm.name()));
@@ -30,14 +31,23 @@ impl App {
             }
             return;
         }
+        // In a folder this copy cannot write to (Program Files): a
+        // self-update would always fail, so none is offered.
+        if let Some(dir) = crate::update::read_only_folder() {
+            if manual {
+                log(&format!("update: skipped, cannot write to {dir}"));
+                nwg::modal_info_message(&self.window, title(), &crate::update::read_only_message(&dir));
+            }
+            return;
+        }
         if self.update_busy.replace(true) {
             if manual {
-                self.set_status(tr!("جاري التحقق من التحديثات…", "Checking for updates…"));
+                self.set_status(tr!("جارٍ التحقق من التحديثات…", "Checking for updates…"));
             }
             return;
         }
         if manual {
-            self.set_status(tr!("جاري التحقق من التحديثات…", "Checking for updates…"));
+            self.set_status(tr!("جارٍ التحقق من التحديثات…", "Checking for updates…"));
         }
         let slot = self.update_result.clone();
         let notice = self.update_notice.sender();
@@ -90,7 +100,7 @@ impl App {
                 }
             }
             UpdateEvent::Installed(Ok(())) => {
-                self.set_status(tr!("اكتمل التحديث. جاري إعادة التشغيل…", "Update complete. Restarting…"));
+                self.set_status(tr!("اكتمل التحديث. جارٍ إعادة التشغيل…", "Update complete. Restarting…"));
                 // Leaves only when the new version runs; otherwise the old
                 // program file goes back in place, so the install always has
                 // a program that starts.
@@ -179,7 +189,7 @@ impl App {
         let total = self.update_progress.1.load(Ordering::Relaxed);
         if total > 0 && self.update_busy.get() {
             let done = self.update_progress.0.load(Ordering::Relaxed);
-            self.set_status(&trf!("جاري تنزيل التحديث… {}٪", "Downloading the update… {}%", (done * 100 / total).min(100)));
+            self.set_status(&trf!("جارٍ تنزيل التحديث… {}٪", "Downloading the update… {}%", (done * 100 / total).min(100)));
         }
     }
 }
