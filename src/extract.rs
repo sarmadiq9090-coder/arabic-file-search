@@ -23,7 +23,10 @@ mod bidi_fix;
 mod epub;
 #[cfg(test)]
 mod fuzz;
+#[cfg(test)]
+pub(crate) mod hostile;
 mod mail;
+mod pdf_guard;
 mod pdf_images;
 
 /// Files larger than this are never opened.
@@ -55,6 +58,19 @@ const OTHER_EXTS: &[&str] = &[
 /// Images searched through Windows OCR (see `crate::ocr`), when it is available.
 #[cfg(windows)]
 const IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif"];
+
+/// Tests only: true when the environment variable `var` is set, to turn a
+/// safety check off in a child process and show what it prevents
+/// (`extract::hostile`). Always false in the app.
+#[cfg(test)]
+fn unchecked(var: &str) -> bool {
+    std::env::var_os(var).is_some()
+}
+
+#[cfg(not(test))]
+fn unchecked(_var: &str) -> bool {
+    false
+}
 
 /// Returns true if the extension (lowercase, no dot) is supported for content search.
 pub fn is_supported(ext: &str) -> bool {
@@ -735,15 +751,35 @@ fn extract_pdf(path: &Path) -> Option<String> {
     // though `extract_text` has an outer guard as well. (It does not print to
     // stdout in normal operation; in a GUI-subsystem build there is no console
     // to print to anyway.)
-    let text = crate::crash_log::quietly(|| pdf_extract::extract_text_from_mem(&bytes)).ok()?;
+    let text = crate::crash_log::quietly(|| pdf_text(&bytes)).ok()?.ok()?;
     // A scanned PDF may have no text layer at all: OCR its page images.
     #[cfg(windows)]
     let text = pdf_images::ocr_if_scanned(&bytes, text.unwrap_or_default());
     #[cfg(not(windows))]
-    let text = text.ok()?;
+    let text = text?;
     // Before `extract_text` folds presentation forms: their shapes are the
     // best evidence of visual (reversed) Arabic line order.
     Some(bidi_fix::fix_visual_order(text))
+}
+
+/// A PDF whose structure pdf-extract cannot walk safely (see [`pdf_guard`]).
+struct UnsafePdf;
+
+/// The text layer of the PDF in `bytes`, as `pdf_extract::extract_text_from_mem`
+/// gives it (`None` when it cannot be read), but only after [`pdf_guard`]
+/// has found that walking the document ends: pdf-extract recurses without
+/// limit, and a stack overflow ends the process whatever catches panics.
+fn pdf_text(bytes: &[u8]) -> Result<Option<String>, UnsafePdf> {
+    let Ok(mut doc) = lopdf::Document::load_mem(bytes) else { return Ok(None) };
+    if doc.is_encrypted() && doc.decrypt("").is_err() {
+        return Ok(None);
+    }
+    if !unchecked("BAHTH_TEST_UNCHECKED_PDF") && !pdf_guard::bounded(&doc) {
+        return Err(UnsafePdf);
+    }
+    let mut text = String::new();
+    let done = pdf_extract::output_doc(&doc, &mut pdf_extract::PlainTextOutput::new(&mut text));
+    Ok(done.is_ok().then_some(text))
 }
 
 // ---------------------------------------------------------------------------
