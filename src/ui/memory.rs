@@ -99,6 +99,7 @@ impl App {
         if !self.thumbs_on() {
             self.thumbs.cache.replace(None);
         }
+        self.webui_shed_thumbs();
         crate::folder_sizes::forget();
         if was_watching {
             self.mem.resume_at.set(Some(Instant::now() + mem_guard::SHED_COOLDOWN));

@@ -66,6 +66,8 @@ mod updates;
 mod watching;
 mod web_server;
 mod webui;
+#[cfg(target_env = "msvc")]
+mod webui_thumbs;
 
 use native_windows_gui as nwg;
 use nwg::NativeUi;

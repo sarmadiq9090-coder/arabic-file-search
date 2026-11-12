@@ -22,6 +22,7 @@
 
 pub mod assets;
 pub mod bridge;
+pub mod png;
 #[cfg(all(windows, target_env = "msvc"))]
 pub mod host;
 

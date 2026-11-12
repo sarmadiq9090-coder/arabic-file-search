@@ -21,6 +21,17 @@ pub fn own_url(url: &str) -> bool {
     url.strip_prefix(ORIGIN).is_some_and(|rest| rest.is_empty() || rest.starts_with('/')) || url.starts_with(START_URL)
 }
 
+/// Where the page asks for a thumbnail: `/thumb/<key>`, the key a random
+/// one-time name the program gave for a row it listed (never a path).
+pub const THUMB_PREFIX: &str = "/thumb/";
+
+/// The thumbnail key in a request path, if it is exactly `/thumb/` and 32
+/// lowercase hex digits; anything else is not a thumbnail request.
+pub fn thumb_key(path: &str) -> Option<&str> {
+    let key = path.strip_prefix(THUMB_PREFIX)?;
+    (key.len() == 32 && key.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))).then_some(key)
+}
+
 /// Scripts, styles and fonts only from the program itself; no inline script,
 /// no `eval`, no network, no plug-ins, no frames, no forms.
 pub const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; \
@@ -96,6 +107,17 @@ pub const HEADERS: &[(&str, &str)] = &[
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn thumbnail_keys_are_exact() {
+        let k = "0123456789abcdef0123456789abcdef";
+        assert_eq!(super::thumb_key(&format!("/thumb/{k}")), Some(k));
+        for bad in ["/thumb/", "/thumb/0123", "/thumb/0123456789ABCDEF0123456789ABCDEF", "/thumb/../app.js", "/thumb/C:\\x.jpg", "/thumbs/0123456789abcdef0123456789abcdef", "/thumb/0123456789abcdef0123456789abcdef/x"] {
+            assert_eq!(super::thumb_key(bad), None, "{bad}");
+        }
+        // Not served as a file either.
+        assert_eq!(super::serve("GET", &format!("/thumb/{k}"), "<html>").status, 404);
+    }
+
     #[test]
     fn only_the_programs_own_urls() {
         for ok in ["http://instafind.localhost", "http://instafind.localhost/", "http://instafind.localhost/index.html", "instafind://localhost/", "instafind://localhost/app.js"] {
