@@ -24,6 +24,11 @@ if ($Machine) {
     Write-Host ("stack reserve {0:N0} bytes" -f $stack)
     if ($stack -lt 8MB) { throw ("{0} reserves only {1} bytes of stack, not 8 MB" -f $Exe, $stack) }
 }
+# Task Manager, the taskbar and Explorer show the version resource's
+# FileDescription, not the file name: it must say InstaFind (the file stays bahth.exe).
+$info = (Get-Item $Exe).VersionInfo
+Write-Host ("version resource: description '{0}', product '{1}', version {2}" -f $info.FileDescription, $info.ProductName, $info.FileVersion)
+if ($info.FileDescription -ne 'InstaFind' -or $info.ProductName -ne 'InstaFind') { throw "${Exe}: the version resource must name the program InstaFind" }
 $data = Join-Path $env:LOCALAPPDATA 'BahthSari'
 $crash = Join-Path $data 'crash.txt'
 $index = Join-Path $data 'index.bin'
