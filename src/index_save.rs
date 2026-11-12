@@ -53,6 +53,17 @@ pub fn retry_in(base: Duration, failures: u32) -> Duration {
     base.saturating_mul(1u32 << failures.saturating_sub(1).min(10)).min(MAX_GAP)
 }
 
+/// The test hook `BAHTH_TEST_SAVE_DELAY_MS`: every index save waits this
+/// long before it writes, so the Windows memory test can make saves slower
+/// than the changes. `None` (no delay) when unset, empty, not a number or
+/// zero; at most ten minutes.
+pub const TEST_SAVE_DELAY_VAR: &str = "BAHTH_TEST_SAVE_DELAY_MS";
+
+pub fn test_save_delay(value: Option<&str>) -> Option<Duration> {
+    let ms: u64 = value?.trim().parse().ok()?;
+    (ms > 0).then(|| Duration::from_millis(ms.min(600_000)))
+}
+
 /// How long after a save that took `took` the next one may start.
 pub fn next_gap(took: Duration, factor: u32) -> Duration {
     took.saturating_mul(factor).min(MAX_GAP)
@@ -1309,6 +1320,19 @@ mod tests {
         assert!(!queue.write(&older, 3).unwrap(), "the older snapshot must not replace the newer file");
         assert_eq!(disk.last_written.load(Ordering::SeqCst), 9);
         assert_eq!(disk.finished.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn the_slow_save_test_hook_is_read_carefully() {
+        assert_eq!(TEST_SAVE_DELAY_VAR, "BAHTH_TEST_SAVE_DELAY_MS");
+        assert_eq!(test_save_delay(None), None, "inert when unset");
+        for bad in ["", " ", "abc", "-5", "1.5", "0", "9999999999999999999999"] {
+            assert_eq!(test_save_delay(Some(bad)), None, "{bad:?}");
+        }
+        assert_eq!(test_save_delay(Some("90000")), Some(Duration::from_secs(90)));
+        assert_eq!(test_save_delay(Some(" 250 ")), Some(Duration::from_millis(250)));
+        assert_eq!(test_save_delay(Some("600000")), Some(Duration::from_secs(600)));
+        assert_eq!(test_save_delay(Some("5000000")), Some(Duration::from_secs(600)), "capped at ten minutes");
     }
 
     #[test]

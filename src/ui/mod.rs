@@ -697,6 +697,9 @@ pub fn run() {
     if activate_running_copy(updated || moved) {
         return;
     }
+    if let Some(d) = files::test_save_delay() {
+        startup::log(&format!("test hook: {} set; every index save waits {} ms", crate::index_save::TEST_SAVE_DELAY_VAR, d.as_millis()));
+    }
     // An interrupted update that left only bahth.exe.old: it is put back.
     // The leftovers of an update are deleted once this copy has shown that it
     // runs (`on_tick`), never before.

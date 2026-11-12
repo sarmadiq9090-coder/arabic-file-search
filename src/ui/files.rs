@@ -235,7 +235,12 @@ pub(super) const EDIT_SAVE: Duration = Duration::from_millis(500);
 /// `index_save`; until 0.10.0 each waiting save held one).
 pub(super) static SAVES: LazyLock<Arc<SaveQueue>> = LazyLock::new(|| {
     SaveQueue::new(
-        Box::new(|idx| idx.save(&index::cache_path())),
+        Box::new(|idx| {
+            if let Some(delay) = test_save_delay() {
+                std::thread::sleep(delay);
+            }
+            idx.save(&index::cache_path())
+        }),
         // `index.dirty`: there while changes are only in memory (see
         // `index_save`); a start that finds it scans the drives again.
         Box::new(|unsaved| {
@@ -255,6 +260,12 @@ pub(super) static SAVES: LazyLock<Arc<SaveQueue>> = LazyLock::new(|| {
         index_save::RETRY,
     )
 });
+
+/// The slow-save test hook (`index_save::TEST_SAVE_DELAY_VAR`), read once.
+pub(super) fn test_save_delay() -> Option<Duration> {
+    static DELAY: std::sync::OnceLock<Option<Duration>> = std::sync::OnceLock::new();
+    *DELAY.get_or_init(|| index_save::test_save_delay(std::env::var(index_save::TEST_SAVE_DELAY_VAR).ok().as_deref()))
+}
 
 /// A whole copy of the index is worth a line in the log (it is what makes
 /// memory use jump), but on a busy PC not one every ten seconds.
