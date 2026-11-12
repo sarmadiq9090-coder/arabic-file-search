@@ -58,6 +58,16 @@ pub const DEFAULT_MAX_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 
 const DAT: &str = "content.dat";
 const IDX: &str = "content.idx";
+/// What the extractors could read when the store was filled (see
+/// [`ContentCache::revalidate`]).
+const SIGNATURE: &str = "extractor.txt";
+/// Bumped when an extractor learns to read files it gave no text for
+/// before: their "no text" entries are then dropped once.
+#[cfg_attr(not(windows), allow(dead_code))] // read by the Windows UI
+pub const EXTRACTOR_VERSION: u32 = 2;
+/// `Meta::hash` of a "no text" entry that marks a file a run died reading
+/// (unused otherwise for "no text"): kept whatever the signature says.
+const POISONED: u64 = u64::from_le_bytes(*b"POISONED");
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 enum Kind {
@@ -481,6 +491,9 @@ impl ContentCache {
             if let Some((path, size, mtime)) = decode_marker(&bytes) {
                 if stamp(Path::new(&path)) == Some((size, mtime)) {
                     self.put(&path, size, mtime, None);
+                    if let Some(m) = self.lock().map.get_mut(path.as_str()) {
+                        m.hash = POISONED;
+                    }
                 }
                 self.recovered.push(path);
             }
@@ -491,6 +504,48 @@ impl ContentCache {
         for p in files {
             let _ = fs::remove_file(p);
         }
+    }
+
+    /// Drops what may read differently now that the extractors changed:
+    /// when `signature` (the extractor version and the OCR languages, say)
+    /// is not the one the store was filled with, every "no text" entry
+    /// (scanned PDFs found empty before the Arabic OCR language pack was
+    /// installed, files an older version could not read) and every image
+    /// entry is forgotten, so each is read once more. Files a run died
+    /// reading stay skipped. Returns how many entries were dropped.
+    pub fn revalidate(&self, signature: &str) -> usize {
+        let file = self.dir.join(SIGNATURE);
+        if fs::read_to_string(&file).is_ok_and(|s| s == signature) {
+            return 0;
+        }
+        let dropped = {
+            let mut inner = self.lock();
+            let before = inner.map.len();
+            let mut garbage = 0;
+            inner.map.retain(|path, m| {
+                let image = Path::new(&**path)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|e| IMAGE_EXTS.contains(&e.to_ascii_lowercase().as_str()));
+                let keep = match m.kind {
+                    Kind::NoText => m.hash == POISONED,
+                    Kind::Text => !image,
+                };
+                if !keep && m.kind == Kind::Text {
+                    garbage += u64::from(m.len);
+                }
+                keep
+            });
+            inner.garbage += garbage;
+            let dropped = before - inner.map.len();
+            inner.dirty |= dropped > 0;
+            dropped
+        };
+        // The new signature only once the store no longer has the old entries.
+        if self.flush().is_ok() {
+            let _ = fs::write(&file, signature);
+        }
+        dropped
     }
 
     /// Files a previous run died extracting (see the module docs): each is
@@ -1763,6 +1818,35 @@ mod tests {
         eprintln!("marker set + clear: {} ns per document", per.as_nanos());
         assert!(per < Duration::from_millis(1), "{per:?}");
         drop(c);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn new_extractor_signature_rereads_no_text_and_images_once() {
+        // Entries were keyed on size and mtime only: a scanned PDF found
+        // empty before the Arabic OCR language pack was installed stayed
+        // "no text" until the file changed.
+        let dir = temp_dir("signature");
+        let c = ContentCache::open(&dir).unwrap();
+        assert_eq!(c.revalidate("v2 ocr=en-US"), 0, "an empty store has nothing to drop");
+        c.put("C:\\scan.pdf", 1, 1, None);
+        c.put("C:\\photo.JPG", 2, 2, Some("صورة"));
+        c.put("C:\\report.docx", 3, 3, Some(AR));
+        c.put("C:\\poisoned.pdf", 4, 4, None);
+        c.lock().map.get_mut("C:\\poisoned.pdf").unwrap().hash = POISONED;
+        assert_eq!(c.revalidate("v2 ocr=en-US"), 0, "same signature: nothing changes");
+        assert_eq!(c.revalidate("v2 ocr=ar-SA,en-US"), 2);
+        assert_eq!(c.get("C:\\scan.pdf", 1, 1), None);
+        assert_eq!(c.get("C:\\photo.JPG", 2, 2), None);
+        assert_eq!(c.get("C:\\report.docx", 3, 3), Some(Some(AR.into())));
+        assert_eq!(c.get("C:\\poisoned.pdf", 4, 4), Some(None));
+        // Read again and stored: kept from now on, also after a reopen.
+        c.put("C:\\scan.pdf", 1, 1, Some("نص من OCR"));
+        c.flush().unwrap();
+        drop(c);
+        let c = ContentCache::open(&dir).unwrap();
+        assert_eq!(c.revalidate("v2 ocr=ar-SA,en-US"), 0);
+        assert_eq!(c.get("C:\\scan.pdf", 1, 1).unwrap().unwrap(), "نص من OCR");
         fs::remove_dir_all(&dir).unwrap();
     }
 }

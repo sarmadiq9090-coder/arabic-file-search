@@ -13,6 +13,7 @@
 - **مستند داخل أرشيف أو بمئات الأجزاء المضغوطة** لم يعد يفكّ مئات الميجابايتات: لكل ملف حدّ واحد لما يُفكّ ضغطه، يشمل ما بداخله. / **Nested inflation:** one decompression budget per file, members and their parts included; at most 64 header/footer parts per docx.
 
 ### إصلاحات
+- **بعد تثبيت حزمة اللغة العربية لقراءة الصور** تُعاد قراءة ملفات PDF الممسوحة والصور التي لم يُعثر فيها على نص، مرة واحدة. / After the **Arabic OCR language pack** is installed, scanned PDFs and images found empty are read once more.
 - **النصوص الأطول من 80 ميجابايت** تُحفظ مقصوصة بدل إعادة قراءتها في كل تشغيل وكل بحث، وملف .xls ليس جدولاً حقيقياً (صفحة ويب محفوظة بهذا الامتداد) لم يعد يُخرج نصه مرتين. / **Texts over 80 MB** are stored cut to the limit instead of being re-read every time; a non-workbook **.xls** no longer yields its text twice.
 
 ## 0.10.0 — 2026-11-11

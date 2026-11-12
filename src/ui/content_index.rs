@@ -33,6 +33,17 @@ pub(super) fn shared() -> Option<&'static ContentCache> {
                     log(&format!("content index: the last run stopped while reading {path}; skipped until the file changes"));
                 }
                 c.clear_markers_at_exit();
+                // Installing the Arabic OCR language pack (or a newer reader)
+                // makes scanned PDFs and images worth reading once more.
+                let signature = format!(
+                    "extractor {}; ocr {}",
+                    content_cache::EXTRACTOR_VERSION,
+                    crate::ocr::languages().join(",")
+                );
+                let dropped = c.revalidate(&signature);
+                if dropped > 0 {
+                    log(&format!("content index: {dropped} documents to read again ({signature})"));
+                }
             }
             cache.ok()
         })
