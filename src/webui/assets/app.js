@@ -18,19 +18,19 @@
       ph: "ابحث باسم الملف…", phContent: "ابحث داخل المستندات ثم اضغط Enter…", type: "النوع", size: "الحجم", date: "التاريخ",
       filters: "عوامل التصفية", lookIn: "البحث في", allDrives: "كل الأقراص", chooseFolder: "اختيار مجلد…", clearFilter: "إزالة",
       inside: "داخل المستندات", sortBy: "الترتيب",
-      sorts: { best: "الأنسب أولاً", name: "الاسم", path: "المسار", size: "الحجم", date: "آخر تعديل" },
+      sorts: { best: "الأنسب أولاً", name: "الاسم", path: "المسار", size: "الحجم", date: "تاريخ التعديل" },
       asc: "تصاعدي", desc: "تنازلي",
-      cName: "الاسم والمسار", cSize: "الحجم", cDate: "آخر تعديل",
+      cName: "الاسم والمسار", cSize: "الحجم", cDate: "تاريخ التعديل",
       results: "النتائج", preview: "المعاينة",
       recent: "ملفات فتحتها مؤخراً", recentNone: "الملفات التي تفتحها تظهر هنا.", tryThese: "جرّب هذه",
       trust: "كل شيء يبقى على جهازك. لا نجمع أي بيانات استخدام.",
       tips: [["تقرير .pdf", "ملفات PDF فقط"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"], ['"عقد إيجار"', "العبارة كما هي"], ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["hgjrvdv", "لوحة المفاتيح الخطأ ← «التقرير»"]],
       kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد", kMenu: "إجراءات",
       open: "فتح", openFolder: "فتح المجلد", copyPath: "نسخ المسار", more: "إجراءات أخرى",
-      fType: "النوع", fSize: "الحجم", fMod: "آخر تعديل", fMatches: "التطابقات", folder: "مجلد", file: "ملف",
+      fType: "النوع", fSize: "الحجم", fMod: "تاريخ التعديل", fMatches: "التطابقات", folder: "مجلد", file: "ملف",
       nres: (n) => (n === 0 ? "لا نتائج" : n === 1 ? "نتيجة واحدة" : n === 2 ? "نتيجتان" : n <= 10 ? `${num(n)} نتائج` : `${num(n)} نتيجة`),
       nMatches: (n) => (n === 1 ? "تطابق واحد" : n === 2 ? "تطابقان" : n <= 10 ? `${num(n)} تطابقات` : `${num(n)} تطابقاً`),
-      count: (n, ms) => `عدد النتائج: ${num(n)} (خلال ${num(ms)} ملّي ثانية)`,
+      count: (n, ms) => (n ? `وجدت ${T.nres(n)} في ${num(ms)} ملّي ثانية` : T.nres(0)),
       files: (n) => `الفهرس محدَّث · ${num(n)} ملف`,
       noresH: (q) => `لا توجد نتائج لـ «${q}»`,
       noresSub: (n, kind, scope) => `بحثنا في أسماء ${num(n)} ملف ${scope ? `داخل ${scope}` : "في كل الأقراص"}${kind ? `، ضمن «${kind}» فقط` : ""}.`,
@@ -93,7 +93,7 @@
       fType: "Type", fSize: "Size", fMod: "Modified", fMatches: "Matches", folder: "Folder", file: "File",
       nres: (n) => (n === 0 ? "No results" : n === 1 ? "1 result" : `${num(n)} results`),
       nMatches: (n) => (n === 1 ? "1 match" : `${num(n)} matches`),
-      count: (n, ms) => `${num(n)} results in ${num(ms)} ms`,
+      count: (n, ms) => (n ? `Found ${T.nres(n)} in ${num(ms)} ms` : T.nres(0)),
       files: (n) => `Index up to date · ${num(n)} files`,
       noresH: (q) => `No results for “${q}”`,
       noresSub: (n, kind, scope) => `We searched ${num(n)} file names ${scope ? `in ${scope}` : "on all drives"}${kind ? `, “${kind}” only` : ""}.`,
@@ -178,6 +178,10 @@
     if (days === 1) return digits(`${T.yesterday} ${fmtTime.format(d)}`);
     return digits((d.getFullYear() === now.getFullYear() ? fmtDay : fmtDayYear).format(d));
   }
+
+  // The date and time in full (the preview pane), as the classic window's column.
+  const fmtFull = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit" });
+  function fullDate(secs) { return secs ? digits(fmtFull.format(new Date(secs * 1000))) : ""; }
 
   // ---------- DOM helpers (no HTML from data, ever) ----------
   function h(tag, attrs, ...kids) {
@@ -638,7 +642,7 @@
     const kind = r.folder ? T.folder : r.ext ? `${r.ext.toUpperCase()} · ${T.file}` : T.file;
     const facts = h("dl", { class: "facts" }, h("dt", null, T.fType), h("dd", null, kind));
     if (!r.folder) facts.append(h("dt", null, T.fSize), h("dd", { class: "num" }, size(r.size)));
-    facts.append(h("dt", null, T.fMod), h("dd", { class: "num" }, when(r.mtime)));
+    facts.append(h("dt", null, T.fMod), h("dd", { class: "num", title: fullDate(r.mtime) }, fullDate(r.mtime)));
     if (r.matches) facts.append(h("dt", null, T.fMatches), h("dd", { class: "num" }, T.nMatches(r.matches)));
     const open = btn("primary", I.open, T.open + " ", () => act("open", S.rows[S.sel]), { disabled: r.gone });
     open.append(h("kbd", null, "Enter"));
