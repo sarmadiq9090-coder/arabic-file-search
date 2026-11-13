@@ -77,6 +77,51 @@ pub struct Settings {
     /// 1.0's one-time move of classic users to the new look was made
     /// ([`Settings::make_new_look_only`]).
     pub new_ui_only: bool,
+    /// The global hotkey that opens InstaFind (Ctrl+Alt+F unless the user
+    /// picked another, e.g. because another program has it).
+    pub hotkey: Hotkey,
+}
+
+/// The keys of the global "open InstaFind" hotkey the user can choose from
+/// (Settings ▸ Search from anywhere). Ctrl+Alt+F unless another program has
+/// it; the others are offered then.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Hotkey {
+    #[default]
+    CtrlAltF,
+    CtrlAltSpace,
+    CtrlShiftF,
+    WinAltF,
+}
+
+impl Hotkey {
+    pub const ALL: [Hotkey; 4] = [Hotkey::CtrlAltF, Hotkey::CtrlAltSpace, Hotkey::CtrlShiftF, Hotkey::WinAltF];
+
+    /// As saved, and as the page names it (the serde name).
+    pub fn code(self) -> &'static str {
+        match self {
+            Hotkey::CtrlAltF => "ctrl_alt_f",
+            Hotkey::CtrlAltSpace => "ctrl_alt_space",
+            Hotkey::CtrlShiftF => "ctrl_shift_f",
+            Hotkey::WinAltF => "win_alt_f",
+        }
+    }
+
+    pub fn from_code(code: &str) -> Option<Hotkey> {
+        let code = code.trim().to_ascii_lowercase();
+        Hotkey::ALL.into_iter().find(|h| h.code() == code)
+    }
+
+    /// The keys as Windows writes them, in every language.
+    pub fn label(self) -> &'static str {
+        match self {
+            Hotkey::CtrlAltF => "Ctrl+Alt+F",
+            Hotkey::CtrlAltSpace => "Ctrl+Alt+Space",
+            Hotkey::CtrlShiftF => "Ctrl+Shift+F",
+            Hotkey::WinAltF => "Win+Alt+F",
+        }
+    }
 }
 
 /// How the floating search box above the clock shows itself.
@@ -165,7 +210,7 @@ impl FloatPos {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Off, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_trying: 0, new_ui_default: false, new_ui_only: false }
+        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Off, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_trying: 0, new_ui_default: false, new_ui_only: false, hotkey: Hotkey::CtrlAltF }
     }
 }
 
@@ -243,6 +288,7 @@ impl Settings {
                 "new_ui_trying" => s.new_ui_trying = value.parse().unwrap_or(0).min(crate::webui::MAX_TRYING),
                 "new_ui_default" => s.new_ui_default = value == "1",
                 "new_ui_only" => s.new_ui_only = value == "1",
+                "hotkey" => s.hotkey = Hotkey::from_code(value).unwrap_or_default(),
                 _ => {}
             }
         }
@@ -252,7 +298,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let cols: Vec<String> = self.columns.iter().map(i32::to_string).collect();
         format!(
-            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\nnew_ui_failed={}\nnew_ui_default={}\nread_cloud_files={}\nnew_ui_only={}\nnew_ui_trying={}\n",
+            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\nnew_ui_failed={}\nnew_ui_default={}\nread_cloud_files={}\nnew_ui_only={}\nnew_ui_trying={}\nhotkey={}\n",
             self.width,
             self.height,
             self.maximized as u8,
@@ -280,7 +326,8 @@ impl Settings {
             self.new_ui_default as u8,
             self.read_cloud_files as u8,
             self.new_ui_only as u8,
-            self.new_ui_trying
+            self.new_ui_trying,
+            self.hotkey.code()
         )
     }
 
@@ -330,13 +377,32 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, read_cloud_files: true, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, file_opens: 7, rating_asked: true, new_ui: true, new_ui_failed: true, new_ui_trying: 2, new_ui_default: true, new_ui_only: true };
+        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, read_cloud_files: true, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, file_opens: 7, rating_asked: true, new_ui: true, new_ui_failed: true, new_ui_trying: 2, new_ui_default: true, new_ui_only: true, hotkey: Hotkey::WinAltF };
         assert_eq!(Settings::parse(&s.to_text()), s);
         for mode in [FloatingMode::Fade, FloatingMode::Hidden, FloatingMode::Off] {
             let s = Settings { floating_mode: mode, ..Settings::default() };
             assert_eq!(Settings::parse(&s.to_text()), s);
         }
         assert_eq!(Settings::parse("garbage\nwidth=abc"), Settings::default());
+    }
+
+    #[test]
+    fn hotkey_choice() {
+        assert_eq!(Settings::default().hotkey, Hotkey::CtrlAltF);
+        assert!(Settings::default().to_text().contains("hotkey=ctrl_alt_f\n"));
+        for h in Hotkey::ALL {
+            let s = Settings { hotkey: h, ..Settings::default() };
+            assert_eq!(Settings::parse(&s.to_text()), s);
+            assert_eq!(Hotkey::from_code(h.code()), Some(h));
+            // The page names it by the same code (bridge.rs `Request::Hotkey`).
+            assert_eq!(serde_json::from_str::<Hotkey>(&format!("\"{}\"", h.code())).unwrap(), h);
+        }
+        assert_eq!(Settings::parse("hotkey=CTRL_SHIFT_F\n").hotkey, Hotkey::CtrlShiftF);
+        // An older file (no key) or a damaged one: Ctrl+Alt+F.
+        assert_eq!(Settings::parse("hotkey=alt_f4\n").hotkey, Hotkey::CtrlAltF);
+        assert_eq!(Settings::parse("width=900\n").hotkey, Hotkey::CtrlAltF);
+        let labels: Vec<&str> = Hotkey::ALL.iter().map(|h| h.label()).collect();
+        assert_eq!(labels, ["Ctrl+Alt+F", "Ctrl+Alt+Space", "Ctrl+Shift+F", "Win+Alt+F"]);
     }
 
     #[test]

@@ -25,13 +25,26 @@ CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000 if os.name
 EXIT_FOUND, EXIT_NONE, EXIT_ERROR = 0, 1, 2
 
 
-def default_exe():
+def default_exes():
+    """Where InstaFind is usually found, in order: the folder the app moves
+    itself to (Programs\\InstaFind), the folder older docs named
+    (Programs\\Bahth), and the Microsoft Store edition's `instafind.exe` alias."""
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~\\AppData\\Local")
-    return os.path.join(base, "Programs", "Bahth", "bahth.exe")
+    return [
+        os.path.join(base, "Programs", "InstaFind", "bahth.exe"),
+        os.path.join(base, "Programs", "Bahth", "bahth.exe"),
+        os.path.join(base, "Microsoft", "WindowsApps", "instafind.exe"),
+    ]
+
+
+def default_exe():
+    """The first of `default_exes` that exists, else the first (named in the "not found" message)."""
+    candidates = default_exes()
+    return next((c for c in candidates if os.path.isfile(c)), candidates[0])
 
 
 def find_exe(settings=None):
-    """The exe to run: plugin setting, then the BAHTH_EXE env var, then the default install path."""
+    """The exe to run: plugin setting, then the BAHTH_EXE env var, then the usual install paths."""
     for candidate in ((settings or {}).get("bahth_path"), os.environ.get(ENV_VAR)):
         if candidate and candidate.strip():
             return os.path.expandvars(candidate.strip().strip('"'))
