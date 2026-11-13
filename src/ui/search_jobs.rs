@@ -392,6 +392,8 @@ impl App {
             self.set_status(tr!("اكتب الكلمة أو العبارة التي تريد البحث عنها داخل المستندات.", "Type the word or phrase to search for inside documents."));
             return;
         }
+        // Before the state is borrowed: it reads it too.
+        let current = self.index_current();
         let mut st = self.state.borrow_mut();
         let mut shown = self.parse_query(&self.query.text());
         shown.note_document_search();
@@ -409,13 +411,14 @@ impl App {
             let started = std::time::Instant::now();
             // After a panic (logged by the hook) the search still ends, so
             // the window doesn't wait for it forever.
-            if crate::crash_log::catch(|| search::search_content(&idx.entries, &q, &scope, &p, &h, cache)).is_none() {
+            if crate::crash_log::catch(|| search::search_content(&idx.entries, &q, &scope, &p, &h, cache, current)).is_none() {
                 p.done.store(true, Ordering::Relaxed);
             }
             log(&format!(
-                "content search: {} documents ({} from the content index) in {} ms",
+                "content search: {} documents ({} from the content index{}) in {} ms",
                 p.checked.load(Ordering::Relaxed),
                 p.from_cache.load(Ordering::Relaxed),
+                search::word_index_note(&p),
                 started.elapsed().as_millis()
             ));
         });
@@ -542,6 +545,7 @@ impl App {
         let done = job.progress.done.load(Ordering::Relaxed);
         let cached = job.progress.from_cache.load(Ordering::Relaxed);
         let capped = job.progress.capped.load(Ordering::Relaxed);
+        let job_unindexed = job.progress.unindexed.load(Ordering::Relaxed);
         let changed = !new_hits.is_empty();
         st.rows.extend(new_hits.into_iter().map(|h| Row {
             entry: h.index,
@@ -579,6 +583,11 @@ impl App {
             // document the content index lacked, so its warm-up doesn't count.)
             if n == 0 && self.state.borrow().scan.is_some() {
                 status = format!("{status} {}.", indexing_status::incomplete_text(crate::i18n::current()));
+            }
+            // Slower than it will be: the word index is still being built.
+            let unindexed = job_unindexed;
+            if unindexed > 0 {
+                status = format!("{status} {}", indexing_status::word_index_incomplete_text(crate::i18n::current(), unindexed));
             }
             // Images were searched without their Arabic text: say so rather
             // than skipping it silently.

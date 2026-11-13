@@ -11,8 +11,11 @@
 //! The expected size is about [`ENTRY_BYTES`] per file or folder in the index
 //! (measured: 195 to 240 bytes on the Windows heap, with room for paths
 //! longer than the synthetic ones), [`DOCUMENT_BYTES`] per document known to
-//! the content index (measured: about 260, plus the warm-up's own list at
-//! about 180) and [`BASE_BYTES`] for the program itself.
+//! the content index (measured: about 260, plus about 30 for its word
+//! index's map from path to document, 29 bytes for 300k documents, plus the
+//! warm-up's own list at about 180) and [`BASE_BYTES`] for the program
+//! itself. The word index's postings and vocabulary stay on disk (read per
+//! search); while the warm-up runs it also holds up to 4 MB of word lists.
 //!
 //! The idle trim ([`idle_trim_due`]): after [`TRIM_IDLE`] with no search and
 //! no input in the program's windows, once the background document reading
@@ -21,8 +24,8 @@
 //! to Windows. The index and the content index's map stay, so the next
 //! search is as fast as ever. What it can give back is mostly what the
 //! scan, the load and the warm-up left free in the heap: the warm-up's list
-//! (about 180 of the 450 bytes per document) and the temporary copies of
-//! the index. What stays is about 230 bytes per entry, 260 per document and
+//! (about 180 of the 480 bytes per document) and the temporary copies of
+//! the index. What stays is about 230 bytes per entry, 290 per document and
 //! the program itself.
 //!
 //! Free of Win32, so it is tested on every platform.
@@ -32,7 +35,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 pub const ENTRY_BYTES: u64 = 300;
-pub const DOCUMENT_BYTES: u64 = 450;
+pub const DOCUMENT_BYTES: u64 = 480;
 pub const BASE_BYTES: u64 = 200 * MB;
 pub const SHED_FACTOR: u64 = 3;
 pub const SHED_FLOOR: u64 = 1536 * MB;
@@ -175,7 +178,7 @@ mod tests {
         assert_eq!(sample(0, 0, 0).expected(), 200 * MB);
         // A big Unity/Steam PC: 4 million files, 3 million documents.
         let big = sample(0, 4_000_000, 3_000_000);
-        assert_eq!(big.expected() / MB, (4_000_000 * 300 + 3_000_000 * 450) / MB + 200);
+        assert_eq!(big.expected() / MB, (4_000_000 * 300 + 3_000_000 * 480) / MB + 200);
         assert!(big.expected() > 2 * GB);
         let line = Sample { private: 5161 * MB, entries: 4_000_000, documents: 3_000_000, queue: 12 }.line();
         assert_eq!(line, format!("memory: private 5161 MB, entries 4000000, documents 3000000, queue 12 (expected about {} MB)", big.expected() / MB));

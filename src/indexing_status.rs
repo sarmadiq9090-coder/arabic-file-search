@@ -138,6 +138,18 @@ pub fn incomplete_text(lang: Lang) -> &'static str {
     lang.pick("قد تكون النتائج ناقصة أثناء الفهرسة", "Results may be incomplete while indexing")
 }
 
+/// Said after a search inside documents that read `n` documents in full
+/// because the content index's word index doesn't hold them yet (it is
+/// being built, or they changed since): such a search is slower, not less
+/// complete.
+pub fn word_index_incomplete_text(lang: Lang, n: usize) -> String {
+    let n = group_digits(n);
+    match lang {
+        Lang::Ar => format!("(قُرئ {n} مستنداً كاملاً لأن فهرس الكلمات لم يكتمل بعد؛ سيصبح البحث أسرع بعد اكتماله.)"),
+        Lang::En => format!("({n} documents were read in full: the word index is not complete yet, and searches get faster once it is.)"),
+    }
+}
+
 /// What a search that found nothing says while indexing runs, instead of
 /// "no results" (the progress itself is shown beside it); `None` when
 /// nothing is being indexed, so the usual "no results" applies.

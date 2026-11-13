@@ -105,3 +105,15 @@ pub fn peak_of<R>(f: impl FnOnce() -> R) -> (usize, R) {
     });
     (PEAK.load(Ordering::SeqCst), result)
 }
+
+/// Like [`peak_of`], and also how many of the bytes `f` allocated are still
+/// alive when it returns (what it left behind: a structure it built).
+pub fn retained_of<R>(f: impl FnOnce() -> R) -> (usize, usize, R) {
+    let mut live = 0;
+    let (peak, result) = peak_of(|| {
+        let r = f();
+        live = LIVE.load(Ordering::SeqCst);
+        r
+    });
+    (peak, live, result)
+}

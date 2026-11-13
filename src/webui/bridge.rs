@@ -1325,6 +1325,8 @@ pub struct ContentState {
     pub found: usize,
     /// Texts that came from the content index.
     pub cached: usize,
+    /// Documents read in full because the word index doesn't hold them yet.
+    pub unindexed: usize,
     pub done: bool,
     /// What is being indexed meanwhile.
     pub indexing: Indexing,
@@ -1348,6 +1350,9 @@ pub fn content_text(s: &ContentState, lang: Lang) -> String {
         // Documents not in the index yet were not searched.
         if s.found == 0 && s.indexing.names_incomplete() {
             t = format!("{t} {}.", indexing_status::incomplete_text(lang));
+        }
+        if s.unindexed > 0 {
+            t = format!("{t} {}", indexing_status::word_index_incomplete_text(lang, s.unindexed));
         }
         if s.ocr_arabic_missing {
             t = format!("{t} {}", indexing_status::ocr_arabic_missing_text(lang));
@@ -1865,7 +1870,7 @@ mod tests {
 
     #[test]
     fn content_progress_texts() {
-        let s = |found, done, indexing| ContentState { checked: 1200, total: 4000, found, cached: 0, done, indexing, ocr_arabic_missing: false };
+        let s = |found, done, indexing| ContentState { checked: 1200, total: 4000, found, cached: 0, unindexed: 0, done, indexing, ocr_arabic_missing: false };
         assert_eq!(content_text(&s(3, false, Indexing::Idle), Lang::En), "Searching inside documents… checked 1,200 of 4,000 — found 3");
         assert!(content_text(&s(0, false, Indexing::Names { found: 9 }), Lang::Ar).contains("قد تكون النتائج ناقصة"));
         assert_eq!(content_text(&s(2, true, Indexing::Idle), Lang::Ar), "انتهى البحث. المستندات المفحوصة: 4,000، عدد النتائج: 2.");
@@ -1873,6 +1878,9 @@ mod tests {
         let t = content_text(&done, Lang::En);
         assert!(t.starts_with("Searched 4,000 documents: found 0 files. (50 from the index) Results may be incomplete"), "{t}");
         assert!(t.contains("Arabic"), "{t}");
+        let slow = ContentState { unindexed: 1500, ..s(2, true, Indexing::Idle) };
+        assert!(content_text(&slow, Lang::En).ends_with("(1,500 documents were read in full: the word index is not complete yet, and searches get faster once it is.)"));
+        assert!(content_text(&slow, Lang::Ar).contains("فهرس الكلمات لم يكتمل"));
     }
 
     #[test]

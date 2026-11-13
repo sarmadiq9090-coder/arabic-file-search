@@ -147,8 +147,9 @@ impl App {
                 }
             }
             let s = cache.stats();
+            let w = cache.word_stats();
             log(&format!(
-                "content index warm: {} of {} new documents in {} ms on {threads} threads{}; {} cloud-only not read; stored {} ({} with text), {} KB{}",
+                "content index warm: {} of {} new documents in {} ms on {threads} threads{}; {} cloud-only not read; stored {} ({} with text), {} KB{}; word index: {} added from the store, {} documents ({} waiting in memory), {} segments, {} KB on disk, about {} KB in memory{}",
                 progress.added.load(Ordering::Relaxed),
                 progress.total.load(Ordering::Relaxed),
                 started.elapsed().as_millis(),
@@ -157,7 +158,14 @@ impl App {
                 s.documents,
                 s.texts,
                 s.bytes / 1024,
-                if s.full { ", full" } else { "" }
+                if s.full { ", full" } else { "" },
+                progress.indexed.load(Ordering::Relaxed),
+                w.docs,
+                w.pending,
+                w.segments,
+                w.bytes / 1024,
+                w.heap / 1024,
+                if w.broken { ", damaged: rebuilt by the next warm-up" } else { "" }
             ));
             drop(finished);
         });

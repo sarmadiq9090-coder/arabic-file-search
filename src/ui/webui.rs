@@ -1793,6 +1793,7 @@ mod imp {
                 st.settings.content_index
             };
             self.webui_send_history();
+            let current = self.index_current();
             let progress = Arc::new(ContentProgress::default());
             let hits = Arc::new(Mutex::new(Vec::new()));
             let (p, h, idx, scope) = (progress.clone(), hits.clone(), index.clone(), params.scope.clone());
@@ -1800,13 +1801,14 @@ mod imp {
                 let cache = if use_index { content_index::shared() } else { None };
                 let started = std::time::Instant::now();
                 // After a panic (logged by the hook) the search still ends.
-                if crate::crash_log::catch(|| search::search_content(&idx.entries, &q, &scope, &p, &h, cache)).is_none() {
+                if crate::crash_log::catch(|| search::search_content(&idx.entries, &q, &scope, &p, &h, cache, current)).is_none() {
                     p.done.store(true, Ordering::Relaxed);
                 }
                 log(&format!(
-                    "webui content search: {} documents ({} from the content index) in {} ms",
+                    "webui content search: {} documents ({} from the content index{}) in {} ms",
                     p.checked.load(Ordering::Relaxed),
                     p.from_cache.load(Ordering::Relaxed),
+                    search::word_index_note(&p),
                     started.elapsed().as_millis()
                 ));
             });
@@ -1864,6 +1866,7 @@ mod imp {
                 total: progress.total.load(Ordering::Relaxed),
                 found,
                 cached: progress.from_cache.load(Ordering::Relaxed),
+                unindexed: progress.unindexed.load(Ordering::Relaxed),
                 done,
                 indexing: self.indexing(),
                 ocr_arabic_missing: done && crate::ocr::arabic_missing(),

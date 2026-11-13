@@ -116,6 +116,13 @@ fn push_norm(out: &mut String, c: char, seats: bool) -> usize {
     out.len() - before
 }
 
+/// Pushes the [`normalize`]d form of the one character `c` onto `out`
+/// (`normalize` of a text is these pieces one after another).
+#[inline]
+pub fn push_normalized(out: &mut String, c: char) {
+    push_norm(out, c, false);
+}
+
 /// Normalises a string for matching.
 pub fn normalize(s: &str) -> String {
     let mut out = String::with_capacity(s.len());

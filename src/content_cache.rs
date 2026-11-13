@@ -43,6 +43,7 @@ use std::sync::{Mutex, MutexGuard, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::cloud;
+use crate::content_words::{self, Found, Plan, WordStats, Words};
 use crate::extract;
 use crate::index::Entry;
 
@@ -203,6 +204,27 @@ pub struct ContentCache {
     inflight: InFlight,
     /// Files a previous run died extracting, now stored as "no text".
     recovered: Vec<String>,
+    /// Which documents hold which words (`content_words`): kept in step
+    /// with `inner.map` (every change to the map changes it under the same
+    /// lock), so a document it holds is held for its current stored text.
+    words: content_words::Index,
+}
+
+/// [`content_words::Stamp`] of a stored document: the checksum of its
+/// stored text tells a text read again for the same file apart.
+fn word_stamp(path: &str, m: &Meta) -> content_words::Stamp {
+    (content_words::key(path), m.size, m.mtime, if m.kind == Kind::Text { m.hash } else { 0 })
+}
+
+/// What [`ContentCache::narrow`] left of a search's documents.
+pub struct Narrowed {
+    /// The documents to read: those the word index can't rule out, and
+    /// those it doesn't hold for their current text.
+    pub keep: Vec<u32>,
+    /// Documents the word index ruled out (indices into the entries).
+    pub ruled_out: Vec<u32>,
+    /// Documents read because the word index doesn't hold them (yet).
+    pub unindexed: usize,
 }
 
 // ---------------------------------------------------------------------------
@@ -362,7 +384,7 @@ impl Drop for SearchGuard<'_> {
     }
 }
 
-fn fnv(bytes: &[u8]) -> u64 {
+pub(crate) fn fnv(bytes: &[u8]) -> u64 {
     bytes.iter().fold(0xcbf2_9ce4_8422_2325, |h, &b| (h ^ b as u64).wrapping_mul(0x0100_0000_01b3))
 }
 
@@ -380,12 +402,12 @@ fn new_id() -> u64 {
 }
 
 #[cfg(unix)]
-fn read_at(f: &File, buf: &mut [u8], offset: u64) -> io::Result<()> {
+pub(crate) fn read_at(f: &File, buf: &mut [u8], offset: u64) -> io::Result<()> {
     std::os::unix::fs::FileExt::read_exact_at(f, buf, offset)
 }
 
 #[cfg(windows)]
-fn read_at(f: &File, mut buf: &mut [u8], mut offset: u64) -> io::Result<()> {
+pub(crate) fn read_at(f: &File, mut buf: &mut [u8], mut offset: u64) -> io::Result<()> {
     use std::os::windows::fs::FileExt;
     while !buf.is_empty() {
         match f.seek_read(buf, offset) {
@@ -552,7 +574,9 @@ impl ContentCache {
             Some(loaded) => loaded,
             None => Self::create_fresh(dir)?,
         };
+        let words = content_words::Index::open(dir, inner.map.iter().map(|(p, m)| word_stamp(p, m)));
         let mut cache = ContentCache {
+            words,
             dir: dir.to_path_buf(),
             max_bytes,
             inner: Mutex::new(inner),
@@ -627,6 +651,9 @@ impl ContentCache {
                 if !keep && m.kind == Kind::Text {
                     garbage += u64::from(m.len);
                 }
+                if !keep {
+                    self.words.remove(content_words::key(path));
+                }
                 keep
             });
             inner.garbage += garbage;
@@ -683,6 +710,7 @@ impl ContentCache {
         {
             let mut inner = self.lock();
             for path in &gone {
+                self.words.remove(content_words::key(path));
                 if let Some(old) = inner.map.remove(path)
                     && old.kind == Kind::Text
                 {
@@ -814,15 +842,12 @@ impl ContentCache {
     /// Texts over [`MAX_TEXT`] are cut to it, and once the store reaches its
     /// size cap no new texts are added.
     pub fn put(&self, path: &str, size: u64, mtime: i64, text: Option<&str>) {
-        let rec = match text {
-            // The beginning only: not storing it meant extracting it again
-            // at every start and every search.
-            Some(t) => {
-                let t = &t[..t.floor_char_boundary(MAX_TEXT)];
-                Some((lz4_flex::block::compress(t.as_bytes()), t.len() as u32))
-            }
-            None => None,
-        };
+        // The beginning only: not storing it meant extracting it again at
+        // every start and every search.
+        let text = text.map(|t| &t[..t.floor_char_boundary(MAX_TEXT)]);
+        let rec = text.map(|t| (lz4_flex::block::compress(t.as_bytes()), t.len() as u32));
+        // Before the lock: the words of the text as stored.
+        let words = text.map_or_else(Words::none, content_words::doc_words);
         let mut inner = self.lock();
         let meta = match rec {
             None => Meta { size, mtime, offset: 0, len: 0, raw_len: 0, hash: 0, kind: Kind::NoText },
@@ -846,15 +871,159 @@ impl ContentCache {
             inner.garbage += u64::from(old.len);
         }
         inner.dirty = true;
+        self.words.replace(content_words::key(path), words);
+        drop(inner);
+        if self.words.pending_full() {
+            let _ = self.flush_words(false);
+        }
     }
 
-    /// Writes `content.idx` (via a temp file and a rename) if anything changed.
+    /// Writes `content.idx` (via a temp file and a rename) if anything
+    /// changed, and the word index's waiting documents once there are
+    /// enough of them.
     pub fn flush(&self) -> io::Result<()> {
-        let mut inner = self.lock();
-        if !inner.dirty {
-            return Ok(());
+        {
+            let mut inner = self.lock();
+            if inner.dirty {
+                write_idx(&self.dir, &mut inner)?;
+            }
         }
-        write_idx(&self.dir, &mut inner)
+        self.flush_words(false)
+    }
+
+    /// Writes the word index's waiting documents as a segment when there
+    /// are enough of them (any, with `force`). Never merges: a search that
+    /// stores what it read must not wait for one (the warm-up merges, see
+    /// [`merge_words_now`](Self::merge_words_now)).
+    fn flush_words(&self, force: bool) -> io::Result<()> {
+        if self.words.write_pending(force)? {
+            self.write_words_manifest()?;
+        }
+        Ok(())
+    }
+
+    /// Merges the word index's segments if there are too many (for the
+    /// warm-up, between documents).
+    pub fn merge_words_now(&self) -> io::Result<()> {
+        self.merge_words(false)
+    }
+
+    /// Runs the merge the word index wants now (see
+    /// [`content_words::Index::plan_merge`]), if no other is running.
+    fn merge_words(&self, idle: bool) -> io::Result<()> {
+        let Some(_slot) = self.words.merge_slot() else { return Ok(()) };
+        let Some(job) = self.words.plan_merge(idle) else { return Ok(()) };
+        let old = self.words.run_merge(job)?;
+        if !old.is_empty() {
+            self.write_words_manifest()?;
+            for f in old {
+                let _ = fs::remove_file(f);
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes the word index's manifest for the store as it is now.
+    fn write_words_manifest(&self) -> io::Result<()> {
+        let _one = self.words.manifest_lock();
+        let bytes = {
+            let inner = self.lock();
+            self.words.manifest_bytes(inner.map.iter().map(|(p, m)| word_stamp(p, m)))?
+        };
+        self.words.save_manifest(&bytes)
+    }
+
+    /// For when the program is idle (the end of a warm-up): writes the word
+    /// index's waiting documents, folds small segments together and drops
+    /// tombstones (see [`content_words::Index::plan_merge`]), or starts the
+    /// index afresh when a damaged segment was found.
+    pub fn maintain_words(&self) -> io::Result<()> {
+        if self.words.is_broken() {
+            let old = self.words.reset();
+            self.write_words_manifest()?;
+            for f in old {
+                let _ = fs::remove_file(f);
+            }
+        }
+        if self.words.write_pending(true)? {
+            self.write_words_manifest()?;
+        }
+        self.merge_words(true)
+    }
+
+    /// Whether the word index holds `path` for its current stored text.
+    pub fn is_indexed(&self, path: &str) -> bool {
+        self.words.is_indexed(content_words::key(path))
+    }
+
+    /// Adds the stored text of `path` to the word index (for a store filled
+    /// before the index existed, or whose index was lost): no file is read.
+    /// False when nothing is stored for it or its record is damaged.
+    pub fn index_stored(&self, path: &str) -> bool {
+        let Some(m) = self.lock().map.get(path).copied() else { return false };
+        let text = match m.kind {
+            Kind::NoText => None,
+            Kind::Text => match self.get(path, m.size, m.mtime) {
+                Some(Some(t)) => Some(t),
+                _ => return false,
+            },
+        };
+        let words = text.as_deref().map_or_else(Words::none, content_words::doc_words);
+        drop(text);
+        let inner = self.lock();
+        // Unless it was stored again meanwhile (`put` indexed that one).
+        let same = inner.map.get(path).is_some_and(|n| (n.size, n.mtime, n.hash, n.kind) == (m.size, m.mtime, m.hash, m.kind));
+        if same {
+            self.words.replace(content_words::key(path), words);
+        }
+        drop(inner);
+        if self.words.pending_full() {
+            let _ = self.flush_words(false);
+        }
+        same
+    }
+
+    /// The documents of `candidates` (indices into `entries`) a search with
+    /// `plan` must read: the word index rules out those it holds for their
+    /// current text (the text `text_of` gives while the file is as `entries`
+    /// says) whose words can't match. `None` when the plan can't narrow
+    /// anything (every document is read, as without the index).
+    pub fn narrow(&self, entries: &[Entry], candidates: &[u32], plan: &Plan) -> Option<Narrowed> {
+        let (bits, end) = match self.words.candidates(plan) {
+            Found::Everything => return None,
+            Found::Unavailable => {
+                return Some(Narrowed { keep: candidates.to_vec(), ruled_out: Vec::new(), unindexed: candidates.len() });
+            }
+            Found::Ids { bits, end } => (bits, end),
+        };
+        let inner = self.lock();
+        let ids = self.words.ids();
+        // One thread, about 150 ns a document: never a thread pool while
+        // holding the store's lock.
+        let (mut keep, mut ruled_out, mut unindexed) = (Vec::new(), Vec::new(), 0);
+        for &i in candidates {
+            let e = &entries[i as usize];
+            let id = inner
+                .map
+                .get(&*e.path)
+                .filter(|m| m.size == e.size && m.mtime == e.mtime)
+                .and_then(|_| ids.get(content_words::key(&e.path)))
+                .filter(|&id| id < end);
+            match id {
+                Some(id) if !content_words::has_bit(&bits, id) => ruled_out.push(i),
+                Some(_) => keep.push(i),
+                None => {
+                    keep.push(i);
+                    unindexed += 1;
+                }
+            }
+        }
+        Some(Narrowed { keep, ruled_out, unindexed })
+    }
+
+    /// What the word index holds.
+    pub fn word_stats(&self) -> WordStats {
+        self.words.stats()
     }
 
     /// Rewrites `content.dat` without unused records when they are more than
@@ -932,6 +1101,7 @@ impl ContentCache {
     #[cfg_attr(not(windows), allow(dead_code))] // the Windows UI
     pub fn shrink(&self) {
         self.lock().map.shrink_to_fit();
+        self.words.shrink();
     }
 
     pub fn documents(&self) -> usize {
@@ -976,6 +1146,8 @@ pub struct WarmProgress {
     /// them): checked, not pending; read by a later warm-up once they are
     /// on this PC or the user allows downloads.
     pub cloud: AtomicUsize,
+    /// Documents whose stored text it added to the word index (no file read).
+    pub indexed: AtomicUsize,
 }
 
 /// How many threads [`warm`] should use on this machine: half the logical
@@ -1086,9 +1258,18 @@ fn warm_with(
     probe: &(dyn Fn(&Path) -> Option<cloud::Stamp> + Sync),
     read_cloud: &(dyn Fn() -> bool + Sync),
 ) {
-    let mut todo: Vec<&Entry> =
-        entries.iter().filter(|e| is_document(e) && !cache.is_fresh(&e.path, e.size, e.mtime)).collect();
-    todo.sort_by_cached_key(|e| (warm_rank(e), Reverse(e.mtime)));
+    // (document, its stored text only needs adding to the word index)
+    let mut todo: Vec<(&Entry, bool)> = entries
+        .iter()
+        .filter(|e| is_document(e))
+        .filter_map(|e| match cache.is_fresh(&e.path, e.size, e.mtime) {
+            false => Some((e, false)),
+            true => (!cache.is_indexed(&e.path)).then_some((e, true)),
+        })
+        .collect();
+    // Indexing a stored text takes no file and little time: those first,
+    // so searches get fast soonest.
+    todo.sort_by_cached_key(|&(e, stored)| (!stored, warm_rank(e), Reverse(e.mtime)));
     progress.total.store(todo.len(), Ordering::Relaxed);
     let next = AtomicUsize::new(0);
     // When the warm-up last saved, and how many documents it had added.
@@ -1101,10 +1282,23 @@ fn warm_with(
             while cache.searching() && !cancel.load(Ordering::Relaxed) {
                 std::thread::sleep(Duration::from_millis(100));
             }
-            if cancel.load(Ordering::Relaxed) || cache.is_full() {
+            if cancel.load(Ordering::Relaxed) {
                 break;
             }
-            let Some(e) = todo.get(next.fetch_add(1, Ordering::Relaxed)) else { break };
+            let Some(&(e, stored)) = todo.get(next.fetch_add(1, Ordering::Relaxed)) else { break };
+            if stored {
+                // The word index only: from the store, whatever the file is now.
+                if cache.index_stored(&e.path) {
+                    progress.indexed.fetch_add(1, Ordering::Relaxed);
+                }
+                progress.checked.fetch_add(1, Ordering::Relaxed);
+                // Thousands a second: segments pile up between saves.
+                let _ = cache.merge_words_now();
+                continue;
+            }
+            if cache.is_full() {
+                break;
+            }
             let one_big = is_heavy(e).then(|| big.lock().unwrap_or_else(|e| e.into_inner()));
             // The file as it is now (the index may lag behind); a search may
             // also have stored it meanwhile.
@@ -1116,6 +1310,8 @@ fn warm_with(
                 } else if extract_and_store(cache, &e.path, (st.size, st.mtime)).1 {
                     progress.added.fetch_add(1, Ordering::Relaxed);
                 }
+            } else if !cache.is_indexed(&e.path) && cache.index_stored(&e.path) {
+                progress.indexed.fetch_add(1, Ordering::Relaxed);
             }
             drop(one_big);
             progress.checked.fetch_add(1, Ordering::Relaxed);
@@ -1126,6 +1322,7 @@ fn warm_with(
                 let since = last.0.elapsed();
                 if since >= FLUSH_MIN && time_to_save(since, added.saturating_sub(last.1), cache.documents()) {
                     let _ = cache.flush();
+                    let _ = cache.merge_words_now();
                     *last = (Instant::now(), added);
                 }
             }
@@ -1143,6 +1340,7 @@ fn warm_with(
     });
     let _ = cache.flush();
     let _ = cache.compact();
+    let _ = cache.maintain_words();
 }
 
 #[cfg(test)]
@@ -2236,6 +2434,48 @@ mod tests {
         warm_with(&entries, &cache2, &p, &AtomicBool::new(false), 1, &|| {}, &cloud::probe, &|| false);
         assert_eq!((p.added.load(Ordering::Relaxed), p.cloud.load(Ordering::Relaxed)), (2, 0));
         drop((cache, cache2));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn warm_adds_stored_texts_to_the_word_index_without_reading_files() {
+        // A store filled before the word index existed (or whose index was
+        // lost): the warm-up indexes what is stored, opening no file, so a
+        // cloud-only file is not downloaded either.
+        let dir = temp_dir("warm_words");
+        fs::create_dir_all(&dir).unwrap();
+        let mut entries = Vec::new();
+        for (name, text) in [("تقرير.txt", "تقرير المبيعات"), ("سحابة.txt", "رئيس القسم"), ("فارغ.txt", " ")] {
+            let p = dir.join(name);
+            fs::write(&p, text).unwrap();
+            entries.push(file_entry(&p, 10_000));
+        }
+        let cache = ContentCache::open(&dir.join("store")).unwrap();
+        let p = WarmProgress::default();
+        warm_with(&entries, &cache, &p, &AtomicBool::new(false), 2, &|| {}, &cloud::probe, &|| false);
+        assert_eq!(p.added.load(Ordering::Relaxed), 3);
+        assert!(entries.iter().all(|e| cache.is_indexed(&e.path)));
+        assert_eq!(cache.word_stats().docs, 3);
+        drop(cache);
+        // The word index lost; the files gone from this PC too (or cloud-only).
+        fs::remove_file(dir.join("store").join("words.man")).unwrap();
+        for e in &entries {
+            fs::remove_file(&*e.path).unwrap();
+        }
+        let cache = ContentCache::open(&dir.join("store")).unwrap();
+        assert!(entries.iter().all(|e| !cache.is_indexed(&e.path)));
+        let cloud = cloud_probe(&[&entries[1].path]);
+        let p = WarmProgress::default();
+        warm_with(&entries, &cache, &p, &AtomicBool::new(false), 2, &|| {}, &cloud, &|| false);
+        let n = |a: &AtomicUsize| a.load(Ordering::Relaxed);
+        assert_eq!((n(&p.total), n(&p.checked), n(&p.indexed), n(&p.added), n(&p.cloud)), (3, 3, 3, 0, 0));
+        assert!(entries.iter().all(|e| cache.is_indexed(&e.path)));
+        // Written to disk at the end of the warm-up: there after a reopen.
+        drop(cache);
+        let cache = ContentCache::open(&dir.join("store")).unwrap();
+        assert_eq!(cache.word_stats().docs, 3);
+        assert!(cache.word_stats().segments >= 1);
+        drop(cache);
         fs::remove_dir_all(&dir).unwrap();
     }
 }

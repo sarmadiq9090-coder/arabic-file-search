@@ -37,6 +37,8 @@ mod cloud;
 #[cfg(any(windows, test))]
 mod content_cache;
 #[cfg(any(windows, test))]
+mod content_words;
+#[cfg(any(windows, test))]
 mod crash_log;
 #[cfg(any(windows, test))]
 mod dupes;

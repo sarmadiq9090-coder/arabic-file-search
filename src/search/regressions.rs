@@ -197,7 +197,7 @@ fn search_many(n: usize, text: &str, q: &str, limits: HitLimits) -> (Vec<Content
     let text_of = |_: &Entry| (Some(text.to_string()), false);
     let mut q = at(q);
     q.show_system = true;
-    search_documents(&entries, &q, "", &progress, &hits, limits, &text_of);
+    search_documents(&entries, &q, "", &progress, &hits, limits, &text_of, None);
     (hits.into_inner().unwrap(), progress)
 }
 
