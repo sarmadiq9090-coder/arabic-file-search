@@ -35,11 +35,12 @@ pub struct Term {
     /// Normalised alternatives (the words as typed, also without an
     /// article), matched anywhere; never empty.
     pub alts: Vec<String>,
-    /// The other spellings of its hamza seats ([`query_forms`], and inside
-    /// documents [`crate::normalize::document_forms`]). They are lossy («ريس»
-    /// for «رئيس» is also the end of «باريس», «نهاي» for «نهائي» the start
-    /// of «نهاية»), so they match only as whole words, after an optional
-    /// article ([`lossy_matches`]).
+    /// The other spellings of its hamza seats and of a گ typed for ق
+    /// ([`query_forms`], and inside documents
+    /// [`crate::normalize::document_forms`]). They are lossy («ريس» for
+    /// «رئيس» is also the end of «باريس», «نهاي» for «نهائي» the start of
+    /// «نهاية», «قول» for «گول» is not «goal»), so they match only as whole
+    /// words, after an optional article ([`lossy_matches`]).
     pub word_alts: Vec<String>,
 }
 
@@ -394,8 +395,8 @@ pub struct Query {
     /// (see [`crate::normalize`]: «مسئول», «مسؤول» and «مسوول» find each
     /// other); among equally good matches the names spelled as typed come first.
     pub spelled: Vec<String>,
-    /// True when the first term has a hamza seat ([`Self::spelled`] differs
-    /// from its plain spelling or has other spellings).
+    /// True when the first term has a hamza seat or گ ([`Self::spelled`]
+    /// differs from its plain spelling or has other spellings).
     pub spelled_seat: bool,
     /// A wildcard for any name was typed: `*` alone (or `**`), `*.*` or
     /// `ext:*`. It filters nothing, like Explorer's `*.*`, so a query of
@@ -607,9 +608,10 @@ fn split_op(v: &str) -> (&str, &str) {
     ("", v)
 }
 
-/// The value with Arabic digits, case and letter forms folded and `٫` as `.`.
+/// The value with Arabic digits, case and letter forms folded and `٫` as `.`
+/// ([`normalize`] does it all).
 fn fold_value(v: &str) -> String {
-    normalize(unquote(v)).replace('\u{066B}', ".")
+    normalize(unquote(v))
 }
 
 // ------------------------------------------------------------------ sizes
@@ -1073,7 +1075,7 @@ impl Query {
                 _ => q.terms.push(term),
             }
         }
-        q.spelled_seat = q.spelled.iter().any(|a| a.contains(['ؤ', 'ئ']) || !query_forms(a).is_empty());
+        q.spelled_seat = q.spelled.iter().any(|a| a.contains(['ؤ', 'ئ', 'گ']) || !query_forms(a).is_empty());
         if q.franco {
             for t in &mut q.terms {
                 let latin: Vec<String> = t.alts.iter().filter(|a| crate::franco::is_arabizi(a)).cloned().collect();

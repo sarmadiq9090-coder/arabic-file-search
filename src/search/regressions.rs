@@ -821,3 +821,192 @@ fn hamza_spellings_owner_list() {
         }
     }
 }
+
+// ------------------------- Persian, Iraqi and Kurdish letters: گ چ پ ڤ ژ ێ ۆ
+
+/// Iraqi users type گ, چ, پ, ڤ and ژ (and Kurdish users ێ, ۆ, ڕ, ڵ, ی, ک,
+/// ە), where Arabic spelling writes ك, ج, ب, ف, ز, ي, و, ر, ل, ه: «كراج» did
+/// not find «گراج», nor «فيديو» «ڤيديو». Each is now its Arabic letter in
+/// every normalised text, so the two spellings find each other both ways, in
+/// names and inside documents, also after ال and with tashkeel.
+#[test]
+fn persian_iraqi_kurdish_letters_find_their_arabic_letter() {
+    let groups: &[&[&str]] = &[
+        &["گراج", "كراج"],
+        &["گاع", "كاع"],
+        &["چاي", "جاي"],
+        &["پيتزا", "بيتزا"],
+        &["پاسپورت", "باسبورت"],
+        &["ڤيديو", "فيديو"],
+        &["بيژن", "بيزن"],
+        &["سلێمانی", "سليماني"],
+        &["کۆمەڵ", "كومهل"],
+        &["ڕۆژ", "روژ", "روز"],
+        &["دڵ", "دل"],
+    ];
+    let voweled = |w: &str| {
+        let mut c = w.chars();
+        let first = c.next().unwrap();
+        format!("{first}\u{064E}{}", c.as_str())
+    };
+    for group in groups {
+        for &name in group.iter() {
+            for name in [name.to_string(), format!("ال{name}"), voweled(name)] {
+                let entries = vec![entry(&format!(r"C:\a\{name}.txt"), false), entry(r"C:\a\تقرير.txt", false)];
+                for &q in group.iter() {
+                    for q in [q.to_string(), format!("ال{q}"), voweled(q)] {
+                        if q.starts_with("ال") && !name.starts_with("ال") {
+                            continue;
+                        }
+                        assert_eq!(search_names(&entries, &at(&q), ""), vec![0], "{q} → {name}");
+                        for doc in [format!("حضر {name} اليوم"), format!("حضر و{name}.")] {
+                            if q.starts_with("ال") && !doc.contains(" ال") {
+                                continue;
+                            }
+                            assert!(match_text(&doc, &at(&q)).is_some(), "{q} in «{doc}»");
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Presentation forms (old PDFs) are the same letters.
+    assert!(match_text("\u{FB58}\u{FBFE}\u{FE98}\u{FEB0}\u{FE8E}", &at("بيتزا")).is_some());
+    assert!(match_text("\u{FB94}\u{FE8E}\u{FECA}", &at("كاع")).is_some());
+    // The underline covers the letter as written.
+    let marked = |name: &str, q: &str| match_ranges(name, &at(q)).into_iter().map(|(s, e)| name[s..e].to_string()).collect::<Vec<_>>();
+    assert_eq!(marked("فلم ڤيديو.mp4", "فيديو"), ["ڤيديو"]);
+    assert_eq!(marked("فلم فيديو.mp4", "ڤيديو"), ["فيديو"]);
+}
+
+/// گ is also the Iraqi ق (گال = قال, گلب = قلب, گاع = قاع). A query's گ also
+/// finds ق, but as a whole word only (after an optional article), as the
+/// lossy hamza spellings do: «گول» is the Iraqi «قول» and also «goal». The
+/// other way round a typed ق never finds گ (which is ك once normalised: قلب
+/// would find كلب).
+#[test]
+fn gaf_in_a_query_is_also_qaf_as_a_whole_word() {
+    let entries = vec![
+        entry(r"C:\a\قاع البحر.jpg", false), // 0
+        entry(r"C:\a\القاع.txt", false),     // 1
+        entry(r"C:\a\قاعة الدرس.docx", false), // 2
+        entry(r"C:\a\قاعدة.txt", false),     // 3
+        entry(r"C:\a\كاع.txt", false),       // 4
+        entry(r"C:\a\گاع.txt", false),       // 5
+        entry(r"C:\a\قلب.mp3", false),       // 6
+        entry(r"C:\a\كلب.jpg", false),       // 7
+        entry(r"C:\a\گلبي.mp3", false),      // 8
+        entry(r"C:\a\مسئول.txt", false),     // 9
+    ];
+    let ranked = |s: &str| search_names(&entries, &at(s), "");
+    let find = |s: &str| {
+        let mut r = ranked(s);
+        r.sort_unstable();
+        r
+    };
+    // گ: ك anywhere, ق as a whole word.
+    assert_eq!(find("گاع"), vec![0, 1, 4, 5]);
+    assert_eq!(find("الگاع"), find("گاع")); // and without the article, as always
+    assert_eq!(find("گلب"), vec![6, 7, 8]);
+    // Spelled as typed first: گاع, then the كاع and قاع names.
+    assert_eq!(ranked("گاع")[0], 5);
+    assert_eq!(ranked("كاع")[..2], [4, 5]);
+    // A typed ك or ق is unchanged: ق never reaches ك or گ, ك never ق.
+    assert_eq!(find("قاع"), vec![0, 1, 2, 3]);
+    assert_eq!(find("كاع"), vec![4, 5]);
+    assert_eq!(find("قلب"), vec![6]);
+    assert_eq!(find("كلب"), vec![7, 8]);
+    // With a hamza seat in the same phrase, each spelling.
+    assert_eq!(find("\"مسئول\""), vec![9]);
+    let q = at("\"گال مسئول\"");
+    for w in ["قال مسيول", "قال مسوول", "كال مسوول"] {
+        assert!(q.terms[0].alts.iter().chain(&q.terms[0].word_alts).any(|a| a == w), "{w}: {q:?}");
+    }
+    // An exclusion is as typed: -گاع hides كاع and گاع, not قاع.
+    assert_eq!(find("txt -گاع"), vec![1, 3, 9]);
+    // Underlined: the word only.
+    let marked = |name: &str, q: &str| match_ranges(name, &at(q)).into_iter().map(|(s, e)| name[s..e].to_string()).collect::<Vec<_>>();
+    assert_eq!(marked("قاع البحر.jpg", "گاع"), ["قاع"]);
+    assert_eq!(marked("القاعة والقاع.txt", "گاع"), ["قاع"]);
+
+    // Inside documents.
+    let text = "قال المدرس إن القاع عميق، وفي قاعة الدرس قاعدة جديدة";
+    assert_eq!(all_matches(text, &at("گاع"), 9).0, 1);
+    assert!(match_text(text, &at("گال")).is_some());
+    assert!(match_text(text, &at("ww:گال")).is_some());
+    assert!(match_text(text, &at(r#""گال المدرس"~1"#)).is_some());
+    assert!(match_text("گال المدرس", &at("قال")).is_none()); // one way only
+    assert!(match_text("گال المدرس", &at("كال")).is_some());
+    assert!(match_text("كلب الجيران", &at("قلب")).is_none());
+    assert!(match_text("قلب الام", &at("كلب")).is_none());
+    assert!(match_text("قلب الام", &at("گلب")).is_some());
+}
+
+/// Common Arabic words are untouched: the folds change only the extra
+/// letters, so no word with ك, ق, ج, ب, ف or ز finds another word.
+#[test]
+fn extra_letter_folds_add_no_false_matches() {
+    let entries = vec![
+        entry(r"C:\a\قانون العمل.pdf", false), // 0
+        entry(r"C:\a\كانون الثاني.xlsx", false), // 1
+        entry(r"C:\a\جامعة بغداد.docx", false), // 2
+        entry(r"C:\a\فاتورة زيارة.pdf", false), // 3
+        entry(r"C:\a\بنك الرافدين.pdf", false), // 4
+        entry(r"C:\a\ورقة.txt", false), // 5
+        entry(r"C:\a\وقت.txt", false), // 6
+    ];
+    let find = |s: &str| {
+        let mut r = search_names(&entries, &at(s), "");
+        r.sort_unstable();
+        r
+    };
+    assert_eq!(find("قانون"), vec![0]);
+    assert_eq!(find("كانون"), vec![1]);
+    assert_eq!(find("گانون"), vec![0, 1]); // ك anywhere, ق as the whole word
+    assert_eq!(find("جامعة"), vec![2]);
+    assert_eq!(find("فاتورة"), vec![3]);
+    assert_eq!(find("زيارة"), vec![3]);
+    assert_eq!(find("بنك"), vec![4]);
+    assert_eq!(find("ورگة"), vec![5]);
+    assert_eq!(find("وگت"), vec![6]);
+    assert_eq!(find("وگ"), Vec::<u32>::new()); // a part of a word: ك only
+}
+
+// ------------------------------------- Arabic decimal and thousands separators
+
+/// «١٢٫٥» (Arabic decimal separator) did not find «12.5», nor «١٬٢٥٠»
+/// (Arabic thousands separator) «1,250», though the digits were folded. The
+/// separators are now `.` and `,` in every normalised text.
+#[test]
+fn arabic_number_separators_match_ascii_ones() {
+    let entries = vec![
+        entry(r"C:\a\سعر ١٢٫٥ دينار.txt", false), // 0
+        entry(r"C:\a\price 12.5.txt", false),      // 1
+        entry(r"C:\a\مبلغ ١٬٢٥٠.pdf", false),     // 2
+        entry(r"C:\a\total 1,250.pdf", false),     // 3
+        entry(r"C:\a\۱۲٫۵ persian.txt", false),    // 4
+        entry(r"C:\a\125.txt", false),             // 5
+    ];
+    let find = |s: &str| {
+        let mut r = search_names(&entries, &at(s), "");
+        r.sort_unstable();
+        r
+    };
+    for q in ["12.5", "١٢٫٥", "۱۲٫۵", "١٢.٥", "12٫5"] {
+        assert_eq!(find(q), vec![0, 1, 4], "{q}");
+    }
+    for q in ["1,250", "١٬٢٥٠", "1٬250"] {
+        assert_eq!(find(q), vec![2, 3], "{q}");
+    }
+    assert_eq!(find("125"), vec![5]);
+    let marked = |name: &str, q: &str| match_ranges(name, &at(q)).into_iter().map(|(s, e)| name[s..e].to_string()).collect::<Vec<_>>();
+    assert_eq!(marked("سعر ١٢٫٥ دينار.txt", "12.5"), ["١٢٫٥"]);
+    // Inside documents.
+    let text = "المبلغ الكلي ١٬٢٥٠٫٧٥ دينار، والخصم 2.5%";
+    assert!(match_text(text, &at("1,250.75")).is_some());
+    assert!(match_text(text, &at("٢٫٥")).is_some());
+    assert!(match_text(text, &at("\"1,250\"")).is_some());
+    assert!(match_text(text, &at("1.250")).is_none());
+    // A size filter still reads ٫ as the decimal point.
+    assert_eq!(at("حجم:١٫٥م").size, Some((MB * 3 / 2, MB * 3 / 2)));
+}

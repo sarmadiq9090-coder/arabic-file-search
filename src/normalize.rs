@@ -20,6 +20,14 @@
 //! them only as whole words (after an optional article), never inside
 //! another word, and never for an excluded word; the query as typed keeps
 //! matching anywhere (see `search::Term`).
+//!
+//! Letters of Persian, Iraqi and Kurdish spelling are their Arabic letter
+//! everywhere ([`normalize`]): ی ێ → ي, ک گ → ك, ۆ → و, ە → ه, چ → ج, پ →
+//! ب, ڤ → ف, ژ → ز, ڕ → ر, ڵ → ل. Arabic spelling writes these sounds with
+//! that letter (بيتزا, فيديو, كراج), so each pair is one word spelled two
+//! ways. گ is also the Iraqi ق (گال = قال): a query's گ is also ق, as a
+//! whole word only ([`query_forms`]), and گ is kept in the spelling as
+//! typed, so names spelled with it rank first for a query with it.
 
 // Only the Windows UI and the tests use this module.
 
@@ -37,14 +45,31 @@ fn map_char(c: char) -> Option<char> {
         // All alef forms to bare alef.
         'أ' | 'إ' | 'آ' | 'ٱ' | 'ٲ' | 'ٳ' => Some('ا'),
         'ة' => Some('ه'),
-        'ى' | 'ئ' | 'ی' => Some('ي'),
-        'ؤ' => Some('و'),
-        'ک' | 'ڪ' => Some('ك'),
-        // Persian/Urdu heh forms.
+        // Farsi yeh, and Kurdish ێ (ê).
+        'ى' | 'ئ' | 'ی' | 'ێ' => Some('ي'),
+        // Kurdish ۆ (o).
+        'ؤ' | 'ۆ' => Some('و'),
+        // Keheh, swash kaf, and gaf (Iraqi, Persian and Kurdish g; Arabic
+        // spelling writes it ك: كراج, كوكل). A query's گ is also ق as a
+        // whole word ([`query_forms`]).
+        'ک' | 'ڪ' | 'گ' => Some('ك'),
+        // Persian/Urdu heh forms (ە is also the Kurdish vowel e).
         'ە' | 'ہ' | 'ھ' | 'ۀ' => Some('ه'),
-        // Arabic-Indic and Persian digits to ASCII digits.
+        // The other Persian, Iraqi and Kurdish letters, written in Arabic
+        // with the base letter: چ (ch, چاي/جاي), پ (p, پيتزا/بيتزا), ڤ (v,
+        // ڤيديو/فيديو), ژ (zh), and Kurdish ڕ (rr) and ڵ (ll).
+        'چ' => Some('ج'),
+        'پ' => Some('ب'),
+        'ڤ' => Some('ف'),
+        'ژ' => Some('ز'),
+        'ڕ' => Some('ر'),
+        'ڵ' => Some('ل'),
+        // Arabic-Indic and Persian digits to ASCII digits, and the Arabic
+        // decimal and thousands separators (١٢٫٥, ١٬٠٠٠) to `.` and `,`.
         '\u{0660}'..='\u{0669}' => char::from_u32(c as u32 - 0x0660 + '0' as u32),
         '\u{06F0}'..='\u{06F9}' => char::from_u32(c as u32 - 0x06F0 + '0' as u32),
+        '\u{066B}' => Some('.'),
+        '\u{066C}' => Some(','),
         _ => Some(c),
     }
 }
@@ -63,15 +88,21 @@ pub const FORM_SEP: char = '\u{1}';
 /// It never matches more than the normalised name: queries hold no ؤ or ئ.
 pub const SPELLING_SEP: char = '\u{2}';
 
+/// Gaf, kept as typed in a spelling ([`normalize_spelling`]) like ؤ and ئ:
+/// it is ك in the normalised text, and a query's گ is also ق (Iraqi گال =
+/// قال, گلب = قلب), matched only as a whole word ([`query_forms`]).
+const GAF: char = 'گ';
+
 /// Hamza above as a combining mark (decomposed text, e.g. names from macOS,
 /// and the decomposition of the presentation forms of ؤ and ئ).
 const HAMZA_ABOVE: char = '\u{0654}';
 
 /// Pushes the mapped, lower-cased form of a single character. With
-/// `seats`, ؤ and ئ (also as و/ي/ى plus a combining hamza) stay as they are.
+/// `seats`, ؤ and ئ (also as و/ي/ى plus a combining hamza) and گ stay as
+/// they are.
 #[inline]
 fn push_mapped(out: &mut String, c: char, seats: bool) {
-    if seats && matches!(c, 'ؤ' | 'ئ') {
+    if seats && matches!(c, 'ؤ' | 'ئ' | GAF) {
         out.push(c);
     } else if seats && c == HAMZA_ABOVE {
         // Same byte length, so a map stays valid.
@@ -125,9 +156,9 @@ pub fn normalize(s: &str) -> String {
     out
 }
 
-/// Like [`normalize`], but ؤ and ئ keep their seat: the spelling as typed.
-/// Same length and character boundaries as [`normalize`] (ؤ/و and ئ/ي are
-/// two bytes each).
+/// Like [`normalize`], but ؤ and ئ keep their seat and گ stays گ: the
+/// spelling as typed. Same length and character boundaries as [`normalize`]
+/// (ؤ/و, ئ/ي and گ/ك are two bytes each).
 pub fn normalize_spelling(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -183,6 +214,7 @@ fn forms_mapped(spelling: &str, map: &[u32], query: bool) -> Vec<(String, Vec<u3
         let prev = k.checked_sub(1).map(|p| chars[p].1);
         let next = chars.get(k + 1).map(|n| n.1);
         let Some((plain, other, drop)) = seat(c, prev, next, query) else {
+            let c = if c == GAF { 'ك' } else { c };
             carrier.push(c);
             for f in [&mut alt, &mut dropped] {
                 f.0.push(c);
@@ -286,46 +318,65 @@ pub fn document_forms(norm: &str) -> Vec<String> {
 /// [`name_key`]; this is the same list, for the tests.)
 #[cfg(test)]
 pub fn seat_forms(s: &str) -> Vec<String> {
-    forms_of(s, false)
+    spelling_forms(&normalize_spelling(s), false)
 }
 
-/// The other spellings of a query's hamza seats: those of `seat_forms`,
-/// and ؤ before و also as ي (for documents, see [`seat`]).
+/// The other spellings of a query: those of its hamza seats (as in
+/// `seat_forms`, and ؤ before و also as ي for documents, see [`seat`]),
+/// then, when it has گ, the query with ق for it and that one's seat
+/// spellings. All are lossy (گول is the Iraqi قول, but also «goal»), so
+/// they match only as whole words. The other way round, a typed ق never
+/// finds گ: ق is far more common, and گ is ك in every normalised text, so
+/// it would also find ك (قلب would find كلب).
 pub fn query_forms(s: &str) -> Vec<String> {
-    forms_of(s, true)
+    let spelling = normalize_spelling(s);
+    let mut out = spelling_forms(&spelling, true);
+    if spelling.contains(GAF) {
+        let qaf = spelling.replace(GAF, "ق");
+        for f in std::iter::once(plain(&qaf)).chain(spelling_forms(&qaf, true)) {
+            if !out.contains(&f) {
+                out.push(f);
+            }
+        }
+    }
+    out
 }
 
-fn forms_of(s: &str, query: bool) -> Vec<String> {
-    let spelling = normalize_spelling(s);
-    let map = vec![0; spelling.len()];
-    forms_mapped(&spelling, &map, query).into_iter().map(|f| f.0).collect()
+/// A [`normalize_spelling`] text as [`normalize`] would give it.
+fn plain(spelling: &str) -> String {
+    spelling
+        .chars()
+        .map(|c| match c {
+            'ؤ' => 'و',
+            'ئ' => 'ي',
+            GAF => 'ك',
+            c => c,
+        })
+        .collect()
+}
+
+fn spelling_forms(spelling: &str, query: bool) -> Vec<String> {
+    forms_mapped(spelling, &vec![0; spelling.len()], query).into_iter().map(|f| f.0).collect()
 }
 
 /// What a file name is matched against: its normalised form, then each of
 /// its `seat_forms` after a [`FORM_SEP`], then, when it has ؤ or ئ, its
 /// [`normalize_spelling`] after a [`SPELLING_SEP`] (for ranking the name
 /// spelled as typed first, without normalising it again for every search).
-/// Names without a hamza seat are just their normalised form; [`primary`]
-/// gives it back.
+/// Names without a hamza seat or گ are just their normalised form;
+/// [`primary`] gives it back.
 pub fn name_key(name: &str) -> String {
     // One pass: the spelling, which is the normalised name unless it has a seat.
     let mut spelling = String::with_capacity(name.len());
     let mut seats = false;
     for c in name.chars() {
-        seats |= matches!(c, 'ؤ' | 'ئ' | 'ء' | HAMZA_ABOVE) || is_presentation_form(c);
+        seats |= matches!(c, 'ؤ' | 'ئ' | 'ء' | GAF | HAMZA_ABOVE) || is_presentation_form(c);
         push_norm(&mut spelling, c, true);
     }
-    if !seats || !has_seat_bytes(&spelling) {
+    if !seats || !(has_seat_bytes(&spelling) || spelling.contains(GAF)) {
         return spelling;
     }
-    let mut key: String = spelling
-        .chars()
-        .map(|c| match c {
-            'ؤ' => 'و',
-            'ئ' => 'ي',
-            c => c,
-        })
-        .collect();
+    let mut key = plain(&spelling);
     let plain = key.len();
     for (f, _) in forms_mapped(&spelling, &vec![0; spelling.len()], false) {
         key.push(FORM_SEP);
@@ -565,6 +616,41 @@ mod tests {
         assert_eq!(normalize("ملف\u{061C}ات"), "ملفات");
     }
 
+    #[test]
+    fn persian_iraqi_kurdish_letters_fold() {
+        assert_eq!(normalize("گ چ پ ڤ ژ"), "ك ج ب ف ز");
+        assert_eq!(normalize("ی ێ ک ۆ ە ڕ ڵ"), "ي ي ك و ه ر ل");
+        assert_eq!(normalize("گراج پيتزا ڤيديو چاي"), "كراج بيتزا فيديو جاي");
+        assert_eq!(normalize("سلێمانی ڕۆژ دڵ"), "سليماني روز دل");
+        // Presentation forms: پ, چ, ژ, ڤ and گ in their initial shapes.
+        assert_eq!(normalize("\u{FB58}\u{FB7C}\u{FB8A}\u{FB6C}\u{FB94}"), "بجزفك");
+        // The spelling keeps گ (same length), so names spelled with it rank first.
+        assert_eq!(normalize_spelling("گاع"), "گاع");
+        assert_eq!(normalize_spelling("گاع").len(), normalize("گاع").len());
+        assert_eq!(name_key("گاع.txt"), "كاع.txt\u{2}گاع.txt");
+        assert_eq!(primary(&name_key("گاع.txt")), "كاع.txt");
+        assert_eq!(name_key("گلب مسئول"), "كلب مسيول\u{1}كلب مسوول\u{2}گلب مسئول");
+        assert_eq!(name_key("چاي.txt"), "جاي.txt");
+        // A query's گ is also ق (lossy: whole words only), never the other way.
+        assert_eq!(query_forms("گاع"), ["قاع"]);
+        assert_eq!(query_forms("الگاع"), ["القاع"]);
+        assert_eq!(query_forms("گال مسئول"), ["كال مسوول", "قال مسيول", "قال مسوول"]);
+        for none in ["قاع", "كاع", "چاي", "پيتزا"] {
+            assert!(query_forms(none).is_empty(), "{none}");
+        }
+        assert!(seat_forms("گاع").is_empty());
+    }
+
+    #[test]
+    fn arabic_number_separators_fold() {
+        assert_eq!(normalize("١٢٫٥"), "12.5");
+        assert_eq!(normalize("١٬٢٥٠٫٧٥"), "1,250.75");
+        assert_eq!(normalize("۱۲٫۵"), "12.5");
+        let (n, map) = normalize_with_map("س ١٬٢");
+        assert_eq!(n, "س 1,2");
+        assert_eq!(map, [0, 0, 2, 3, 5, 7]);
+    }
+
     const SAMPLES: &[&str] = &[
         "",
         "Report.PDF",
@@ -572,6 +658,7 @@ mod tests {
         "إسلام أحمد مستشفى مدرسة",
         "\u{FE8D}\u{FEDF}\u{FE98}\u{FED8}\u{FEAE}\u{FEF3}\u{FEAE} \u{FEFB}\u{FDF2}",
         "کتابی ۱۲۳ \u{200F}x\u{202B}y",
+        "گلب مسئول ڕۆژ چاي ١٬٢٥٠٫٧٥",
         "ÄÖÜ ß İ",
     ];
 
