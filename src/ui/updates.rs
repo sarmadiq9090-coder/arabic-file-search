@@ -172,6 +172,9 @@ impl App {
         }
         self.update_busy.set(true);
         self.save_settings();
+        if !crate::update::signature_checking_configured() {
+            log("update: signature checking not configured (update::TRUSTED_PUBLIC_KEYS is empty); checking SHA-256 only");
+        }
         let total = rel.exe_size;
         self.update_progress.0.store(0, Ordering::Relaxed);
         self.update_progress.1.store(total, Ordering::Relaxed);

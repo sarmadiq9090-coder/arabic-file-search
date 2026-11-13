@@ -1,0 +1,2 @@
+# Signed bytes: never convert line endings (Windows runners check out with autocrlf).
+* -text
