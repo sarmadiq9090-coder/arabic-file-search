@@ -43,7 +43,14 @@ winapi = { version = "0.3", features = ["winuser", "consoleapi", "wincon", "proc
 
 # Windows.Media.Ocr for text in images and scanned PDFs (src/ocr.rs);
 # ApplicationModel(_Activation): the Store version's StartupTask (src/store.rs).
-windows = { version = "0.62", features = ["ApplicationModel", "ApplicationModel_Activation", "Foundation", "Foundation_Collections", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage", "Storage_Streams", "Win32_System_WinRT"] }
+# Win32_UI_Accessibility (+ Com, Ole, Variant, Foundation): the quick popup's
+# result list for screen readers (src/ui/quick_access.rs, an IAccessible) and
+# the annotated names of native controls (src/ui/accessible.rs).
+windows = { version = "0.62", features = ["ApplicationModel", "ApplicationModel_Activation", "Foundation", "Foundation_Collections", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage", "Storage_Streams", "Win32_System_WinRT",
+    "Win32_Foundation", "Win32_System_Com", "Win32_System_Ole", "Win32_System_Variant", "Win32_UI_Accessibility"] }
+# The `#[implement]` macro (that IAccessible) names this crate directly; the
+# same version the `windows` crate uses.
+windows-core = "0.62.2"
 
 # The new interface (src/webui/): WebView2 through wry, hosted in a Win32
 # window. MSVC only: with the GNU target webview2-com links WebView2Loader.dll

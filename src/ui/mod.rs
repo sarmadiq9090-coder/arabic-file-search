@@ -51,6 +51,7 @@ mod memory;
 mod older_copy;
 mod placement;
 mod quick;
+mod quick_access;
 mod quickswitch;
 mod rating;
 mod relocate;
