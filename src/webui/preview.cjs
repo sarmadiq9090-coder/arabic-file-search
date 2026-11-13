@@ -298,9 +298,15 @@ const SHOTS = [
   // A document found by its text: its matching lines start above the fold; wide screens.
   ["content-lines-en-light", "en", "light", [["click", "#chip-content"], ["type", "lease agreement"], ["key", "Enter"], ["wait", 300]], { expect: { linesTop: true } }],
   ["wide-en-light", "en", "light", [["type", "report"]], { width: 1920, height: 1080, expect: { rows: 11 } }],
-  // Column widths: the edge before the Date header drags (kept in the page's storage).
-  ["col-width-en-light", "en", "light", [["type", "report"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "98px" } }],
-  ["col-width-ar-light", "ar", "light", [["type", "تقرير"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "158px" } }],
+  // Column widths: the edge at the end of every header drags (kept in the page's storage):
+  // to the right grows a column in English, to the left in Arabic.
+  ["col-width-en-light", "en", "light", [["type", "report"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "158px", grips: 3 } }],
+  ["col-width-ar-light", "ar", "light", [["type", "تقرير"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "98px", grips: 3 } }],
+  // The name and path column too: given a width, the rows keep it (the rest of the row stays empty); a double click gives it back.
+  ["col-name-en-light", "en", "light", [["type", "report"], ["drag", '.grip[data-col="name"]']], { expect: { nameSized: true, nameCellMatches: true } }],
+  ["col-name-reset-ar-light", "ar", "light", [["type", "تقرير"], ["drag", '.grip[data-col="name"]'], ["dblclick", '.grip[data-col="name"]']], { expect: { nameSized: false } }],
+  // From the keyboard: Tab to an edge, then the arrow keys.
+  ["col-keys-en-dark", "en", "dark", [["type", "report"], ["focus", '.grip[data-col="size"]'], ["key", "ArrowRight"], ["key", "ArrowRight"]], { expect: { sizeW: "128px" } }],
   // The thumbnail view (Ctrl+T): tiles, pictures by one-time key (never a path), keys in reading order.
   ["grid-ar-light", "ar", "light", [["type", "تقرير"], ["key", "Control+t"], ["wait", 500]], { expect: { grid: true, pics: true } }],
   ["grid-en-dark", "en", "dark", [["type", "report"], ["click", "#view-grid"], ["wait", 500]], { expect: { grid: true, pics: true } }],
@@ -405,6 +411,8 @@ const SHOTS = [
       if (what === "type") { await pg.fill("#q", a); await pg.waitForTimeout(150); }
       else if (what === "key") { await pg.keyboard.press(a); await pg.waitForTimeout(60); }
       else if (what === "click") { await pg.click(a); await pg.waitForTimeout(120); }
+      else if (what === "dblclick") { await pg.dblclick(a); await pg.waitForTimeout(80); }
+      else if (what === "focus") { await pg.focus(a); }
       else if (what === "rclick") { await pg.click(a, { button: "right" }); await pg.waitForTimeout(120); }
       else if (what === "fill") { await pg.fill(a, b); }
       else if (what === "chip") { await pg.click(`#chip-${a}`); await pg.click(`#menu-${a} [data-k="${b}"]`); await pg.waitForTimeout(120); }
@@ -505,6 +513,10 @@ const SHOTS = [
         downByCols: (() => { const l = document.getElementById("list"); const cols = getComputedStyle(l).gridTemplateColumns.split(" ").length; return cols > 1 && l.getAttribute("aria-activedescendant") === "r" + cols; })(),
         tagline: visible(document.querySelector("#view-nores .tagline")),
         dateW: document.body.style.getPropertyValue("--w-date"),
+        sizeW: document.body.style.getPropertyValue("--w-size"),
+        grips: document.querySelectorAll("#cols .grip").length,
+        nameSized: /px/.test(document.body.style.getPropertyValue("--c-name")),
+        nameCellMatches: (() => { const hd = document.querySelector("#cols .cwrap.start"), nm = document.querySelector("#list .row .nm"); return !!hd && !!nm && Math.abs(hd.getBoundingClientRect().width - nm.parentElement.children[1].getBoundingClientRect().width) < 2; })(),
         linesTop: (() => { const l = document.querySelector(".preview .pv-lines, .preview .snip"); return !!l && l.getBoundingClientRect().top < innerHeight * 0.75; })(),
         zoom: document.documentElement.style.zoom || "1",
         pathPx: [...document.querySelectorAll("#list .row .n2")].every((p) => parseFloat(getComputedStyle(p).fontSize) >= 13.5),

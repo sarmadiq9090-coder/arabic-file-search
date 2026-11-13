@@ -20,7 +20,7 @@
       inside: "داخل المستندات", sortBy: "الترتيب",
       sorts: { best: "الأنسب أولاً", name: "الاسم", path: "المسار", size: "الحجم", date: "تاريخ التعديل" },
       asc: "تصاعدي", desc: "تنازلي",
-      cName: "الاسم والمسار", cSize: "الحجم", cDate: "تاريخ التعديل",
+      cName: "الاسم والمسار", cSize: "الحجم", cDate: "تاريخ التعديل", resize: (c) => `تغيير عرض عمود «${c}»`,
       results: "النتائج", preview: "المعاينة",
       recent: "ملفات فتحتها مؤخراً", recentNone: "الملفات التي تفتحها تظهر هنا.", tryThese: "جرّب هذه",
       trust: "ملفاتك وفهرسها يبقيان على جهازك ولا نجمع بيانات استخدام. يتصل البرنامج بالإنترنت فقط ليتحقق من التحديثات (GitHub) ولأسعار العملات؛ والبحث من الهاتف يعمل داخل شبكة بيتك فقط.",
@@ -90,7 +90,7 @@
       inside: "Inside documents", sortBy: "Sort",
       sorts: { best: "Best match first", name: "Name", path: "Path", size: "Size", date: "Modified" },
       asc: "ascending", desc: "descending",
-      cName: "Name and path", cSize: "Size", cDate: "Modified",
+      cName: "Name and path", cSize: "Size", cDate: "Modified", resize: (c) => `Resize the “${c}” column`,
       results: "Results", preview: "Preview",
       recent: "Recently opened files", recentNone: "Files you open show up here.", tryThese: "Try these",
       trust: "Your files and their index stay on your PC; no usage data is collected. InstaFind goes online only to check for updates (GitHub) and fetch exchange rates; phone search works only on your home network.",
@@ -644,16 +644,25 @@
     savePref(); applyZoom();
   }
   document.addEventListener("wheel", (e) => { if (e.ctrlKey) { zoomBy(e.deltaY < 0 ? 1 : -1); e.preventDefault(); } }, { passive: false });
-  const COLW = { size: 96, date: 128 };
+  // Every column can be sized (kept in this page's storage, as the classic
+  // list keeps its columns): the name and path column takes what is left
+  // until it is given a width of its own (null).
+  const COLW = { name: null, size: 96, date: 128 };
+  const COL_MIN = { name: 160, size: 64, date: 64 }, COL_MAX = { name: 4000, size: 320, date: 320 };
   function colWidth(key) { const w = PREF.cols && PREF.cols[key]; return typeof w === "number" ? w : COLW[key]; }
   function setColWidth(key, w, save = true) {
-    PREF.cols = Object.assign({}, PREF.cols, { [key]: Math.round(Math.max(64, Math.min(320, w))) });
+    PREF.cols = Object.assign({}, PREF.cols, { [key]: w === null ? null : Math.round(Math.max(COL_MIN[key], Math.min(COL_MAX[key], w))) });
     applyCols();
     if (save) savePref();
   }
   function applyCols() {
     document.body.style.setProperty("--w-size", colWidth("size") + "px");
     document.body.style.setProperty("--w-date", colWidth("date") + "px");
+    // (Never wider than the list: it gives way when the window narrows.)
+    const name = colWidth("name");
+    if (name === null) document.body.style.removeProperty("--c-name");
+    else document.body.style.setProperty("--c-name", `minmax(0, ${name}px)`);
+    for (const g of document.querySelectorAll(".grip")) g.setAttribute("aria-valuenow", String(Math.round(g.parentElement.getBoundingClientRect().width)));
   }
   function setPref(key, on) { PREF[key] = on; savePref(); applyView(); renderChips(); if (S.view === "settings") renderSettings(); }
   function viewButtons() {
@@ -745,24 +754,41 @@
       b.dataset.sort = key;
       return b;
     };
-    // The Size and Date columns can be made wider or narrower by dragging
-    // the edge before their header (kept for next time).
+    // Every column is made wider or narrower by dragging the edge at the
+    // end of its header, as in the classic list (kept for next time), or
+    // with the arrow keys on that edge; a double click gives the column its
+    // usual width back (the name column: what is left).
+    const label = { name: T.cName, size: T.cSize, date: T.cDate };
     const grip = (key) => {
-      const g = h("span", { class: "grip", role: "separator", "aria-orientation": "vertical", "aria-label": key === "size" ? T.cSize : T.cDate });
+      const g = h("span", { class: "grip", role: "separator", tabindex: "0", "aria-orientation": "vertical", "aria-label": T.resize(label[key]), "aria-valuemin": String(COL_MIN[key]), "aria-valuemax": String(COL_MAX[key]) });
+      g.dataset.col = key;
+      const rtl = () => document.documentElement.dir === "rtl";
+      // The width now (the name column has none of its own until sized).
+      const now = () => colWidth(key) ?? Math.round(g.parentElement.getBoundingClientRect().width);
       g.addEventListener("pointerdown", (e) => {
         e.preventDefault(); e.stopPropagation();
-        const start = e.clientX, w0 = colWidth(key), rtl = document.documentElement.dir === "rtl";
+        const start = e.clientX, w0 = now();
         g.setPointerCapture(e.pointerId); g.classList.add("on");
-        const move = (ev) => setColWidth(key, w0 + (rtl ? ev.clientX - start : start - ev.clientX), false);
-        const up = () => { g.classList.remove("on"); g.removeEventListener("pointermove", move); savePref(); };
+        // The end edge follows the pointer: to the right grows a column in a
+        // left-to-right page, to the left in a right-to-left one.
+        const move = (ev) => setColWidth(key, w0 + (rtl() ? start - ev.clientX : ev.clientX - start), false);
+        const up = () => { g.classList.remove("on"); g.removeEventListener("pointermove", move); savePref(); applyCols(); };
         g.addEventListener("pointermove", move);
         g.addEventListener("pointerup", up, { once: true });
       });
+      g.addEventListener("keydown", (e) => {
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+        const grow = (e.key === "ArrowRight") !== rtl();
+        setColWidth(key, now() + (grow ? 16 : -16));
+        e.preventDefault(); e.stopPropagation();
+      });
+      g.addEventListener("dblclick", (e) => { setColWidth(key, COLW[key]); e.stopPropagation(); });
       g.addEventListener("click", (e) => e.stopPropagation());
       return g;
     };
     const size = col("size", T.cSize, "end"), date = col("date", T.cDate, "end");
-    $("cols").replaceChildren(h("span"), col("name", T.cName), h("span", { class: "cwrap end" }, grip("size"), size), h("span", { class: "cwrap end" }, grip("date"), date));
+    $("cols").replaceChildren(h("span"), h("span", { class: "cwrap start" }, col("name", T.cName), grip("name")), h("span", { class: "cwrap end" }, size, grip("size")), h("span", { class: "cwrap end" }, date, grip("date")));
+    applyCols();
   }
   function renderRows(refresh) {
     const top = list.scrollTop;
