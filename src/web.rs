@@ -555,6 +555,25 @@ pub fn esc(s: &str) -> String {
     out
 }
 
+/// Escapes text for HTML content as [`esc`] does, with each phone number,
+/// date or version in it ([`crate::bidi_layout::digit_runs`]) in a
+/// left-to-right isolate that overrides its characters' direction (`.r`;
+/// an isolate alone leaves "٢٠٢٦-١١-١٢" reversed), so «هاتف 0770-123-4567»
+/// does not read "4567-123-0770" in a right-to-left line. Display only.
+fn esc_runs(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 8);
+    let mut from = 0;
+    for (a, b) in crate::bidi_layout::digit_runs(s) {
+        out.push_str(&esc(&s[from..a]));
+        out.push_str("<bdi class=\"r\" dir=\"ltr\">");
+        out.push_str(&esc(&s[a..b]));
+        out.push_str("</bdi>");
+        from = b;
+    }
+    out.push_str(&esc(&s[from..]));
+    out
+}
+
 const STYLE: &str = "body{font-family:system-ui,'Segoe UI',Tahoma,sans-serif;margin:0;background:#f6f7f9;color:#1b1f24}\
 header{background:#1e5aa8;color:#fff;padding:12px 16px;font-size:18px}\
 main{padding:12px 16px;max-width:760px;margin:auto}\
@@ -565,7 +584,7 @@ ul{list-style:none;padding:0;margin:0}\
 li{background:#fff;border-radius:8px;padding:10px 12px;margin-bottom:8px;box-shadow:0 1px 2px #0002;overflow-wrap:anywhere}\
 .n{font-weight:600;font-size:16px}.n a{color:#1e5aa8}\
 .f{color:#555;font-size:13px;margin-top:2px}.m{color:#777;font-size:13px;margin-top:2px}\
-.e{color:#b00020}.i{color:#555}\
+.e{color:#b00020}.i{color:#555}.r{unicode-bidi:isolate-override}\
 @media (prefers-color-scheme:dark){body{background:#15181c;color:#e6e8eb}li{background:#22262b}\
 .f,.i{color:#aab}.m{color:#99a}input{background:#22262b;color:#e6e8eb;border-color:#444}.n a{color:#8ab4f8}}";
 
@@ -678,7 +697,7 @@ autocomplete=\"off\" autofocus><button type=\"submit\">{}</button></form>",
     };
     let _ = write!(body, "<p class=\"i\">{}</p><ul>", esc(&summary));
     for e in hits.iter().take(shown).filter_map(|&i| index.entries.get(i as usize)) {
-        let name = esc(e.name());
+        let name = esc_runs(e.name());
         let name = if downloads && !e.is_dir {
             format!("<a href=\"/f?p={}\">{name}</a>", percent_encode(&e.path))
         } else {
@@ -688,7 +707,7 @@ autocomplete=\"off\" autofocus><button type=\"submit\">{}</button></form>",
             body,
             "<li><div class=\"n\"><bdi>{name}</bdi></div><div class=\"f\"><bdi dir=\"ltr\">{}</bdi></div>\
 <div class=\"m\">{} · <bdi dir=\"ltr\">{}</bdi></div></li>",
-            esc(folder_of(&e.path)),
+            esc_runs(folder_of(&e.path)),
             esc(&fmt_size(e)),
             esc(&fmt_date(e.mtime)),
         );
@@ -1320,6 +1339,20 @@ mod tests {
     #[test]
     fn escapes_html() {
         assert_eq!(esc(r#"<script>alert('x')</script> & "q""#), "&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt; &amp; &quot;q&quot;");
+    }
+
+    #[test]
+    fn digit_runs_are_isolated_and_escaped() {
+        assert_eq!(esc_runs("هاتف 0770-123-4567.txt"), "هاتف <bdi class=\"r\" dir=\"ltr\">0770-123-4567</bdi>.txt");
+        assert_eq!(esc_runs("<b>2026-11-12</b> & 1/2"), "&lt;b&gt;<bdi class=\"r\" dir=\"ltr\">2026-11-12</bdi>&lt;/b&gt; &amp; <bdi class=\"r\" dir=\"ltr\">1/2</bdi>");
+        assert_eq!(esc_runs("report 7.pdf"), "report 7.pdf");
+        assert_eq!(esc_runs(""), "");
+        // The page lists the name and its folder that way; the link keeps the real path.
+        let s = shared_with(vec![entry(r"C:\الفواتير 2026-11\فاتورة 2026-11-12.pdf", 10, false)]);
+        let page = search_page("فاتورة", &s.index(), true, false);
+        assert!(page.contains("فاتورة <bdi class=\"r\" dir=\"ltr\">2026-11-12</bdi>.pdf"), "{page}");
+        assert!(page.contains("الفواتير <bdi class=\"r\" dir=\"ltr\">2026-11</bdi>"), "{page}");
+        assert!(page.contains(&format!("/f?p={}", percent_encode(r"C:\الفواتير 2026-11\فاتورة 2026-11-12.pdf"))));
     }
 
     #[test]

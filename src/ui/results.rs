@@ -6,7 +6,7 @@ use std::io::Write;
 
 use winapi::shared::minwindef::LPARAM;
 
-use super::format::{csv_field, digits, fmt_num, ltr_path};
+use super::format::{csv_field, digits, fmt_num, ltr_path, shown_digits, ui_rtl};
 use super::shell;
 use super::{App, COL_DATE, COL_NAME, COL_PATH, COL_SIZE, COL_SNIPPET, COLUMNS, Row};
 use crate::index;
@@ -271,9 +271,9 @@ impl App {
                 t.push_str(&trf!("(أول {} سطر)\r\n", "(first {} lines)\r\n", digits(m.lines.len().to_string())));
             }
             for (line, s) in &m.lines {
-                t.push_str(&trf!("\r\nسطر {}:  {}", "\r\nLine {}:  {}", digits(line.to_string()), s.replace(['\r', '\n'], " ")));
+                t.push_str(&trf!("\r\nسطر {}:  {}", "\r\nLine {}:  {}", digits(line.to_string()), shown_digits(&s.replace(['\r', '\n'], " "))));
             }
-            self.matches_window.set_text(&trf!("كل التطابقات — {}", "All matches — {}", e.name()));
+            self.matches_window.set_text(&trf!("كل التطابقات — {}", "All matches — {}", shown_digits(e.name())));
             t
         };
         self.matches_text.set_text(&text);
@@ -420,17 +420,18 @@ impl App {
         let Some(r) = st.rows.get(row) else { return String::new() };
         let Some(e) = st.rows_index.entries.get(r.entry as usize) else { return String::new() };
         match col {
-            // An Arabic name's extension kept whole (".xlsx") at its end.
-            COL_NAME => crate::bidi_layout::list_name(e.name(), e.is_dir).0,
+            // An Arabic name's extension kept whole (".xlsx") at its end,
+            // its dates and phone numbers as typed.
+            COL_NAME => crate::bidi_layout::list_name(e.name(), e.is_dir, ui_rtl()).0,
             COL_PATH => ltr_path(&e.path),
             COL_SIZE => self.size_cell(&st.rows_index, r.entry, e),
             COL_DATE => shell::format_time(e.mtime, true),
             COL_SNIPPET => {
-                let snippet = r.snippet.as_deref().unwrap_or_default();
+                let snippet = shown_digits(r.snippet.as_deref().unwrap_or_default());
                 match &r.matches {
                     // "(12) …the first match…": how many places matched.
                     Some(m) if m.count > 1 => format!("({}) {snippet}", digits(m.count.to_string())),
-                    _ => snippet.to_string(),
+                    _ => snippet,
                 }
             }
             _ => String::new(),
@@ -453,7 +454,7 @@ impl App {
     }
 
     /// Byte ranges of the query's matches in a row's file name, as the
-    /// list shows it (`cell_text`, with the marks before an extension).
+    /// list shows it (`cell_text`, with the marks `bidi_layout::list_name` puts in).
     pub(super) fn match_ranges(&self, row: usize) -> Vec<(usize, usize)> {
         let Ok(st) = self.state.try_borrow() else { return Vec::new() };
         let Some(q) = &st.shown_query else { return Vec::new() };
@@ -462,7 +463,7 @@ impl App {
         if ranges.is_empty() {
             return ranges;
         }
-        crate::bidi_layout::shift_ranges(ranges, crate::bidi_layout::list_name(e.name(), e.is_dir).1)
+        crate::bidi_layout::shift_ranges(ranges, &crate::bidi_layout::list_name(e.name(), e.is_dir, ui_rtl()).1)
     }
 
     pub(super) fn custom_draw(&self, l: LPARAM) -> Option<isize> {

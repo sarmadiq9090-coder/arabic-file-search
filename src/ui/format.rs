@@ -15,6 +15,18 @@ pub(super) fn ltr_path(path: &str) -> String {
     crate::bidi_layout::ltr_path(path, crate::i18n::is_en())
 }
 
+/// A file name, folder name or document text as shown in the interface:
+/// its phone numbers, dates and versions read in the order they were typed
+/// ([`crate::bidi_layout::ordered_digits`]). Display only, as `ltr_path`.
+pub(super) fn shown_digits(text: &str) -> String {
+    crate::bidi_layout::ordered_digits(text, ui_rtl())
+}
+
+/// The interface reads right to left (Arabic).
+pub(super) fn ui_rtl() -> bool {
+    !crate::i18n::is_en()
+}
+
 /// Reads a NUL-terminated UTF-16 string.
 ///
 /// # Safety

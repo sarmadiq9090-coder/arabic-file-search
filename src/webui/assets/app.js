@@ -270,12 +270,39 @@
     return svg;
   }
 
-  // Text in pieces with the matched parts in <mark>; it takes the direction of its first strong letter.
-  function marked(pieces, cls = "t") {
-    const el = h("bdi", { class: cls });
-    for (const [text, hl] of pieces) el.append(hl ? h("mark", null, text) : document.createTextNode(text));
+  // Phone numbers, dates, versions and times («0770-123-4567», «2026-11-12»,
+  // «12/11/2026», «2.0.1», «10:30»): groups of digits joined by one - / . : or ,
+  // (the runs of src/bidi_layout.rs `digit_runs`). After an Arabic letter the
+  // bidi algorithm takes their digits for Arabic numbers, which "-" does not
+  // join, so a right-to-left line showed "4567-123-0770" and "12-11-2026".
+  // Each run goes in a left-to-right isolate that also overrides the
+  // direction of its characters (.run in app.css): an isolate alone keeps
+  // "٢٠٢٦-١١-١٢" reversed, ٠–٩ being Arabic numbers in any context. A run is
+  // only digits and separators, so the override changes nothing else. The
+  // text itself is unchanged.
+  const DIGIT_RUN = /[0-9\u0660-\u0669\u06F0-\u06F9]+(?:[-/.:,][0-9\u0660-\u0669\u06F0-\u06F9]+)+/g;
+  // Appends text in pieces to `el`, the matched parts in <mark>, each digit
+  // run in a <bdi class="run" dir="ltr"> (a match may start or end inside one).
+  function fill(el, pieces) {
+    const runs = [...pieces.map(([t]) => t).join("").matchAll(DIGIT_RUN)].map((m) => [m.index, m.index + m[0].length]);
+    let pos = 0, r = 0, box = null;
+    for (const [text, hl] of pieces) {
+      for (let i = 0; i < text.length;) {
+        const at = pos + i;
+        if (r < runs.length && at >= runs[r][1]) { r++; box = null; continue; }
+        const inRun = r < runs.length && at >= runs[r][0];
+        const end = r < runs.length ? Math.min(text.length, (inRun ? runs[r][1] : runs[r][0]) - pos) : text.length;
+        if (inRun && !box) el.append(box = h("bdi", { class: "run", dir: "ltr" }));
+        const part = text.slice(i, end);
+        (inRun ? box : el).append(hl ? h("mark", null, part) : document.createTextNode(part));
+        i = end;
+      }
+      pos += text.length;
+    }
     return el;
   }
+  // Text in pieces with the matched parts in <mark>; it takes the direction of its first strong letter.
+  function marked(pieces, cls = "t") { return fill(h("bdi", { class: cls }), pieces); }
   function plainName(r) { return r.name.map(([t]) => t).join(""); }
 
   // A file name as its base and its extension: «تقرير المبيعات ٢٠٢٦.xlsx»
@@ -312,7 +339,6 @@
     const dot = extAt(name, folder);
     if (dot < 0) return marked(pieces, cls);
     const [base, ext] = splitPieces(pieces, dot);
-    const fill = (el, ps) => { for (const [text, hl] of ps) el.append(hl ? h("mark", null, text) : document.createTextNode(text)); return el; };
     return h("span", { class: cls + " fname", dir: firstStrongDir(name.slice(0, dot)) }, fill(h("bdi", { class: "base", dir: "auto" }), base), fill(h("bdi", { class: "ext", dir: "ltr" }), ext));
   }
   const nameEl = (r) => fileName(r.name, r.folder);
@@ -332,7 +358,7 @@
     if (unc) el.append(h("span", { class: "sep" }, "\\\\"));
     segs.forEach((s, i) => {
       if (i) { el.append(h("span", { class: "sep" }, "\\"), h("wbr")); }
-      el.append(s === null ? h("span", { class: "ell" }, "…") : h("bdi", null, s));
+      el.append(s === null ? h("span", { class: "ell" }, "…") : fill(h("bdi"), [[s, false]]));
     });
     if (segs.length === 1 && full.endsWith("\\")) el.append(h("span", { class: "sep" }, "\\"));
     return el;
@@ -831,7 +857,8 @@
       else text = (S.note ? S.note + " · " : "") + T.count(S.total, S.ms) + " · " + text;
       if (S.warnings.length) text += ` — ${T.note}: ${S.warnings.join(LANG === "ar" ? "، " : "; ")}`;
     } else if (!S.notice && S.content && contentStale() && S.q.trim()) text = T.pressEnter;
-    $("status-text").textContent = text;
+    $("status-text").replaceChildren();
+    fill($("status-text"), [[text, false]]);
     $("status-text").classList.toggle("warn", !!(S.notice && S.noticeWarn));
   }
   for (const ev of ["keydown", "mousedown"]) document.addEventListener(ev, () => { if (S.notice && S.noticeWarn) { S.notice = ""; S.noticeWarn = false; renderStatus(); } }, true);

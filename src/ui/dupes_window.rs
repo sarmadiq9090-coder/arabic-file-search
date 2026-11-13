@@ -26,7 +26,7 @@ use winapi::um::winnt::REG_DWORD;
 use winapi::um::winreg::{RegQueryValueExW, RegSetValueExW};
 use winapi::um::winuser::{NMHDR, SendMessageW, WM_NOTIFY, WM_SETFONT};
 
-use super::format::{digits, fmt_num, ltr_path};
+use super::format::{digits, fmt_num, ltr_path, shown_digits};
 use super::shell::{self, wide};
 use super::lazy::{Bound, Lazy};
 use super::startup::background_priority;
@@ -706,6 +706,7 @@ impl App {
                     return String::new();
                 };
                 let (name, folder) = split_path(&file.path);
+                let name = shown_digits(name);
                 match col {
                     0 => match group.same_file_as(f) {
                         // Another path to a file listed above: a hard link,

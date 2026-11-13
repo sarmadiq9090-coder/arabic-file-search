@@ -224,6 +224,8 @@ body.compact .row .n3 { display: none; }
 .banner.slim { grid-template-columns: auto 1fr; align-items: center; gap: 14px; padding: 6px 14px; }
 .banner.slim .s { display: none; }
 .row.gone .n1 .t, .row.gone .n1 .t bdi { text-decoration: line-through; }
+/* A phone number, date or version (app.js DIGIT_RUN): its digits left to right as typed. */
+.run { unicode-bidi: isolate-override; }
 mark { background: var(--mark-bg); color: var(--mark-fg); border-radius: 3px; padding: 0 1px; box-decoration-break: clone; }
 .path { direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-nums; }
 .path .sep { color: var(--faint); padding-inline: 1px; }

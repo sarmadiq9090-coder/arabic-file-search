@@ -12,7 +12,8 @@
 // page follows the language's direction, that a file name shows its
 // extension left to right at its logical end (".xlsx" on the left of an
 // Arabic name, on the right of an English one) with the matches still
-// marked, and that every message the page
+// marked, that phone numbers and dates read as typed (0770-123-4567 after
+// Arabic words, not 4567-123-0770), and that every message the page
 // sends has the fields src/webui/bridge.rs accepts and nothing more (the
 // program refuses unknown fields), and that every request about a row names
 // the version of the list it is on (the fake numbers its lists as
@@ -71,6 +72,8 @@ function fakeProgram(cfg) {
     [`${U}\\OneDrive\\الموارد البشرية\\الحضور والانصراف\\2026`, "تقرير الحضور - آذار.xlsx", 92 * 1024, 200 * 86400],
     [`${U}\\Music\\تسجيلات`, "تسجيل التقرير الصوتي.m4a", 8.7 * 1048576, 240 * 86400],
     ["D:\\Archive\\2024", "تقارير قديمة", 0, 400 * 86400, true],
+    // A phone number and a date after Arabic words: each must read as typed.
+    [`${U}\\Documents\\الفواتير 2026-11`, "فاتورة رقم 1234 بتاريخ 2026-11-12 من شركة Microsoft هاتف 0770-123-4567.txt", 3 * 1024, 30 * 86400],
   ] : [
     [`${U}\\Documents\\Work\\Finance`, "Sales report 2026.xlsx", 48 * 1024, 7 * 60],
     [`${U}\\Documents\\Reports\\2026`, "Annual report final.pdf", 2.4 * 1048576, 26 * 3600],
@@ -329,6 +332,10 @@ const SHOTS = [
   ["report-problem-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#report-problem"], ["wait", 50]], { expect: { settings: true, lastSent: "report_problem" } }],
   // A name split into base and extension keeps its matches marked, in the extension too.
   ["names-split-ar-light", "ar", "light", [["type", "xlsx"]], { expect: { marks: 2, fnames: 2 } }],
+  // «…بتاريخ 2026-11-12 … هاتف 0770-123-4567.txt»: the date and the phone read
+  // as typed, in the list, its folder, the preview and the status bar's
+  // file count, a match inside the phone marked.
+  ["digit-runs-ar-light", "ar", "light", [["type", "123-45"]], { expect: { rows: 1, marks: 1, runs: 7 } }],
 ];
 
 (async () => {
@@ -397,6 +404,18 @@ const SHOTS = [
       if (!box.value && getComputedStyle(box).direction !== (lang === "ar" ? "rtl" : "ltr")) bad.push("search hint not in the page's direction");
       // Names, snippets and matching lines pick their own direction.
       for (const el of document.querySelectorAll(".pv-name .t, .row .n3 .sn, .lines .lt, .field input")) if (visible(el) && getComputedStyle(el).unicodeBidi !== "plaintext" && el.tagName !== "BDI" && !(el.classList.contains("fname") && el.dir) && !el.matches(":placeholder-shown")) bad.push("text without its own direction: " + el.className);
+      // Phone numbers, dates and versions (app.js DIGIT_RUN) read as typed:
+      // each character of a run to the right of the one before it.
+      let runs = 0;
+      for (const el of document.querySelectorAll(".run")) {
+        if (!visible(el)) continue;
+        runs++;
+        const rs = [];
+        const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        while (walk.nextNode()) for (let i = 0; i < walk.currentNode.length; i++) { const r = document.createRange(); r.setStart(walk.currentNode, i); r.setEnd(walk.currentNode, i + 1); rs.push(r.getBoundingClientRect()); }
+        if (rs.some((r) => Math.abs(r.top - rs[0].top) > 2)) continue; // wrapped: no order on one line
+        if (rs.some((r, i) => i && !(r.left > rs[i - 1].left))) bad.push("digit run out of order: " + el.textContent);
+      }
       // File names: the extension (".xlsx") left to right, at the end of the
       // name as it reads: on the left of an Arabic name, on the right of an
       // English one.
@@ -434,7 +453,7 @@ const SHOTS = [
         content: document.querySelectorAll("#list .row .n3").length > 0, stop: visible(document.getElementById("stop")),
         chipsOn: document.querySelectorAll(".chip.on").length, settings: view === "view-settings",
         names: [...document.querySelectorAll("#list .row .n1 .t")].map((e) => e.textContent), gone: document.querySelectorAll("#list .row.gone").length,
-        fnames: document.querySelectorAll("#list .row .fname").length, marks: document.querySelectorAll("#list .row .n1 mark").length,
+        fnames: document.querySelectorAll("#list .row .fname").length, runs, marks: document.querySelectorAll("#list .row .n1 mark").length,
         sent: window.__sent.map((m) => m.op), recycles: window.__sent.filter((m) => m.op === "recycle").length,
         stale: window.__stale.length, q: document.querySelector("#q").value, focus: document.activeElement && document.activeElement.id,
         lastSent: window.__sent.length ? window.__sent[window.__sent.length - 1].op : null,

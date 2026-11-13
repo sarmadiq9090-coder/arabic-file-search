@@ -53,11 +53,11 @@ impl App {
         }
         let path = self.row_path(row);
         let refuse = path.is_none();
-        // The box starts with the shown text; an Arabic name's has marks
-        // before its extension (`bidi_layout::list_name`): give it the name.
+        // The box starts with the shown text, which may have marks before
+        // an extension or in a date (`bidi_layout::list_name`): give it the name.
         if let Some(path) = &path {
             let name = path.rsplit('\\').next().unwrap_or(path);
-            if crate::bidi_layout::list_name(name, false).1.is_some()
+            if !crate::bidi_layout::list_name(name, false, super::format::ui_rtl()).1.is_empty()
                 && let Some(list) = self.list.handle.hwnd()
             {
                 let edit = unsafe { SendMessageW(list, winapi::um::commctrl::LVM_GETEDITCONTROL, 0, 0) };

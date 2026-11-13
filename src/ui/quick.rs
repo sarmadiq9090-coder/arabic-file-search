@@ -995,7 +995,9 @@ impl App {
                             }
                         }
                         let font = if row.group == Group::More { &look.small } else { &look.title };
-                        let title = quick::embed_quoted(&row.title);
+                        let file = matches!(row.target, Target::File { .. });
+                        // A file's dates and phone numbers as typed.
+                        let title = quick::embed_quoted(&if file { crate::bidi_layout::ordered_digits(&row.title, rtl) } else { row.title.clone() });
                         if row.subtitle.is_empty() || row.group == Group::More {
                             surface::draw_text(dc, font, p.text, &title, &Rect::at(tx, slot.y, text_w, slot.h), rtl, false);
                         } else {
@@ -1004,7 +1006,7 @@ impl App {
                             let bottom = Rect::at(tx, slot.y + half, text_w, half - px(3, s));
                             surface::draw_text(dc, font, p.text, &title, &top, rtl, false);
                             // A folder reads left to right; other second lines as written.
-                            let sub = if matches!(row.target, Target::File { .. }) { super::format::ltr_path(&row.subtitle) } else { row.subtitle.clone() };
+                            let sub = if file { super::format::ltr_path(&row.subtitle) } else { row.subtitle.clone() };
                             surface::draw_text(dc, &look.small, p.muted, &sub, &bottom, rtl, false);
                         }
                     }
