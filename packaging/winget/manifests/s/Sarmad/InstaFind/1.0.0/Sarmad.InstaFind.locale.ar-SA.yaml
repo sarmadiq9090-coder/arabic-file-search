@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.locale.1.12.0.schema.json
 
 PackageIdentifier: Sarmad.InstaFind
-PackageVersion: 0.10.0
+PackageVersion: 1.0.0
 PackageLocale: ar-SA
 Publisher: Sarmad
 PublisherUrl: https://github.com/sarmadiq9090-coder
@@ -31,6 +31,6 @@ Tags:
 - full-text-search
 - ocr
 - indexer
-ReleaseNotesUrl: https://github.com/sarmadiq9090-coder/arabic-file-search/releases/tag/v0.10.0
+ReleaseNotesUrl: https://github.com/sarmadiq9090-coder/arabic-file-search/releases/tag/v1.0.0
 ManifestType: locale
 ManifestVersion: 1.12.0
