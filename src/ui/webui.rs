@@ -185,6 +185,8 @@ mod imp {
         options_pending: Cell<bool>,
         /// An Options item may have changed a setting the page shows.
         settings_stale: Cell<bool>,
+        /// The page asked to check for updates: done on the next tick.
+        updates_pending: Cell<bool>,
         /// The program is restarting from the page's own message handler:
         /// the page is left to the process exit, not dropped inside it.
         exiting: Cell<bool>,
@@ -957,6 +959,7 @@ mod imp {
                     floating: s.floating_mode != FloatingMode::Off,
                     tray_icon: s.tray_icon,
                     version: env!("CARGO_PKG_VERSION"),
+                    store: crate::store::is_packaged(),
                 })
             };
             self.webui_send(&msg);
@@ -1016,6 +1019,7 @@ mod imp {
                             version: env!("CARGO_PKG_VERSION"),
                             // Once: a page loaded again does not say it again.
                             switched: self.webui.tell_switch.replace(false),
+                            store: crate::store::is_packaged(),
                         }
                     };
                     self.webui_send(&hello);
@@ -1308,6 +1312,9 @@ mod imp {
                     self.webui_send_history();
                 }
                 Request::Rating { rate } => self.rating_answer(rate),
+                // On the next tick, not inside WebView2's handler (it may ask
+                // with a message box).
+                Request::CheckUpdates {} => self.webui.updates_pending.set(true),
                 Request::OpenWith { list, seq, ver, id } => self.webui_verb(list, seq, ver, id, "openas"),
                 Request::Properties { list, seq, ver, id } => self.webui_verb(list, seq, ver, id, "properties"),
                 Request::SwitchTo { list, seq, ver, id } => {
@@ -1865,6 +1872,11 @@ mod imp {
             }
             if self.webui.options_pending.replace(false) && self.webui_visible() {
                 self.webui_options_menu();
+            }
+            if self.webui.updates_pending.replace(false) && self.webui.active.get() {
+                // As the Options menu's item: the Store version is told where
+                // its updates come from and offered its Store page.
+                self.check_for_update(true);
             }
             if self.webui.active.get() && !self.webui.switching.get() {
                 if let Some(browser_gone) = self.webui.failed.take() {

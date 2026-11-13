@@ -109,7 +109,7 @@ function fakeProgram(cfg) {
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id", "name"],
     save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], options_menu: [], report_problem: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], thumbs: ["seq", "ver", "ids"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
-    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], rating: ["rate"], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
+    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], rating: ["rate"], check_updates: [], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
@@ -132,7 +132,7 @@ function fakeProgram(cfg) {
   const status = cfg.indexing
     ? { type: "status", state: "names", files: 36000, text: ar ? "جارٍ الفهرسة… 36,000 ملف حتى الآن" : "Indexing… 36,000 files so far" }
     : { type: "status", state: "ready", files: 1204331, text: null };
-  const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1" };
+  const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1", store: !!cfg.store };
   const history = {
     type: "history",
     recent: ar ? ["تقرير المبيعات", "عقد الإيجار", "فاتورة الكهرباء .pdf", "صور العيد"] : ["sales report", "lease agreement", "electricity bill .pdf", "holiday photos"],
@@ -162,7 +162,7 @@ function fakeProgram(cfg) {
       }
     }
     if (m.op === "hello") {
-      send({ type: "hello", kinds: KINDS, sizes: SIZES, dates: DATES, kind: 0, sort: "best", desc: false, digits: false, version: "0.9.1", switched: !!cfg.switched });
+      send({ type: "hello", kinds: KINDS, sizes: SIZES, dates: DATES, kind: 0, sort: "best", desc: false, digits: false, version: "0.9.1", switched: !!cfg.switched, store: !!cfg.store });
       send({ type: "scope", path: cfg.scope || "", search: false });
       send(settings); send(status); send(history);
       recentVer = nextVer();
@@ -366,6 +366,10 @@ const SHOTS = [
   // The Store build's rating question: a row above the status line that keeps the focus in the box; one answer.
   ["rating-ar-light", "ar", "light", [["type", "تقرير"], ["eval", "window.__instafind.recv({ type: 'rating' })"], ["wait", 50]], { expect: { rating: true, focus: "q" } }],
   ["rating-later-en-dark", "en", "dark", [["type", "report"], ["eval", "window.__instafind.recv({ type: 'rating' })"], ["click", "#rate-later"], ["wait", 50]], { expect: { rating: false, lastSent: "rating" } }],
+  // "Check for updates" beside "Report a problem" (both mandatory); the Store version says the Store, in its privacy line too.
+  ["updates-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#check-updates"], ["wait", 50]], { expect: { settings: true, lastSent: "check_updates", updBtn: "التحقق من التحديثات…" } }],
+  ["updates-store-en-dark", "en", "dark", [["key", "Control+,"]], { store: true, expect: { settings: true, updBtn: "Updates from Microsoft Store…", trustStore: true } }],
+  ["trust-store-ar-light", "ar", "light", [], { store: true, expect: { trustStore: true } }],
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
@@ -394,7 +398,7 @@ const SHOTS = [
       if (!file.startsWith(ASSETS) || !fs.existsSync(file)) return route.fulfill({ status: 404, headers, body: "" });
       route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || "application/octet-stream", headers, body: fs.readFileSync(file) });
     });
-    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches });
+    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches, store: !!opts.store });
     await pg.goto(ORIGIN + "/");
     await pg.waitForFunction(() => document.querySelector("#menu-kind") && document.querySelector("#menu-kind").children.length > 0);
     for (const [what, a, b] of steps) {
@@ -514,6 +518,8 @@ const SHOTS = [
         dlgName: !!document.querySelector("#dlg-h .fname"),
         qswitch: visible(document.getElementById("qswitch")),
         rating: visible(document.getElementById("rating")),
+        updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent : null; })(),
+        trustStore: [...document.querySelectorAll('[data-i18n="trust"], .settings .muted')].filter(visible).every((el) => el.textContent.includes("Microsoft Store") && !el.textContent.includes("GitHub")),
         clearItem: (() => { const it = document.getElementById("hist-clear"); return it ? `${it.textContent}|${it.getAttribute("aria-disabled") === "true" ? "off" : "on"}` : null; })(),
         recentRows: document.querySelectorAll("#recent .row").length,
         inside: document.getElementById("chip-content").getAttribute("aria-pressed") === "true",

@@ -24,6 +24,7 @@
       results: "النتائج", preview: "المعاينة",
       recent: "ملفات فتحتها مؤخراً", recentNone: "الملفات التي تفتحها تظهر هنا.", tryThese: "جرّب هذه",
       trust: "ملفاتك وفهرسها يبقيان على جهازك ولا نجمع بيانات استخدام. يتصل البرنامج بالإنترنت فقط ليتحقق من التحديثات (GitHub) ولأسعار العملات؛ والبحث من الهاتف يعمل داخل شبكة بيتك فقط.",
+      trustStore: "ملفاتك وفهرسها يبقيان على جهازك ولا نجمع بيانات استخدام. يتصل البرنامج بالإنترنت فقط لأسعار العملات، وتصله التحديثات من Microsoft Store؛ والبحث من الهاتف يعمل داخل شبكة بيتك فقط.",
       tips: [["تقرير .pdf", "ملفات PDF فقط"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"], ['"عقد إيجار"', "العبارة كما هي"], ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["hgjrvdv", "لوحة المفاتيح الخطأ ← «التقرير»"]],
       kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد", kMenu: "المزيد",
       open: "فتح", openFolder: "فتح المجلد", copyPath: "نسخ المسار", more: "إجراءات أخرى",
@@ -70,7 +71,10 @@
       app: "تطبيق", appsLabel: "برامج بهذا الاسم",
       grid: "عرض المصغرات (Ctrl+T)",
       compact: "عرض مضغوط", compactSub: "سطر واحد لكل نتيجة، فتظهر نتائج أكثر", showPreview: "إظهار المعاينة", hidePreview: "إخفاء المعاينة",
-      sMore: "المزيد", sMoreRow: "خيارات أخرى", sMoreSub: "التحقق من التحديثات، الدعم والملاحظات، أدوات مثل الملفات المكررة وأحجام المجلدات، وإعدادات البحث من أي مكان", moreBtn: "فتح قائمة الخيارات…", sReportRow: "الإبلاغ عن مشكلة", sReportSub: "تعرض ما سيُشارَك قبل أي شيء: لن يُرسل شيء إلا إذا ضغطت أنت، وأسماء الملفات والمسارات تُحذف.", reportBtn: "الإبلاغ عن مشكلة…",
+      sMore: "المزيد", sMoreRow: "خيارات أخرى", sMoreSub: "التحقق من التحديثات، الدعم والملاحظات، أدوات مثل الملفات المكررة وأحجام المجلدات، وإعدادات البحث من أي مكان", moreBtn: "فتح قائمة الخيارات…",
+      sHelp: "التحديثات والمساعدة", sUpdRow: "التحديثات", sUpdSub: (v) => `الإصدار المثبّت ${v}. يتحقق البرنامج من وجود إصدار أحدث ويعرض عليك تثبيته.`, updBtn: "التحقق من التحديثات…",
+      sUpdSubStore: (v) => `الإصدار المثبّت ${v}. تصل التحديثات من Microsoft Store.`, updBtnStore: "التحديثات من Microsoft Store…",
+      sReportRow: "الإبلاغ عن مشكلة", sReportSub: "تعرض ما سيُشارَك قبل أي شيء: لن يُرسل شيء إلا إذا ضغطت أنت، وأسماء الملفات والمسارات تُحذف.", reportBtn: "الإبلاغ عن مشكلة…",
       sSearch: "البحث والفهرسة", sHideSystem: "إخفاء ملفات النظام", sHideSystemSub: "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
       sContentIndex: "فهرسة محتوى المستندات في الخلفية", sContentIndexSub: "بحث أسرع داخل الملفات، ويشمل النص في الصور والملفات الممسوحة",
       sReadCloud: "قراءة محتوى الملفات الموجودة على السحابة فقط (يُنزّلها من الإنترنت)",
@@ -90,6 +94,7 @@
       results: "Results", preview: "Preview",
       recent: "Recently opened files", recentNone: "Files you open show up here.", tryThese: "Try these",
       trust: "Your files and their index stay on your PC; no usage data is collected. InstaFind goes online only to check for updates (GitHub) and fetch exchange rates; phone search works only on your home network.",
+      trustStore: "Your files and their index stay on your PC; no usage data is collected. InstaFind goes online only to fetch exchange rates, and its updates come from the Microsoft Store; phone search works only on your home network.",
       tips: [["report .pdf", "PDF files only"], ["size:>10mb", "Bigger than 10 MB"], ["dm:thisweek", "Changed this week"], ['"lease agreement"', "Exact phrase"], ["root: كتاب", "Arabic root: مكتبة، الكاتب"], ["احمد", "Also finds «أحمد»"]],
       kNav: "Move", kOpen: "Open", kFolder: "Folder", kMenu: "More",
       open: "Open", openFolder: "Open folder", copyPath: "Copy path", more: "More actions",
@@ -132,7 +137,10 @@
       app: "App", appsLabel: "Programs by this name",
       grid: "Thumbnail view (Ctrl+T)",
       compact: "Compact rows", compactSub: "One line per result, so more of them fit", showPreview: "Show the preview", hidePreview: "Hide the preview",
-      sMore: "More", sMoreRow: "More options", sMoreSub: "Check for updates, support and feedback, tools such as duplicate files and folder sizes, and search-from-anywhere settings", moreBtn: "Open the Options menu…", sReportRow: "Report a problem", sReportSub: "Shows what would be shared first: nothing is sent unless you press a button, and file names and paths are removed.", reportBtn: "Report a problem…",
+      sMore: "More", sMoreRow: "More options", sMoreSub: "Check for updates, support and feedback, tools such as duplicate files and folder sizes, and search-from-anywhere settings", moreBtn: "Open the Options menu…",
+      sHelp: "Updates and help", sUpdRow: "Updates", sUpdSub: (v) => `Installed version ${v}. Looks for a newer version and offers to install it.`, updBtn: "Check for updates…",
+      sUpdSubStore: (v) => `Installed version ${v}. Updates come from the Microsoft Store.`, updBtnStore: "Updates from Microsoft Store…",
+      sReportRow: "Report a problem", sReportSub: "Shows what would be shared first: nothing is sent unless you press a button, and file names and paths are removed.", reportBtn: "Report a problem…",
       sSearch: "Search and indexing", sHideSystem: "Hide system files", sHideSystemSub: "The Windows folder, temporary and cache files",
       sContentIndex: "Index document contents in the background", sContentIndexSub: "Faster search inside files, text in pictures and scans included",
       sReadCloud: "Read contents of cloud-only files (downloads them)",
@@ -144,6 +152,8 @@
     },
   }[LANG];
   const SORTS = ["best", "name", "path", "size", "date"];
+  // The privacy line: the Store version's updates come from the Store, not GitHub.
+  function trustText() { return S.store ? T.trustStore : T.trust; }
 
   // ---------- state ----------
   const S = {
@@ -380,7 +390,8 @@
       S.kinds = m.kinds || []; S.sizes = m.sizes || []; S.dates = m.dates || [];
       S.kind = m.kind < S.kinds.length ? m.kind : 0;
       S.sort = SORTS.includes(m.sort) ? m.sort : "best"; S.desc = !!m.desc;
-      S.digits = !!m.digits; S.version = m.version || "";
+      S.digits = !!m.digits; S.version = m.version || ""; S.store = !!m.store;
+      for (const el of document.querySelectorAll('[data-i18n="trust"]')) el.textContent = trustText();
       renderChips(); renderStatus();
       if (m.switched) showSwitched();
     },
@@ -1193,9 +1204,14 @@
       section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("read_cloud_files", T.sReadCloud), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
       section(T.sAnywhere, sw("hotkey_quick", T.sHotkey), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
       section(T.sStartup, sw("autostart", T.sAutostart)),
-      section(T.sMore, h("div", { class: "srow" }, h("label", { for: "options-menu" }, h("span", null, T.sMoreRow), h("small", null, T.sMoreSub)), btn("", I.dots, T.moreBtn, () => send({ op: "options_menu" }), { id: "options-menu" })),
+      // "Check for updates" and "Report a problem", each with its own button
+      // in view (the release standard), before the Options menu's rest.
+      section(T.sHelp,
+        h("div", { class: "srow" }, h("label", { for: "check-updates" }, h("span", null, T.sUpdRow), h("small", { class: "num" }, digits((st.store ? T.sUpdSubStore : T.sUpdSub)(st.version)))),
+          btn("", I.refresh, st.store ? T.updBtnStore : T.updBtn, () => send({ op: "check_updates" }), { id: "check-updates" })),
         h("div", { class: "srow" }, h("label", { for: "report-problem" }, h("span", null, T.sReportRow), h("small", null, T.sReportSub)), btn("", I.flag, T.reportBtn, () => send({ op: "report_problem" }), { id: "report-problem" }))),
-      section(T.sAbout, h("p", { class: "num" }, digits(T.version(st.version))), h("p", { class: "muted" }, T.trust)),
+      section(T.sMore, h("div", { class: "srow" }, h("label", { for: "options-menu" }, h("span", null, T.sMoreRow), h("small", null, T.sMoreSub)), btn("", I.dots, T.moreBtn, () => send({ op: "options_menu" }), { id: "options-menu" }))),
+      section(T.sAbout, h("p", { class: "num" }, digits(T.version(st.version))), h("p", { class: "muted" }, trustText())),
     );
   }
   $("set-btn").addEventListener("click", () => (S.view === "settings" ? closeSettings() : openSettings()));

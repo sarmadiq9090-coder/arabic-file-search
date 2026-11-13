@@ -276,6 +276,9 @@ pub enum Request {
     OpenWith { list: List, seq: u64, ver: u64, id: u32 },
     /// Windows' Properties window for the file of row `id`.
     Properties { list: List, seq: u64, ver: u64, id: u32 },
+    /// Check for updates now (the Store version: where its updates come
+    /// from, and its Store page), as the Options menu's item.
+    CheckUpdates {},
     /// The answer to the Store rating row ([`Outbound::Rating`]): rate now
     /// (`rate`, opens the Store's review page) or not now.
     Rating { rate: bool },
@@ -418,6 +421,8 @@ pub struct SettingsOut {
     pub floating: bool,
     pub tray_icon: bool,
     pub version: &'static str,
+    /// The Microsoft Store version: its updates come from the Store.
+    pub store: bool,
 }
 
 /// A message to the page.
@@ -440,6 +445,9 @@ pub enum Outbound {
         /// This start moved someone who used the classic window to the new
         /// look (the only one since 1.0): say so once.
         switched: bool,
+        /// The Microsoft Store version: its updates come from the Store,
+        /// not GitHub (the privacy line says so).
+        store: bool,
     },
     Results {
         seq: u64,
@@ -1498,6 +1506,8 @@ mod tests {
         assert_eq!(req(r#""op":"switch_to","path":"C:\\Windows""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"switch_cancel""#), Ok(Request::SwitchCancel {}));
         assert_eq!(req(r#""op":"rating","rate":true"#), Ok(Request::Rating { rate: true }));
+        assert_eq!(req(r#""op":"check_updates""#), Ok(Request::CheckUpdates {}));
+        assert_eq!(req(r#""op":"check_updates","url":"https://x""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"rating""#), Err(Rejected::Malformed));
         assert_eq!(serde_json::to_string(&Outbound::Rating).unwrap(), r#"{"type":"rating"}"#);
         assert_eq!(req(r#""op":"open_with","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::OpenWith { list: List::Results, seq: 2, ver: 3, id: 1 }));
@@ -1888,9 +1898,11 @@ mod tests {
             floating: false,
             tray_icon: true,
             version: "1.0.0",
+            store: true,
         });
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.starts_with(r#"{"type":"settings","lang":"ar","next_lang":"en""#), "{json}");
+        assert!(json.ends_with(r#""version":"1.0.0","store":true}"#), "{json}");
         let json = serde_json::to_string(&Outbound::Renamed { list: List::Recent, seq: 0, ver: 3, id: 1, name: "a".into() }).unwrap();
         assert_eq!(json, r#"{"type":"renamed","list":"recent","seq":0,"ver":3,"id":1,"name":"a"}"#);
     }
