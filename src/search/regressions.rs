@@ -503,8 +503,11 @@ fn hamza_seat_spellings_find_each_other() {
     assert_eq!(match_text(text, &at("مسئول")).as_deref(), Some(text));
     assert!(match_text("شئون الطلاب", &at("شؤون")).is_some());
     assert!(match_text("مسوول المخزن", &at("مسئول")).is_some());
-    // Excluding a spelling excludes the others.
-    assert_eq!(find("txt -مسئول -رئيس -سؤال -مسائل -بيئة -شئون -سيال -مسيول"), Vec::<u32>::new());
+    // Excluding a spelling excludes the names spelled another way with the
+    // seat (their keys hold it). An exclusion has no lossy spellings, so the
+    // names typed without the hamza stay (مسوول, شوون, ريس) unless typed too.
+    assert_eq!(find("txt -مسئول -رئيس -سؤال -مسائل -بيئة -شئون -سيال -مسيول"), vec![2, 5, 8]);
+    assert_eq!(find("txt -مسوول -ريس -سوال -مسايل -بيية -شوون -سيال -مسيول"), Vec::<u32>::new());
 }
 
 /// The name spelled as typed comes before the other spellings when they
@@ -521,14 +524,16 @@ fn hamza_seat_spelling_as_typed_ranks_first() {
     let find = |s: &str| search_names(&entries, &at(s), "");
     // As typed first, then the other spellings, shorter names first.
     assert_eq!(find("مسؤول"), vec![1, 3, 0, 4, 2]);
-    assert_eq!(find("مسئول"), vec![0, 2, 1, 4, 3]);
+    // «مسؤولية» holds «مسوول» only inside a longer word, and that spelling
+    // of «مسئول» is lossy: it matches whole words only (see Term::word_alts).
+    assert_eq!(find("مسئول"), vec![0, 2, 1, 4]);
     assert_eq!(find("مسوول"), vec![4, 0, 1, 2, 3]);
     // A whole-name match still comes first, whatever its spelling.
     assert_eq!(find("مسئول.txt"), vec![0, 1, 4]);
     assert_eq!(find("مسوول.txt"), vec![4, 0, 1]);
     // Diacritics and the article do not stop a name counting as typed.
     assert_eq!(find("المسؤول"), vec![1, 3, 0, 4, 2]);
-    assert_eq!(find("مَسْئُول"), vec![0, 2, 1, 4, 3]);
+    assert_eq!(find("مَسْئُول"), vec![0, 2, 1, 4]);
     // رئيس / ريس.
     let entries = vec![entry(r"C:\a\رئيس.txt", false), entry(r"C:\a\ريس.txt", false)];
     assert_eq!(search_names(&entries, &at("ريس"), ""), vec![1, 0]);
@@ -662,10 +667,12 @@ fn query_without_hamza_finds_the_seat_in_documents() {
     // ww:, proximity and exclusions too.
     assert!(match_text(text, &at("ww:ريس")).is_some());
     assert!(match_text(text, &at(r#""ريس القسم"~1"#)).is_some());
-    assert!(match_text(text, &at("القسم -ريس")).is_none());
+    // An exclusion is matched as typed only: «ريس» is not in «رئيس».
+    assert!(match_text(text, &at("القسم -ريس")).is_some());
+    assert!(match_text(text, &at("القسم -رئيس")).is_none());
     // و and ي stay different letters where no hamza can be.
     for w in ["سيارة", "بيوت", "تقرير", "كبير", "مدير", "سؤال", "report"] {
-        assert_eq!(crate::normalize::document_forms(&normalize(w)), (Vec::new(), Vec::new()), "{w}");
+        assert!(crate::normalize::document_forms(&normalize(w)).is_empty(), "{w}");
     }
     assert!(match_text("سيارة جديدة", &at("سوارة")).is_none());
     // The same lines are listed when a result is opened.
@@ -683,12 +690,124 @@ fn query_without_hamza_finds_the_seat_in_documents() {
 fn document_forms_are_capped() {
     let q = at("مسوولين شوونهم ريس وو شيء").for_documents();
     for t in &q.terms {
-        assert!(t.alts.len() + t.ends.len() <= 2 + 1 + MAX_TERM_DOCUMENT_FORMS, "{t:?}");
+        assert!(t.alts.len() + t.word_alts.len() <= 2 + 1 + MAX_TERM_DOCUMENT_FORMS, "{t:?}");
     }
     let many = "مسوول ".repeat(40);
-    let (forms, ends) = crate::normalize::document_forms(&many);
-    assert!(forms.len() + ends.len() <= crate::normalize::MAX_DOCUMENT_FORMS);
+    assert!(crate::normalize::document_forms(&many).len() <= crate::normalize::MAX_DOCUMENT_FORMS);
     // Names are not searched with them: name search stays as it was.
     assert_eq!(at("ريس").terms[0].alts, ["ريس"]);
-    assert!(at("ريس").terms[0].ends.is_empty());
+    assert!(at("ريس").terms[0].word_alts.is_empty());
+}
+
+// ------------------------------- lossy hamza spellings match whole words only
+
+/// «رئيس» also searched for «ريس» (its seat dropped) as a plain substring, so
+/// it found «إدريس», «باريس» and «تدريس»; «نهائي» ranked «نهاية» first (it
+/// starts with «نهاي»), «جزئي» found «جزيرة», «-رئيس» hid every name with
+/// «ريس» in it, and inside documents «نهائي» found every «نهاية». The other
+/// spellings of a seat now match only as whole words (after an optional
+/// article), and exclusions use the word as typed only.
+#[test]
+fn lossy_hamza_spellings_match_whole_words_only() {
+    let entries = vec![
+        entry(r"C:\a\رئيس القسم.txt", false),         // 0
+        entry(r"C:\a\إدريس.txt", false),              // 1
+        entry(r"C:\a\باريس 2024.jpg", false),         // 2
+        entry(r"C:\a\تدريس الرياضيات.docx", false),   // 3
+        entry(r"C:\a\ريس.txt", false),                // 4
+        entry(r"C:\a\الريس الجديد.txt", false),       // 5
+        entry(r"C:\a\تقرير نهائي.pdf", false),        // 6
+        entry(r"C:\a\نهاية العام.docx", false),       // 7
+        entry(r"C:\a\جزيرة.png", false),              // 8
+        entry(r"C:\a\تقرير جزئي.pdf", false),         // 9
+        entry(r"C:\a\ريسيتال.txt", false),            // 10
+    ];
+    let ranked = |s: &str| search_names(&entries, &at(s), "");
+    let find = |s: &str| {
+        let mut r = ranked(s);
+        r.sort_unstable();
+        r
+    };
+    for q in ["رئيس", "الرئيس", "رَئِيس", "\"رئيس\"", "ww:رئيس", "رءيس"] {
+        assert_eq!(find(q), vec![0, 4, 5], "{q}");
+    }
+    // The spelling as typed first.
+    assert_eq!(ranked("رئيس")[0], 0);
+    assert_eq!(find("نهائي"), vec![6]);
+    assert_eq!(find("نهائي.pdf"), vec![6]);
+    assert_eq!(find("جزئي"), vec![9]);
+    // Excluding «رئيس» does not hide «ريس» inside other words.
+    assert_eq!(find("txt -رئيس"), vec![1, 4, 5, 10]);
+    assert_eq!(find("jpg -رئيس"), vec![2]);
+    assert_eq!(find("docx -رئيس"), vec![3, 7]);
+    // Proximity words too.
+    assert_eq!(find(r#""رئيس القسم"~1"#), vec![0]);
+    assert_eq!(find(r#""رئيس 2024"~1"#), Vec::<u32>::new());
+    // A phrase: its other spelling as whole words too (an article may come first).
+    assert_eq!(find("\"رئيس الجديد\""), vec![5]);
+    assert_eq!(find("\"الرئيس الجديد\""), vec![5]);
+    assert_eq!(find("\"يس الجديد\""), vec![5]);
+    assert_eq!(find("\"رئيس 2024\""), Vec::<u32>::new());
+    // The query as typed still matches anywhere (as before).
+    assert_eq!(find("ريس"), vec![0, 1, 2, 3, 4, 5, 10]);
+    // Underlined: the word only.
+    let marked = |name: &str, q: &str| match_ranges(name, &at(q)).into_iter().map(|(s, e)| name[s..e].to_string()).collect::<Vec<_>>();
+    assert_eq!(marked("باريس وريس.txt", "رئيس"), ["ريس"]);
+    assert!(marked("إدريس.txt", "رئيس").is_empty());
+
+    // Inside documents.
+    let text = "سافر إدريس إلى باريس لتدريس الرياضيات في نهاية العام وزار جزيرة";
+    for q in ["رئيس", "نهائي", "جزئي", "\"رئيس\"", "ww:نهائي", r#""نهائي العام"~1"#] {
+        assert!(match_text(text, &at(q)).is_none(), "{q}");
+    }
+    assert!(match_text(text, &at("سافر -رئيس")).is_some());
+    assert!(match_text(text, &at("سافر -نهائي")).is_some());
+    assert_eq!(all_matches("نهاية ونهائي والنهائي ونهايات", &at("نهائي"), 9).0, 2);
+    assert!(match_text("التقرير النهائي للعام", &at("نهائي")).is_some());
+    assert!(match_text("قال الريس كلمته", &at("رئيس")).is_some());
+    assert!(match_text("حضر الرئيس", &at("ريس")).is_some());
+    assert!(match_text("في نهاية العام", &at("نهاي")).is_some()); // as typed: anywhere
+}
+
+/// The owner's list: each pair is one word, typed either way, as the query
+/// and as the file name (also with the article and with tashkeel), and inside
+/// documents (where the word is matched whole).
+#[test]
+fn hamza_spellings_owner_list() {
+    let groups: &[&[&str]] = &[
+        &["رئيس", "ريس"],
+        &["مسؤول", "مسئول", "مسوول"],
+        &["شؤون", "شئون", "شوون"],
+        &["سؤال", "سوال"],
+        &["مسائل", "مسايل"],
+        &["شاطئ", "شاطيء"],
+        &["شيء", "شئ"],
+    ];
+    // A fatha after the first letter.
+    let voweled = |w: &str| {
+        let mut c = w.chars();
+        let first = c.next().unwrap();
+        format!("{first}\u{064E}{}", c.as_str())
+    };
+    for group in groups {
+        for &name in group.iter() {
+            for name in [name.to_string(), format!("ال{name}"), voweled(name)] {
+                let entries = vec![entry(&format!(r"C:\a\{name}.txt"), false), entry(r"C:\a\تقرير.txt", false)];
+                for &q in group.iter() {
+                    for q in [q.to_string(), format!("ال{q}"), voweled(q)] {
+                        if q.starts_with("ال") && !name.starts_with("ال") {
+                            continue; // «الرئيس» needs the article in the name
+                        }
+                        assert_eq!(search_names(&entries, &at(&q), ""), vec![0], "{q} → {name}");
+                        for doc in [format!("حضر {name} اليوم"), format!("حضر و{name}.")] {
+                            if q.starts_with("ال") && !doc.contains(" ال") {
+                                continue;
+                            }
+                            assert!(match_text(&doc, &at(&q)).is_some(), "{q} in «{doc}»");
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

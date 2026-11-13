@@ -13,6 +13,13 @@
 //! A final ئ is also يء (شاطئ = شاطيء). Document text is kept as it is and
 //! has no extra forms, so a search inside documents adds to the query the
 //! spellings its words may have there ([`document_forms`]).
+//!
+//! The other spellings of a query ([`query_forms`], [`document_forms`]) are
+//! lossy: «ريس», the seat of «رئيس» dropped, is also the end of «إدريس» and
+//! «باريس», and «نهاي» («نهائي») the start of «نهاية». So a search matches
+//! them only as whole words (after an optional article), never inside
+//! another word, and never for an excluded word; the query as typed keeps
+//! matching anywhere (see `search::Term`).
 
 // Only the Windows UI and the tests use this module.
 
@@ -206,22 +213,22 @@ pub const MAX_DOCUMENT_FORMS: usize = 4;
 
 /// The spellings a normalised query alternative may have in a document when
 /// the query left a hamza out (a document's words have no extra forms, unlike
-/// a [`name_key`]): `(forms, ends)`, `ends` being forms that only match where
-/// a word ends. Where a seat may have been typed as its carrier:
+/// a [`name_key`]). Like every other spelling of a seat they are lossy, so a
+/// search matches them only as whole words (see `search::Term::word_alts`).
+/// Where a seat may have been typed as its carrier:
 /// - و before و may be ئ: «مسوول» is also «مسيول» (مسئول), «شوون» «شيون» (شئون);
 /// - a seat before ي may have been left out, in the second letter of a word
 ///   (also after ال), when a consonant follows: «ريس» is also «رييس» (رئيس),
 ///   «ضيل» «ضييل» (ضئيل);
 /// - a final ء after ي may be the seat ئ: «شيء» is also «شي» (شئ) and
-///   «مباديء» «مبادي» (مبادئ), but only at the end of a word, or «شيء»
-///   would find «شيخ».
+///   «مباديء» «مبادي» (مبادئ).
 ///
 /// Each change on its own, then all of them, at most [`MAX_DOCUMENT_FORMS`]
 /// forms: never one per combination.
-pub fn document_forms(norm: &str) -> (Vec<String>, Vec<String>) {
-    let (mut forms, mut ends) = (Vec::new(), Vec::new());
+pub fn document_forms(norm: &str) -> Vec<String> {
+    let mut forms = Vec::new();
     if !norm.contains(['و', 'ي', 'ء']) {
-        return (forms, ends);
+        return forms;
     }
     let chars: Vec<char> = norm.chars().collect();
     // (char index, replacement) of every place a seat may be.
@@ -257,26 +264,21 @@ pub fn document_forms(norm: &str) -> (Vec<String>, Vec<String>) {
     let singles = (0..edits.len()).map(|e| vec![e]);
     let subsets = singles.chain((edits.len() > 1).then_some(all));
     for subset in subsets {
-        if forms.len() + ends.len() >= MAX_DOCUMENT_FORMS {
+        if forms.len() >= MAX_DOCUMENT_FORMS {
             break;
         }
         let mut f = String::with_capacity(norm.len() + 2);
-        let mut ends_word = false;
         for (k, &c) in chars.iter().enumerate() {
             match subset.iter().map(|&e| edits[e]).find(|&(i, _)| i == k) {
-                Some((_, to)) => {
-                    f.push_str(to);
-                    ends_word |= to.is_empty() && k + 1 == chars.len();
-                }
+                Some((_, to)) => f.push_str(to),
                 None => f.push(c),
             }
         }
-        let list = if ends_word { &mut ends } else { &mut forms };
-        if f != norm && !list.contains(&f) {
-            list.push(f);
+        if f != norm && !forms.contains(&f) {
+            forms.push(f);
         }
     }
-    (forms, ends)
+    forms
 }
 
 /// The other spellings of a name's hamza seats (see the module notes), as
@@ -481,25 +483,23 @@ mod tests {
     #[test]
     fn document_forms_of_a_query_without_hamza() {
         let df = |s: &str| document_forms(&normalize(s));
-        let none = (Vec::<String>::new(), Vec::<String>::new());
-        assert_eq!(df("مسوول"), (vec!["مسيول".to_string()], vec![]));
-        assert_eq!(df("شوون"), (vec!["شيون".to_string()], vec![]));
-        assert_eq!(df("ريس"), (vec!["رييس".to_string()], vec![]));
-        assert_eq!(df("الريس"), (vec!["الرييس".to_string()], vec![]));
-        assert_eq!(df("ضيل"), (vec!["ضييل".to_string()], vec![]));
-        assert_eq!(df("شيء"), (vec![], vec!["شي".to_string()]));
-        assert_eq!(df("مباديء"), (vec![], vec!["مبادي".to_string()]));
-        // Inside a phrase the next character ends the word already.
-        assert_eq!(df("شيء جديد"), (vec!["شي جديد".to_string()], vec![]));
+        let v = |l: &[&str]| l.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(df("مسوول"), v(&["مسيول"]));
+        assert_eq!(df("شوون"), v(&["شيون"]));
+        assert_eq!(df("ريس"), v(&["رييس"]));
+        assert_eq!(df("الريس"), v(&["الرييس"]));
+        assert_eq!(df("ضيل"), v(&["ضييل"]));
+        assert_eq!(df("شيء"), v(&["شي"]));
+        assert_eq!(df("مباديء"), v(&["مبادي"]));
+        assert_eq!(df("شيء جديد"), v(&["شي جديد"]));
         // Each change, then all of them.
-        assert_eq!(df("مسوول ريس"), (vec!["مسيول ريس".to_string(), "مسوول رييس".to_string(), "مسيول رييس".to_string()], vec![]));
-        assert_eq!(df("ريس شيء"), (vec!["رييس شيء".to_string()], vec!["ريس شي".to_string(), "رييس شي".to_string()]));
+        assert_eq!(df("مسوول ريس"), v(&["مسيول ريس", "مسوول رييس", "مسيول رييس"]));
+        assert_eq!(df("ريس شيء"), v(&["رييس شيء", "ريس شي", "رييس شي"]));
         for w in ["سيارة", "بيوت", "رييس", "تقرير", "مدير", "وو", "report", ""] {
-            assert_eq!(df(w), none, "{w}");
+            assert!(df(w).is_empty(), "{w}");
         }
         let long = "مسوول ".repeat(100);
-        let (f, e) = document_forms(&long);
-        assert_eq!(f.len() + e.len(), MAX_DOCUMENT_FORMS);
+        assert_eq!(document_forms(&long).len(), MAX_DOCUMENT_FORMS);
     }
 
     #[test]

@@ -28,31 +28,74 @@ const MAX_SPANS: usize = 1_000_000;
 /// extra substring searches per document, whatever the query.
 const MAX_TERM_DOCUMENT_FORMS: usize = 6;
 
-/// One search term: it matches when any of its alternatives is contained.
+/// One search term: it matches when any of its alternatives is contained,
+/// or any of its word alternatives occurs as a whole word.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Term {
-    /// Normalised alternatives; never empty.
+    /// Normalised alternatives (the words as typed, also without an
+    /// article), matched anywhere; never empty.
     pub alts: Vec<String>,
-    /// Alternatives that only match where a word ends (see
-    /// [`crate::normalize::document_forms`]); only a query for documents
-    /// ([`Query::for_documents`]) has them.
-    pub ends: Vec<String>,
+    /// The other spellings of its hamza seats ([`query_forms`], and inside
+    /// documents [`crate::normalize::document_forms`]). They are lossy («ريس»
+    /// for «رئيس» is also the end of «باريس», «نهاي» for «نهائي» the start
+    /// of «نهاية»), so they match only as whole words, after an optional
+    /// article ([`lossy_matches`]).
+    pub word_alts: Vec<String>,
 }
 
 impl Term {
+    /// A term of the normalised alternatives `alts` and the word
+    /// alternatives `word_alts`, each with its article-less form unless
+    /// `exact`, and none of `word_alts` that `alts` already has.
+    fn new(alts: Vec<String>, word_alts: Vec<String>, exact: bool) -> Term {
+        let mut t = Term { alts: Vec::new(), word_alts: Vec::new() };
+        for a in alts {
+            push_alt(&mut t.alts, a, exact);
+        }
+        for w in word_alts {
+            t.push_word_alt(w, exact);
+        }
+        t
+    }
+
+    /// Adds a word alternative (and its article-less form unless `exact`).
+    fn push_word_alt(&mut self, w: String, exact: bool) {
+        let mut forms = Vec::new();
+        push_alt(&mut forms, w, exact);
+        for f in forms {
+            if !self.alts.contains(&f) {
+                push_unique(&mut self.word_alts, f);
+            }
+        }
+    }
+
+    /// Adds the alternatives of `other` (a `a|b` choice).
+    fn join(&mut self, other: Term) {
+        for a in other.alts {
+            self.word_alts.retain(|w| *w != a);
+            push_unique(&mut self.alts, a);
+        }
+        for w in other.word_alts {
+            if !self.alts.contains(&w) {
+                push_unique(&mut self.word_alts, w);
+            }
+        }
+    }
+
     /// Byte position of the earliest alternative found in `hay`.
     fn find_in(&self, hay: &str) -> Option<usize> {
-        let ends = self.ends.iter().filter_map(|a| end_matches(hay, a).next());
-        self.alts.iter().filter_map(|a| hay.find(a.as_str())).chain(ends).min()
+        let words = self.word_alts.iter().filter_map(|a| lossy_matches(hay, a).next());
+        self.alts.iter().filter_map(|a| hay.find(a.as_str())).chain(words).min()
     }
 
     pub(crate) fn matches(&self, hay: &str) -> bool {
-        self.alts.iter().any(|a| hay.contains(a.as_str())) || self.ends.iter().any(|a| end_matches(hay, a).next().is_some())
+        self.alts.iter().any(|a| hay.contains(a.as_str())) || self.word_alts.iter().any(|a| lossy_matches(hay, a).next().is_some())
     }
 
     /// Byte position of the earliest alternative found in `hay` as a whole word.
     fn find_word(&self, hay: &str) -> Option<usize> {
-        self.alts.iter().chain(&self.ends).filter_map(|a| word_matches(hay, a).next()).min()
+        let words = self.word_alts.iter().filter_map(|a| lossy_matches(hay, a).next());
+        self.alts.iter().filter_map(|a| word_matches(hay, a).next()).chain(words).min()
     }
 
     /// True when an alternative occurs in `hay` as a whole word.
@@ -61,21 +104,15 @@ impl Term {
     }
 
     /// Adds the spellings its alternatives may have in a document when the
-    /// query left a hamza out ([`crate::normalize::document_forms`]), at
-    /// most [`MAX_TERM_DOCUMENT_FORMS`] in all.
+    /// query left a hamza out ([`crate::normalize::document_forms`]), as word
+    /// alternatives, at most [`MAX_TERM_DOCUMENT_FORMS`] in all.
     fn add_document_forms(&mut self) {
         let mut room = MAX_TERM_DOCUMENT_FORMS;
-        for i in 0..self.alts.len() {
-            let (forms, ends) = crate::normalize::document_forms(&self.alts[i]);
-            for f in forms {
-                if room > 0 && !self.alts.contains(&f) {
-                    self.alts.push(f);
-                    room -= 1;
-                }
-            }
-            for f in ends {
-                if room > 0 && !self.alts.contains(&f) && !self.ends.contains(&f) {
-                    self.ends.push(f);
+        let from: Vec<String> = self.alts.iter().chain(&self.word_alts).cloned().collect();
+        for a in &from {
+            for f in crate::normalize::document_forms(a) {
+                if room > 0 && !self.alts.contains(&f) && !self.word_alts.contains(&f) {
+                    self.word_alts.push(f);
                     room -= 1;
                 }
             }
@@ -93,9 +130,8 @@ impl Term {
                 spans.extend(hay.match_indices(a.as_str()).take(MAX_SPANS).map(|(s, _)| (s, s + a.len())));
             }
         }
-        for a in self.ends.iter().filter(|a| !a.is_empty()) {
-            let at = if whole_word { word_matches(hay, a).take(MAX_SPANS).collect::<Vec<_>>() } else { end_matches(hay, a).take(MAX_SPANS).collect() };
-            spans.extend(at.into_iter().map(|s| (s, s + a.len())));
+        for a in self.word_alts.iter().filter(|a| !a.is_empty()) {
+            spans.extend(lossy_matches(hay, a).take(MAX_SPANS).map(|s| (s, s + a.len())));
         }
         merge_spans(spans)
     }
@@ -129,11 +165,23 @@ fn word_matches<'a>(hay: &'a str, w: &'a str) -> impl Iterator<Item = usize> + '
     })
 }
 
-/// Start offsets of the occurrences of `w` in `hay` that end a word.
-fn end_matches<'a>(hay: &'a str, w: &'a str) -> impl Iterator<Item = usize> + 'a {
-    hay.match_indices(w)
-        .map(|(s, _)| s)
-        .filter(move |&s| !w.is_empty() && !hay[s + w.len()..].chars().next().is_some_and(is_word_char))
+/// What may come before a word alternative in the same word: an article
+/// ([`ARTICLES`]) or the conjunction و.
+const WORD_ALT_PREFIXES: [&str; 7] = ["وال", "بال", "كال", "فال", "لل", "ال", "و"];
+
+/// Start offsets of the occurrences of the word alternative `w` in `hay`
+/// (see [`Term::word_alts`]): whole words, or the rest of a word after one
+/// of [`WORD_ALT_PREFIXES`] («الريس», «وريس»), never the inside of another
+/// word («باريس», «نهاية»).
+fn lossy_matches<'a>(hay: &'a str, w: &'a str) -> impl Iterator<Item = usize> + 'a {
+    hay.match_indices(w).map(|(s, _)| s).filter(move |&s| {
+        if w.is_empty() || hay[s + w.len()..].chars().next().is_some_and(is_word_char) {
+            return false;
+        }
+        let before = &hay[..s];
+        let word_start = before.char_indices().rev().take_while(|&(_, c)| is_word_char(c)).last().map_or(s, |(i, _)| i);
+        word_start == s || WORD_ALT_PREFIXES.contains(&&before[word_start..])
+    })
 }
 
 /// The words of `hay` as (byte offset, word), split on non-word characters.
@@ -214,7 +262,7 @@ impl Near {
         // once per entry name checked.
         let mut need = vec![0u32; self.words.len()];
         for (t, term) in self.words.iter().enumerate() {
-            let first = self.words[..t].iter().position(|w| w.alts == term.alts).unwrap_or(t);
+            let first = self.words[..t].iter().position(|w| w == term).unwrap_or(t);
             need[first] += 1;
         }
         need
@@ -924,12 +972,7 @@ impl Query {
                 // Split as spelled (same words as normalised) so each word
                 // also gets the other spellings of its hamza seats.
                 for w in split_words(&normalize_spelling(&tok)).map(|(_, w)| w) {
-                    let mut alts = Vec::new();
-                    push_alt(&mut alts, normalize(w), false);
-                    for f in query_forms(w) {
-                        push_alt(&mut alts, f, false);
-                    }
-                    words.push(Term { alts, ..Term::default() });
+                    words.push(Term::new(vec![normalize(w)], query_forms(w), false));
                 }
                 if words.len() >= 2 {
                     q.near.push(Near { words, dist });
@@ -969,10 +1012,11 @@ impl Query {
                     }
                     pieces = tok[len..].split('|').collect();
                 } else if let Some(word) = exclude_word(&tok) {
+                    // As typed only: the other spellings of a seat are lossy
+                    // («-رئيس» would hide every name with «ريس» in it).
                     let n = normalize(word);
                     if !n.trim().is_empty() {
                         q.excludes.push(n);
-                        q.excludes.extend(query_forms(word));
                         join = false;
                         continue;
                     }
@@ -980,20 +1024,17 @@ impl Query {
                     pieces = tok.split('|').collect();
                 }
             }
-            let mut alts = Vec::new();
+            let mut term = Term::default();
             for p in &pieces {
                 let n = normalize(p);
                 if !n.trim().is_empty() {
-                    push_alt(&mut alts, n, quoted);
-                    // The other spellings of its hamza seats (مسئول → مسوول).
-                    for f in query_forms(p) {
-                        push_alt(&mut alts, f, quoted);
-                    }
+                    // With the other spellings of its hamza seats (مسئول → مسوول), as whole words.
+                    term.join(Term::new(vec![n], query_forms(p), quoted));
                 }
             }
             let join_prev = join || pieces.first() == Some(&"") && pieces.len() > 1;
             join = pieces.len() > 1 && pieces.last() == Some(&"");
-            if alts.is_empty() {
+            if term.alts.is_empty() {
                 join |= join_prev;
                 continue;
             }
@@ -1008,8 +1049,8 @@ impl Query {
                 }
             }
             match q.terms.last_mut() {
-                Some(last) if joins => alts.into_iter().for_each(|a| push_unique(&mut last.alts, a)),
-                _ => q.terms.push(Term { alts, ..Term::default() }),
+                Some(last) if joins => last.join(term),
+                _ => q.terms.push(term),
             }
         }
         q.spelled_seat = q.spelled.iter().any(|a| a.contains(['ؤ', 'ئ']) || !query_forms(a).is_empty());
@@ -1082,15 +1123,12 @@ impl Query {
                 self.regexes.push(p);
             }
         } else if let Some(len) = prefix_len(tok, &WORD_PREFIXES) {
-            let mut alts = Vec::new();
+            let mut term = Term::default();
             for w in unquote(&tok[len..]).split('|').filter(|w| !normalize(w).trim().is_empty()) {
-                push_unique(&mut alts, normalize(w));
-                for f in query_forms(w) {
-                    push_unique(&mut alts, f);
-                }
+                term.join(Term::new(vec![normalize(w)], query_forms(w), true));
             }
-            if !alts.is_empty() {
-                self.words.push(Term { alts, ..Term::default() });
+            if !term.alts.is_empty() {
+                self.words.push(term);
             }
         } else {
             return false;
@@ -1099,20 +1137,17 @@ impl Query {
     }
 
     /// This query for matching document text: each term (also `ww:` and
-    /// proximity words) and exclusion also has the spellings its words may
+    /// proximity words) also has, as whole words, the spellings its words may
     /// have in a document when the query left a hamza out, «مسوول» finding
     /// «مسئول» and «ريس» «رئيس» ([`crate::normalize::document_forms`]). A file
     /// name has those as extra forms in its key, and a stored text is kept as
     /// it is, so they are added to the query once per search instead.
+    /// Exclusions stay as typed: those spellings are lossy.
     pub(crate) fn for_documents(&self) -> Query {
         let mut q = self.clone();
         let near = q.near.iter_mut().flat_map(|n| n.words.iter_mut());
         for t in q.terms.iter_mut().chain(q.words.iter_mut()).chain(near) {
             t.add_document_forms();
-        }
-        let extra: Vec<String> = q.excludes.iter().flat_map(|x| crate::normalize::document_forms(x).0).collect();
-        for x in extra {
-            push_unique(&mut q.excludes, x);
         }
         q
     }
@@ -1791,6 +1826,9 @@ pub fn match_ranges(name: &str, q: &Query) -> Vec<(usize, usize)> {
                 // Step one char so overlapping occurrences are found too.
                 from = s + norm[s..].chars().next().map_or(1, char::len_utf8);
             }
+        }
+        for alt in q.terms.iter().flat_map(|t| &t.word_alts).filter(|a| !a.is_empty()) {
+            ranges.extend(lossy_matches(norm, alt).map(|s| (map[s] as usize, end_in(map, s + alt.len() - 1))));
         }
     }
     for (norm, map) in &forms {
