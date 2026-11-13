@@ -397,6 +397,12 @@ pub struct Query {
     /// True when the first term has a hamza seat ([`Self::spelled`] differs
     /// from its plain spelling or has other spellings).
     pub spelled_seat: bool,
+    /// A wildcard for any name was typed: `*` alone (or `**`), `*.*` or
+    /// `ext:*`. It filters nothing, like Explorer's `*.*`, so a query of
+    /// only that [`is_empty`](Self::is_empty): the window lists nothing for
+    /// it, as for an empty box, and the command line lists every file
+    /// ([`all_names`]).
+    pub any_name: bool,
 }
 
 /// File-type presets for the type filter: (label, extensions). An empty list
@@ -993,8 +999,15 @@ impl Query {
                     join = false;
                     continue;
                 }
+                // `*` is any name: no filter (as `*.*` below).
+                if !tok.is_empty() && tok.chars().all(|c| c == '*') {
+                    q.any_name = true;
+                    join = false;
+                    continue;
+                }
                 let lower = tok.to_lowercase();
                 if let Some((list, bare)) = ext_filter(&lower) {
+                    q.any_name |= list.contains('*') && ext_items(list).next().is_none();
                     for ext in ext_items(list) {
                         q.exts.push(ext.to_string());
                         if bare {
@@ -1325,6 +1338,19 @@ pub fn search_names(entries: &[Entry], q: &Query, scope: &str) -> Vec<u32> {
     if q.is_empty() {
         return Vec::new();
     }
+    rank_names(entries, q, scope)
+}
+
+/// [`search_names`], but an empty query lists every entry in `scope` that
+/// passes its filters (system files, see [`Query::show_system`]) instead of
+/// nothing: for the command line, where `bahth -s *` asks for every file.
+pub fn all_names(entries: &[Entry], q: &Query, scope: &str) -> Vec<u32> {
+    if q.is_empty() && !q.fuzzy && !q.root { rank_names(entries, q, scope) } else { search_names(entries, q, scope) }
+}
+
+/// The matches of [`search_names`] in its order, for a query that is not
+/// `fuzzy:` or `root:` (an empty one matches every entry).
+fn rank_names(entries: &[Entry], q: &Query, scope: &str) -> Vec<u32> {
     let scope_lower = scope.to_lowercase();
     let mut hits: Vec<(u8, u8, bool, u32, u32)> = entries
         .par_iter()

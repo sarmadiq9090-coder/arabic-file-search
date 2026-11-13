@@ -122,6 +122,15 @@ fn extension_filter_spellings() {
     // …and it ends a pending `|` like any filter.
     assert_eq!(at("a | *.* b").terms.len(), 2);
     assert!(at("*.* .pdf").warnings.is_empty());
+    // A lone `*` is `*.*`, not the letter `*` (which no name has).
+    for q in ["*", "**", "*.*", "ext:*"] {
+        let q = at(q);
+        assert!(q.is_empty() && q.any_name, "{q:?}");
+    }
+    assert_eq!(names("تقرير *"), names("تقرير"));
+    assert_eq!(names("* .gitignore"), names(".gitignore"));
+    assert!(!at("تقرير").any_name && !at("ext:pdf").any_name && !at("\"*\"").any_name);
+    assert_eq!(at("\"*\"").terms[0].alts, ["*"]);
 }
 
 /// A type picked in the list still limits a dot-name search to that type.

@@ -168,7 +168,7 @@ bahth.exe -s تقرير -n 20 --sort date --desc --scope "D:\العمل"
 bahth.exe -s عقد --json
 ```
 
-الخيارات: `-n`/`--max`، و`--sort name|path|size|date` مع `--desc`، و`--scope`، و`--count`، و`--csv`، و`--json`، و`--all` (لإظهار ملفات النظام)، و`--help`. رمز الخروج 0 عند وجود نتائج، و1 عند عدمها، و2 عند الخطأ. وإذا لم يجد البحث شيئاً كما كُتب، يجرّب ما يجرّبه البرنامج: لغة لوحة المفاتيح الخطأ (`hgjrvdv` تجد «التقرير»)، ثم الفرانكو (`ta2rer`)، ثم الأخطاء الإملائية.
+الخيارات: `-n`/`--max`، و`--sort name|path|size|date` مع `--desc`، و`--scope`، و`--count`، و`--csv`، و`--json`، و`--all` (لإظهار ملفات النظام)، و`--help`. و`-s *` (أو `*.*`) تعطي كل الملفات (مثلاً `bahth -s * --count` لعددها). رمز الخروج 0 عند وجود نتائج، و1 عند عدمها، و2 عند الخطأ. وإذا لم يجد البحث شيئاً كما كُتب، يجرّب ما يجرّبه البرنامج: لغة لوحة المفاتيح الخطأ (`hgjrvdv` تجد «التقرير»)، ثم الفرانكو (`ta2rer`)، ثم الأخطاء الإملائية.
 
 إضافة Flow Launcher جاهزة (اكتب `ب فاتورة`) وأمثلة PowerShell وAutoHotkey وWindows Terminal في [`integrations/`](integrations/).
 
@@ -341,7 +341,7 @@ bahth.exe -s report -n 20 --sort date --desc --scope "D:\Work"
 bahth.exe -s contract --json
 ```
 
-Options: `-n`/`--max`, `--sort name|path|size|date` with `--desc`, `--scope`, `--count`, `--csv`, `--json`, `--all` (include system files), `--help`. Exit code 0 = results, 1 = none, 2 = error. When nothing matches as typed, it tries what the window tries: the wrong keyboard layout (`hgjrvdv` finds «التقرير»), then Arabizi (`ta2rer`), then typos.
+Options: `-n`/`--max`, `--sort name|path|size|date` with `--desc`, `--scope`, `--count`, `--csv`, `--json`, `--all` (include system files), `--help`. `-s *` (or `*.*`) lists every file (`bahth -s * --count` counts them). Exit code 0 = results, 1 = none, 2 = error. When nothing matches as typed, it tries what the window tries: the wrong keyboard layout (`hgjrvdv` finds «التقرير»), then Arabizi (`ta2rer`), then typos.
 
 A Flow Launcher plugin (keyword `bs`) and PowerShell, AutoHotkey and Windows Terminal examples are in [`integrations/`](integrations/).
 
