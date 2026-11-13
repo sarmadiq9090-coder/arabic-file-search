@@ -1121,8 +1121,12 @@ mod imp {
                 }
                 Request::Copy { list, seq, ver, id } => {
                     if let Some(path) = self.webui_path(list, seq, ver, id) {
-                        nwg::Clipboard::set_data_text(&self.webui.parts.window, &path);
-                        self.webui_notice(tr!("تم نسخ المسار.", "Path copied."));
+                        // Another program may hold the clipboard: then it says so.
+                        if shell::copy_text(&self.webui.parts.window, &path) {
+                            self.webui_notice(tr!("تم نسخ المسار.", "Path copied."));
+                        } else {
+                            self.webui_warn(shell::copy_failed_text());
+                        }
                     }
                 }
                 Request::CopyFile { list, seq, ver, id } => {
@@ -1147,8 +1151,11 @@ mod imp {
                     match text {
                         // Not borrowed while the clipboard notifies its previous owner.
                         Some((n, text)) => {
-                            nwg::Clipboard::set_data_text(&self.webui.parts.window, &text);
-                            self.webui_notice(trf!("تم نسخ {} مسار.", "Copied {} paths.", crate::indexing_status::group_digits(n)));
+                            if shell::copy_text(&self.webui.parts.window, &text) {
+                                self.webui_notice(trf!("تم نسخ {} مسار.", "Copied {} paths.", crate::indexing_status::group_digits(n)));
+                            } else {
+                                self.webui_warn(shell::copy_failed_text());
+                            }
                         }
                         None => self.webui_notice(tr!("لا توجد نتائج لنسخها.", "There are no results to copy.")),
                     }

@@ -348,7 +348,11 @@ impl App {
                         app.dupes_open(true);
                     } else if handle == d.menu_copy {
                         if let Some(p) = app.dupes_selected_files().first() {
-                            nwg::Clipboard::set_data_text(&d.window, p);
+                            // Another program may hold the clipboard: then it says so
+                            // (a success keeps the totals line as it is).
+                            if !super::shell::copy_text(&d.window, p) {
+                                d.summary.set_text(super::shell::copy_failed_text());
+                            }
                         }
                     } else if handle == d.menu_delete {
                         app.dupes_delete();
