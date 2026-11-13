@@ -7,36 +7,39 @@ Lemon (local-ai-chat), with its own key pair and InstaFind's release flow.
 
 <div dir="rtl">
 
-## خطوات المالك (مرة واحدة، بدون أي جهاز ثابت)
+## خطوات المالك (مرة واحدة، من الهاتف، بدون أي جهاز ثابت)
 
 **الوضع الآن:** التوقيع غير مُفعَّل بعد، والإصدارات تُنشر كما كانت. لا يتغير شيء حتى تكمل هذه الخطوات.
-كل شيء يجري في المتصفح على GitHub، ولا يبقى أي ملف على أي جهاز.
+كل شيء يجري في متصفح الهاتف على GitHub، ولا يبقى أي ملف على أي جهاز. يكفي نحو 15 دقيقة.
 
 1. **فعّل التحقق بخطوتين (2FA)** في حسابك على GitHub إن لم يكن مفعّلاً:
    الصورة الشخصية ← Settings ← Password and authentication ← Enable two-factor authentication.
 2. **أنشئ البيئة `release`:** افتح المستودع ← Settings ← Environments ← New environment، واكتب الاسم `release` ثم Configure environment.
    - فعّل **Required reviewers** وأضف نفسك (`sarmadiq9090-coder`) ثم Save protection rules.
    - في **Deployment branches and tags** اختر Selected branches and tags ← Add deployment branch or tag rule ← اكتب `main`.
-3. **أنشئ المفاتيح في Codespace مؤقت:** في صفحة المستودع اضغط Code ← Codespaces ← Create codespace on main. وفي الطرفية (Terminal) في الأسفل شغّل:
+   - (إن وجدت البيئة `release` موجودة مسبقاً، فقد أنشأها GitHub تلقائياً عند أول إصدار: افتحها وأكمل الإعدادين أعلاه.)
+3. **شغّل سكربت المفاتيح في Codespace مؤقت:** في صفحة المستودع اضغط Code ← Codespaces ← Create codespace on main.
+   انتظر حتى يفتح، ثم في الطرفية (Terminal) في الأسفل اكتب هذا السطر واضغط Enter:
    ```sh
-   sudo apt-get update && sudo apt-get install -y minisign
-   mkdir -p ~/k && cd ~/k
-   minisign -G -p primary.pub -s primary.key   # اكتب كلمة مرور قوية مرتين
-   minisign -G -p backup.pub  -s backup.key    # كلمة مرور قوية أخرى
-   cat primary.key; cat primary.pub; cat backup.key; cat backup.pub
+   bash keys/ceremony.sh
    ```
+   السكربت ينزّل minisign ويتحقق من بصمته، ثم يصنع مفتاحين (أساسي واحتياطي) بكلمتي مرور عشوائيتين قويتين، ويتأكد أنهما يعملان،
+   ثم يعرض **أربع كتل** عليها الحروف A وB وC وD. انسخ ما بين سطر `START` وسطر `END` فقط من كل كتلة.
+   إن صعب النسخ من الطرفية على الهاتف، اكتب `code ~/k/A.txt` (أو B أو C أو D) لتفتح الكتلة في المحرر وتنسخها من هناك.
    المفاتيح خاصة ببحث سريع وحده. لا تستعمل مفاتيح Lemon أو أي برنامج آخر.
-4. **ضع المفتاح الأساسي في أسرار البيئة:** Settings ← Environments ← `release` ← Environment secrets ← Add environment secret:
-   - `MINISIGN_SECRET_KEY`: محتوى `primary.key` كاملاً (السطران).
-   - `MINISIGN_PASSWORD`: كلمة مرور المفتاح الأساسي.
-5. **احفظ المفتاح الاحتياطي في مدير كلمات المرور فقط:** محتوى `backup.key` كاملاً وكلمة مروره. لا تضعه في GitHub ولا على أي جهاز.
-6. **أرسل المفتاحين العامّين إلى Claude:** انسخ محتوى `primary.pub` و`backup.pub` (ليسا سرّيين) وأرسلهما في جلسة Claude. سيفتح Claude طلب دمج يضيفهما إلى `keys/` وإلى قائمة `TRUSTED_PUBLIC_KEYS` في البرنامج (انظر [keys/README.md](../../keys/README.md)).
-   بين الخطوة 4 وهذا الطلب، تُوقَّع الإصدارات وتُرفع ملفات `.minisig` معها، لكن النسخ المثبّتة لا تتحقق منها بعد (تحذير في سجل GitHub).
-7. **احذف الـ Codespace:** من github.com/codespaces ← (…) ← Delete.
+4. **أضف السرّين إلى البيئة:** في تبويب آخر: Settings ← Environments ← `release` ← Environment secrets ← Add environment secret:
+   - الاسم `MINISIGN_SECRET_KEY` والقيمة **الكتلة A** (سطران).
+   - الاسم `MINISIGN_PASSWORD` والقيمة **الكتلة B**.
+5. **احفظ الكتلة C في مدير كلمات المرور فقط:** هي المفتاح الاحتياطي وكلمة مروره. لا تضعها في GitHub ولا على أي جهاز ولا ترسلها لأحد.
+6. **أرسل الكتلة D إلى Claude:** فيها المفتاحان العامّان (ليسا سرّيين). سيفتح Claude طلب دمج يضيفهما إلى `keys/` وإلى قائمة `TRUSTED_PUBLIC_KEYS` في البرنامج (انظر [keys/README.md](../../keys/README.md)).
+   **لا ترسل أبداً الكتل A أو B أو C**، ولا لـ Claude.
+   بين الخطوة 4 ودمج هذا الطلب، تُوقَّع الإصدارات وتُرفع ملفات `.minisig` معها، لكن النسخ المثبّتة لا تتحقق منها بعد (تحذير في سجل GitHub).
+7. **احذف الـ Codespace:** من github.com/codespaces ← (…) بجانبه ← Delete. حذفه يحذف المفاتيح التي فيه.
+
+**بعد ذلك، في كل إصدار:** يصلك إشعار (وبريد) من GitHub بأن مهمة `sign` تنتظر موافقتك. افتح صفحة التشغيل ← **Review deployments** ← اختر `release` ← **Approve and deploy**.
+وافق فقط على الإصدارات التي طلبتها أنت. بدون موافقة لا يُنشر الإصدار (وتنتهي المهلة بعد 30 يوماً).
 
 بعد دمج طلب المفاتيح يصير التوقيع **إلزامياً**: النسخ الجديدة ترفض أي تحديث بلا توقيع صحيح.
-في كل يوم إصدار يصلك إشعار من GitHub لمراجعة مهمة `sign` والموافقة عليها (Review deployments ← Approve).
-وافق فقط على الإصدارات التي بدأتها أنت.
 
 > **انتبه:** إذا وُجدت المفاتيح العامة في `keys/` وغاب السر `MINISIGN_SECRET_KEY` من البيئة، تتوقف مهمة `sign` برسالة خطأ ولا يُنشر الإصدار، لأن النسخ المثبّتة سترفضه.
 
@@ -123,13 +126,13 @@ only.
 ## Release flow (`.github/workflows/build.yml`)
 
 A release still starts when main has a `Cargo.toml` version with no tag, and only
-after every check (including `smoke` and `ui`) has passed.
+after every check (`linux-test`, `windows`, `smoke`, `ui`, `newlook`) has passed.
 
 | Job | Token / secrets | Does |
 |---|---|---|
 | `version` | `contents: read` | Reads the version, and says whether its tag is new. Releasing is skipped unless it is. |
 | `sign` | Environment **`release`** (owner approval, branch `main`), with `MINISIGN_SECRET_KEY` and `MINISIGN_PASSWORD`. `contents: read` | Runs **no repository code** (no checkout). It reads `keys/minisign-{primary,backup}.pub` at the commit through the API (only a 404 counts as "not committed"; any other API error fails). **No `MINISIGN_SECRET_KEY`** and no public key: it logs a warning, signs nothing and passes, so releases are published unsigned as before. **Secret, no public key yet**: it signs, checks against the public half recreated from the secret (`minisign -R`), and warns that apps do not check signatures yet. **Public keys but no secret**: it fails, since apps with those keys would refuse an unsigned update. To sign, it downloads the three smoke-tested exes and installs minisign 0.12 from a pinned URL with a pinned SHA-256 (the archive was verified with its author's key). It runs `minisign -S -t "instafind <tag>"` for each exe and checks each with `minisign -V -H` (pre-hashed only, as the app requires) against the public keys, including the exact trusted comment. Finally it uploads artifact `bahth-minisig`. |
-| `release` | `contents: write`, `actions: write` | Deletes any stale draft of the tag left by a failed run, then creates the release as a **draft** with the three exes. If signed, it uploads the three `.minisig` files. It checks that the draft has exactly the expected non-empty assets, then publishes it (`--draft=false --latest`) and starts `packaging.yml`. |
+| `release` | `contents: write`, `actions: write` | Deletes any stale draft of the tag left by a failed run, then writes `SHA256SUMS.txt` (the three exes, plus their `.minisig` files when signed) and creates the release as a **draft** with the three exes and `SHA256SUMS.txt`. If signed, it uploads the three `.minisig` files. It checks that the draft has exactly the expected non-empty assets, then publishes it (`--draft=false --latest`) and starts `packaging.yml` and `store.yml`. |
 
 Draft safety: `releases/latest`, which every installed copy asks for, never
 returns a draft, and the updater also ignores drafts. A half-made release is never
@@ -137,9 +140,40 @@ offered. If `release` fails after creating the draft, re-run the failed jobs: th
 stale draft is deleted first.
 
 Compatibility: asset names are unchanged (`bahth.exe`, `bahth-x86.exe`,
-`bahth-arm64.exe`). The `.minisig` files are extra assets that old clients
-ignore. `packaging.yml` downloads only `bahth*.exe`. Releases end up non-draft,
+`bahth-arm64.exe`, `SHA256SUMS.txt`). The `.minisig` files are extra assets that old clients
+ignore. `packaging.yml` downloads only `bahth*.exe` and `store.yml` the three exes by name.
+Without keys and secret the published assets are exactly those of 1.0: the three
+exes and `SHA256SUMS.txt`.
+
+The owner's approval: the first release after this change auto-creates the
+`release` Environment if it does not exist yet (with no reviewers, so nothing
+waits). Once the owner sets **Required reviewers** there (step 2 above), every
+release pauses at `sign` until they press **Review deployments → Approve and
+deploy**; a pending approval fails after 30 days. Releases end up non-draft,
 non-prerelease and latest, as before.
+
+## Key ceremony (`keys/ceremony.sh`)
+
+The owner runs it once in a temporary Codespace (owner steps above). It:
+
+- refuses to run if `~/k` already holds keys (nothing is overwritten);
+- downloads minisign 0.12 from the same pinned URL as the `sign` job and
+  checks the same SHA-256, then runs it from `~/k`;
+- makes `primary` and `backup` key pairs with `minisign -G -p … -s …`, each
+  with its own password of 24 random bytes from `/dev/urandom` as 48 hex
+  characters (letters and digits only, so a phone copy cannot mangle it);
+- signs a test file with each key and verifies it pre-hashed (`-V -H`) with the
+  exact trusted comment, as CI and the app do;
+- prints four labelled blocks, Arabic and English, and also saves them as
+  `~/k/A.txt` … `~/k/D.txt`: **A** `MINISIGN_SECRET_KEY` (the two lines of
+  `primary.key`), **B** `MINISIGN_PASSWORD`, **C** the backup secret key and
+  its password (password manager only), **D** both public keys (to Claude);
+- writes nothing outside `~/k` (explicit `-p`/`-s`, so no `~/.minisign`), and
+  ends by telling the owner to delete the Codespace.
+
+The `sign` job tolerates what a phone paste may do to the secrets: a missing
+`untrusted comment:` first line is put back, and CRs and spaces around the key
+and the password are dropped.
 
 ## Rotation and loss
 
@@ -147,9 +181,13 @@ A client trusts only the keys compiled into the version it runs, so a release mu
 be signed by a key that every client still in use trusts. Keep rotations rare.
 
 - **Primary key lost or leaked.**
-  1. Make a new backup pair in a Codespace.
+  1. Make a new backup pair in a Codespace (`keys/ceremony.sh` makes two
+     pairs: keep block C as the new backup and its public key from block D,
+     and ignore the other pair).
   2. Put the **old backup** secret key and its password into the `release`
-     secrets. It is now the signing key.
+     secrets. It is now the signing key. From block C, `MINISIGN_SECRET_KEY`
+     takes only the two key lines (`untrusted comment: …` and the line after
+     it) and `MINISIGN_PASSWORD` only the password line.
   3. Release a version with `TRUSTED_PUBLIC_KEYS = [old backup, new backup]`,
      and update `keys/*.pub` to match. Every client trusts the old backup, so
      every client accepts this release.
