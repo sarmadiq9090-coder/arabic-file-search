@@ -35,9 +35,9 @@ packaged (`src/store.rs`) and behaves as a Store app.
 
 When `GetCurrentPackageFullName` succeeds the program is the Store version:
 
-- **Updates.** No GitHub check and no self-update (`update.rs` refuses too). Options ▸ "Updates from Microsoft Store (version …)" says that updates come from the Store. Downloading code would break Store policy 10.2.2, and the program's folder (`WindowsApps`) is read-only anyway.
-- **Start with Windows** uses the package's StartupTask (`Windows.ApplicationModel.StartupTask`, TaskId `InstaFindStartup`) instead of the `Run` key, which a packaged app cannot write for real. It is **off until the user turns it on** (Options ▸ Start with Windows, or Settings ▸ Apps ▸ Startup ▸ InstaFind): `store::ENABLE_STARTUP_ON_FIRST_RUN` is `false` because Store policy 10.2.8 wants the user's consent (`autostart::apply_store_default`). The first-run question's "Start with Windows" check box (from `claude/store-review-polish`) is one place to turn it on. If the user turns it off in Settings ▸ Apps ▸ Startup or in Task Manager, Windows reports `DisabledByUser`, the program never turns it back on, and the Options item explains where to change it. A sign-in launch is recognised by the activation kind (`StartupTask`), since the task passes no `--startup`, and the program starts hidden in the tray as before.
-- **Data.** The program still writes to `%LOCALAPPDATA%\BahthSari` (index, content cache, rates, log, settings) and `HKCU\Software\BahthSari`. Windows redirects these writes to the package's private folder `%LOCALAPPDATA%\Packages\FastKiwi.InstaFind_sm1xjmj6v76yc\LocalCache\Local\BahthSari` and its private registry hive. The program sees one consistent view, and Windows removes the data on uninstall. The `instafind.exe` alias runs inside the package, so `instafind.exe -s "query"` reads the same index. A portable `bahth.exe` on the same PC keeps its own, separate index. The first log line of a Store run names the package and the real data folder.
+- **Updates.** No GitHub check and no self-update (`update::managed_by()` returns `Store`, so `update.rs` refuses too). Options ▸ "Updates from Microsoft Store (version …)" (the same Options menu that the new look's Settings ▸ More opens) says that updates come from the Store and offers to open InstaFind's page in the Store app (`ms-windows-store://pdp/?ProductId=9MTK4KMFQ657`). Downloading code would break Store policy 10.2.2, and the program's folder (`WindowsApps`) is read-only anyway. Report a problem is unchanged (it names the install as "Microsoft Store").
+- **Start with Windows** uses the package's StartupTask (`Windows.ApplicationModel.StartupTask`, TaskId `InstaFindStartup`) instead of the `Run` key, which a packaged app cannot write for real. It is **off until the user turns it on** (Options ▸ Start with Windows, the new look's Settings, or Settings ▸ Apps ▸ Startup ▸ InstaFind): `store::ENABLE_STARTUP_ON_FIRST_RUN` is `false` because Store policy 10.2.8 wants the user's consent (`autostart::apply_store_default`). If the user turns it off in Settings ▸ Apps ▸ Startup or in Task Manager, Windows reports `DisabledByUser`, the program never turns it back on, and the Options item explains where to change it. A sign-in launch is recognised by the activation kind (`StartupTask`), since the task passes no `--startup`, and the program starts hidden in the tray as before (classic and new look: `autostart::launched_at_sign_in`).
+- **Data.** The program still writes to `%LOCALAPPDATA%\BahthSari` (index, content cache, rates, log, settings) and `HKCU\Software\BahthSari`. Windows redirects these writes to the package's private folder `%LOCALAPPDATA%\Packages\FastKiwi.InstaFind_sm1xjmj6v76yc\LocalCache\Local\BahthSari` and its private registry hive. The program sees one consistent view, and Windows removes the data on uninstall. The `instafind.exe` alias runs inside the package, so `instafind.exe -s "query"` reads the same index. A portable `bahth.exe` on the same PC keeps its own, separate index. The first log line of a Store run names the package and the real data folder. The index saver (temporary file, then rename; the dirty marker), settings, history, crash log, content cache, thumbnails and the new look's WebView2 folder all live there and work as in the portable program, because the program only ever uses the `%LOCALAPPDATA%\BahthSari` path. The file watcher and the document indexer see the real path, so they leave out both folders (`store::real_data_dir`): otherwise every log write would come back as a change, and the history would match every search inside documents.
 - **No phone search.** Options has no "Search from phone" item and the LAN server never starts (it serves file names over plain HTTP; Store policy 10.5.4).
 - **Licences.** The package carries `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt` next to `bahth.exe`; About offers to open the notices (the portable program opens the copy on GitHub).
 - **Unchanged:** global hotkeys (`RegisterHotKey`: Ctrl+Alt+F, Ctrl+Alt+G, optional Alt+Space), the tray icon, the floating box, the folder watchers and the indexer. A full-trust package runs as a normal desktop process of the user, and no low-level keyboard hooks are used. The single-instance mutex is shared with a portable copy, so only one of them runs at a time.
@@ -53,10 +53,10 @@ next `store` run then builds the real package.
 
 ## 2. Get the package
 
-**Which release:** the first release that contains Store mode (`src/store.rs`) is **v0.9.2**, on the Nov 13 train. v0.9.1 and older have no Store mode: packaged, they would offer GitHub self-updates and use the `Run` key, so never package them for the Store.
+**Which release:** the first release that contains Store mode (`src/store.rs`) is **v1.0.0**. v0.10.0 and older have no Store mode: packaged, they would offer GitHub self-updates and use the `Run` key, so never package them for the Store.
 
-- **Automatically:** when `build.yml` publishes a release, it starts `store.yml` with the new tag. The run is named `store v0.9.2` (for example) in the Actions list.
-- **By hand:** GitHub ▸ Actions ▸ **store** ▸ Run workflow. Enter the tag (`v0.9.2` or later) to package that release's exact exes. Leave it empty only for a test build from the branch, never for an upload.
+- **Automatically:** when `build.yml` publishes a release, it starts `store.yml` with the new tag. The run is named `store v1.0.0` (for example) in the Actions list.
+- **By hand:** GitHub ▸ Actions ▸ **store** ▸ Run workflow. Enter the tag (`v1.0.0` or later) to package that release's exact exes. Leave it empty only for a test build from the branch, never for an upload.
 - Open the finished run. Its summary shows the file, the version and the identity (with a warning if it is a TEST identity). Download the **store-package** artifact and unzip it to get `InstaFind_X.Y.Z.0.msixbundle`.
 
 The version is the app version plus `.0`, because the Store keeps the fourth number for itself. Every submission needs a higher version than the last, so submit after a release, never twice for the same version.
@@ -108,7 +108,7 @@ The version is the app version plus `.0`, because the Store keeps the fourth num
 **Search terms** (7 max)
 `file search`, `find files`, `Arabic search`, `search inside documents`, `instant file search`, `desktop search`, `بحث عن الملفات`
 
-**Copyright:** © 2026 Sarmad (FastKiwi). MIT licensed.
+**Copyright:** © 2026 Sarmad (FastKiwi). All rights reserved.
 
 ## Store listing: Arabic (العربية)
 
@@ -140,7 +140,7 @@ The version is the app version plus `.0`, because the Store keeps the fourth num
 7. الانتقال إلى مجلد في أي نافذة فتح أو حفظ بـ Ctrl+Alt+G
 8. فهرس حي يتبع تغييرات الملفات
 9. كشف الملفات المكررة وأحجام المجلدات
-10. واجهة عربية وإنكليزية تدعم الكتابة من اليمين إلى اليسار
+10. واجهة عربية وإنجليزية تدعم الكتابة من اليمين إلى اليسار
 11. كل شيء يبقى على جهازك: بلا حساب ولا إعلانات ولا تتبّع
 
 **كلمات البحث**
@@ -166,6 +166,8 @@ The version is the app version plus `.0`, because the Store keeps the fourth num
 >
 > Network: the only automatic connection is a download of public currency exchange rates from https://open.er-api.com/v6/latest/USD (no key, no user data), at most every 12 hours, for the calculator's currency answers. The Store build never updates itself (updates come from the Store). "Send feedback" and the optional crash report only open a prefilled GitHub issue page in the user's browser; nothing is sent unless the user submits it there. The Store build has no "Search from phone" feature (the portable build's read-only home-network page uses plain HTTP, so it is removed from the Store build: no menu item, and the server never starts). The app opens no listening ports.
 >
+> The main window is drawn with Microsoft Edge WebView2 (the Evergreen runtime that Windows 10/11 already have); without it the app uses its classic Win32 window.
+>
 > To test: launch InstaFind and wait a minute for the first index (progress shows at the bottom). Type part of any file name, e.g. "windows" or "notepad", and the results appear as you type. Press Ctrl+Alt+F from any app for the quick search, and type "100 usd to eur" or "calc". Options > Language switches between Arabic and English. No account or sign-in is needed.
 
 ## Screenshots
@@ -174,7 +176,7 @@ The Store wants PNG screenshots of at least **1366×768** (1920×1080 is
 best), between 1 and 10 per language. The current ones in `docs/screenshots/`
 (1100×700) and `docs/media/` (946×593) are **too small**. Options:
 
-1. **From CI (use these):** every `store` run has a `screenshots` job ([`ci/store-shots.ps1`](../../ci/store-shots.ps1)). It sets the runner's screen to 1920×1080, seeds sample files with Arabic and English names in `C:\Users\Public\Demo`, and captures full-screen shots in both languages: (1) name search («تقرير» / "report"); (2) search inside documents; (3) the Ctrl+Alt+F quick search; (4) the duplicate finder. They are uploaded as the **store-screenshots** artifact, together with `resolution.txt`, which records the resolution actually used. If the runner refused 1920×1080, the job warns and the shots are smaller (check that they are still at least 1366×768).
+1. **From CI (use these):** every `store` run has a `screenshots` job ([`ci/store-shots.ps1`](../../ci/store-shots.ps1)). It sets the runner's screen to 1920×1080, seeds sample files with Arabic and English names in `C:\Users\Public\Demo`, and captures full-screen shots in both languages: (1) name search («تقرير» / "report"); (2) search inside documents; (3) the Ctrl+Alt+F quick search; (4) the duplicate finder. The scenes use the classic window (the script's `settings.txt` says `new_ui=0`), although 1.0 opens the new look by default; for new-look shots use the `newlook-test` artifact of `build.yml` (`newlook.png`, `newlook-query.png`, 1100×700, too small for the Store as they are) or capture them by hand. They are uploaded as the **store-screenshots** artifact, together with `resolution.txt`, which records the resolution actually used. If the runner refused 1920×1080, the job warns and the shots are smaller (check that they are still at least 1366×768).
 2. **By hand:** full-screen captures at 1920×1080 (Win+Shift+S).
 3. **Stop-gap:** `python3 packaging/msix/make_assets.py --screenshots out/` puts each `docs/media/*.png` centred on a 1366×768 canvas. Certification accepts that, but it looks small in the Store.
 
@@ -202,7 +204,7 @@ Logos for the listing: the Store builds the tile from the package. If Partner Ce
 | **Start with Windows** | 10.2.8 (user consent) | Opt-in: `ENABLE_STARTUP_ON_FIRST_RUN = false`, so the first run leaves the declared StartupTask off and `store.yml`'s install test fails if it is on. The user turns it on in Options or Settings ▸ Apps ▸ Startup, and Windows' `DisabledByUser` is respected. |
 | **runFullTrust** (restricted capability) | Restricted capabilities review | Justified in the notes. Expected for a packaged Win32 app. |
 | **Phone search** serves file names over plain HTTP on the LAN | 10.5.4 (secure transmission) | Not in the Store build: `web_server.rs` builds no menu item and never starts the server when `store::is_packaged()`. The portable build keeps it (off by default, PIN-protected, read-only). |
-| **Third-party licences** | 10.1.x / open-source licence terms | Every package ships `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt` (all 148 crates in the exe and their licence texts, from `packaging/make_notices.py`; `store.yml` checks it matches `Cargo.lock`). About ▸ Yes opens it. |
+| **Third-party licences** | 10.1.x / open-source licence terms | Every package ships `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt` (all 160 crates in the exe and their licence texts, and the OFL fonts of the new look, from `packaging/make_notices.py`; `store.yml` checks it matches `Cargo.lock`). About ▸ Yes opens it. |
 | **Packaging unverified exes** | Supply chain | `store.yml` packs a release's exes only if each matches the SHA-256 digest GitHub recorded at upload, and fails closed otherwise. |
 | **System commands** in the quick search (shut down, restart, lock) | 10.1 | Only when the user picks them. Mentioned implicitly via "answers"; fine. |
 | **Screenshots** below 1366×768 | Listing requirements | Captured at 1920×1080 by `store.yml` (`store-screenshots`, above). |
@@ -210,7 +212,7 @@ Logos for the listing: the Store builds the tile from the package. If Partner Ce
 ## Notes for maintainers
 
 - Store mode is decided once per process by `store::is_packaged()`. Any new feature that writes next to the exe, edits the `Run` key, installs or moves the program (for example a "move to a permanent folder" offer) must check it first.
-- PR #21/#25 add `update::managed_by()` for winget/Scoop installs; the Store guard in `update.rs` is one separate `if crate::store::is_packaged()` block at the top of `check_latest` and merges with them and with #24.
+- `store::is_packaged()` is the only package test: `rating::is_packaged()` (the rating question) and `update::managed_by()` (which then returns `PackageManager::Store`) use it.
 - Keep `packaging/msix/AppxManifest.xml` and `src/store.rs` in step: `cargo test store::` checks the TaskId, alias, exe name, entry points, `runFullTrust` and MinVersion.
 - Regenerate the logos after an icon change: `python3 packaging/msix/make_assets.py`.
 
@@ -224,9 +226,9 @@ Logos for the listing: the Store builds the tile from the package. If Partner Ce
    - يجلب أسعار صرف العملات من open.er-api.com كل 12 ساعة على الأكثر، بلا أي بيانات من المستخدم؛
    - يفتح صفحة GitHub في المتصفح للملاحظات وتقارير الأعطال، ولا يرسل شيئاً إلا إذا ضغط المستخدم «Submit».
 3. **الصور:** كل تشغيل لـ **store** يلتقط صور الشاشة بالعربية والإنجليزية ويضعها في **store-screenshots** أسفل صفحة التشغيل (بجانب store-package). نزّلها وارفعها في **Store listings**.
-4. **الحصول على الحزمة:** بعد إصدار v0.9.2 (13 نوفمبر) تُبنى الحزمة تلقائياً، واسم التشغيل في Actions هو `store v0.9.2`. أو يدوياً:
+4. **الحصول على الحزمة:** بعد إصدار v1.0.0 تُبنى الحزمة تلقائياً، واسم التشغيل في Actions هو `store v1.0.0`. أو يدوياً:
    1. افتح صفحة المستودع على GitHub ← تبويب **Actions** ← اختر **store** من القائمة اليسرى.
-   2. اضغط **Run workflow** ← اكتب رقم الإصدار في خانة tag: **`v0.9.2`** (أول إصدار فيه وضع المتجر، يصدر مع دفعة 13 نوفمبر) أو أحدث ← **Run workflow**. لا ترفع v0.9.1 أو أقدم إلى المتجر.
+   2. اضغط **Run workflow** ← اكتب رقم الإصدار في خانة tag: **`v1.0.0`** (أول إصدار فيه وضع المتجر) أو أحدث ← **Run workflow**. لا ترفع v0.10.0 أو أقدم إلى المتجر.
    3. انتظر حتى تظهر علامة ✓ خضراء، وافتح التشغيل، ثم نزّل **store-package** من أسفل الصفحة وفكّ ضغطه. ستجد ملف `InstaFind_….msixbundle`.
 5. **الرفع إلى المتجر:**
    1. ادخل https://partner.microsoft.com ← **Apps and games** ← **InstaFind** ← **Start submission**.
@@ -240,6 +242,6 @@ Logos for the listing: the Store builds the tile from the package. If Partner Ce
 6. **كل تحديث لاحق:** بعد كل إصدار أسبوعي نزّل الحزمة الجديدة من Actions، ثم في Partner Center اضغط **Update** ← **Packages**، واستبدل الملف، ثم **Submit**. لا يمكن رفع الرقم نفسه مرتين.
 
 **ملاحظات مهمة:**
-- نسخة المتجر لا تحدّث نفسها؛ المتجر يحدّثها. وتشغيلها مع ويندوز يُضبط من «خيارات» أو من إعدادات ويندوز ← التطبيقات ← بدء التشغيل.
+- نسخة المتجر لا تحدّث نفسها؛ المتجر يحدّثها، وزر التحديث فيها يعرض فتح صفحة البرنامج في المتجر. وتشغيلها مع ويندوز يُضبط من «خيارات» أو من إعدادات ويندوز ← التطبيقات ← بدء التشغيل.
 - بيانات نسخة المتجر منفصلة عن النسخة المحمولة (`bahth.exe`)، فلكل منهما فهرسها.
 - نسخة المتجر لا تعمل مع ويندوز إلا إذا شغّل المستخدم ذلك بنفسه (شرط سياسة المتجر 10.2.8)، وتظهر في إعدادات ويندوز ← التطبيقات ← بدء التشغيل باسم InstaFind.
