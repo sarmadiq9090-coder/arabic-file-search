@@ -88,7 +88,7 @@
       sPhone: "البحث من الهاتف", sPhoneRow: "البحث من الهاتف (شبكة البيت)", sPhoneSub: "ابحث في ملفات هذا الحاسوب من متصفح هاتفك المتصل بشبكة Wi-Fi نفسها. للقراءة فقط، ويعمل في شبكة البيت فقط.",
       sPhoneOpen: "افتح في متصفح الهاتف:", sPhonePin: "واكتب الرمز السري:", sPhoneQr: "أو امسح هذا الرمز بكاميرا الهاتف ليفتح البحث مباشرة دون الرمز السري. لا تُطلع عليه أحداً.",
       sPhoneQrLabel: "رمز QR يفتح البحث من الهاتف", sPhoneOff: "متوقف. شغّله لترى العنوان والرمز.", sPhoneWait: "جارٍ التحقق من الشبكة…",
-      sPhoneAllow: "السماح بهذه الشبكة", sPhoneMore: "إعدادات أخرى…", sPhoneMoreSub: "المنفذ، والسماح بتنزيل الملفات، ورمز ورابط جديدان",
+      sPhoneIdle: "توقّف وحده بعد ساعتين دون أي طلب من الهاتف، للأمان. شغّله من جديد حين تحتاجه.", sPhoneAllow: "السماح بهذه الشبكة", sPhoneMore: "إعدادات أخرى…", sPhoneMoreSub: "المنفذ، والسماح بتنزيل الملفات، ورمز ورابط جديدان",
       sAbout: "حول البرنامج", version: (v) => `بحث سريع (InstaFind) — الإصدار ${v}`,
       // «كيف أبحث؟» (the ? button and F1): examples to click, and the keys.
       helpH: "كيف أبحث؟", helpKey: "كيف أبحث؟ (F1)", helpMore: "كل طرق البحث…", helpSub: "انقر مثالاً ليُكتب في خانة البحث. تعمل الأمثلة بالعربية والإنجليزية، والأرقام العربية مقبولة.",
@@ -170,7 +170,7 @@
       sPhone: "Search from phone", sPhoneRow: "Search from phone (home network)", sPhoneSub: "Search this PC's files from your phone's browser on the same Wi-Fi. Read-only, and only on your home network.",
       sPhoneOpen: "Open in the phone's browser:", sPhonePin: "and type the PIN:", sPhoneQr: "Or scan this code with the phone's camera to open the search without the PIN. Don't show it to anyone.",
       sPhoneQrLabel: "QR code that opens phone search", sPhoneOff: "Off. Turn it on to see the address and the PIN.", sPhoneWait: "Checking the network…",
-      sPhoneAllow: "Allow this network", sPhoneMore: "More settings…", sPhoneMoreSub: "The port, downloading files, and a new PIN and link",
+      sPhoneIdle: "It turned itself off after two hours with no request from a phone, to be safe. Turn it on again when you need it.", sPhoneAllow: "Allow this network", sPhoneMore: "More settings…", sPhoneMoreSub: "The port, downloading files, and a new PIN and link",
       sAbout: "About", version: (v) => `InstaFind — version ${v}`,
       helpH: "How to search", helpKey: "How to search (F1)", helpMore: "All the ways to search…", helpSub: "Click an example to put it in the search box. Every filter also has an Arabic spelling.",
       helpEx: [["sales report", "names with both words"], ['"lease agreement"', "the exact phrase"], ["report .pdf", "PDF files only (or ext:pdf)"], ["ext:docx,xlsx", "several types"],
@@ -1338,13 +1338,14 @@
     const b = h("button", { class: "sw", type: "button", role: "switch", "aria-checked": String(!!ph.on), id: "set-phone", "aria-label": T.sPhoneRow }, h("span", { class: "knob" }));
     b.addEventListener("click", () => send({ op: "set", key: "phone", on: !ph.on }));
     const rows = [h("div", { class: "srow" }, h("label", { for: "set-phone" }, h("span", null, T.sPhoneRow), h("small", null, T.sPhoneSub)), b)];
+    // (It turns itself off after two hours with no request.)
     if (ph.running && ph.url) {
       const qr = qrSvg(ph.link || ph.url);
       rows.push(h("div", { class: "phone" }, qr,
         h("div", { class: "ptext" }, h("small", null, T.sPhoneOpen), h("bdi", { class: "purl", dir: "ltr", id: "phone-url" }, ph.url),
           h("small", null, T.sPhonePin), h("bdi", { class: "ppin", dir: "ltr", id: "phone-pin" }, ph.pin), qr ? h("small", null, T.sPhoneQr) : null)));
     } else if (ph.on) rows.push(h("p", { class: "pnote", id: "phone-note" }, ph.note || T.sPhoneWait));
-    else rows.push(h("p", { class: "muted", id: "phone-note" }, T.sPhoneOff));
+    else rows.push(h("p", { class: ph.idle_off ? "pnote idle" : "muted", id: "phone-note" }, ph.idle_off ? T.sPhoneIdle : T.sPhoneOff));
     if (ph.running && ph.note) rows.push(h("p", { class: "pnote" }, ph.note));
     const btns = h("div", { class: "srow pbtns" });
     if (ph.on && !ph.running && ph.allow) btns.append(btn("primary", I.globe, T.sPhoneAllow, () => send({ op: "phone_allow" }), { id: "phone-allow" }));

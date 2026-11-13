@@ -459,6 +459,8 @@ pub struct PhoneOut {
     pub note: String,
     /// "Allow this network" would start it.
     pub allow: bool,
+    /// It turned itself off after two hours with no request.
+    pub idle_off: bool,
 }
 
 /// The hotkey choices for [`SettingsOut::hotkeys`].

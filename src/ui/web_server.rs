@@ -10,7 +10,9 @@
 //! Windows marks it private) or of a network the user allowed in this run.
 //! It stops when the PC leaves that network and moves with a new address.
 //! While it runs, the tray icon's tip and a check mark on the Options item
-//! say so.
+//! say so. After two hours with no request from any phone ([`web::IDLE_OFF`])
+//! it turns itself off, as if the user had (logged, and said in the window
+//! and the new look's Settings).
 
 use native_windows_gui as nwg;
 use std::cell::{Cell, RefCell};
@@ -70,6 +72,9 @@ pub struct WebUi {
     refusal: Cell<Option<Refusal>>,
     /// The network seen last, for the window.
     seen: RefCell<Vec<net::Candidate>>,
+    /// It turned itself off after [`web::IDLE_OFF`] with no request (until
+    /// it is turned on again).
+    idle_off: Cell<bool>,
 }
 
 impl std::ops::Deref for WebUi {
@@ -282,6 +287,7 @@ impl App {
             match evt {
                 nwg::Event::OnMenuItemSelected if handle == app.web.menu_item && app.ensure_web_window() => app.show_web_window(),
                 nwg::Event::OnTimerTick if handle == app.timer => {
+                    app.check_web_idle();
                     app.poll_web_network();
                     app.sync_web_index();
                 }
@@ -376,6 +382,8 @@ impl App {
         };
         shared.set_index(self.state.borrow().index.clone());
         self.set_web_show_system(&shared);
+        // The idle time counts from the start.
+        shared.note_request(std::time::Instant::now());
         let mut all = ips.to_vec();
         all.push(Ipv4Addr::LOCALHOST);
         match web::Server::start_on(&all, port, shared) {
@@ -528,6 +536,7 @@ impl App {
         if crate::store::is_packaged() {
             return; // see build_web_ui
         }
+        self.web.idle_off.set(false);
         if on {
             self.web.wanted.set(true);
             set_dword(REG_ON, 1);
@@ -549,6 +558,21 @@ impl App {
         }
         self.refresh_web_window();
         self.webui_settings_changed();
+    }
+
+    /// Off after two hours with no request from a phone: an open door
+    /// nobody uses is closed (the user turns it on again when needed).
+    fn check_web_idle(&self) {
+        if self.web.server.borrow().is_none() {
+            return;
+        }
+        let expired = self.web.shared.borrow().as_ref().is_some_and(|s| s.idle_expired(std::time::Instant::now()));
+        if expired {
+            log(&format!("web: no request for {} minutes; turning phone search off", web::IDLE_OFF.as_secs() / 60));
+            self.set_web_on(false);
+            self.web.idle_off.set(true);
+            self.refresh_web_window();
+        }
     }
 
     /// The new look's «السماح بهذه الشبكة» / "Allow this network".
@@ -581,7 +605,7 @@ impl App {
         let w = &self.web;
         let server = w.server.borrow();
         let wanted = w.wanted.get();
-        let mut out = crate::webui::bridge::PhoneOut { on: wanted, running: server.is_some(), ..Default::default() };
+        let mut out = crate::webui::bridge::PhoneOut { on: wanted, running: server.is_some(), idle_off: w.idle_off.get(), ..Default::default() };
         // What the server checks (see refresh_web_window).
         let secrets = if server.is_some() { w.shared.borrow().as_ref().map(|s| s.current_secrets()) } else { None };
         if let (Some(s), Some((token, pin))) = (server.as_ref(), secrets) {
@@ -706,10 +730,20 @@ impl App {
                 }
             }
             _ if wanted => text.push_str(&off_reason(refusal, &w.seen.borrow(), w.error.borrow().is_some())),
+            _ if w.idle_off.get() => text.push_str(idle_off_text()),
             _ => text.push_str(tr!("متوقف. فعّل الخيار أعلاه للبدء.", "Off. Tick the box above to start.")),
         }
         w.details.set_text(&text);
     }
+}
+
+/// It turned itself off after two hours unused (the window; the page has
+/// its own words).
+fn idle_off_text() -> &'static str {
+    tr!(
+        "توقّف البحث من الهاتف وحده بعد ساعتين دون أي طلب من الهاتف، للأمان. فعّل الخيار أعلاه لتشغيله من جديد.",
+        "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again."
+    )
 }
 
 /// Why the switch is on but the server is not running, for the window.

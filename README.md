@@ -107,7 +107,7 @@ scoop install instafind
 - **أحجام المجلدات**: عمود الحجم يشمل المجلدات، ونافذة تبيّن ما يملأ القرص.
 - **عرض المصغرات** للصور والمستندات (Ctrl+T).
 - **استبدال نص في عدة ملفات نصية** مع معاينة ونسخة احتياطية وزر تراجع.
-- **البحث من الهاتف** عبر شبكة المنزل: مطفأ افتراضياً، برمز دخول، وللقراءة فقط.
+- **البحث من الهاتف** عبر شبكة المنزل: مطفأ افتراضياً، برمز دخول أو رمز QR من الإعدادات، وللقراءة فقط، ويتوقف وحده بعد ساعتين دون استخدام.
 - **سحب النتيجة وإفلاتها** في واتساب أو البريد أو Word، وCtrl+C ينسخ الملف نفسه، وF2 لإعادة التسمية، وDelete إلى سلة المحذوفات.
 - **تصدير النتائج** إلى CSV يفتحه Excel بالعربية.
 - **سطر الأوامر** و**إضافة Flow Launcher** وأمثلة PowerShell وAutoHotkey.
@@ -280,7 +280,7 @@ InstaFind's second includes starting the command-line tool and loading the index
 - **Folder sizes** in the Size column and a disk-usage window.
 - **Thumbnail view** (Ctrl+T).
 - **Find & replace in text files** with preview, backups and undo.
-- **Search from your phone** over the home network: off by default, PIN-protected, read-only.
+- **Search from your phone** over the home network: off by default, PIN-protected (or scan the QR code in Settings), read-only, and it turns itself off after two hours unused.
 - **Drag & drop** results into WhatsApp, mail or Word; Ctrl+C copies the file itself; F2 renames; Delete sends to the Recycle Bin.
 - **Export** results to CSV that opens correctly in Excel.
 - **Command line**, a **Flow Launcher** plugin, and PowerShell / AutoHotkey examples.
