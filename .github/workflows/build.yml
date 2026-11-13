@@ -469,6 +469,10 @@ jobs:
     permissions:
       contents: write
       actions: write
+      # Build provenance (the attest step below): a signed statement that
+      # these exes were built by this workflow from this commit.
+      id-token: write
+      attestations: write
     env:
       TAG: ${{ needs.version.outputs.tag }}
       SIGNED: ${{ needs.sign.outputs.signed }}
@@ -513,6 +517,17 @@ jobs:
               echo "Deleting stale draft release ${id}"
               gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${id}"
             done
+      # Build provenance for the three exes, before anything is published
+      # (owner-approved): anyone can check a download with
+      # `gh attestation verify bahth.exe --repo sarmadiq9090-coder/arabic-file-search`.
+      - if: steps.free.outputs.free == 'true'
+        name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            bahth.exe
+            bahth-x86.exe
+            bahth-arm64.exe
       # A draft first, then publish once every file is there: installed
       # copies ask for `releases/latest`, which never returns a draft, so
       # nobody is offered a half-uploaded release. Assets: the three exes,
