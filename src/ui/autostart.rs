@@ -1,5 +1,7 @@
 //! Starting with Windows: a value under the current user's `Run` key (no
 //! admin rights needed) that launches the program hidden in the tray.
+//! The Microsoft Store version uses its package's StartupTask instead
+//! (`crate::store`): a packaged program's `Run` value is never read.
 
 use winapi::shared::minwindef::{DWORD, HKEY};
 use winapi::shared::winerror::ERROR_SUCCESS;
@@ -85,6 +87,48 @@ fn set_string(key: &Key, name: &str, value: &str) -> bool {
     }
 }
 
+/// A string value (REG_SZ), if the key has one under `name`.
+fn get_string(key: &Key, name: &str) -> Option<String> {
+    let name = wide(name);
+    let mut buf = [0u16; 1024];
+    let mut size = (buf.len() * 2) as DWORD;
+    let mut kind: DWORD = 0;
+    let ok = unsafe {
+        RegQueryValueExW(key.0, name.as_ptr(), std::ptr::null_mut(), &mut kind, buf.as_mut_ptr().cast(), &mut size)
+    };
+    if ok != ERROR_SUCCESS as i32 || kind != REG_SZ {
+        return None;
+    }
+    let n = (size as usize / 2).min(buf.len());
+    let s = &buf[..n];
+    let end = s.iter().position(|&c| c == 0).unwrap_or(n);
+    Some(String::from_utf16_lossy(&s[..end]))
+}
+
+/// The folders `run_entry` tells Downloads and temp folders by. The same
+/// lookup as `ui/relocate.rs` (kept apart so the two files stay separate).
+pub(super) fn folders() -> crate::relocate::Folders {
+    crate::relocate::Folders::from_env(&|name| std::env::var(name).ok(), downloads_folder())
+}
+
+/// The Downloads folder, also when the user moved it.
+fn downloads_folder() -> Option<String> {
+    use winapi::shared::winerror::SUCCEEDED;
+    use winapi::um::combaseapi::CoTaskMemFree;
+    use winapi::um::knownfolders::FOLDERID_Downloads;
+    use winapi::um::shlobj::SHGetKnownFolderPath;
+    let mut p = std::ptr::null_mut();
+    // SAFETY: `p` receives a string the shell allocated; it is freed below
+    // even when the call fails.
+    let hr = unsafe { SHGetKnownFolderPath(&FOLDERID_Downloads, 0, std::ptr::null_mut(), &mut p) };
+    if p.is_null() {
+        return None;
+    }
+    let s = unsafe { super::format::wide_to_string(p) };
+    unsafe { CoTaskMemFree(p.cast()) };
+    SUCCEEDED(hr).then_some(s)
+}
+
 /// The first byte of Task Manager's record for our entry, if it has one:
 /// even (2, 6) means allowed, odd (3, 7) means turned off there.
 fn approved_flag() -> Option<u8> {
@@ -114,23 +158,65 @@ fn unblock() {
     }
 }
 
+/// Whether this run started with Windows (hidden, in the background): the
+/// `Run` entry passes `--startup`; the Store's startup task passes nothing.
+pub fn launched_at_sign_in() -> bool {
+    std::env::args().any(|a| a == STARTUP_ARG) || crate::store::launched_by_startup_task()
+}
+
+/// What to tell the user when `set_enabled` fails.
+pub fn change_failed_message() -> String {
+    match crate::store::startup_state() {
+        Some(state) => crate::store::startup_refused_message(state),
+        None => tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting.").to_string(),
+    }
+}
+
 /// Whether the program starts with Windows: our `Run` entry is there and
 /// Task Manager has not turned it off.
 pub fn is_enabled() -> bool {
+    if crate::store::is_packaged() {
+        return crate::store::startup_state().is_some_and(|s| s.is_on());
+    }
     open(RUN_KEY, false).is_some_and(|k| has_value(&k, VALUE)) && !blocked_by_task_manager()
 }
 
+/// The exe our `Run` entry starts, if there is one with a full path.
+pub(super) fn entry_exe() -> Option<String> {
+    let key = open(RUN_KEY, false)?;
+    let command = get_string(&key, VALUE)?;
+    crate::run_entry::exe_of(&command).map(str::to_owned)
+}
+
 /// Turns starting with Windows on or off for the current user. The entry
-/// points at this exe, which the updater keeps at the same path.
+/// points at this exe, which the updater keeps at the same path, except
+/// that a copy in Downloads or a temp folder, or one in a folder of the
+/// user's own while an installed copy exists, keeps an entry that starts
+/// that other copy (`crate::run_entry::target`).
+/// (The user's choice: `run_entry::Why::User`.)
 pub fn set_enabled(on: bool) -> bool {
+    set_enabled_for(on, crate::run_entry::Why::User)
+}
+
+/// [`set_enabled`] for `why` (`run_entry::target`).
+fn set_enabled_for(on: bool, why: crate::run_entry::Why) -> bool {
+    if crate::store::is_packaged() {
+        if let Some(own) = open(OWN_KEY, true) {
+            set_string(&own, CHOSEN, "1");
+        }
+        return crate::store::set_startup(on).is_ok();
+    }
     let Some(key) = open(RUN_KEY, true) else { return false };
     if let Some(own) = open(OWN_KEY, true) {
         set_string(&own, CHOSEN, "1");
     }
     if on {
         let Ok(exe) = std::env::current_exe() else { return false };
+        let current = exe.to_string_lossy();
+        let existing = get_string(&key, VALUE);
+        let target = crate::run_entry::target(&current, existing.as_deref(), &folders(), &|p| std::path::Path::new(p).is_file(), why);
         unblock();
-        set_string(&key, VALUE, &command(&exe))
+        set_string(&key, VALUE, &command(std::path::Path::new(target)))
     } else {
         let name = wide(VALUE);
         let r = unsafe { RegDeleteValueW(key.0, name.as_ptr()) };
@@ -152,17 +238,33 @@ pub fn point_to(exe: &std::path::Path) -> bool {
 }
 
 /// On by default: the first run turns it on once; after that only the user's
-/// choice counts. A stale path (the exe moved) is refreshed.
-pub fn apply_default() {
+/// choice counts. A stale path (the exe moved) is refreshed, but only toward
+/// the copy that counts as installed (`crate::run_entry::target`): a copy
+/// run once from Downloads, a temp folder or a folder of the user's own does
+/// not take the entry from an installed copy that exists. `took_over`: this
+/// copy has just replaced the one that ran.
+pub fn apply_default(took_over: bool) {
     let own = open(OWN_KEY, false);
     let chosen = own.as_ref().is_some_and(|k| has_value(k, CHOSEN));
     // 0.8.1 turns it on once more, for those who had it off without meaning to.
     let reset_done = own.as_ref().is_some_and(|k| has_value(k, RESET_081));
     drop(own);
     if !chosen || !reset_done || is_enabled() {
-        set_enabled(true);
+        set_enabled_for(true, if took_over { crate::run_entry::Why::TookOver } else { crate::run_entry::Why::Refresh });
     }
     if !reset_done && let Some(own) = open(OWN_KEY, true) {
         set_string(&own, RESET_081, "1");
+    }
+}
+
+/// The Microsoft Store version's counterpart of `apply_default`, through
+/// the package's startup task: off until the user turns it on
+/// (`store::ENABLE_STARTUP_ON_FIRST_RUN`), and never against a choice made
+/// in Settings or Task Manager. Kept apart from `apply_default`, which is
+/// about the `Run` key only.
+pub fn apply_store_default() {
+    let chosen = open(OWN_KEY, false).is_some_and(|k| has_value(&k, CHOSEN));
+    if crate::store::startup_state().is_some_and(|s| crate::store::enable_on_first_run(chosen, s)) {
+        set_enabled(true);
     }
 }

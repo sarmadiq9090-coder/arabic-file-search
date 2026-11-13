@@ -5,7 +5,6 @@
 //! message body (text/plain parts, text/html as a fallback). Non-text
 //! attachments are skipped.
 
-use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
@@ -26,7 +25,7 @@ const MAX_PARTS: usize = 4096;
 // ---------------------------------------------------------------------------
 
 pub(super) fn extract_eml(path: &Path) -> Option<String> {
-    eml_to_text(&read_capped(File::open(path).ok()?, MAX_FILE_SIZE)?)
+    eml_to_text(&read_capped(crate::cloud::open(path).ok()?, MAX_FILE_SIZE)?)
 }
 
 /// Appends `v` trimmed plus a newline, unless it is blank.
@@ -276,15 +275,16 @@ fn parse_content_type(v: &str) -> (String, Vec<(String, String)>) {
 fn split_multipart<'a>(body: &'a [u8], boundary: &[u8]) -> Vec<&'a [u8]> {
     let mut delim = b"--".to_vec();
     delim.extend_from_slice(boundary);
-    // Offsets of delimiter lines (start of line).
+    // Offsets of delimiter lines: only a line can start with one, so each
+    // line is compared once (searching for the delimiter anywhere was
+    // quadratic for a long boundary over a body like it).
     let mut marks = Vec::new();
-    let mut pos = 0;
-    while let Some(off) = find(&body[pos..], &delim) {
-        let at = pos + off;
-        if at == 0 || body[at - 1] == b'\n' {
+    let mut at = 0;
+    while at < body.len() && !super::budget::tick() {
+        if body[at..].starts_with(&delim) {
             marks.push(at);
         }
-        pos = at + delim.len();
+        at += body[at..].iter().position(|&b| b == b'\n').map_or(body.len(), |p| p + 1);
     }
     let mut parts = Vec::new();
     for (i, &m) in marks.iter().enumerate() {
@@ -307,23 +307,6 @@ fn split_multipart<'a>(body: &'a [u8], boundary: &[u8]) -> Vec<&'a [u8]> {
         parts.push(&body[start.min(end)..end]);
     }
     parts
-}
-
-fn find(hay: &[u8], needle: &[u8]) -> Option<usize> {
-    if needle.is_empty() || hay.len() < needle.len() {
-        return None;
-    }
-    let first = needle[0];
-    let last = hay.len() - needle.len();
-    let mut i = 0;
-    while i <= last {
-        i += hay[i..=last].iter().position(|&b| b == first)?;
-        if hay[i..].starts_with(needle) {
-            return Some(i);
-        }
-        i += 1;
-    }
-    None
 }
 
 fn charset_encoding(charset: &str) -> Option<&'static Encoding> {
@@ -382,6 +365,10 @@ pub(super) fn decode_header_value(raw: &[u8]) -> String {
     out
 }
 
+/// Longest encoded-word payload looked at (RFC 2047 allows 75 characters
+/// for the whole word; mail software is often more generous).
+const MAX_ENCODED_WORD: usize = 1024;
+
 /// Parses `=?charset?B|Q?text?=` at the start of `s`.
 /// Returns (length consumed, encoding, decoded bytes).
 fn parse_encoded_word(s: &str) -> Option<(usize, &'static Encoding, Vec<u8>)> {
@@ -392,7 +379,9 @@ fn parse_encoded_word(s: &str) -> Option<(usize, &'static Encoding, Vec<u8>)> {
     let q2 = after_cs.find('?')?;
     let kind = &after_cs[..q2];
     let payload_start = &after_cs[q2 + 1..];
-    let end = payload_start.find("?=")?;
+    // An encoded word is at most 75 characters (RFC 2047); looking further
+    // made a header of unfinished `=?a?b?x` quadratic.
+    let end = payload_start[..payload_start.floor_char_boundary(MAX_ENCODED_WORD)].find("?=")?;
     let payload = &payload_start[..end];
     if charset.is_empty() || payload.contains(' ') {
         return None;
@@ -500,7 +489,7 @@ fn codepage_to_encoding(cp: u16) -> Option<&'static Encoding> {
 }
 
 pub(super) fn extract_msg(path: &Path) -> Option<String> {
-    let comp = cfb::CompoundFile::open(File::open(path).ok()?).ok()?;
+    let comp = cfb::CompoundFile::open(crate::cloud::open(path).ok()?).ok()?;
     msg_to_text(comp)
 }
 

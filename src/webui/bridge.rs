@@ -21,7 +21,7 @@ use std::time::Instant;
 
 use crate::fuzzy::{self, Fallback};
 use crate::history::History;
-use crate::i18n::{KIND_LABELS_EN, Lang};
+use crate::i18n::{KIND_LABELS_EN, Lang, Locale};
 use crate::index::{Entry, Index};
 use crate::indexing_status::{self, Indexing};
 use crate::search::{self, ContentHit, KINDS, Query, SortKey};
@@ -31,12 +31,17 @@ use crate::suggest::{self, Situation, Suggestion};
 pub const FIRST_PAGE: usize = 60;
 /// Rows sent for each later request.
 pub const MORE_PAGE: usize = 200;
+/// Rows a list of file names keeps once the index it was made from changes
+/// (see [`Shown::detach`]); the page shows far fewer before asking again.
+pub const DETACH_ROWS: usize = 20_000;
 /// Longer messages are refused unread.
 pub const MAX_MESSAGE: usize = 16 * 1024;
 /// Longest search text accepted, in characters.
 pub const MAX_QUERY: usize = 1000;
 /// Longest new file name accepted, in characters (Windows' own limit).
 pub const MAX_NAME: usize = 255;
+/// Thumbnails asked for in one request (the tiles that came into view).
+pub const MAX_THUMBS: usize = 64;
 /// Recent searches listed in the history menu.
 pub const RECENT_SEARCHES: usize = 15;
 
@@ -122,6 +127,8 @@ pub enum Setting {
     Autostart,
     /// Index document contents in the background.
     ContentIndex,
+    /// Read cloud-only files too, which downloads them.
+    ReadCloudFiles,
     /// Update the index when files change.
     AutoIndex,
     /// Leave Windows' own files out of the results.
@@ -132,22 +139,19 @@ pub enum Setting {
     Floating,
     /// The icon in the notification area.
     TrayIcon,
+    /// Search from phone (home network); not in the Microsoft Store version.
+    Phone,
 }
 
-/// The interface language the page can choose.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum LangCode {
-    Ar,
-    En,
-}
+/// The interface language the page can choose: the code of a language
+/// this build offers ([`crate::i18n::Locale::find`]); any other is refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LangCode(pub &'static Locale);
 
-impl LangCode {
-    pub fn lang(self) -> Lang {
-        match self {
-            LangCode::Ar => Lang::Ar,
-            LangCode::En => Lang::En,
-        }
+impl<'de> Deserialize<'de> for LangCode {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let code = String::deserialize(d)?;
+        Locale::find(&code).map(LangCode).ok_or_else(|| serde::de::Error::custom("not a language of the interface"))
     }
 }
 
@@ -208,6 +212,9 @@ pub enum Request {
     Rename { list: List, seq: u64, ver: u64, id: u32, name: String },
     /// Move the file of row `id` to the Recycle Bin (the page asked first).
     Recycle { list: List, seq: u64, ver: u64, id: u32 },
+    /// Drag the file of row `id` out of the window (to Explorer, a mail, a
+    /// chat), as the classic list does; the page saw the drag start.
+    Drag { list: List, seq: u64, ver: u64, id: u32 },
     /// Search only in the folder of row `id` (the folder itself for a folder).
     Scope { list: List, seq: u64, ver: u64, id: u32 },
     /// Choose the folder to search in with Windows' folder dialog.
@@ -215,7 +222,7 @@ pub enum Request {
     /// Search all drives again.
     AllDrives {},
     /// Run saved search `id` (its place in the history's saved list).
-    Saved { id: u32 },
+    Saved { id: u32, name: String },
     /// Save the current search (with the folder searched now).
     SaveSearch {
         q: String,
@@ -240,9 +247,47 @@ pub enum Request {
     Web { q: String },
     /// Hide the window (Esc in an empty box).
     Hide {},
-    /// Go back to the classic window, now and from the next start («العودة
-    /// إلى الشكل القديم» in the settings).
-    ClassicLook {},
+    /// Start app `id` of those offered for search `seq` ([`Outbound::Apps`]).
+    App { seq: u64, id: u32 },
+    /// Export the results listed now to a CSV file (Save dialog).
+    Export {},
+    /// Replace text in the plain-text files among the results listed now.
+    ReplaceText {},
+    /// Folder sizes of the folder of row `id` (the folder itself for a folder).
+    FolderSizes { list: List, seq: u64, ver: u64, id: u32 },
+    /// One-time keys for the thumbnails of rows `ids` of version `ver` of
+    /// search `seq` (the grid view; at most [`MAX_THUMBS`] at a time).
+    Thumbs { seq: u64, ver: u64, ids: Vec<u32> },
+    /// Open the program's Options menu (the classic window's, with its
+    /// tools, support, updates and quick-search settings) at the pointer.
+    OptionsMenu {},
+    /// Open the "Report a problem" window: it shows what would be shared
+    /// before anything happens (nothing is sent by the program).
+    ReportProblem {},
+    /// Move the Save/Open dialog waiting since Ctrl+Alt+G
+    /// ([`Outbound::QuickSwitch`]) to the folder of row `id`.
+    SwitchTo { list: List, seq: u64, ver: u64, id: u32 },
+    /// Forget the Save/Open dialog waiting since Ctrl+Alt+G (Esc).
+    SwitchCancel {},
+    /// Windows' "Open with" choice for the file of row `id`.
+    OpenWith { list: List, seq: u64, ver: u64, id: u32 },
+    /// Windows' Properties window for the file of row `id`.
+    Properties { list: List, seq: u64, ver: u64, id: u32 },
+    /// Check for updates now (the Store version: where its updates come
+    /// from, and its Store page), as the Options menu's item.
+    CheckUpdates {},
+    /// The answer to the Store rating row ([`Outbound::Rating`]): rate now
+    /// (`rate`, opens the Store's review page) or not now.
+    Rating { rate: bool },
+    /// Use `key` as the global hotkey from now on (one of
+    /// [`crate::settings::Hotkey::ALL`]; refused by Windows when another
+    /// program has it, then the old one stays).
+    Hotkey { key: crate::settings::Hotkey },
+    /// Search from phone: allow the network this PC is on now (Windows
+    /// does not mark it private, or it is not the home network).
+    PhoneAllow {},
+    /// The "Search from phone" window, with the port, downloads and a new PIN.
+    PhoneWindow {},
 }
 
 /// Why a message was refused.
@@ -279,6 +324,8 @@ pub fn parse(body: &str, source: &str, token: &str) -> Result<Request, Rejected>
         Request::Search { q, kind, size, date, .. } => *kind < KINDS.len() && *size < SIZES.len() && *date < DATES.len() && text_ok(q),
         Request::SaveSearch { q, kind, .. } => *kind < KINDS.len() && !q.trim().is_empty() && text_ok(q),
         Request::Web { q } => !q.trim().is_empty() && text_ok(q),
+        Request::Saved { name, .. } => text_ok(name),
+        Request::Thumbs { ids, .. } => !ids.is_empty() && ids.len() <= MAX_THUMBS,
         Request::Rename { name, .. } => !name.trim().is_empty() && name.chars().count() <= MAX_NAME,
         _ => true,
     };
@@ -335,6 +382,10 @@ pub struct RowOut {
     /// Moved to the Recycle Bin since it was listed.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub gone: bool,
+    /// On a drive that is not connected now (its entry is kept until the
+    /// drive is back): the page adds «القرص غير متصل» / "drive not connected".
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub offline: bool,
 }
 
 fn is_zero(n: &u32) -> bool {
@@ -373,12 +424,60 @@ pub struct SettingsOut {
     pub digits: bool,
     pub autostart: bool,
     pub content_index: bool,
+    pub read_cloud_files: bool,
     pub auto_index: bool,
     pub hide_system: bool,
     pub hotkey_quick: bool,
     pub floating: bool,
     pub tray_icon: bool,
     pub version: &'static str,
+    /// The Microsoft Store version: its updates come from the Store.
+    pub store: bool,
+    /// A check for updates the user asked for is running: its button says
+    /// so and waits.
+    pub checking_updates: bool,
+    /// The global hotkey (`Hotkey::code`), whether another program has it,
+    /// and the choices as `[code, keys]`.
+    pub hotkey: &'static str,
+    pub hotkey_taken: bool,
+    pub hotkeys: Vec<[&'static str; 2]>,
+    /// Search from phone; `None` in the Microsoft Store version (it has none).
+    pub phone: Option<PhoneOut>,
+}
+
+/// What the page searched last, with its filters ([`Outbound::Restore`]).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct Restore {
+    pub q: String,
+    pub kind: usize,
+    pub size: usize,
+    pub date: usize,
+    pub content: bool,
+}
+
+/// Search from phone, as the settings page shows it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct PhoneOut {
+    /// The switch is on (it runs whenever the network allows).
+    pub on: bool,
+    /// The server runs now.
+    pub running: bool,
+    /// While running: the address to open on the phone, the PIN
+    /// (`1234 5678`) and the direct link with the secret (for the QR code).
+    pub url: String,
+    pub pin: String,
+    pub link: String,
+    /// Why it is not running although on, or that it works on this PC only.
+    pub note: String,
+    /// "Allow this network" would start it.
+    pub allow: bool,
+    /// It turned itself off after two hours with no request.
+    pub idle_off: bool,
+}
+
+/// The hotkey choices for [`SettingsOut::hotkeys`].
+pub fn hotkeys() -> Vec<[&'static str; 2]> {
+    crate::settings::Hotkey::ALL.iter().map(|h| [h.code(), h.label()]).collect()
 }
 
 /// A message to the page.
@@ -398,6 +497,12 @@ pub enum Outbound {
         /// Write numbers with Arabic-Indic digits.
         digits: bool,
         version: &'static str,
+        /// This start moved someone who used the classic window to the new
+        /// look (the only one since 1.0): say so once.
+        switched: bool,
+        /// The Microsoft Store version: its updates come from the Store,
+        /// not GitHub (the privacy line says so).
+        store: bool,
     },
     Results {
         seq: u64,
@@ -451,6 +556,10 @@ pub enum Outbound {
     History {
         recent: Vec<String>,
         saved: Vec<SavedOut>,
+        /// "Clear history and recent files" has something to clear: recent
+        /// searches, opened files, quick-search launches or web searches
+        /// (`History::clear_activity`).
+        clearable: bool,
     },
     /// The folder searched now, "" for all drives; `search`: run the
     /// current search again in it.
@@ -487,16 +596,51 @@ pub enum Outbound {
         /// The progress in words, while indexing runs.
         text: Option<String>,
     },
-    /// Put this text in the box and search (from the quick popup).
+    /// Put this text in the box and search (from the quick popup); with
+    /// `content` inside documents, with `all_kinds` in every file type
+    /// (its suggestions for a search that found nothing).
     Query {
         q: String,
+        content: bool,
+        all_kinds: bool,
     },
+    /// The search of the page before, given back to a page created again
+    /// after the hidden window's WebView2 was closed to free its memory:
+    /// its text and filters, run again.
+    Restore(Restore),
     /// Put the caret in the search box.
     Focus,
-    /// A short message for the status bar.
+    /// A short message for the status bar; `warn` for a problem (shown
+    /// until the next action, in the warning colour, and read out).
     Notice {
         text: String,
+        warn: bool,
     },
+    /// The thumbnail keys of rows of version `ver` of search `seq`: the page
+    /// loads `/thumb/<key>` for each (rows it no longer lists get none).
+    Thumbs {
+        seq: u64,
+        ver: u64,
+        keys: Vec<(u32, String)>,
+    },
+    /// The apps search `seq`'s text names strongly (as the classic window's
+    /// app buttons), by title; the page asks for one by its place.
+    Apps {
+        seq: u64,
+        apps: Vec<String>,
+    },
+    /// Ctrl+Alt+G was pressed in a Save/Open dialog (`on`, with the hint to
+    /// show while it waits), or that dialog was moved, closed or forgotten:
+    /// while on, Enter on a result asks for [`Request::SwitchTo`], Esc for
+    /// [`Request::SwitchCancel`], and the result menu offers the move.
+    QuickSwitch {
+        on: bool,
+        text: String,
+    },
+    /// The Microsoft Store build's one-time rating question is due
+    /// (`crate::rating`): a calm row under the results, never a dialog,
+    /// never taking the focus; the answer is [`Request::Rating`].
+    Rating,
 }
 
 /// The script that hands `msg` to the page.
@@ -527,6 +671,15 @@ pub fn status(loading: bool, ix: Indexing, files: usize, lang: Lang) -> Outbound
     Outbound::Status { state, files, text: indexing_status::progress_text(lang, ix, &indexing_status::group_digits) }
 }
 
+/// Whether a status message of the classic window reports a problem (it
+/// then shows as a warning in the new look): "could not…", "wait…", "was
+/// not…", in Arabic or English.
+pub fn looks_like_a_problem(text: &str) -> bool {
+    let t = text.trim_start();
+    ["تعذر", "تعذّر", "لم ", "انتظر", "خطأ"].iter().any(|p| t.starts_with(p))
+        || ["could not", "couldn't", "cannot", "can't", "wait ", "the file was not", "error", "failed"].iter().any(|p| t.to_lowercase().starts_with(p))
+}
+
 /// The recent and saved searches for the history menu.
 pub fn history(h: &History) -> Outbound {
     Outbound::History {
@@ -537,6 +690,7 @@ pub fn history(h: &History) -> Outbound {
             .enumerate()
             .map(|(i, s)| SavedOut { id: i as u32, name: s.name.clone(), content: s.content, scoped: !s.scope.is_empty() })
             .collect(),
+        clearable: !h.activity_is_empty(),
     }
 }
 
@@ -606,6 +760,7 @@ pub fn row(id: u32, e: &Entry, q: Option<&Query>) -> RowOut {
         snippet: None,
         matches: 0,
         gone: false,
+        offline: crate::drives::is_absent(&e.path),
     }
 }
 
@@ -759,11 +914,16 @@ impl Lists {
         ver > self.floor
     }
 
-    /// Keeps `paths` as the recent files listed now; returns their version.
-    pub fn set_recent(&mut self, paths: Vec<String>) -> u64 {
+    /// Keeps `paths` as the recent files listed now; returns their version,
+    /// or `None` when the page already lists these very files (then nothing
+    /// is sent, and a dialog open on one of them keeps working).
+    pub fn set_recent(&mut self, paths: Vec<String>) -> Option<u64> {
+        if self.fresh(self.recent.ver) && self.recent.paths == paths {
+            return None;
+        }
         let ver = self.next_ver();
         self.recent = RecentList { ver, paths };
-        ver
+        Some(ver)
     }
 
     /// The results listed now, if they are version `ver` of search `seq`.
@@ -797,9 +957,18 @@ impl Lists {
     /// one is listed or the page loaded again since it started. Returns
     /// whether to send it to the page (not when a newer search waits, which
     /// the page would drop it for), and the search waiting to run.
-    pub fn finished(&mut self, shown: Shown) -> (bool, Option<Params>) {
+    pub fn finished(&mut self, mut shown: Shown) -> (bool, Option<Params>) {
         let pending = self.pending.take();
         if !self.fresh(shown.ver) || self.shown.as_ref().is_some_and(|s| s.seq > shown.seq) {
+            return (false, pending);
+        }
+        // The same search run again (the index changed elsewhere) found the
+        // very same rows: the page keeps its list and its version, so a
+        // rename or delete dialog open on it still works.
+        if let Some(old) = self.shown.as_ref().filter(|s| s.seq == shown.seq && s.changed.is_empty() && s.params.content == shown.params.content && s.all_paths() == shown.all_paths()) {
+            shown.ver = old.ver;
+            shown.params.ver = old.ver;
+            self.shown = Some(shown);
             return (false, pending);
         }
         let send = pending.as_ref().is_none_or(|p| p.seq == shown.seq);
@@ -855,12 +1024,27 @@ pub struct Found {
     pub lines: Vec<(u32, String)>,
 }
 
+/// A row as "Export results" writes it (the classic window's CSV columns).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportRow {
+    pub path: String,
+    /// `None` for a folder.
+    pub size: Option<u64>,
+    pub mtime: i64,
+    /// The matching text, for a search inside documents.
+    pub snippet: String,
+}
+
 /// The rows a search found, kept to answer the page's later requests.
 pub struct Shown {
     pub seq: u64,
     /// This list's version: a new one for every list and every new order ([`Lists`]).
     pub ver: u64,
+    /// The index the rows point into: the snapshot searched, or after
+    /// [`detach`](Self::detach) a small one holding the listed rows only.
     pub index: Arc<Index>,
+    /// How many files and folders the searched index held.
+    pub files: usize,
     pub hits: Vec<u32>,
     /// The query whose matches are marked (a fallback's, when one found the rows).
     pub marked: Query,
@@ -878,7 +1062,51 @@ pub struct Shown {
 impl Shown {
     /// An empty list for a search inside documents with `q`, filled as it runs.
     pub fn documents(index: Arc<Index>, q: Query, params: Params) -> Shown {
-        Shown { seq: params.seq, ver: params.ver, index, hits: Vec::new(), marked: q, params, found: HashMap::new(), changed: HashMap::new(), done: false }
+        let files = index.entries.len();
+        Shown { seq: params.seq, ver: params.ver, index, files, hits: Vec::new(), marked: q, params, found: HashMap::new(), changed: HashMap::new(), done: false }
+    }
+
+    /// Lets go of the index snapshot that was searched, so the window's
+    /// index can change in place: the list keeps a small index of its own
+    /// rows instead, with the same row ids, and answers the page as before.
+    /// (Holding the snapshot made every change on disk copy the whole index
+    /// while a list was on screen, and kept a second, outdated copy of it
+    /// for as long as the window sat in the tray.)
+    ///
+    /// A list of file names keeps its first [`DETACH_ROWS`] rows only: it is
+    /// searched again as soon as the window shows (the index it was made
+    /// from is gone, so it counts as out of date). A finished search inside
+    /// documents keeps every row, since it is not run again by itself.
+    /// False, and nothing changes, while such a search is still running:
+    /// its new rows are numbered by the snapshot.
+    pub fn detach(&mut self) -> bool {
+        if !self.done {
+            return false;
+        }
+        // Every row must point at an entry of the snapshot; should one not
+        // (a search never gives such a row), nothing is changed: row ids
+        // are positions, and a list that lost a row would hand the page's
+        // next request about row N to the file of row N+1.
+        if self.hits.iter().any(|&i| i as usize >= self.index.entries.len()) {
+            return false;
+        }
+        if !self.params.content && self.hits.len() > DETACH_ROWS {
+            // Rows past the kept ones become misses (`path` gives `None`).
+            self.hits.truncate(DETACH_ROWS);
+            let rows = self.hits.len() as u32;
+            self.changed.retain(|id, _| *id < rows);
+        }
+        // The rows' entries, in path order as an index keeps them; every
+        // row keeps its id and points at the same file as before.
+        let mut by_path: Vec<u32> = self.hits.clone();
+        by_path.sort_unstable();
+        by_path.dedup();
+        let entries: Vec<Entry> = by_path.iter().map(|&i| self.index.entries[i as usize].clone()).collect();
+        let place = |old: u32| by_path.binary_search(&old).map_or(u32::MAX, |i| i as u32);
+        self.hits = self.hits.iter().map(|&old| place(old)).collect();
+        self.found = std::mem::take(&mut self.found).into_iter().filter_map(|(old, f)| by_path.binary_search(&old).ok().map(|i| (i as u32, f))).collect();
+        self.index = Arc::new(Index { entries, roots: self.index.roots.clone(), built_at: self.index.built_at });
+        true
     }
 
     /// Adds what a search inside documents found since the last call.
@@ -948,6 +1176,28 @@ impl Shown {
         self.index.entries.get(i as usize).map(|e| &*e.path)
     }
 
+    /// Every row as "Export results" writes it, in the order shown;
+    /// renamed rows with their new path, rows moved to the Recycle Bin left out.
+    pub fn export_rows(&self) -> Vec<ExportRow> {
+        (0..self.hits.len() as u32)
+            .filter_map(|id| {
+                let path = self.path(id)?.to_string();
+                let hit = *self.hits.get(id as usize)?;
+                let e = self.index.entries.get(hit as usize)?;
+                let snippet = self.found.get(&hit).map(|f| f.snippet.clone()).unwrap_or_default();
+                Some(ExportRow { path, size: (!e.is_dir).then_some(e.size), mtime: e.mtime, snippet })
+            })
+            .collect()
+    }
+
+    /// Row `id`'s file for its thumbnail: (path, size, date, is a folder);
+    /// a renamed row by its new path, none for a row sent to the Recycle Bin.
+    pub fn thumb_entry(&self, id: u32) -> Option<(&str, u64, i64, bool)> {
+        let path = self.path(id)?;
+        let e = self.index.entries.get(*self.hits.get(id as usize)? as usize)?;
+        Some((path, e.size, e.mtime, e.is_dir))
+    }
+
     /// Whether row `id` is a folder.
     pub fn is_dir(&self, id: u32) -> bool {
         self.hits.get(id as usize).and_then(|&i| self.index.entries.get(i as usize)).is_some_and(|e| e.is_dir)
@@ -958,11 +1208,29 @@ impl Shown {
         (0..self.hits.len() as u32).filter_map(|id| self.path(id)).collect()
     }
 
-    /// Every matching line of row `id` (search inside documents only).
-    pub fn matches(&self, id: u32) -> Option<Outbound> {
+    /// Row `id`'s matching lines were not kept (only the first results of a
+    /// search keep theirs, `search::LINED_HITS`): the file and the query to
+    /// read them again with. That read can take long (a big document), so
+    /// the window does it on another thread and answers with
+    /// [`matches_read`](Self::matches_read).
+    pub fn matches_to_read(&self, id: u32) -> Option<(String, Query)> {
         let f = self.found.get(self.hits.get(id as usize)?)?;
-        let lines = f.lines.iter().map(|(n, l)| (*n, marked(l, &self.marked))).collect();
-        Some(Outbound::Matches { seq: self.seq, ver: self.ver, id, count: f.count, lines })
+        (f.lines.is_empty() && f.count > 0).then(|| Some((self.path(id)?.to_string(), self.marked.clone()))).flatten()
+    }
+
+    /// Every matching line of row `id` (search inside documents only), as
+    /// kept with the row.
+    pub fn matches(&self, id: u32) -> Option<Outbound> {
+        self.matches_read(id, None)
+    }
+
+    /// [`matches`](Self::matches) with what reading the document again found
+    /// (`again`; the kept count and lines when `None`).
+    pub fn matches_read(&self, id: u32, again: Option<(u32, Vec<(u32, String)>)>) -> Option<Outbound> {
+        let f = self.found.get(self.hits.get(id as usize)?)?;
+        let (count, lines) = again.as_ref().map_or((f.count, &f.lines), |(c, l)| (*c, l));
+        let lines = lines.iter().map(|(n, l)| (*n, marked(l, &self.marked))).collect();
+        Some(Outbound::Matches { seq: self.seq, ver: self.ver, id, count, lines })
     }
 
     /// The message with the first rows (sent again when a search inside
@@ -976,7 +1244,7 @@ impl Shown {
             rows: self.page(0, FIRST_PAGE),
             note,
             suggestions,
-            files: self.index.entries.len(),
+            files: self.files,
             kind_label: if self.params.kind == 0 { String::new() } else { kinds(lang).swap_remove(self.params.kind) },
             scope: self.params.scope.clone(),
             content: self.params.content,
@@ -1070,7 +1338,8 @@ pub fn search(index: Arc<Index>, p: Params, lang: Lang) -> (Shown, Outbound) {
     };
     let suggestions = if hits.is_empty() { suggestions(&p.text, situation) } else { Vec::new() };
     let note = fallback.map(|fb| fb.status(&p.text));
-    let shown = Shown { seq: p.seq, ver: p.ver, index, hits, marked, params: p, found: HashMap::new(), changed: HashMap::new(), done: true };
+    let files = index.entries.len();
+    let shown = Shown { seq: p.seq, ver: p.ver, index, files, hits, marked, params: p, found: HashMap::new(), changed: HashMap::new(), done: true };
     let msg = shown.results(ms, note, suggestions, lang);
     (shown, msg)
 }
@@ -1078,7 +1347,8 @@ pub fn search(index: Arc<Index>, p: Params, lang: Lang) -> (Shown, Outbound) {
 /// The query of a search inside documents, or `None` when it has nothing
 /// to look for in a text (only filters, or nothing typed).
 pub fn content_query(p: &Params) -> Option<Query> {
-    let q = parser(p)(&p.text);
+    let mut q = parser(p)(&p.text);
+    q.note_document_search();
     q.has_text_criteria().then_some(q)
 }
 
@@ -1115,6 +1385,8 @@ pub struct ContentState {
     pub found: usize,
     /// Texts that came from the content index.
     pub cached: usize,
+    /// Documents read in full because the word index doesn't hold them yet.
+    pub unindexed: usize,
     pub done: bool,
     /// What is being indexed meanwhile.
     pub indexing: Indexing,
@@ -1126,18 +1398,23 @@ pub struct ContentState {
 pub fn content_text(s: &ContentState, lang: Lang) -> String {
     let n = indexing_status::group_digits;
     if s.done {
-        let cached = match (s.cached, lang) {
-            (0, _) => String::new(),
-            (c, Lang::Ar) => format!(" (من الفهرس: {})", n(c)),
-            (c, Lang::En) => format!(" ({} from the index)", n(c)),
+        let cached = match s.cached {
+            0 => String::new(),
+            c => trf!(in lang; " (من الفهرس: {})", " ({} from the index)", n(c)),
         };
-        let mut t = match lang {
-            Lang::Ar => format!("انتهى البحث داخل {} مستند: وجدت {} ملف.{cached}", n(s.total), n(s.found)),
-            Lang::En => format!("Searched {} documents: found {} files.{cached}", n(s.total), n(s.found)),
-        };
+        let mut t = trf!(
+            in lang;
+            "انتهى البحث. المستندات المفحوصة: {}، عدد النتائج: {}.{cached}",
+            "Searched {} documents: found {} files.{cached}",
+            n(s.total),
+            n(s.found)
+        );
         // Documents not in the index yet were not searched.
         if s.found == 0 && s.indexing.names_incomplete() {
             t = format!("{t} {}.", indexing_status::incomplete_text(lang));
+        }
+        if s.unindexed > 0 {
+            t = format!("{t} {}", indexing_status::word_index_incomplete_text(lang, s.unindexed));
         }
         if s.ocr_arabic_missing {
             t = format!("{t} {}", indexing_status::ocr_arabic_missing_text(lang));
@@ -1150,10 +1427,11 @@ pub fn content_text(s: &ContentState, lang: Lang) -> String {
         return t;
     }
     let (checked, total, found) = (n(s.checked.min(s.total)), n(s.total), n(s.found));
-    match lang {
-        Lang::Ar => format!("جارِ البحث داخل المستندات… تم فحص {checked} من {total} — وجدت {found}"),
-        Lang::En => format!("Searching inside documents… checked {checked} of {total} — found {found}"),
-    }
+    trf!(
+        in lang;
+        "جارٍ البحث داخل المستندات… تم فحص {checked} من {total} — عدد النتائج: {found}",
+        "Searching inside documents… checked {checked} of {total} — found {found}"
+    )
 }
 
 #[cfg(test)]
@@ -1165,7 +1443,7 @@ mod tests {
 
     fn entry(path: &str, size: u64, mtime: i64, is_dir: bool) -> Entry {
         let name = path.rsplit('\\').next().unwrap();
-        Entry { path: path.into(), size, mtime, is_dir, norm_name: crate::normalize::normalize(name).into() }
+        Entry { path: path.into(), size, mtime, is_dir, norm_name: crate::normalize::name_key(name).into() }
     }
 
     /// Synthetic files, sorted by path as the index keeps them.
@@ -1252,21 +1530,69 @@ mod tests {
         );
         assert_eq!(req(r#""op":"rename","list":"results","seq":1,"ver":2,"id":0,"name":" ""#), Err(Rejected::Invalid));
         assert_eq!(req(&format!(r#""op":"rename","list":"results","seq":1,"ver":2,"id":0,"name":"{}""#, "a".repeat(MAX_NAME + 1))), Err(Rejected::Invalid));
-        assert_eq!(req(r#""op":"saved","id":2"#), Ok(Request::Saved { id: 2 }));
+        assert_eq!(req(r#""op":"saved","id":2,"name":"عقود""#), Ok(Request::Saved { id: 2, name: "عقود".into() }));
+        assert_eq!(req(r#""op":"saved","id":2"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"save_search","q":"عقد","content":true"#), Ok(Request::SaveSearch { q: "عقد".into(), kind: 0, content: true }));
         assert_eq!(req(r#""op":"save_search","q":"","content":true"#), Err(Rejected::Invalid));
         assert_eq!(req(r#""op":"save_search","q":"a","scope":"D:\\""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"clear_recent""#), Ok(Request::ClearRecent {}));
         assert_eq!(req(r#""op":"set","key":"hide_system","on":false"#), Ok(Request::Set { key: Setting::HideSystem, on: false }));
+        assert_eq!(req(r#""op":"set","key":"read_cloud_files","on":true"#), Ok(Request::Set { key: Setting::ReadCloudFiles, on: true }));
         assert_eq!(req(r#""op":"set","key":"run_command","on":true"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"set","key":"digits""#), Err(Rejected::Malformed));
-        assert_eq!(req(r#""op":"lang","lang":"en""#), Ok(Request::Lang { lang: LangCode::En }));
-        assert_eq!(req(r#""op":"lang","lang":"fr""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"lang","lang":"en""#), Ok(Request::Lang { lang: LangCode(Locale::of(Lang::En)) }));
+        assert_eq!(req(r#""op":"lang","lang":"ar""#), Ok(Request::Lang { lang: LangCode(Locale::of(Lang::Ar)) }));
+        assert_eq!(req(r#""op":"lang","lang":"xx""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"lang","lang":"he""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"lang","lang":7"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"restart""#), Ok(Request::Restart {}));
-        assert_eq!(req(r#""op":"classic_look""#), Ok(Request::ClassicLook {}));
-        assert_eq!(req(r#""op":"classic_look","forever":true"#), Err(Rejected::Malformed));
-        assert_eq!(parse(r#"{"op":"classic_look"}"#, SRC, TOKEN), Err(Rejected::Token));
-        assert_eq!(parse(&format!(r#"{{"t":"{TOKEN}","op":"classic_look"}}"#), "https://evil.example/", TOKEN), Err(Rejected::Origin));
+        // There is no way back to the classic look since 1.0.
+        assert_eq!(req(r#""op":"classic_look""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"options_menu""#), Ok(Request::OptionsMenu {}));
+        assert_eq!(req(r#""op":"thumbs","seq":3,"ver":4,"ids":[0,1,2]"#), Ok(Request::Thumbs { seq: 3, ver: 4, ids: vec![0, 1, 2] }));
+        assert_eq!(req(r#""op":"thumbs","seq":3,"ver":4,"ids":[]"#), Err(Rejected::Invalid));
+        let many: Vec<String> = (0..=MAX_THUMBS).map(|i| i.to_string()).collect();
+        assert_eq!(req(&format!(r#""op":"thumbs","seq":3,"ver":4,"ids":[{}]"#, many.join(","))), Err(Rejected::Invalid));
+        assert_eq!(req(r#""op":"thumbs","seq":3,"ids":[0]"#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"thumbs","seq":3,"ver":4,"ids":[0],"path":"C:\\a.jpg""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"report_problem""#), Ok(Request::ReportProblem {}));
+        assert_eq!(req(r#""op":"hotkey","key":"win_alt_f""#), Ok(Request::Hotkey { key: crate::settings::Hotkey::WinAltF }));
+        assert_eq!(req(r#""op":"hotkey","key":"alt_f4""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"hotkey""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"set","key":"phone","on":true"#), Ok(Request::Set { key: Setting::Phone, on: true }));
+        assert_eq!(req(r#""op":"phone_allow""#), Ok(Request::PhoneAllow {}));
+        assert_eq!(req(r#""op":"phone_window""#), Ok(Request::PhoneWindow {}));
+        // The page never names a port, a network or a PIN.
+        assert_eq!(req(r#""op":"phone_allow","network":"x""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"report_problem","text":"x""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"export""#), Ok(Request::Export {}));
+        assert_eq!(req(r#""op":"export","path":"C:\\x.csv""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"replace_text""#), Ok(Request::ReplaceText {}));
+        assert_eq!(req(r#""op":"folder_sizes","list":"results","seq":1,"ver":2,"id":0"#), Ok(Request::FolderSizes { list: List::Results, seq: 1, ver: 2, id: 0 }));
+        assert_eq!(req(r#""op":"folder_sizes","seq":1,"id":0"#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"app","seq":4,"id":0"#), Ok(Request::App { seq: 4, id: 0 }));
+        assert_eq!(req(r#""op":"app","seq":4,"id":0,"path":"C:\\x.exe""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"app","seq":4"#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"drag","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::Drag { list: List::Results, seq: 2, ver: 3, id: 1 }));
+        assert_eq!(req(r#""op":"drag","list":"results","seq":2,"ver":3,"id":1,"path":"C:\\x""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"options_menu","item":3"#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"hide","forever":true"#), Err(Rejected::Malformed));
+        assert_eq!(parse(r#"{"op":"hide"}"#, SRC, TOKEN), Err(Rejected::Token));
+        assert_eq!(parse(&format!(r#"{{"t":"{TOKEN}","op":"hide"}}"#), "https://evil.example/", TOKEN), Err(Rejected::Origin));
+        assert_eq!(req(r#""op":"switch_to","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::SwitchTo { list: List::Results, seq: 2, ver: 3, id: 1 }));
+        assert_eq!(req(r#""op":"switch_to","list":"recent","seq":0,"ver":4,"id":0"#), Ok(Request::SwitchTo { list: List::Recent, seq: 0, ver: 4, id: 0 }));
+        // A folder, never a path, from the page.
+        assert_eq!(req(r#""op":"switch_to","path":"C:\\Windows""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"switch_cancel""#), Ok(Request::SwitchCancel {}));
+        assert_eq!(req(r#""op":"rating","rate":true"#), Ok(Request::Rating { rate: true }));
+        assert_eq!(req(r#""op":"check_updates""#), Ok(Request::CheckUpdates {}));
+        assert_eq!(req(r#""op":"check_updates","url":"https://x""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"rating""#), Err(Rejected::Malformed));
+        assert_eq!(serde_json::to_string(&Outbound::Rating).unwrap(), r#"{"type":"rating"}"#);
+        assert_eq!(req(r#""op":"open_with","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::OpenWith { list: List::Results, seq: 2, ver: 3, id: 1 }));
+        assert_eq!(req(r#""op":"properties","list":"recent","seq":0,"ver":3,"id":1"#), Ok(Request::Properties { list: List::Recent, seq: 0, ver: 3, id: 1 }));
+        // Only Windows' own two verbs, never one the page names.
+        assert_eq!(req(r#""op":"properties","list":"results","seq":2,"ver":3,"id":1,"verb":"runas""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"reindex""#), Ok(Request::Reindex {}));
         assert_eq!(req(r#""op":"stop","seq":9"#), Ok(Request::Stop { seq: 9 }));
     }
@@ -1436,6 +1762,18 @@ mod tests {
         let Some(Outbound::Matches { count, lines, seq, id, .. }) = shown.matches(0) else { panic!() };
         assert_eq!((count, seq, id, lines.len(), lines[1].0), (4, 11, 0, 2, 9));
         assert!(shown.matches(5).is_none());
+        // Kept lines are answered at once; a row whose lines were not kept
+        // names the file to read again (on another thread), and the answer
+        // built from that read carries what it found.
+        assert!(shown.matches_to_read(0).is_none());
+        let entry = shown.hits[1];
+        shown.found.get_mut(&entry).unwrap().lines.clear();
+        let (path, q) = shown.matches_to_read(1).unwrap();
+        assert_eq!(Some(path.as_str()), shown.path(1));
+        assert_eq!(q, shown.marked);
+        let Some(Outbound::Matches { count, lines, .. }) = shown.matches_read(1, Some((7, vec![(2, "عقد إيجار".into())]))) else { panic!() };
+        assert_eq!((count, lines.len()), (7, 1));
+        assert!(shown.matches_to_read(9).is_none());
         // At the end, best match is path order, as in the classic window.
         shown.done = true;
         shown.resort(Sort::Best, false);
@@ -1445,6 +1783,105 @@ mod tests {
         // Nothing to look for in a text: no search inside documents.
         assert!(content_query(&Params { text: "size:>1mb".into(), content: true, ..Params::default() }).is_none());
         assert!(content_query(&Params { text: "  ".into(), content: true, ..Params::default() }).is_none());
+    }
+
+    /// 0.10.1: a list on screen (or in the tray) must not pin the index
+    /// snapshot it was made from. After `detach` it answers the page exactly
+    /// as before, from its own rows, and the snapshot has one owner again.
+    #[test]
+    fn a_list_lets_go_of_the_index_and_still_answers() {
+        let idx = index();
+        let p = Params { seq: 4, ver: 2, text: "تقرير".into(), sort: Sort::Path, ..Params::default() };
+        let (mut shown, first) = search(idx.clone(), p.clone(), Lang::Ar);
+        let (twin, _) = search(idx.clone(), p, Lang::Ar);
+        assert!(shown.hits.len() >= 3 && shown.hits.len() < idx.entries.len());
+        // A row renamed while listed is remembered by its place.
+        shown.changed.insert(1, Some("D:\\Projects\\جديد.docx".into()));
+        let before = (shown.page(0, 100), shown.all_paths().join("|"), shown.results(0, None, Vec::new(), Lang::Ar));
+        assert!(Arc::strong_count(&idx) >= 3);
+
+        assert!(shown.detach());
+        drop(twin);
+        assert_eq!(Arc::strong_count(&idx), 1, "the list no longer holds the snapshot");
+        assert!(!Arc::ptr_eq(&shown.index, &idx), "so it counts as out of date and is searched again");
+        assert_eq!(shown.index.entries.len(), shown.hits.len());
+        assert_eq!((shown.page(0, 100), shown.all_paths().join("|"), shown.results(0, None, Vec::new(), Lang::Ar)), before);
+        let Outbound::Results { files, total, .. } = first else { panic!() };
+        assert_eq!((files, total), (idx.entries.len(), shown.hits.len()));
+        for id in 0..shown.hits.len() as u32 {
+            assert_eq!(shown.is_dir(id), shown.path(id) == Some("D:\\Projects\\تقرير الصيانة"));
+        }
+        // Sorting again works on its own rows, and a second call is harmless.
+        shown.changed.clear();
+        shown.resort(Sort::Name, true);
+        let (mut again, _) = search(idx.clone(), Params { text: "تقرير".into(), sort: Sort::Name, desc: true, ..Params::default() }, Lang::Ar);
+        assert_eq!(shown.all_paths(), again.all_paths());
+        assert!(shown.detach() && again.detach());
+        assert_eq!(shown.all_paths(), again.all_paths());
+
+        // A search inside documents: not while it runs (its new rows are
+        // numbered by the snapshot), every row and its matches afterwards.
+        let p = Params { seq: 11, text: "عقد إيجار".into(), content: true, ..Params::default() };
+        let mut docs = Shown::documents(idx.clone(), content_query(&p).unwrap(), p);
+        let notes = "C:\\Users\\Sara\\Desktop\\notes.txt";
+        let pdf = "C:\\Users\\Sara\\Documents\\العمل\\التقرير السنوي.pdf";
+        docs.absorb(vec![hit(&idx, pdf, "بند عقد الإيجار", 1)]);
+        assert!(!docs.detach());
+        docs.absorb(vec![hit(&idx, notes, "…نص عقد الإيجار الموقّع…", 4)]);
+        docs.done = true;
+        let before = (docs.page(0, 10), docs.matches(0), docs.matches(1));
+        assert!(docs.detach());
+        assert_eq!(Arc::strong_count(&idx), 1);
+        assert_eq!((docs.page(0, 10), docs.matches(0), docs.matches(1)), before);
+        assert_eq!(docs.all_paths(), [pdf, notes]);
+        docs.resort(Sort::Best, false);
+        assert_eq!(docs.all_paths(), [notes, pdf]);
+        assert_eq!(docs.page(0, 10)[0].matches, 4);
+    }
+
+    /// Fail closed: after the index it was made from changed, every row id
+    /// gives the file it gave before, or nothing; never another file.
+    #[test]
+    fn row_ids_give_the_same_file_or_nothing_after_detach() {
+        let idx = index();
+        let p = Params { seq: 5, text: "تقرير".into(), sort: Sort::Name, desc: true, ..Params::default() };
+        let (mut shown, _) = search(idx.clone(), p, Lang::Ar);
+        let n = shown.hits.len() as u32;
+        let before: Vec<Option<String>> = (0..n + 3).map(|id| shown.path(id).map(str::to_string)).collect();
+        assert!(shown.detach());
+        // The window's index changes (a file renamed, one removed): the list
+        // no longer looks at it.
+        drop(idx);
+        for id in 0..n + 3 {
+            assert_eq!(shown.path(id).map(str::to_string), before[id as usize], "row {id}");
+        }
+        assert_eq!(shown.path(n), None);
+        assert_eq!(shown.path(u32::MAX), None);
+        // A row that does not point into the snapshot: nothing is changed.
+        let (mut odd, _) = search(index(), Params { text: "تقرير".into(), ..Params::default() }, Lang::Ar);
+        odd.hits.push(9_999);
+        let kept = odd.index.clone();
+        assert!(!odd.detach());
+        assert!(Arc::ptr_eq(&odd.index, &kept));
+    }
+
+    #[test]
+    fn a_long_list_of_names_keeps_its_first_rows() {
+        let entries: Vec<Entry> = (0..DETACH_ROWS + 500).map(|i| entry(&format!("C:\\data\\report_{i:06}.txt"), 1, 1, false)).collect();
+        let idx = Arc::new(Index { entries, ..Index::default() });
+        let (mut shown, _) = search(idx.clone(), Params { text: "report".into(), sort: Sort::Path, ..Params::default() }, Lang::Ar);
+        assert_eq!(shown.hits.len(), DETACH_ROWS + 500);
+        shown.changed.insert(3, None);
+        shown.changed.insert(DETACH_ROWS as u32 + 7, None);
+        let first = shown.page(0, 300);
+        assert!(shown.detach());
+        assert_eq!(Arc::strong_count(&idx), 1);
+        assert_eq!((shown.hits.len(), shown.index.entries.len()), (DETACH_ROWS, DETACH_ROWS));
+        assert_eq!(shown.page(0, 300), first);
+        assert_eq!(shown.changed.len(), 1);
+        // The count of files searched is still the whole index's.
+        let Outbound::Results { files, .. } = shown.results(0, None, Vec::new(), Lang::Ar) else { panic!() };
+        assert_eq!(files, DETACH_ROWS + 500);
     }
 
     #[test]
@@ -1489,29 +1926,46 @@ mod tests {
             h.add_recent(&format!("بحث {i}"));
         }
         h.add_saved(crate::history::SavedSearch { name: "عقود".into(), query: "عقد".into(), kind: 1, scope: "D:\\".into(), content: true });
-        let Outbound::History { recent, saved } = history(&h) else { panic!() };
+        let Outbound::History { recent, saved, clearable } = history(&h) else { panic!() };
         assert_eq!(recent.len(), RECENT_SEARCHES);
+        assert!(clearable);
         assert_eq!(saved, [SavedOut { id: 0, name: "عقود".into(), content: true, scoped: true }]);
         // The saved search's folder is not sent to the page.
         let json = serde_json::to_string(&history(&h)).unwrap();
         assert!(!json.contains("D:\\\\"), "{json}");
+        // Only opened files, no searches: still something to clear.
+        let mut opened = History::default();
+        assert!(matches!(history(&opened), Outbound::History { clearable: false, .. }));
+        opened.record_open("C:\\ملف.txt", 1_700_000_000);
+        assert!(matches!(history(&opened), Outbound::History { clearable: true, .. }));
+        opened.clear_activity();
+        assert!(matches!(history(&opened), Outbound::History { clearable: false, .. }));
     }
 
     #[test]
     fn content_progress_texts() {
-        let s = |found, done, indexing| ContentState { checked: 1200, total: 4000, found, cached: 0, done, indexing, ocr_arabic_missing: false };
+        let s = |found, done, indexing| ContentState { checked: 1200, total: 4000, found, cached: 0, unindexed: 0, done, indexing, ocr_arabic_missing: false };
         assert_eq!(content_text(&s(3, false, Indexing::Idle), Lang::En), "Searching inside documents… checked 1,200 of 4,000 — found 3");
         assert!(content_text(&s(0, false, Indexing::Names { found: 9 }), Lang::Ar).contains("قد تكون النتائج ناقصة"));
-        assert_eq!(content_text(&s(2, true, Indexing::Idle), Lang::Ar), "انتهى البحث داخل 4,000 مستند: وجدت 2 ملف.");
+        assert_eq!(content_text(&s(2, true, Indexing::Idle), Lang::Ar), "انتهى البحث. المستندات المفحوصة: 4,000، عدد النتائج: 2.");
         let done = ContentState { cached: 50, ocr_arabic_missing: true, ..s(0, true, Indexing::Names { found: 1 }) };
         let t = content_text(&done, Lang::En);
         assert!(t.starts_with("Searched 4,000 documents: found 0 files. (50 from the index) Results may be incomplete"), "{t}");
         assert!(t.contains("Arabic"), "{t}");
+        let slow = ContentState { unindexed: 1500, ..s(2, true, Indexing::Idle) };
+        assert!(content_text(&slow, Lang::En).ends_with("(1,500 documents were read in full: the word index is not complete yet, and searches get faster once it is.)"));
+        assert!(content_text(&slow, Lang::Ar).contains("فهرس الكلمات لم يكتمل"));
+    }
+
+    #[test]
+    fn restore_message() {
+        let s = script(&Outbound::Restore(Restore { q: "تقرير".into(), kind: 2, size: 1, date: 3, content: true }));
+        assert_eq!(s, r#"window.__instafind&&window.__instafind.recv({"type":"restore","q":"تقرير","kind":2,"size":1,"date":3,"content":true})"#);
     }
 
     #[test]
     fn script_and_status() {
-        let s = script(&Outbound::Query { q: "a\"b</script>\u{2028}".into() });
+        let s = script(&Outbound::Query { q: "a\"b</script>\u{2028}".into(), content: false, all_kinds: false });
         assert!(s.starts_with("window.__instafind&&window.__instafind.recv({\"type\":\"query\""), "{s}");
         assert!(s.contains(r#"a\"b</script>"#));
         assert!(matches!(status(true, Indexing::Idle, 0, Lang::Ar), Outbound::Status { state: "loading", .. }));
@@ -1525,15 +1979,24 @@ mod tests {
             digits: false,
             autostart: true,
             content_index: true,
+            read_cloud_files: false,
             auto_index: true,
             hide_system: true,
             hotkey_quick: true,
             floating: false,
             tray_icon: true,
             version: "1.0.0",
+            store: true,
+            checking_updates: true,
+            hotkey: "ctrl_alt_f",
+            hotkey_taken: true,
+            hotkeys: hotkeys(),
+            phone: None,
         });
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.starts_with(r#"{"type":"settings","lang":"ar","next_lang":"en""#), "{json}");
+        assert!(json.contains(r#""version":"1.0.0","store":true,"checking_updates":true,"hotkey":"ctrl_alt_f","hotkey_taken":true,"hotkeys":[["ctrl_alt_f","Ctrl+Alt+F"],["ctrl_alt_space","Ctrl+Alt+Space"],"#), "{json}");
+        assert!(json.ends_with(r#""phone":null}"#), "{json}");
         let json = serde_json::to_string(&Outbound::Renamed { list: List::Recent, seq: 0, ver: 3, id: 1, name: "a".into() }).unwrap();
         assert_eq!(json, r#"{"type":"renamed","list":"recent","seq":0,"ver":3,"id":1,"name":"a"}"#);
     }
@@ -1599,6 +2062,24 @@ mod tests {
     }
 
     #[test]
+    fn the_same_rows_found_again_keep_their_version() {
+        let mut lists = Lists::default();
+        let (shown, msg) = listed(&mut lists, 7, Sort::Name);
+        let v1 = ver_of(&msg);
+        lists.finished(shown);
+        // Run again in the background with the same rows: not sent, same version.
+        let (again, _) = listed(&mut lists, 7, Sort::Name);
+        assert_eq!(fin(&mut lists, again), (false, None));
+        assert_eq!(lists.shown.as_ref().unwrap().ver, v1);
+        assert!(lists.path(List::Results, 7, v1, 0).is_ok());
+        // A renamed row since: the list is sent again with a new version.
+        lists.shown_at_mut(7, v1).unwrap().changed.insert(0, Some("C:\\x.pdf".into()));
+        let (third, msg) = listed(&mut lists, 7, Sort::Name);
+        assert_eq!(fin(&mut lists, third), (true, None));
+        assert_ne!(ver_of(&msg), v1);
+    }
+
+    #[test]
     fn a_dialog_acts_on_the_list_it_was_opened_for() {
         // The rename dialog is opened on row 0 of version v1; while it is
         // open the list is listed again. Its OK names v1, which is refused.
@@ -1631,11 +2112,13 @@ mod tests {
         let mut lists = Lists::default();
         // Nothing listed yet: version 0 names nothing.
         assert_eq!(lists.path(List::Recent, 0, 0, 0), Err(Miss::Stale));
-        let v1 = lists.set_recent(vec!["C:\\a\\one.txt".into(), "C:\\a\\two.txt".into()]);
+        let v1 = lists.set_recent(vec!["C:\\a\\one.txt".into(), "C:\\a\\two.txt".into()]).unwrap();
+        // The same files again (the window shown again): nothing new, the version stays.
+        assert_eq!(lists.set_recent(vec!["C:\\a\\one.txt".into(), "C:\\a\\two.txt".into()]), None);
         assert_eq!(lists.path(List::Recent, 0, v1, 1), Ok("C:\\a\\two.txt"));
         assert_eq!(lists.path(List::Recent, 0, 0, 1), Err(Miss::Stale));
         // A file opened moves to the top: the list is sent again, and row 1 is another file.
-        let v2 = lists.set_recent(vec!["C:\\a\\two.txt".into(), "C:\\a\\one.txt".into()]);
+        let v2 = lists.set_recent(vec!["C:\\a\\two.txt".into(), "C:\\a\\one.txt".into()]).unwrap();
         assert_ne!(v1, v2);
         assert_eq!(lists.path(List::Recent, 0, v1, 1), Err(Miss::Stale));
         assert_eq!(lists.path(List::Recent, 0, v2, 1), Ok("C:\\a\\one.txt"));
@@ -1702,6 +2185,39 @@ mod tests {
     }
 
     #[test]
+    fn problems_are_told_apart() {
+        for p in ["تعذر التحقق من التحديثات.", "لم يُحذف الملف.", "انتظر حتى تكتمل الفهرسة.", "Could not check for updates.", "Wait until indexing is complete.", "The file was not deleted."] {
+            assert!(looks_like_a_problem(p), "{p}");
+        }
+        for ok in ["تم تصدير 12 نتيجة.", "جارٍ التحقق من التحديثات…", "Exported 12 results.", "Checking for updates…", "Downloading the update… 40%", ""] {
+            assert!(!looks_like_a_problem(ok), "{ok}");
+        }
+    }
+
+    #[test]
+    fn export_rows_follow_the_list() {
+        let idx = index();
+        let mut shown = Shown::documents(idx.clone(), Query::parse("تقرير"), Params { seq: 1, ver: 1, text: "تقرير".into(), content: true, ..Params::default() });
+        shown.absorb(vec![
+            hit(&idx, "C:\\Users\\Sara\\Documents\\تقرير المبيعات 2026.xlsx", "مبيعات الربع", 2),
+            hit(&idx, "D:\\Projects\\تقرير الصيانة", "", 1),
+            hit(&idx, "C:\\Users\\Sara\\Desktop\\notes.txt", "تقرير", 1),
+        ]);
+        // Renamed and recycled rows since they were listed.
+        shown.changed.insert(0, Some("C:\\Users\\Sara\\Documents\\تقرير نهائي.xlsx".into()));
+        shown.changed.insert(2, None);
+        let rows = shown.export_rows();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0], ExportRow { path: "C:\\Users\\Sara\\Documents\\تقرير نهائي.xlsx".into(), size: Some(48_000), mtime: rows[0].mtime, snippet: "مبيعات الربع".into() });
+        assert_eq!((rows[1].path.as_str(), rows[1].size), ("D:\\Projects\\تقرير الصيانة", None));
+        // Thumbnails: by row, the renamed row by its new path, none for the recycled one or past the end.
+        assert_eq!(shown.thumb_entry(0).map(|e| (e.0, e.1, e.3)), Some(("C:\\Users\\Sara\\Documents\\تقرير نهائي.xlsx", 48_000, false)));
+        assert!(shown.thumb_entry(1).is_some_and(|e| e.3));
+        assert_eq!(shown.thumb_entry(2), None);
+        assert_eq!(shown.thumb_entry(99), None);
+    }
+
+    #[test]
     fn recent_rows_skip_missing_files() {
         let paths = ["C:\\a\\gone.txt", "C:\\a\\here.pdf", "D:\\dir"];
         let (kept, rows) = recent_rows(&paths, |p| match p {
@@ -1712,5 +2228,28 @@ mod tests {
         assert_eq!(kept, ["C:\\a\\here.pdf", "D:\\dir"]);
         assert_eq!((rows[0].id, rows[0].dir.as_str(), rows[0].ext.as_str()), (0, "C:\\a", "pdf"));
         assert!(rows[1].folder);
+    }
+
+    /// The hamza seat spellings find each other directly in the new look
+    /// (the same matcher as the window): no fallback note, the word marked.
+    #[test]
+    fn hamza_seat_spellings_are_direct_matches() {
+        let mut entries = vec![
+            entry("C:\\a\\مسؤول المبيعات.docx", 1, 0, false),
+            entry("C:\\a\\المسئول.txt", 1, 0, false),
+            entry("C:\\a\\مَسْؤُول.txt", 1, 0, false),
+            entry("C:\\a\\شئون الطلاب.pdf", 1, 0, false),
+            entry("C:\\a\\رئيس القسم.txt", 1, 0, false),
+        ];
+        entries.sort_by(|a, b| a.path.cmp(&b.path));
+        let index = Arc::new(Index { entries, ..Index::default() });
+        for (text, want) in [("مسئول", 3), ("مسؤول", 3), ("مسوول", 3), ("المسؤول", 3), ("مَسْؤُول", 3), ("شوون", 1), ("شؤون", 1), ("ريس", 1)] {
+            let p = Params { seq: 1, text: text.into(), ..Params::default() };
+            let (shown, msg) = search(index.clone(), p, Lang::Ar);
+            let Outbound::Results { total, ref note, ref rows, .. } = msg else { panic!() };
+            assert_eq!((total, note.clone()), (want, None), "{text}");
+            assert!(shown.marked.terms.iter().all(|t| !t.alts.is_empty()));
+            assert!(rows.iter().all(|r| r.name.iter().any(|(_, marked)| *marked)), "{text}: {:?}", rows.iter().map(name_of).collect::<Vec<_>>());
+        }
     }
 }

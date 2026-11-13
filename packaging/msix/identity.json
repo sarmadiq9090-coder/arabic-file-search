@@ -1,0 +1,15 @@
+{
+  "_comment": "Package identity from Partner Center > InstaFind > Product management > Product identity. make_layout.py puts these in AppxManifest.xml. If any value contains TODO, the whole `test` block is used instead and the build says it made a TEST package that the Store will not accept.",
+  "name": "FastKiwi.InstaFind",
+  "publisher": "CN=8EFD6949-D088-481F-886D-82300679C5E5",
+  "publisherDisplayName": "FastKiwi",
+  "displayName": "InstaFind",
+  "_packageFamilyName": "FastKiwi.InstaFind_sm1xjmj6v76yc",
+  "_storeId": "9MTK4KMFQ657",
+  "test": {
+    "name": "FastKiwi.InstaFind.Test",
+    "publisher": "CN=InstaFind Test Signing",
+    "publisherDisplayName": "FastKiwi (test build)",
+    "displayName": "InstaFind (test build)"
+  }
+}

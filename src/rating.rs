@@ -72,35 +72,12 @@ pub fn show_now(due: bool, m: Moment) -> bool {
         && m.ticks_since_shown.is_some_and(|t| t >= START_DELAY_TICKS)
 }
 
-/// Whether this copy runs from an MSIX package (the Microsoft Store build).
-/// `GetCurrentPackageFullName` is looked up at run time, so Windows 7 (which
-/// has no packages) simply gets `false`; so does every unpackaged exe.
+/// Whether this copy runs from an MSIX package (the Microsoft Store build):
+/// the one test in `store.rs` (`GetCurrentPackageFullName`, looked up at
+/// run time), shared with the updater, startup task and phone search.
 #[cfg(windows)]
 pub fn is_packaged() -> bool {
-    use std::sync::OnceLock;
-    static PACKAGED: OnceLock<bool> = OnceLock::new();
-    *PACKAGED.get_or_init(|| {
-        use winapi::um::libloaderapi::{GetModuleHandleW, GetProcAddress};
-        // LONG GetCurrentPackageFullName(UINT32 *packageFullNameLength, PWSTR packageFullName)
-        type GetCurrentPackageFullName = unsafe extern "system" fn(*mut u32, *mut u16) -> i32;
-        const ERROR_INSUFFICIENT_BUFFER: i32 = 122;
-        let kernel32: Vec<u16> = "kernel32.dll".encode_utf16().chain(Some(0)).collect();
-        unsafe {
-            let module = GetModuleHandleW(kernel32.as_ptr());
-            if module.is_null() {
-                return false;
-            }
-            let f = GetProcAddress(module, c"GetCurrentPackageFullName".as_ptr());
-            if f.is_null() {
-                return false;
-            }
-            let f: GetCurrentPackageFullName = std::mem::transmute(f);
-            // With an empty buffer a packaged process gets "buffer too small";
-            // an unpackaged one gets APPMODEL_ERROR_NO_PACKAGE (15700).
-            let mut len = 0u32;
-            f(&mut len, std::ptr::null_mut()) == ERROR_INSUFFICIENT_BUFFER
-        }
-    })
+    crate::store::is_packaged()
 }
 
 /// Outside Windows there are no packages.

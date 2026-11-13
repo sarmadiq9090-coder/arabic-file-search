@@ -2,12 +2,11 @@
 //! virtual list's cell text, icons and match highlighting.
 
 use native_windows_gui as nwg;
-use std::collections::HashMap;
 use std::io::Write;
 
 use winapi::shared::minwindef::LPARAM;
 
-use super::format::{csv_field, digits, fmt_num, ltr_path};
+use super::format::{csv_field, digits, fmt_num, ltr_path, shown_digits, ui_rtl};
 use super::shell;
 use super::{App, COL_DATE, COL_NAME, COL_PATH, COL_SIZE, COL_SNIPPET, COLUMNS, Row};
 use crate::index;
@@ -108,11 +107,27 @@ impl App {
         }
     }
 
+    /// Windows' Properties window ("properties") or "Open with" choice
+    /// ("openas") for the selected result.
+    pub(super) fn shell_verb_selected(&self, verb: &str) {
+        match self.selected_path() {
+            Some(p) => {
+                if !shell::invoke_verb(self.window.handle.hwnd(), &p, verb) {
+                    self.set_status(&trf!("تعذّر تنفيذ ذلك على: {}", "Windows could not do that for: {}", ltr_path(&p)));
+                }
+            }
+            None => self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first.")),
+        }
+    }
+
     pub(super) fn copy_path(&self) {
         match self.selected_path() {
             Some(p) => {
-                nwg::Clipboard::set_data_text(&self.window, &p);
-                self.set_status(tr!("تم نسخ المسار.", "Path copied."));
+                if shell::copy_text(&self.window, &p) {
+                    self.set_status(tr!("تم نسخ المسار.", "Path copied."));
+                } else {
+                    self.set_status(shell::copy_failed_text());
+                }
             }
             None => self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first.")),
         }
@@ -131,8 +146,11 @@ impl App {
         let text = paths.join("\r\n");
         // Not borrowed while the clipboard notifies its previous owner.
         drop(st);
-        nwg::Clipboard::set_data_text(&self.window, &text);
-        self.set_status(&trf!("تم نسخ {} مسار.", "Copied {} paths.", fmt_num(n)));
+        if shell::copy_text(&self.window, &text) {
+            self.set_status(&trf!("تم نسخ المسارات. عددها: {}.", "Copied {} paths.", fmt_num(n)));
+        } else {
+            self.set_status(shell::copy_failed_text());
+        }
     }
 
     /// Puts the selected file itself on the clipboard, ready to paste into
@@ -184,7 +202,7 @@ impl App {
         }
         self.show_sort_arrow();
         if self.content_mode() || self.state.borrow().content.is_some() {
-            self.sort_rows_in_place();
+            self.sort_rows_in_place(None);
             self.clear_selection();
             self.refresh_list();
         } else {
@@ -205,19 +223,23 @@ impl App {
         }
     }
 
-    /// Sorts the current rows (used for document-search results).
-    pub(super) fn sort_rows_in_place(&self) {
+    /// Sorts the current rows (used for document-search results) and
+    /// returns where row `selected` went, for [`App::select_row`].
+    pub(super) fn sort_rows_in_place(&self, selected: Option<usize>) -> Option<usize> {
         let (key, desc) = self.sort_key();
         let mut st = self.state.borrow_mut();
-        let mut hits: Vec<u32> = st.rows.iter().map(|r| r.entry).collect();
-        if key == SortKey::Relevance {
-            // Document hits have no score; path order is the neutral order.
-            hits.sort_unstable();
-        } else {
-            search::sort_hits(&st.rows_index.entries, &mut hits, key, desc);
+        let st = &mut *st;
+        search::sort_rows(&st.rows_index.entries, &mut st.rows, |r: &Row| r.entry, key, desc, selected)
+    }
+
+    /// Moves the selection to `row` (to nothing for `None`) after the rows
+    /// were put in another order, so it stays on the same file.
+    pub(super) fn select_row(&self, row: Option<usize>) {
+        self.clear_selection();
+        if let Some(i) = row {
+            self.list.select_item(i, true);
         }
-        let mut by_entry: HashMap<u32, Row> = st.rows.drain(..).map(|r| (r.entry, r)).collect();
-        st.rows = hits.into_iter().filter_map(|entry| by_entry.remove(&entry)).collect();
+        self.show_selected_path();
     }
 
     /// Opens a window listing every matching line of the selected document.
@@ -226,6 +248,16 @@ impl App {
             self.set_status(tr!("اختر ملفاً من القائمة أولاً.", "Select a file in the list first."));
             return;
         };
+        // Lines not kept for this result are read again in the background,
+        // and the window opens when they are there (`on_matches_read`).
+        if self.read_matches_again(row) {
+            self.set_status(tr!("جارٍ قراءة التطابقات من الملف…", "Reading the matches from the file…"));
+            return;
+        }
+        self.show_matches_of(row);
+    }
+
+    fn show_matches_of(&self, row: usize) {
         let text = {
             let st = self.state.borrow();
             let (Some(r), Some(e)) = (st.rows.get(row), st.row_entry(row)) else { return };
@@ -236,12 +268,12 @@ impl App {
             };
             let mut t = trf!("{}\r\nعدد التطابقات: {}\r\n", "{}\r\nMatches: {}\r\n", ltr_path(&e.path), digits(m.count.to_string()));
             if m.lines.len() < m.count as usize {
-                t.push_str(&trf!("(أول {} سطر)\r\n", "(first {} lines)\r\n", digits(m.lines.len().to_string())));
+                t.push_str(&trf!("(أول الأسطر فقط، عددها: {})\r\n", "(first {} lines)\r\n", digits(m.lines.len().to_string())));
             }
             for (line, s) in &m.lines {
-                t.push_str(&trf!("\r\nسطر {}:  {}", "\r\nLine {}:  {}", digits(line.to_string()), s.replace(['\r', '\n'], " ")));
+                t.push_str(&trf!("\r\nسطر {}:  {}", "\r\nLine {}:  {}", digits(line.to_string()), shown_digits(&s.replace(['\r', '\n'], " "))));
             }
-            self.matches_window.set_text(&trf!("كل التطابقات — {}", "All matches — {}", e.name()));
+            self.matches_window.set_text(&trf!("كل التطابقات — {}", "All matches — {}", shown_digits(e.name())));
             t
         };
         self.matches_text.set_text(&text);
@@ -249,9 +281,84 @@ impl App {
         self.matches_text.set_focus();
     }
 
-    /// Saves the result list as a CSV file that Excel opens with Arabic intact.
+    /// A search inside documents keeps the matching lines of its first
+    /// results only (`search::LINED_HITS`); for a later one they are read
+    /// again from the document (or the content index) on a background
+    /// thread, never on this one: a big document can take a long time. True
+    /// when that read was started.
+    fn read_matches_again(&self, row: usize) -> bool {
+        let (path, q, use_index) = {
+            let st = self.state.borrow();
+            let Some(m) = st.rows.get(row).and_then(|r| r.matches.as_ref()) else { return false };
+            if !m.lines.is_empty() || m.count == 0 {
+                return false;
+            }
+            let Some(path) = st.row_entry(row).map(|e| e.path.to_string()) else { return false };
+            let Some(q) = st.shown_query.clone() else { return false };
+            (path, q, st.settings.content_index)
+        };
+        let slot = self.matches_read.clone();
+        let notice = self.matches_notice.sender();
+        crate::crash_log::spawn_named("matches-read", move || {
+            let cache = if use_index { super::content_index::shared() } else { None };
+            let found = crate::crash_log::catch(|| search::document_matches(&path, &q, cache)).flatten();
+            if let Ok(mut s) = slot.lock() {
+                s.push(super::MatchesRead::Classic { path, found });
+            }
+            notice.notice();
+        })
+        .is_some()
+    }
+
+    /// Matches read again in the background: kept with their row, and shown
+    /// (classic window: when that row is still the selected one).
+    pub(super) fn on_matches_read(&self) {
+        let done = self.matches_read.lock().map(|mut s| std::mem::take(&mut *s)).unwrap_or_default();
+        for read in done {
+            match read {
+                super::MatchesRead::Classic { path, found } => {
+                    let row = {
+                        let mut st = self.state.borrow_mut();
+                        let Some(row) = (0..st.rows.len()).find(|&r| st.row_entry(r).is_some_and(|e| *e.path == *path)) else { continue };
+                        if let (Some(m), Some((count, lines))) = (st.rows.get_mut(row).and_then(|r| r.matches.as_mut()), found) {
+                            m.count = count;
+                            m.lines = lines;
+                        }
+                        row
+                    };
+                    if self.list.selected_item() == Some(row) {
+                        self.show_matches_of(row);
+                    }
+                }
+                super::MatchesRead::Web { seq, ver, id, found } => self.webui_matches_read(seq, ver, id, found),
+            }
+        }
+    }
+
+    /// Saves the result list as a CSV file that Excel opens with Arabic intact,
+    /// in columns. The file starts with the UTF-8 BOM (Excel reads Arabic
+    /// only with it) and uses Windows' list separator, as Excel does when
+    /// it opens a CSV: `,` in most regions, `;` where the decimal mark is a
+    /// comma. A `sep=,` first line is not used: the BOM has to come first,
+    /// and Excel then ignores the BOM and shows the Arabic as gibberish.
     pub(super) fn export_csv(&self) {
-        if self.state.borrow().rows.is_empty() {
+        // The results on screen: the new look's while it is the main window.
+        let rows = self.webui_results().unwrap_or_else(|| {
+            let st = self.state.borrow();
+            st.rows
+                .iter()
+                .filter_map(|r| {
+                    let e = st.rows_index.entries.get(r.entry as usize)?;
+                    Some(crate::webui::bridge::ExportRow {
+                        path: e.path.to_string(),
+                        size: (!e.is_dir).then_some(e.size),
+                        mtime: e.mtime,
+                        snippet: r.snippet.clone().unwrap_or_default(),
+                    })
+                })
+                .collect()
+        });
+        if rows.is_empty() {
             self.set_status(tr!("لا توجد نتائج لتصديرها.", "There are no results to export."));
             return;
         }
@@ -271,36 +378,38 @@ impl App {
             slot = Some(d);
         }
         let Some(dialog) = slot.as_ref() else { return };
-        let chosen = if dialog.run(Some(&self.window)) { dialog.get_selected_item().ok() } else { None };
+        let chosen = if self.with_modal_owner(|owner| dialog.run(Some(nwg::ControlHandle::Hwnd(owner)))) { dialog.get_selected_item().ok() } else { None };
         *self.export_dialog.borrow_mut() = slot;
         let Some(path) = chosen else { return };
         let mut path = std::path::PathBuf::from(path);
         if path.extension().is_none() {
             path.set_extension("csv");
         }
-        let st = self.state.borrow();
+        let sep = csv_separator(&list_separator());
         let write = || -> std::io::Result<usize> {
             let mut f = std::io::BufWriter::new(std::fs::File::create(&path)?);
-            f.write_all(tr!("\u{FEFF}الاسم,المسار,الحجم بالبايت,تاريخ التعديل,النص المطابق\r\n", "\u{FEFF}Name,Path,Size in bytes,Date modified,Matching text\r\n").as_bytes())?;
-            let mut n = 0;
-            for r in &st.rows {
-                let Some(e) = st.rows_index.entries.get(r.entry as usize) else { continue };
-                let size = if e.is_dir { String::new() } else { e.size.to_string() };
-                let fields = [e.name(), &e.path, &size, &shell::format_time(e.mtime, false), r.snippet.as_deref().unwrap_or("")];
-                let line: Vec<String> = fields.iter().map(|s| csv_field(s)).collect();
-                f.write_all(line.join(",").as_bytes())?;
-                f.write_all(b"\r\n")?;
-                n += 1;
+            let head = [
+                tr!("الاسم", "Name"),
+                tr!("المسار", "Path"),
+                tr!("الحجم بالبايت", "Size in bytes"),
+                tr!("تاريخ التعديل", "Date modified"),
+                tr!("النص المطابق", "Matching text"),
+            ];
+            f.write_all(format!("\u{FEFF}{}", csv_line(&head, sep)).as_bytes())?;
+            for r in &rows {
+                let name = r.path.rsplit('\\').next().unwrap_or(&r.path);
+                let size = r.size.map(|s| s.to_string()).unwrap_or_default();
+                let fields = [name, &r.path, &size, &shell::format_time(r.mtime, false), &r.snippet];
+                f.write_all(csv_line(&fields, sep).as_bytes())?;
             }
             f.flush()?;
-            Ok(n)
+            Ok(rows.len())
         };
-        let result = write();
-        drop(st);
-        match result {
-            Ok(n) => self.set_status(&trf!("تم تصدير {} نتيجة.", "Exported {} results.", fmt_num(n))),
+        match write() {
+            Ok(n) => self.set_status(&trf!("تم التصدير. عدد النتائج: {}.", "Exported {} results.", fmt_num(n))),
             Err(e) => {
-                nwg::modal_error_message(&self.window, tr!("خطأ", "Error"), &trf!("تعذر حفظ الملف:\n{e}", "Could not save the file:\n{e}"));
+                let text = trf!("تعذر حفظ الملف:\n{e}", "Could not save the file:\n{e}");
+                self.with_modal_owner(|owner| nwg::modal_error_message(nwg::ControlHandle::Hwnd(owner), tr!("خطأ", "Error"), &text));
             }
         }
     }
@@ -311,17 +420,20 @@ impl App {
         let Some(r) = st.rows.get(row) else { return String::new() };
         let Some(e) = st.rows_index.entries.get(r.entry as usize) else { return String::new() };
         match col {
-            // An Arabic name's extension kept whole (".xlsx") at its end.
-            COL_NAME => crate::bidi_layout::list_name(e.name(), e.is_dir).0,
+            // An Arabic name's extension kept whole (".xlsx") at its end,
+            // its dates and phone numbers as typed.
+            COL_NAME => crate::bidi_layout::list_name(e.name(), e.is_dir, ui_rtl()).0,
+            // A drive that is not connected keeps its entries; a quiet note says so.
+            COL_PATH if crate::drives::is_absent(&e.path) => format!("{}  ({})", ltr_path(&e.path), crate::drives::absent_note()),
             COL_PATH => ltr_path(&e.path),
             COL_SIZE => self.size_cell(&st.rows_index, r.entry, e),
             COL_DATE => shell::format_time(e.mtime, true),
             COL_SNIPPET => {
-                let snippet = r.snippet.as_deref().unwrap_or_default();
+                let snippet = shown_digits(r.snippet.as_deref().unwrap_or_default());
                 match &r.matches {
                     // "(12) …the first match…": how many places matched.
                     Some(m) if m.count > 1 => format!("({}) {snippet}", digits(m.count.to_string())),
-                    _ => snippet.to_string(),
+                    _ => snippet,
                 }
             }
             _ => String::new(),
@@ -344,7 +456,7 @@ impl App {
     }
 
     /// Byte ranges of the query's matches in a row's file name, as the
-    /// list shows it (`cell_text`, with the marks before an extension).
+    /// list shows it (`cell_text`, with the marks `bidi_layout::list_name` puts in).
     pub(super) fn match_ranges(&self, row: usize) -> Vec<(usize, usize)> {
         let Ok(st) = self.state.try_borrow() else { return Vec::new() };
         let Some(q) = &st.shown_query else { return Vec::new() };
@@ -353,10 +465,79 @@ impl App {
         if ranges.is_empty() {
             return ranges;
         }
-        crate::bidi_layout::shift_ranges(ranges, crate::bidi_layout::list_name(e.name(), e.is_dir).1)
+        crate::bidi_layout::shift_ranges(ranges, &crate::bidi_layout::list_name(e.name(), e.is_dir, ui_rtl()).1)
     }
 
     pub(super) fn custom_draw(&self, l: LPARAM) -> Option<isize> {
         crate::draw::handle_custom_draw(l, |row| self.match_ranges(row), |row| self.cell_text(row, COL_NAME))
+    }
+}
+
+/// Windows' list separator for the user (Region ▸ Additional settings ▸
+/// List separator), the one Excel splits a CSV it opens by. Empty when it
+/// can't be read.
+fn list_separator() -> String {
+    // Declared here: winapi's binding needs the "winnls" feature.
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetLocaleInfoW(locale: u32, lctype: u32, data: *mut u16, len: i32) -> i32;
+    }
+    const LOCALE_USER_DEFAULT: u32 = 0x0400;
+    const LOCALE_SLIST: u32 = 0x000C;
+    let mut buf = [0u16; 8];
+    // SAFETY: `buf` holds `buf.len()` units; the call writes at most that many.
+    let n = unsafe { GetLocaleInfoW(LOCALE_USER_DEFAULT, LOCALE_SLIST, buf.as_mut_ptr(), buf.len() as i32) };
+    let n = usize::try_from(n).unwrap_or(0).min(buf.len());
+    String::from_utf16_lossy(&buf[..n]).trim_end_matches('\0').to_string()
+}
+
+/// The separator for an exported CSV: Windows' list separator when it is
+/// one character Excel can split by, else a comma.
+fn csv_separator(list: &str) -> char {
+    let mut chars = list.chars();
+    match (chars.next(), chars.next()) {
+        (Some(c @ (',' | ';' | '\t' | '|')), None) => c,
+        _ => ',',
+    }
+}
+
+/// One CSV line, ending with CRLF: each field through `csv_field` (quotes,
+/// and the apostrophe that stops formulas), and quoted when it holds `sep`.
+fn csv_line(fields: &[&str], sep: char) -> String {
+    let mut line = String::new();
+    for (i, s) in fields.iter().enumerate() {
+        if i > 0 {
+            line.push(sep);
+        }
+        let f = csv_field(s);
+        // `csv_field` quotes for commas; an unquoted field has no `"` in it.
+        if !f.starts_with('"') && f.contains(sep) {
+            line.push('"');
+            line.push_str(&f);
+            line.push('"');
+        } else {
+            line.push_str(&f);
+        }
+    }
+    line.push_str("\r\n");
+    line
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn csv_uses_the_list_separator_and_keeps_the_formula_guard() {
+        assert_eq!(csv_separator(";"), ';');
+        assert_eq!(csv_separator(","), ',');
+        for odd in ["", "ab", ";;", "x", "\u{060C}"] {
+            assert_eq!(csv_separator(odd), ',', "{odd:?}");
+        }
+        assert_eq!(csv_line(&["تقرير.pdf", "C:\\a;b", "=1+1", "x,y"], ';'), "تقرير.pdf;\"C:\\a;b\";'=1+1;\"x,y\"\r\n");
+        assert_eq!(csv_line(&["a", "say \"hi\"", "-1"], ','), "a,\"say \"\"hi\"\"\",'-1\r\n");
+        assert_eq!(csv_line(&["=a;b"], ';'), "\"'=a;b\"\r\n");
+        // The locale call answers something (a comma on CI runners).
+        let _ = csv_separator(&list_separator());
     }
 }

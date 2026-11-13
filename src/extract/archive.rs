@@ -23,7 +23,7 @@ use encoding_rs::WINDOWS_1256;
 
 use super::{
     MAX_OUTPUT, MAX_TEXT_READ, OTHER_EXTS, TEXT_EXTS, bidi_fix, decode_bytes, docx_text, epub,
-    extract_doc_heuristic, mail, normalize_arabic_forms, odf_text, pptx_text, rtf_to_text,
+    extract_doc_heuristic, mail, normalize_arabic_forms, odf_text, pdf_text, pptx_text, rtf_to_text,
     spreadsheet_text, strip_html,
 };
 
@@ -110,7 +110,7 @@ pub fn archive_texts(path: &Path) -> Vec<(String, String)> {
 
 fn archive_texts_with(path: &Path, lim: &Limits) -> Vec<(String, String)> {
     let Some(kind) = kind_of(path) else { return Vec::new() };
-    let Ok(file) = File::open(path) else { return Vec::new() };
+    let Ok(file) = crate::cloud::open(path) else { return Vec::new() };
     let len = file.metadata().map_or(0, |m| m.len());
     let mut col = Collector::new(lim, len);
     // Third-party decoders on hostile input: contain any panic, keep what
@@ -178,7 +178,7 @@ impl<'a> Collector<'a> {
 
     /// Counts one more entry; false once the archive should not be read on.
     fn next_entry(&mut self) -> bool {
-        if self.seen >= self.lim.members || self.total >= self.lim.total || self.out_len >= MAX_OUTPUT {
+        if self.seen >= self.lim.members || self.total >= self.lim.total || self.out_len >= MAX_OUTPUT || super::budget::exceeded() {
             return false;
         }
         self.seen += 1;
@@ -198,11 +198,12 @@ impl<'a> Collector<'a> {
 
     /// Reads a member (bounded) and keeps its text.
     fn add(&mut self, name: String, ext: &str, r: impl Read) {
-        let room = self.lim.member_size.min(self.lim.total - self.total);
+        // The members, and the documents inside them, share one budget.
+        let room = super::budget::room(self.lim.member_size.min(self.lim.total - self.total));
         let mut data = Vec::new();
         let read = r.take(room + 1).read_to_end(&mut data);
         self.total += data.len() as u64;
-        if read.is_err() || data.len() as u64 > room {
+        if super::budget::inflate(data.len() as u64) || read.is_err() || data.len() as u64 > room {
             return;
         }
         if let Some(text) = member_text(ext, data) {
@@ -463,10 +464,7 @@ pub(super) fn member_text_inner(ext: &str, mut data: Vec<u8>) -> Option<String> 
         "pptx" => pptx_text(zip(data)?),
         "odt" | "odp" => odf_text(zip(data)?),
         "xlsx" | "xlsm" | "xlsb" | "xls" | "ods" => spreadsheet_text(Cursor::new(data), ext),
-        "pdf" => {
-            let text = pdf_extract::extract_text_from_mem(&data).ok()?;
-            Some(bidi_fix::fix_visual_order(text))
-        }
+        "pdf" => Some(bidi_fix::fix_visual_order(pdf_text(&data).ok()??)),
         "rtf" => Some(rtf_to_text(&data)),
         "doc" => Some(extract_doc_heuristic(&data)),
         "eml" => mail::eml_to_text(&data),
@@ -480,16 +478,15 @@ pub(super) fn member_text_inner(ext: &str, mut data: Vec<u8>) -> Option<String> 
 mod tests {
     use super::*;
     use std::io::Write;
-    use std::path::PathBuf;
+    use crate::test_temp::TempPath;
     use zip::write::SimpleFileOptions;
 
-    fn temp_path(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("bahth_archive_tests_{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir.join(name)
+    /// `name` in a folder of its own, removed when the guard is dropped.
+    fn temp_path(name: &str) -> TempPath {
+        TempPath::in_own_dir("bahth_archive_tests", name)
     }
 
-    fn write(name: &str, bytes: &[u8]) -> PathBuf {
+    fn write(name: &str, bytes: &[u8]) -> TempPath {
         let p = temp_path(name);
         std::fs::write(&p, bytes).unwrap();
         p

@@ -35,16 +35,20 @@ use winapi::um::winuser::*;
 
 use super::launcher_shim as shim;
 use super::startup::{background_priority, log};
-use super::surface::{self, Canvas, Font, KIND_POPUP, WM_APP_CATALOG, WM_APP_FILES};
+use super::surface::{self, Canvas, Font, KIND_POPUP, WM_APP_ACC_OPEN, WM_APP_CATALOG, WM_APP_FILES, WM_APP_SYSTEM};
 use super::{App, shell, title};
 use crate::feedback::{self, SystemInfo};
-use crate::launcher::{self, Action, Catalog, windows::OpenWindow};
+use crate::launcher::{self, Action, Catalog, SystemCommand, windows::OpenWindow};
 use crate::quick::{self, Anchor, FeedbackKind, Group, Icon, ListMetrics, Palette, Parts, Rect, Row, Slot, SlotKind, Target, px};
 
 /// Width of the popup, logical px.
 const WIDTH: i32 = 480;
-/// The search strip at the bottom.
-const STRIP_H: i32 = 52;
+/// The search strip at the bottom: the box, then the line of key hints.
+const STRIP_H: i32 = BOX_H + KEYS_H;
+/// The part of the strip that holds the search box.
+const BOX_H: i32 = 52;
+/// The key hints under the box (`quick::key_hints`).
+const KEYS_H: i32 = 20;
 /// The indexing progress line under the results, while indexing runs.
 const NOTE_H: i32 = 26;
 /// Opacity (of 255) of the list's tint over the acrylic backdrop.
@@ -111,6 +115,13 @@ pub struct Popup {
     no_files: Cell<bool>,
     /// The drive scan is not done, so name results may be incomplete.
     names_incomplete: Cell<bool>,
+    /// A system command running in the background (emptying the Recycle
+    /// Bin), and its result for the UI thread: the command and whether it worked.
+    system_running: Cell<bool>,
+    system_slot: Arc<Mutex<Option<(SystemCommand, bool)>>>,
+    /// The rows as a list for screen readers (`ui/quick_access.rs`); unset
+    /// when Windows refused it.
+    results: std::cell::OnceCell<super::quick_access::Results>,
 }
 
 /// File rows of the latest finished search.
@@ -179,7 +190,7 @@ impl Drop for Popup {
 }
 
 fn rtl() -> bool {
-    !crate::i18n::is_en()
+    crate::i18n::is_rtl()
 }
 
 /// `GET_X_LPARAM` / `GET_Y_LPARAM`.
@@ -216,21 +227,17 @@ fn shell_execute(verb: Option<&str>, file: &str, args: &str) -> bool {
 
 /// A classic tool named without a folder ("taskmgr", "devmgmt.msc", the
 /// settings table's non-`ms-settings:` pages) as its file in the Windows
-/// system folder, when it is there. `ShellExecute` looks in the current
-/// directory first, which for a portable copy started from Downloads is
-/// Downloads, where a program of that name could have been planted.
-fn system_tool(target: &str) -> String {
+/// system folder or the Windows folder (`regedit`); `None` when it is in
+/// neither (`gpedit.msc` on Windows Home), so it is not started at all.
+/// `ShellExecute` looks in the current directory first, which for a portable
+/// copy started from Downloads is Downloads, where a program of that name
+/// could have been planted. Full paths, `shell:` and other URIs are kept.
+fn system_tool(target: &str) -> Option<String> {
     if target.contains(['\\', '/', ':']) {
-        return target.to_string();
-    }
-    let mut buf = [0u16; 260];
-    let n = unsafe { winapi::um::sysinfoapi::GetSystemDirectoryW(buf.as_mut_ptr(), buf.len() as UINT) } as usize;
-    if n == 0 || n >= buf.len() {
-        return target.to_string();
+        return Some(target.to_string());
     }
     let name = if std::path::Path::new(target).extension().is_some() { target.to_string() } else { format!("{target}.exe") };
-    let path = std::path::PathBuf::from(String::from_utf16_lossy(&buf[..n])).join(name);
-    if path.is_file() { path.to_string_lossy().into_owned() } else { target.to_string() }
+    shell::windows_program(&name).map(|p| p.to_string_lossy().into_owned())
 }
 
 /// Whether `path` is something Windows can start as administrator.
@@ -318,6 +325,20 @@ impl App {
             winapi::um::commctrl::SetWindowSubclass(edit, Some(edit_proc), 1, 0);
             let cue = shell::wide(tr!("ابحث...", "Search..."));
             SendMessageW(edit, winapi::um::commctrl::EM_SETCUEBANNER, 1, cue.as_ptr() as LPARAM);
+        }
+        // What a screen reader says for the box (its text is what is typed,
+        // and the hint above is only a cue banner, which it does not read).
+        super::accessible::name_edit(
+            edit,
+            tr!("ابحث", "Search"),
+            tr!(
+                "اكتب اسم ملف أو برنامج أو إعداد. السهمان للأعلى وللأسفل يتنقلان بين النتائج، وEnter يفتح النتيجة المحددة.",
+                "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one."
+            ),
+        );
+        // The rows for screen readers, on a window of their own over the list.
+        if let Some(results) = super::quick_access::Results::create(hwnd) {
+            let _ = self.popup.results.set(results);
         }
         self.popup.hwnd.set(hwnd as usize);
         self.popup.edit.set(edit as usize);
@@ -407,6 +428,9 @@ impl App {
         self.popup.rect.set(rect);
         self.popup.selected.set(None);
         self.popup.enter_pending.set(false);
+        if let Some(results) = self.popup.results.get() {
+            results.reset();
+        }
         // Where the cursor is now: only a real move selects a row.
         let mut cur = winapi::shared::windef::POINT { x: 0, y: 0 };
         unsafe { GetCursorPos(&mut cur) };
@@ -692,11 +716,29 @@ impl App {
         let previous = self.popup.selected.get().and_then(|i| self.popup.rows.borrow().get(i).map(|r| r.target.clone()));
         let selected = quick::reselect(&rows, previous.as_ref());
         ui_test_dump(&query, &rows);
+        let spoken = self.popup.results.get().map(|_| self.popup_spoken_rows(&rows, &slots));
         *self.popup.rows.borrow_mut() = rows;
         *self.popup.slots.borrow_mut() = slots;
         self.popup.selected.set(selected);
         self.popup.list_h.set(list_h);
         self.popup_resize(list_h + px(STRIP_H, scale));
+        if let (Some(results), Some(items)) = (self.popup.results.get(), spoken) {
+            results.update(items, selected, self.popup.note.borrow().clone(), self.popup_edit());
+        }
+    }
+
+    /// The rows as a screen reader reads them, with their place in the list.
+    fn popup_spoken_rows(&self, rows: &[Row], slots: &[Slot]) -> Vec<super::quick_access::Item> {
+        let lang = crate::i18n::current();
+        let names_incomplete = self.popup.note.borrow().is_some() && self.popup.names_incomplete.get();
+        rows.iter()
+            .enumerate()
+            .map(|(i, row)| {
+                let header = quick::starts_section(rows, i).then(|| header_label(row.group, names_incomplete));
+                let (top, height) = slots.iter().find(|s| s.kind == SlotKind::Row(i)).map_or((0, 0), |s| (s.y, s.h));
+                super::quick_access::Item { name: quick::spoken_name(row, header, lang), top, height, selectable: quick::selectable(row) }
+            })
+            .collect()
     }
 
     /// The progress line under the results while indexing runs (the
@@ -735,6 +777,9 @@ impl App {
         unsafe {
             SetWindowPos(hwnd, HWND_TOPMOST, r.left, r.top, r.width(), r.height(), SWP_NOACTIVATE);
         }
+        if let Some(results) = self.popup.results.get() {
+            results.place(r.width(), list_h);
+        }
         // The backdrop shows through the list; a solid Windows 11 popup still
         // extends one (opaque) row, which gets it DWM's shadow.
         if look.backdrop {
@@ -747,7 +792,8 @@ impl App {
         let x = px(48, s);
         let w = (r.width() - x - px(16, s)).max(px(40, s));
         let x = quick::mirror_x(x, w, r.width(), rtl());
-        let y = list_h + (r.height() - list_h - edit_h) / 2;
+        let box_h = (r.height() - list_h - px(KEYS_H, s)).max(edit_h);
+        let y = list_h + (box_h - edit_h) / 2;
         unsafe {
             SetWindowPos(self.popup_edit(), std::ptr::null_mut(), x, y, w, edit_h, SWP_NOZORDER | SWP_NOACTIVATE);
             InvalidateRect(hwnd, std::ptr::null(), 0);
@@ -804,6 +850,9 @@ impl App {
                     if row.is_some() && row != self.popup.selected.get() {
                         self.popup.selected.set(row);
                         unsafe { InvalidateRect(hwnd, std::ptr::null(), 0) };
+                        if let Some(results) = self.popup.results.get() {
+                            results.select(row, false);
+                        }
                     }
                 }
                 Some(0)
@@ -831,6 +880,20 @@ impl App {
                 self.popup_files_found();
                 Some(0)
             }
+            WM_APP_SYSTEM => {
+                self.popup_system_done();
+                Some(0)
+            }
+            WM_APP_ACC_OPEN => {
+                // A screen reader's "default action" on row `w` of the list it saw.
+                let current = self.popup.results.get().is_some_and(|r| r.generation() == l as u32);
+                if current && self.quick_visible() && w < self.popup.rows.borrow().len() {
+                    self.popup.selected.set(Some(w));
+                    unsafe { InvalidateRect(hwnd, std::ptr::null(), 0) };
+                    self.popup_open_selected(How::Open);
+                }
+                Some(0)
+            }
             WM_APP_CATALOG => {
                 if self.quick_visible() {
                     self.popup_refresh();
@@ -854,9 +917,23 @@ impl App {
     /// Keys typed in the search box; `None` lets the box have them.
     fn popup_edit_key(&self, msg: UINT, w: WPARAM) -> Option<LRESULT> {
         match msg {
+            // Windows tells the screen reader about the box itself.
+            WM_SETFOCUS => {
+                if let Some(results) = self.popup.results.get() {
+                    results.leave_list(self.popup_edit(), false);
+                }
+                None
+            }
             WM_KEYDOWN => {
                 let ctrl = unsafe { GetKeyState(VK_CONTROL) } < 0;
                 match w as i32 {
+                    // The caret keys work the box: the screen reader goes back to it.
+                    VK_LEFT | VK_RIGHT | VK_HOME | VK_END => {
+                        if let Some(results) = self.popup.results.get() {
+                            results.leave_list(self.popup_edit(), true);
+                        }
+                        return None;
+                    }
                     VK_DOWN => self.popup_move(1),
                     VK_UP => self.popup_move(-1),
                     VK_NEXT => self.popup_move(4),
@@ -875,15 +952,14 @@ impl App {
     }
 
     fn popup_move(&self, delta: i32) {
-        let n = self.popup.rows.borrow().len();
-        let cur = self.popup.selected.get();
-        let next = if delta.abs() > 1 {
-            cur.map(|c| (c as i64 + delta as i64).clamp(0, n as i64 - 1) as usize).or((n > 0).then_some(0))
-        } else {
-            quick::move_selection(cur, delta, n)
-        };
+        // Past the rows that are not for selecting (the rates credit).
+        let next = quick::step_selection(&self.popup.rows.borrow(), self.popup.selected.get(), delta);
         self.popup.selected.set(next);
         unsafe { InvalidateRect(self.popup_hwnd(), std::ptr::null(), 0) };
+        // A screen reader reads the row the keys moved to.
+        if let Some(results) = self.popup.results.get() {
+            results.select(next, true);
+        }
     }
 
     // ---------------------------------------------------------------- painting
@@ -968,11 +1044,7 @@ impl App {
                     SlotKind::Header(g) => {
                         let r = Rect::at(quick::mirror_x(px(16, s), w - px(32, s), w, rtl), slot.y, w - px(32, s), slot.h);
                         // Not a plain "No results" while the index is not complete.
-                        let label = if g == Group::Suggest && names_incomplete {
-                            crate::indexing_status::incomplete_try(crate::i18n::current())
-                        } else {
-                            group_label(g)
-                        };
+                        let label = header_label(g, names_incomplete);
                         surface::draw_text(dc, &look.header, p.muted, label, &r, rtl, false);
                     }
                     SlotKind::Separator => {}
@@ -991,7 +1063,9 @@ impl App {
                             }
                         }
                         let font = if row.group == Group::More { &look.small } else { &look.title };
-                        let title = quick::embed_quoted(&row.title);
+                        let file = matches!(row.target, Target::File { .. });
+                        // A file's dates and phone numbers as typed.
+                        let title = quick::embed_quoted(&if file { crate::bidi_layout::ordered_digits(&row.title, rtl) } else { row.title.clone() });
                         if row.subtitle.is_empty() || row.group == Group::More {
                             surface::draw_text(dc, font, p.text, &title, &Rect::at(tx, slot.y, text_w, slot.h), rtl, false);
                         } else {
@@ -1000,15 +1074,19 @@ impl App {
                             let bottom = Rect::at(tx, slot.y + half, text_w, half - px(3, s));
                             surface::draw_text(dc, font, p.text, &title, &top, rtl, false);
                             // A folder reads left to right; other second lines as written.
-                            let sub = if matches!(row.target, Target::File { .. }) { super::format::ltr_path(&row.subtitle) } else { row.subtitle.clone() };
+                            let sub = if file { super::format::ltr_path(&row.subtitle) } else { row.subtitle.clone() };
                             surface::draw_text(dc, &look.small, p.muted, &sub, &bottom, rtl, false);
                         }
                     }
                 }
             }
-            // The magnifier at the start of the search strip.
-            let mag = Rect::at(ix, list_h, icon_box, h - list_h);
+            // The magnifier at the start of the search strip, beside the box.
+            let keys_h = px(KEYS_H, s).min(h - list_h);
+            let mag = Rect::at(ix, list_h, icon_box, h - list_h - keys_h);
             surface::draw_glyph(dc, &look.glyph, p.muted, quick::glyph::SEARCH, &mag);
+            // Under it, the keys the popup answers to.
+            let keys = Rect::at(quick::mirror_x(px(16, s), w - px(32, s), w, rtl), h - keys_h - px(4, s), w - px(32, s), keys_h);
+            surface::draw_text(dc, &look.small, p.muted, quick::key_hints(crate::i18n::current()), &keys, rtl, false);
         });
     }
 
@@ -1024,7 +1102,11 @@ impl App {
             return None;
         }
         let ext = lower.rsplit_once('.').map(|(_, e)| e).filter(|e| !e.contains(['\\', '/'])).unwrap_or("");
-        let own = matches!(ext, "exe" | "lnk" | "ico" | "url" | "msc" | "appref-ms");
+        // Its own icon is read from the file: not from a cloud-only one,
+        // which that would download (it gets its type's icon).
+        let own = matches!(ext, "exe" | "lnk" | "ico" | "url" | "msc" | "appref-ms")
+            && !*is_dir
+            && crate::cloud::probe(std::path::Path::new(path)).is_some_and(|s| !crate::cloud::contents_elsewhere(s.attrs));
         let key = if *is_dir {
             "<folder>".to_string()
         } else if own {
@@ -1112,7 +1194,11 @@ impl App {
             },
             (t, How::CopyPath) => match t.path() {
                 Some(p) => {
-                    nwg::Clipboard::set_data_text(&self.window, p);
+                    // Not copied: the popup stays, saying why.
+                    if !shell::copy_text(&self.window, p) {
+                        self.popup_error(shell::copy_failed_text());
+                        return;
+                    }
                     true
                 }
                 None => return,
@@ -1158,6 +1244,11 @@ impl App {
                 return;
             }
             (Target::OpenInMain(q), _) => {
+                // The new look takes the text (no search in the hidden classic window).
+                if self.webui_take_search(q, super::webui::Handover::default()) {
+                    self.hide_quick();
+                    return;
+                }
                 self.query.set_text(q);
                 self.show_window();
                 self.hide_quick();
@@ -1189,16 +1280,33 @@ impl App {
     /// default button.
     pub(super) fn run_action(&self, action: &Action, admin: bool) -> Option<bool> {
         Some(match action {
-            Action::Launch { target, args } => shell_execute(admin.then_some("runas"), &system_tool(target), args),
+            Action::Launch { target, args } => match system_tool(target) {
+                Some(file) => shell_execute(admin.then_some("runas"), &file, args),
+                None => {
+                    log(&format!("quick search: {target} is not in the Windows folders; not started"));
+                    false
+                }
+            },
             Action::OpenUri(uri) => shell::open(uri),
             Action::CopyText(text) => {
-                nwg::Clipboard::set_data_text(&self.window, text);
+                // Not copied: back to the list (the popup stays), saying why.
+                if !shell::copy_text(&self.window, text) {
+                    self.popup_error(shell::copy_failed_text());
+                    return None;
+                }
                 true
             }
             Action::FocusWindow(h) => shim::focus_window(*h),
             Action::System(cmd) => {
+                if let Some(why) = shim::refusal(cmd) {
+                    self.popup_error(&why);
+                    return None;
+                }
                 if !self.popup_confirm(&shim::confirm_text(cmd)) {
                     return None;
+                }
+                if shim::runs_in_background(cmd) && self.popup_system_in_background(cmd) {
+                    return Some(true);
                 }
                 let ok = shim::run_system(cmd);
                 if !ok {
@@ -1209,6 +1317,49 @@ impl App {
         })
     }
 
+    /// Starts a slow system command (emptying the Recycle Bin) on a
+    /// background thread, after the user confirmed it; the result comes back
+    /// as `WM_APP_SYSTEM` (`popup_system_done`). False when no thread could
+    /// be started (then it runs here, as before).
+    fn popup_system_in_background(&self, cmd: &SystemCommand) -> bool {
+        // Already running: the second request has nothing left to do.
+        if self.popup.system_running.replace(true) {
+            return true;
+        }
+        let (slot, post_to, cmd) = (self.popup.system_slot.clone(), self.popup.post_to.clone(), cmd.clone());
+        let started = crate::crash_log::spawn_named("system-command", move || {
+            // The shell's Recycle Bin wants COM on its thread.
+            unsafe { winapi::um::combaseapi::CoInitializeEx(std::ptr::null_mut(), winapi::um::objbase::COINIT_APARTMENTTHREADED) };
+            let ok = crate::crash_log::catch(|| shim::run_system(&cmd)).unwrap_or(false);
+            unsafe { winapi::um::combaseapi::CoUninitialize() };
+            if let Ok(mut s) = slot.lock() {
+                *s = Some((cmd, ok));
+            }
+            let h = post_to.load(Ordering::Relaxed);
+            if h != 0 {
+                unsafe { PostMessageW(h as HWND, WM_APP_SYSTEM, 0, 0) };
+            }
+        });
+        if started.is_none() {
+            self.popup.system_running.set(false);
+        }
+        started.is_some()
+    }
+
+    /// A system command run in the background ended: says so when it failed.
+    fn popup_system_done(&self) {
+        self.popup.system_running.set(false);
+        let Some((cmd, ok)) = self.popup.system_slot.lock().ok().and_then(|mut s| s.take()) else { return };
+        if ok {
+            if cmd == SystemCommand::EmptyRecycleBin {
+                self.set_status(tr!("أُفرغت سلة المحذوفات.", "The Recycle Bin is empty."));
+            }
+        } else {
+            log(&format!("quick search: system command {cmd:?} failed"));
+            self.popup_error(&shim::failed_text(&cmd));
+        }
+    }
+
     fn popup_toggle_pin(&self, row: &Row, target: &Target) {
         let Some(t) = target.pin_target() else { return };
         let pin = crate::history::Pin {
@@ -1216,15 +1367,16 @@ impl App {
             target: t.to_string(),
             app: matches!(target, Target::Launcher(_)),
             dir: matches!(target, Target::File { is_dir: true, .. }),
+            args: target.pin_args().to_string(),
         };
         let mut st = self.state.borrow_mut();
-        let was = st.history.is_pinned(t);
+        let was = st.history.is_pinned(t, target.pin_args());
         let now = st.history.toggle_pin(pin);
         st.history.save();
         drop(st);
         if !was && !now {
             self.popup_error(&trf!(
-                "قائمة المثبّتة ممتلئة ({} عنصراً). ألغِ تثبيت عنصر أولاً.",
+                "قائمة المثبّتة ممتلئة (الحد الأقصى: {}). ألغِ تثبيت عنصر أولاً.",
                 "The pinned list is full ({} items). Unpin one first.",
                 crate::history::MAX_PINS
             ));
@@ -1268,7 +1420,7 @@ impl App {
             Target::Launcher(Action::Launch { target, .. }) => runs_as_admin(target),
             _ => false,
         };
-        let pinned = row.target.pin_target().map(|t| self.state.borrow().history.is_pinned(t));
+        let pinned = row.target.pin_target().map(|t| self.state.borrow().history.is_pinned(t, row.target.pin_args()));
         let mut items: Vec<(How, String)> = vec![(How::Open, tr!("فتح\tEnter", "Open\tEnter").to_string())];
         if admin {
             items.push((How::Admin, tr!("تشغيل كمسؤول", "Run as administrator").to_string()));
@@ -1375,6 +1527,13 @@ impl App {
                 }
             }
             Suggestion::Contents | Suggestion::AllDrives | Suggestion::AllKinds => {
+                // The new look runs it as the suggestion says (inside
+                // documents, all drives, all types), not the hidden classic window.
+                let how = super::webui::Handover { content: *s == Suggestion::Contents, all_kinds: *s == Suggestion::AllKinds, all_drives: *s == Suggestion::AllDrives };
+                if self.webui_take_search(query.trim(), how) {
+                    self.hide_quick();
+                    return;
+                }
                 self.query.set_text(query.trim());
                 if *s == Suggestion::Contents {
                     self.content_chk.set_check_state(nwg::CheckBoxState::Checked);
@@ -1415,7 +1574,7 @@ fn pin_row(p: &crate::history::Pin) -> Row {
             group: Group::Pinned,
             title: p.title.clone(),
             subtitle: tr!("تطبيق", "App").to_string(),
-            target: Target::Launcher(Action::Launch { target: p.target.clone(), args: String::new() }),
+            target: Target::Launcher(Action::Launch { target: p.target.clone(), args: p.args.clone() }),
             icon: if shell_app { Icon::Glyph(quick::glyph::APPS) } else { Icon::Shell { path: p.target.clone(), is_dir: false } },
         }
     } else {
@@ -1438,6 +1597,12 @@ fn label_more_row(r: &mut Row) {
     }
 }
 
+/// The name drawn above a section: not a plain "No results" while the
+/// names are still being scanned (`names_incomplete`).
+fn header_label(g: Group, names_incomplete: bool) -> &'static str {
+    if g == Group::Suggest && names_incomplete { crate::indexing_status::incomplete_try(crate::i18n::current()) } else { group_label(g) }
+}
+
 /// The name shown above a section.
 fn group_label(g: Group) -> &'static str {
     match g {
@@ -1457,7 +1622,8 @@ fn group_label(g: Group) -> &'static str {
 }
 
 /// For the automated UI test (`ci/ui-test.ps1`) only: the popup draws its rows
-/// itself, so UI Automation cannot read them. With `BAHTH_UI_TEST` set, each
+/// itself (screen readers get them from `ui/quick_access.rs`), and the test
+/// reads this file rather than the accessibility tree. With `BAHTH_UI_TEST` set, each
 /// refresh writes the query and the rows to `quick-rows.txt` next to the log.
 fn ui_test_dump(query: &str, rows: &[Row]) {
     use std::io::Write;

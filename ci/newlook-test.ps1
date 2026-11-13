@@ -6,12 +6,36 @@
 #      no WebView2 failure), the setting is kept, no crash, and a screenshot
 #      of its client area is not one flat colour. A short search is typed
 #      (screenshot only, never fails the job).
-#   B. new_ui=0: the classic window opens, and its Options menu offers
-#      "Try the new look".
-#   C. Probe (warns, never fails): choosing that item swaps in the new window
-#      without a restart and saves new_ui=1.
+#   0. Before A (the only look since 1.0): with no settings.txt at all the
+#      new look opens, and the one-time markers (new_ui=1, new_ui_default=1,
+#      new_ui_only=1) are saved, and no first-run question comes over it.
+#   B. Settings of a classic user of 0.10.x (new_ui=0, new_ui_default=1, as
+#      after "Back to the classic look"): the new look opens, the move is
+#      saved (new_ui=1, new_ui_only=1), and neither its settings page nor
+#      the Options menu over it offers a way back to the classic look.
+#   C. BAHTH_CLASSIC=1 (the tests' own classic window): the classic window
+#      opens without the "WebView2 is not working" line, and its Options
+#      menu offers "Try the new look"; probe (warns, never fails): choosing
+#      it swaps in the new window without a restart.
+#   D. Settings as 0.10.0 left them (new_ui=0, no markers): the new look
+#      opens and the markers are saved; then new_ui=0 written by hand after
+#      the move: still the new look.
+#   R. Memory while hidden: with BAHTH_WEBUI_RELEASE_SECS=20 (10 min for
+#      users), a search is typed and the window is hidden to the tray: the
+#      page is suspended, then its WebView2 is closed and every msedgewebview2
+#      process exits (well before 11 min; CI never waits 10 real minutes),
+#      without counting as a failure (no classic window, no new_ui_failed);
+#      a second launch shows the window, the page is created again
+#      ("recreated on show in N ms") and the search box still holds the query.
+#   F. The fallback: with BAHTH_WEBUI_FAIL=1 (WebView2 taken as failing to
+#      start) the classic window takes over and says why, and settings.txt
+#      keeps new_ui=1 (new_ui_failed=1: this run only); the next start,
+#      without it, opens the new look again.
 #
-# Output: <Out>\newlook.png, newlook-query.png, classic.png, switched.png,
+# Note: in a right-to-left (mirrored) window the client origin is the top
+# RIGHT corner on screen; ClientOnScreen returns the true rectangle.
+#
+# Output: <Out>\newlook.png, newlook-query.png, classic.png, switched.png, recreated.png, fallback.png,
 # diagnostics.txt (windows, settings.txt, log.txt, crash.txt), report.md.
 # Runs under Windows PowerShell 5.1 or PowerShell 7 on 64-bit Windows.
 # This file is UTF-8 with a BOM so Windows PowerShell reads the Arabic in it.
@@ -23,7 +47,7 @@ $ErrorActionPreference = 'Stop'
 $Exe = (Resolve-Path $Exe).Path
 New-Item -ItemType Directory -Force $Out | Out-Null
 
-Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+Add-Type -AssemblyName System.Windows.Forms, System.Drawing, UIAutomationClient, UIAutomationTypes
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -53,6 +77,7 @@ public static class N {
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, StringBuilder l, uint flags, uint ms, out IntPtr result);
     [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+    [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr h, int id);
     [DllImport("user32.dll")] static extern int GetMenuItemCount(IntPtr m);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetMenuString(IntPtr m, uint item, StringBuilder sb, int n, uint flags);
 
@@ -69,6 +94,19 @@ public static class N {
             System.Threading.Thread.Sleep(40);
         }
     }
+    [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+    static void Mouse(uint flags) {
+        var i = new INPUT { type = 0 }; i.u.mi = new MOUSEINPUT { dwFlags = flags };
+        SendInput(1, new[] { i }, Marshal.SizeOf(typeof(INPUT)));
+    }
+    // A real left click, press and release, at a screen point.
+    public static void Click(int x, int y) {
+        SetCursorPos(x, y); System.Threading.Thread.Sleep(100);
+        Mouse(2); System.Threading.Thread.Sleep(60); Mouse(4);
+    }
+    public static void MoveTo(int x, int y) { SetCursorPos(x, y); Mouse(1); }
+    public static void Down() { Mouse(2); }
+    public static void Up() { Mouse(4); }
     public static void Chord(params ushort[] vks) {
         var list = new List<INPUT>();
         foreach (var v in vks) list.Add(Key(v, 0, 0));
@@ -129,7 +167,7 @@ public static class N {
 # Real pixels, whatever the display scale.
 [void][N]::SetProcessDPIAware()
 
-$VK = @{ ALT = 0x12; ENTER = 0x0D; ESC = 0x1B; DOWN = 0x28; CTRL = 0x11; A = 0x41 }
+$VK = @{ ALT = 0x12; ENTER = 0x0D; ESC = 0x1B; DOWN = 0x28; CTRL = 0x11; A = 0x41; TAB = 0x09; COMMA = 0xBC; SPACE = 0x20 }
 $BM_CLICK = 0x00F5
 $data = Join-Path $env:LOCALAPPDATA 'BahthSari'
 $settingsFile = Join-Path $data 'settings.txt'
@@ -180,20 +218,82 @@ function Focus-Window($Hwnd) {
     [void][N]::SetForegroundWindow($Hwnd)
     Start-Sleep -Milliseconds 400
 }
-function Read-Settings { if (Test-Path $settingsFile) { [IO.File]::ReadAllText($settingsFile) } else { '' } }
+function Read-Settings { if (Test-Path $settingsFile) { Read-Shared $settingsFile } else { '' } }
 function Setting([string]$Text, [string]$Key) {
     $m = [regex]::Matches($Text, "(?m)^\s*$Key\s*=\s*(.*?)\s*$")
     if ($m.Count) { $m[$m.Count - 1].Groups[1].Value } else { $null }
 }
 # settings.txt as the program reads it (key=value, ASCII, no BOM): no
 # first-run question (box above the clock, moving the exe, Store rating).
-function Write-Settings([int]$NewUi) {
+# With -Old: as 0.10.0 wrote it, without 0.10.1's marker (new_ui_default);
+# with -Only: as 1.0 writes it, with its marker (new_ui_only) too.
+function Write-Settings([int]$NewUi, [switch]$Old, [switch]$Only) {
     New-Item -ItemType Directory -Force $data | Out-Null
     $text = "floating_asked=1`nmove_asked=1`nrating_asked=1`nnew_ui=$NewUi`nnew_ui_failed=0`n"
+    if (-not $Old) { $text += "new_ui_default=1`n" }
+    if ($Only) { $text += "new_ui_only=1`n" }
     [IO.File]::WriteAllText($settingsFile, $text, (New-Object Text.ASCIIEncoding))
     Say "settings.txt written: $($text -replace "`n", ' ')"
 }
-function Log-Text { if (Test-Path $logFile) { [IO.File]::ReadAllText($logFile, [Text.Encoding]::UTF8) } else { '' } }
+# Answers the program's message boxes (the first-run questions) with No,
+# else Cancel, else closes them. Returns how many there were.
+function Dismiss-Dialogs([int]$ProcId) {
+    $n = 0
+    foreach ($d in @(Get-Windows $ProcId | Where-Object { $_.Visible -and $_.Class -eq '#32770' })) {
+        $n++
+        $text = (Get-Children $d.Handle | Where-Object { $_.Class -eq 'Static' -and $_.Text } | ForEach-Object Text) -join ' '
+        Say "dialog '$($d.Text)': $text"
+        $no = [N]::GetDlgItem($d.Handle, 7)
+        if ($no -eq [IntPtr]::Zero) { $no = [N]::GetDlgItem($d.Handle, 2) }
+        if ($no -ne [IntPtr]::Zero) { [void][N]::PostMessage($no, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero) }
+        else { [void][N]::PostMessage($d.Handle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) }  # WM_CLOSE
+    }
+    return $n
+}
+# The page's elements, as Windows UI Automation sees them (WebView2 exposes
+# the page's accessibility tree): the first one of `ControlType` whose name
+# matches `Pattern`, with a non-empty rectangle on screen.
+function Find-Uia($Hwnd, $ControlType, [string]$Pattern) {
+    try { return Find-UiaIn ([Windows.Automation.AutomationElement]::FromHandle($Hwnd)) $ControlType $Pattern } catch { Say "UI Automation: $_"; return $null }
+}
+function Find-UiaIn($Root, $ControlType, [string]$Pattern) {
+    if (-not $Root) { return $null }
+    try {
+        $cond = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, $ControlType)
+        foreach ($e in $root.FindAll([Windows.Automation.TreeScope]::Descendants, $cond)) {
+            $r = $e.Current.BoundingRectangle
+            if ($e.Current.Name -match $Pattern -and -not $r.IsEmpty -and $r.Width -gt 2 -and $r.Height -gt 2) { return $e }
+        }
+    } catch { Say "UI Automation: $_" }
+    return $null
+}
+function Uia-Names($Hwnd, $ControlType) {
+    try {
+        $root = [Windows.Automation.AutomationElement]::FromHandle($Hwnd)
+        $cond = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, $ControlType)
+        return @($root.FindAll([Windows.Automation.TreeScope]::Descendants, $cond) | ForEach-Object { $_.Current.Name } | Select-Object -First 40)
+    } catch { return @("(UI Automation failed: $_)") }
+}
+function Center($El) {
+    $r = $El.Current.BoundingRectangle
+    return @([int]($r.X + $r.Width / 2), [int]($r.Y + $r.Height / 2))
+}
+function Is-Selected($El) {
+    try { return $El.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected } catch { return $null }
+}
+# Reads a file the program may be writing at that moment (log.txt, settings):
+# File.ReadAllText asks for FileShare.Read only and fails while another handle
+# has write access, so open with FileShare.ReadWrite and retry briefly.
+function Read-Shared([string]$Path) {
+    for ($i = 0; $i -lt 5; $i++) {
+        try {
+            $fs = New-Object IO.FileStream($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+            try { $sr = New-Object IO.StreamReader($fs, [Text.Encoding]::UTF8); return $sr.ReadToEnd() } finally { $fs.Dispose() }
+        } catch { Start-Sleep -Milliseconds 100 }
+    }
+    return ''
+}
+function Log-Text { if (Test-Path $logFile) { Read-Shared $logFile } else { '' } }
 function Log-Lines([string]$Pattern) { @((Log-Text) -split "`r?`n" | Where-Object { $_ -match $Pattern }) }
 
 # Saves the window's client area to <Out>\<Name>.png; returns how varied it
@@ -261,15 +361,37 @@ function Diagnostics([string]$When) {
 function Stop-Program {
     Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     if ($script:proc) { [void]$script:proc.WaitForExit(10000) }
+    # Every copy, not only $script:proc: one still ending (or a copy started
+    # by the last part) holds the single-instance lock, and the fresh copy
+    # of the next part then only brings it to the front and leaves. On a CI
+    # runner that made part T fail once.
+    $gone = Wait-Until {
+        Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        -not (Get-Process bahth* -ErrorAction SilentlyContinue)
+    } 15
+    if (-not $gone) {
+        $left = @(Get-Process bahth* -ErrorAction SilentlyContinue | ForEach-Object { "$($_.Id) $($_.ProcessName)" }) -join ', '
+        Say "Stop-Program: bahth processes still running after 15 s: $left"
+    }
     # Its WebView2 processes follow it; give them a moment.
     [void](Wait-Until { -not (Get-Process msedgewebview2 -ErrorAction SilentlyContinue) } 10)
     Start-Sleep -Seconds 1
 }
-function Start-Program {
-    Say "starting $Exe"
-    $script:proc = Start-Process -FilePath $Exe -PassThru
+function Start-Program([string[]]$ArgList = @()) {
+    Say "starting $Exe $($ArgList -join ' ')"
+    $script:proc = if ($ArgList.Count) { Start-Process -FilePath $Exe -ArgumentList $ArgList -PassThru } else { Start-Process -FilePath $Exe -PassThru }
     Say "process $($script:proc.Id)"
 }
+# How long the new look took, from log.txt: launch to the window on screen,
+# and to the page's hello (the page usable). Reported, never failing.
+function Report-Timings([string]$When) {
+    $shown = (Log-Lines 'webui: window on screen \d+ ms' | Select-Object -Last 1)
+    $hello = (Log-Lines 'webui: page said hello' | Select-Object -Last 1)
+    $ws = if ($shown -match '(\d+) ms after launch') { [int]$Matches[1] } else { $null }
+    $hs = if ($hello -match 'hello (\d+) ms after launch') { [int]$Matches[1] } else { $null }
+    Record 'probe' "timing ($When): window on screen within 1 s of launch" ($null -ne $ws -and $ws -lt 1000) ("window {0} ms, page ready {1} ms after launch" -f $(if ($null -ne $ws) { $ws } else { '?' }), $(if ($null -ne $hs) { $hs } else { '?' }))
+}
+function WebView2-Count { @(Get-Process msedgewebview2 -ErrorAction SilentlyContinue).Count }
 function Check-Crash([string]$When) {
     $ok = -not (Test-Path $crash)
     $detail = ''
@@ -307,13 +429,56 @@ if (-not $wv2) {
 }
 Say "WebView2 runtime $wv2"
 
-# A clean start, as a new user who chose the new look.
+# A clean start, as a new user.
 Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force
 Remove-Item $data -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item 'HKCU:\Software\BahthSari' -Recurse -Force -ErrorAction SilentlyContinue
-Write-Settings 1
 
 try {
+    # ------------------------------------------------------------ 0. a new user: the default
+    Say 'part 0: no settings.txt at all'
+    $t0 = Get-Date
+    Start-Program
+    $win = Wait-Until { New-Look $script:proc.Id } 40
+    Record 'core' 'a new user (no settings.txt) gets the new look' ($null -ne $win) $(if ($win) { "'$($win.Text)' after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { 'no new window' })
+    # No first-run question (since 1.0 the box above the clock is an option).
+    $asked = Wait-Until { @(Get-Windows $script:proc.Id | Where-Object { $_.Visible -and $_.Class -eq '#32770' }).Count -gt 0 } 20
+    Record 'core' 'no first-run question over the new look' (-not $asked)
+    if ($asked) { Full-Shot 'unexpected-dialog'; [void](Dismiss-Dialogs $script:proc.Id); Start-Sleep -Seconds 2 }
+    $s = Read-Settings
+    Record 'core' 'the one-time markers are saved (new_ui=1, new_ui_default=1, new_ui_only=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_default') -eq '1') -and ((Setting $s 'new_ui_only') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default') new_ui_only=$(Setting $s 'new_ui_only')")
+    Record 'core' 'the classic window stays hidden (new user)' ($null -eq (Classic $script:proc.Id))
+    Alive 'new user'
+    Check-Crash 'new user'
+    if ($results | Where-Object Result -eq 'FAIL') { Diagnostics 'new user' }
+    Report-Timings 'new user'
+    Stop-Program
+
+    # ------------------------------------------------------------ T. a start in the tray (with Windows)
+    # No WebView2 until the window is shown; a second launch shows it and
+    # the page comes then.
+    Say 'part T: started with Windows (in the tray)'
+    Remove-Item $logFile -Force -ErrorAction SilentlyContinue   # this part's lines only
+    $before = WebView2-Count
+    Start-Program @('--startup')
+    Start-Sleep -Seconds 12
+    $after = WebView2-Count
+    Record 'core' 'a start in the tray creates no WebView2 process' ($after -le $before) ("msedgewebview2 processes: $before before, $after after")
+    Record 'core' 'no window on screen after a start in the tray' ($null -eq (New-Look $script:proc.Id) -and $null -eq (Classic $script:proc.Id))
+    $tray = $script:proc
+    $second = Start-Process -FilePath $Exe -PassThru   # brings the running copy to the front
+    [void]$second.WaitForExit(15000)
+    $script:proc = $tray
+    $win = Wait-Until { New-Look $script:proc.Id } 20
+    Record 'core' 'a second launch shows the new look' ($null -ne $win)
+    $hello = Wait-Until { (Log-Lines 'webui: page said hello').Count -gt 0 } 40
+    Record 'core' 'its page is created and loads when shown' ([bool]$hello) (((Log-Lines 'webui: (page|window)') | Select-Object -Last 3) -join ' | ')
+    if ($win) { [void](Shot-Client $win 'tray-start-shown') }
+    Alive 'tray start'
+    Check-Crash 'tray start'
+    Stop-Program
+    Write-Settings 1
+
     # ------------------------------------------------------------ A. the new look
     $t0 = Get-Date
     Start-Program
@@ -335,11 +500,12 @@ try {
     Alive 'new look, after 45 s'
     Check-Crash 'new look'
     foreach ($l in Log-Lines 'webui') { Say "log: $l" }
-    $bad = @(Log-Lines 'webui: .*(did not load|process failed|showing the page again|back to the classic look|using the classic window|refused a message)')
+    $bad = @(Log-Lines 'webui: .*(did not load|process failed|showing the page again|using the classic window|refused a message)')
     $retried = @(Log-Lines 'webui: first try failed')
     if ($retried.Count) { Record 'probe' 'WebView2 started at the first try' $false ($retried -join ' | ') }
     Record 'core' 'the page loaded: no WebView2 failure or blank-page fallback in log.txt' ($bad.Count -eq 0) ($bad -join ' | ')
     Record 'core' 'log.txt says the new window is ready' ((Log-Lines 'webui: main window ready').Count -gt 0)
+    Report-Timings 'new look'
     $s = Read-Settings
     Record 'core' 'settings.txt keeps new_ui=1' ((Setting $s 'new_ui') -eq '1') ("new_ui=" + (Setting $s 'new_ui'))
     Record 'core' 'settings.txt has no new_ui_failed=1' ((Setting $s 'new_ui_failed') -ne '1') ("new_ui_failed=" + (Setting $s 'new_ui_failed'))
@@ -359,73 +525,311 @@ try {
         } catch { Record 'probe' 'typing a search' $false "$_" }
         Alive 'after typing'
         Check-Crash 'after typing'
+
+        # A plain click on a result selects it and never starts a drag; a
+        # press that moves starts one only while the button is down (the
+        # program's own drag of the file, dropped back on its own search
+        # box, which takes nothing). Results come in while the drives are
+        # indexed: search for something every Windows has.
+        [N]::Chord($VK.CTRL, 0x4B)  # Ctrl+K: the search box, text selected
+        Start-Sleep -Milliseconds 300
+        [N]::Type('notepad')
+        $rowIn = { Find-UiaIn (Find-Uia $win.Handle ([Windows.Automation.ControlType]::List) '^(Results|النتائج)$') ([Windows.Automation.ControlType]::ListItem) '\S' }
+        $row = Wait-Until $rowIn 60
+        if (-not $row) {
+            # Which lists UI Automation sees and how many rows each holds (the
+            # result rows are options of the "Results" listbox, with names).
+            $lists = @(Uia-Names $win.Handle ([Windows.Automation.ControlType]::List)) -join ' | '
+            Record 'probe' 'a result row to click (UI Automation)' $false ("lists: $lists; list items: " + ((Uia-Names $win.Handle ([Windows.Automation.ControlType]::ListItem)) -join ' | '))
+        } else {
+            $drags = (Log-Lines 'webui: drag').Count
+            $c = Center $row
+            Say "clicking result '$($row.Current.Name)' at $($c[0]),$($c[1])"
+            [N]::Click($c[0], $c[1])
+            Start-Sleep -Seconds 1
+            Record 'core' 'a plain click on a result starts no drag' ((Log-Lines 'webui: drag').Count -eq $drags) (((Log-Lines 'webui: drag') | Select-Object -Last 2) -join ' | ')
+            $sel = Is-Selected $row
+            if ($null -eq $sel) { Record 'probe' 'the clicked result is selected (UI Automation SelectionItem)' $false 'pattern not available' }
+            else { Record 'core' 'the clicked result is selected (the click is not swallowed)' ([bool]$sel) }
+            [void](Shot-Client $win 'row-clicked')
+            # A real drag, onto the page's own search box.
+            $box = Find-Uia $win.Handle ([Windows.Automation.ControlType]::ComboBox) '.'
+            $row = & $rowIn
+            if ($row -and $box) {
+                $c = Center $row; $b = Center $box
+                [N]::MoveTo($c[0], $c[1]); Start-Sleep -Milliseconds 200
+                [N]::Down(); Start-Sleep -Milliseconds 200
+                for ($k = 1; $k -le 5; $k++) { [N]::MoveTo($c[0] + 4 * $k, $c[1] + 2 * $k); Start-Sleep -Milliseconds 80 }
+                Start-Sleep -Milliseconds 600
+                for ($k = 1; $k -le 8; $k++) { [N]::MoveTo([int]($c[0] + ($b[0] - $c[0]) * $k / 8), [int]($c[1] + ($b[1] - $c[1]) * $k / 8)); Start-Sleep -Milliseconds 80 }
+                Start-Sleep -Milliseconds 300
+                [N]::Up()
+                Start-Sleep -Seconds 2
+                $started = @(Log-Lines 'webui: drag started').Count -gt 0
+                Record 'probe' 'dragging a result starts the program''s drag' $started (((Log-Lines 'webui: drag') | Select-Object -Last 2) -join ' | ')
+                Alive 'after a drag'
+                Check-Crash 'after a drag'
+                [void](Shot-Client $win 'after-drag')
+            } else {
+                Record 'probe' 'a result and the search box to drag between (UI Automation)' $false
+            }
+        }
     } else {
         Full-Shot 'newlook-screen'
     }
     if ($results | Where-Object Result -eq 'FAIL') { Diagnostics 'new look' }
     Stop-Program
 
-    # ------------------------------------------------------------ B. the classic window
+    # ------------------------------------------------------------ B. a classic user of 0.10.x: moved once, no way back
+    Say 'part B: settings of a classic user of 0.10.x (new_ui=0, new_ui_default=1)'
     Write-Settings 0
     $t0 = Get-Date
     Start-Program
-    $cw = Wait-Until { Classic $script:proc.Id } 40
-    Record 'core' 'the classic window opens with new_ui=0' ($null -ne $cw) $(if ($cw) { "'$($cw.Text)' after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { '' })
-    $other = New-Look $script:proc.Id
-    Record 'core' 'no new window with new_ui=0' ($null -eq $other)
-    if ($cw) {
-        Start-Sleep -Seconds 3
-        Focus-Window $cw.Handle
-        [void](Shot-Client $cw 'classic')
-        # The Options menu offers the new look (first item).
-        $options = Get-Children $cw.Handle | Where-Object { $_.Visible -and $_.Class -eq 'Button' -and $_.Text -match '^Options|^خيارات' } | Select-Object -First 1
-        $items = @()
-        $menu = $null
-        if ($options) {
-            # Focus-Window's Alt tap can leave the window in menu mode, where
-            # a popup menu closes at once: leave that mode first.
-            [void][N]::PostMessage($cw.Handle, 0x001F, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CANCELMODE
-            Start-Sleep -Milliseconds 500
-            for ($try = 1; $try -le 3 -and -not $menu; $try++) {
-                [void][N]::PostMessage($options.Handle, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
-                $menu = Wait-Until { Open-Menu } 6
+    $win = Wait-Until { New-Look $script:proc.Id } 40
+    Record 'core' 'a classic user of 0.10.x gets the new look' ($null -ne $win) $(if ($win) { "after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { 'no new window' })
+    Record 'core' 'the classic window stays hidden (classic user)' ($null -eq (Classic $script:proc.Id))
+    $s = Read-Settings
+    Record 'core' 'the move is saved (new_ui=1, new_ui_default=1, new_ui_only=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_default') -eq '1') -and ((Setting $s 'new_ui_only') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default') new_ui_only=$(Setting $s 'new_ui_only')")
+    if ($win) {
+        # Let the page load, open its settings (the gear button, found with
+        # UI Automation, else Ctrl+,): no "Back to the classic look" there.
+        Start-Sleep -Seconds 8
+        Focus-Window $win.Handle
+        [void][N]::PostMessage($win.Handle, 0x001F, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CANCELMODE (the Alt tap)
+        Start-Sleep -Milliseconds 300
+        $gear = Find-Uia $win.Handle ([Windows.Automation.ControlType]::Button) '^(Settings|الإعدادات)'
+        if ($gear) { $c = Center $gear; [N]::Click($c[0], $c[1]) } else { Say 'no Settings button in UI Automation; pressing Ctrl+,'; [N]::Chord($VK.CTRL, $VK.COMMA) }
+        $page = Wait-Until { Find-Uia $win.Handle ([Windows.Automation.ControlType]::Button) '^(Back to search|رجوع إلى البحث)' } 10
+        Record 'probe' 'the settings page opens' ($null -ne $page) ("buttons UI Automation sees: " + ((Uia-Names $win.Handle ([Windows.Automation.ControlType]::Button)) -join ' | '))
+        [void](Shot-Client $win 'settings-page')
+        if ($page) {
+            $back = Find-Uia $win.Handle ([Windows.Automation.ControlType]::Button) '(classic look|الشكل القديم)'
+            Record 'core' 'the settings page has no way back to the classic look' ($null -eq $back) $(if ($back) { "'$($back.Current.Name)'" } else { '' })
+            # The Options menu over the new look (its "Open the Options
+            # menu" button): no switch of look in it either.
+            $more = Find-Uia $win.Handle ([Windows.Automation.ControlType]::Button) '(Options|خيارات)'
+            $menu = $null
+            if ($more) { $c = Center $more; [N]::Click($c[0], $c[1]); $menu = Wait-Until { Open-Menu } 6 }
+            if ($menu) {
+                $items = @([N]::MenuItems($menu.Handle))
+                Say ("Options items over the new look: " + ($items -join ' / '))
+                $look = @($items | Where-Object { $_ -match 'classic look|الشكل القديم|Try the new look|جرّب الشكل الجديد' })
+                Record 'core' 'the Options menu over the new look offers no switch of look' ($look.Count -eq 0) ($look -join ' / ')
+                Full-Shot 'newlook-options'
+                [N]::Chord($VK.ESC)
+            } else {
+                Record 'probe' 'the Options menu opens over the new look' $false $(if ($more) { 'no popup menu window (#32768)' } else { 'no Options button in UI Automation' })
             }
-            if ($menu) { $items = @([N]::MenuItems($menu.Handle)); Say ("Options items: " + ($items -join ' / ')) }
         }
-        if ($options -and -not $menu) { Say 'no popup menu window (#32768) after clicking Options'; Diagnostics 'options menu did not open' }
-        $first = if ($items.Count) { $items[0] } else { '' }
-        Record 'core' 'the Options menu offers "Try the new look"' ($first -match 'Try the new look|جرّب الشكل الجديد') $(if ($options) { "first item '$first'" } else { 'no Options button' })
-        Full-Shot 'classic-options'
-
-        # ------------------------------------------------------------ C. probe: switch without a restart
-        if ($menu -and $first -match 'Try the new look|جرّب الشكل الجديد') {
-            try {
-                # (The classic window has the foreground, so the open menu
-                # takes the keys; no Alt tap here, it would close the menu.)
-                [N]::Chord($VK.DOWN)
-                Start-Sleep -Milliseconds 300
-                [N]::Chord($VK.ENTER)
-                $sw = Wait-Until { New-Look $script:proc.Id } 40
-                Record 'probe' '"Try the new look" swaps in the new window without a restart' ($null -ne $sw) $(if ($sw) { "'$($sw.Text)'" } else { '' })
-                if ($sw) {
-                    Start-Sleep -Seconds 25   # past the blank-page watchdog
-                    $sw = New-Look $script:proc.Id
-                    if ($sw) { Focus-Window $sw.Handle; $x = Shot-Client $sw 'switched'; Record 'probe' 'the switched-in page is painted' ($x -and $x.Colours -ge 8 -and $x.Top -lt 0.97) $(if ($x) { "$($x.Colours) colours" } else { '' }) }
-                    Record 'probe' 'new_ui=1 saved after switching' ((Setting (Read-Settings) 'new_ui') -eq '1') ("new_ui=" + (Setting (Read-Settings) 'new_ui'))
-                    $back = Classic $script:proc.Id
-                    Record 'probe' 'the classic window is hidden after switching' ($null -eq $back)
-                } else {
-                    Full-Shot 'switch-screen'
-                }
-            } catch { Record 'probe' 'switching from the Options menu' $false "$_" }
-        } elseif ($menu) {
-            [N]::Chord($VK.ESC)
-        }
-        Alive 'classic and switch'
-        Check-Crash 'classic and switch'
-    } else {
-        Full-Shot 'classic-screen'
     }
+    Alive 'classic user moved'
+    Check-Crash 'classic user moved'
+    Stop-Program
+
+    # ------------------------------------------------------------ C. the tests' classic window
+    Say 'part C: BAHTH_CLASSIC=1'
+    Write-Settings 1 -Only
+    $env:BAHTH_CLASSIC = '1'
+    try {
+        $t0 = Get-Date
+        Start-Program
+        $cw = Wait-Until { Classic $script:proc.Id } 40
+        Record 'core' 'the classic window opens with BAHTH_CLASSIC=1' ($null -ne $cw) $(if ($cw) { "'$($cw.Text)' after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { '' })
+        $other = New-Look $script:proc.Id
+        Record 'core' 'no new window with BAHTH_CLASSIC=1' ($null -eq $other)
+        if ($cw) {
+            Start-Sleep -Seconds 3
+            $note = @(Get-Children $cw.Handle | Where-Object { $_.Visible -and $_.Class -eq 'Static' -and $_.Text -match 'WebView2' })
+            Record 'core' 'no "WebView2 is not working" line in the tests'' classic window' ($note.Count -eq 0) (($note | ForEach-Object Text) -join ' | ')
+            Focus-Window $cw.Handle
+            [void](Shot-Client $cw 'classic')
+            # The Options menu offers the new look (first item).
+            $options = Get-Children $cw.Handle | Where-Object { $_.Visible -and $_.Class -eq 'Button' -and $_.Text -match '^Options|^خيارات' } | Select-Object -First 1
+            $items = @()
+            $menu = $null
+            if ($options) {
+                # Focus-Window's Alt tap can leave the window in menu mode, where
+                # a popup menu closes at once: leave that mode first.
+                [void][N]::PostMessage($cw.Handle, 0x001F, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CANCELMODE
+                Start-Sleep -Milliseconds 500
+                for ($try = 1; $try -le 3 -and -not $menu; $try++) {
+                    [void][N]::PostMessage($options.Handle, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
+                    $menu = Wait-Until { Open-Menu } 6
+                }
+                if ($menu) { $items = @([N]::MenuItems($menu.Handle)); Say ("Options items: " + ($items -join ' / ')) }
+            }
+            if ($options -and -not $menu) { Say 'no popup menu window (#32768) after clicking Options'; Diagnostics 'options menu did not open' }
+            $first = if ($items.Count) { $items[0] } else { '' }
+            Record 'core' 'the Options menu offers "Try the new look"' ($first -match 'Try the new look|جرّب الشكل الجديد') $(if ($options) { "first item '$first'" } else { 'no Options button' })
+            Full-Shot 'classic-options'
+
+            # ---------------------------------------------------- probe: switch without a restart
+            if ($menu -and $first -match 'Try the new look|جرّب الشكل الجديد') {
+                try {
+                    # (The classic window has the foreground, so the open menu
+                    # takes the keys; no Alt tap here, it would close the menu.)
+                    [N]::Chord($VK.DOWN)
+                    Start-Sleep -Milliseconds 300
+                    [N]::Chord($VK.ENTER)
+                    $sw = Wait-Until { New-Look $script:proc.Id } 40
+                    Record 'probe' '"Try the new look" swaps in the new window without a restart' ($null -ne $sw) $(if ($sw) { "'$($sw.Text)'" } else { '' })
+                    if ($sw) {
+                        Start-Sleep -Seconds 25   # past the blank-page watchdog
+                        $sw = New-Look $script:proc.Id
+                        if ($sw) { Focus-Window $sw.Handle; $x = Shot-Client $sw 'switched'; Record 'probe' 'the switched-in page is painted' ($x -and $x.Colours -ge 8 -and $x.Top -lt 0.97) $(if ($x) { "$($x.Colours) colours" } else { '' }) }
+                        Record 'probe' 'new_ui=1 kept after switching' ((Setting (Read-Settings) 'new_ui') -eq '1') ("new_ui=" + (Setting (Read-Settings) 'new_ui'))
+                        $back = Classic $script:proc.Id
+                        Record 'probe' 'the classic window is hidden after switching' ($null -eq $back)
+                    } else {
+                        Full-Shot 'switch-screen'
+                    }
+                } catch { Record 'probe' 'switching from the Options menu' $false "$_" }
+            } elseif ($menu) {
+                [N]::Chord($VK.ESC)
+            }
+            Alive 'classic and switch'
+            Check-Crash 'classic and switch'
+        } else {
+            Full-Shot 'classic-screen'
+        }
+        Stop-Program
+    } finally {
+        Remove-Item Env:BAHTH_CLASSIC -ErrorAction SilentlyContinue
+    }
+
+    # ------------------------------------------------------------ D. 0.10.0 settings, and new_ui=0 after the move
+    Say 'part D: settings from 0.10.0 (new_ui=0, no markers)'
+    Write-Settings 0 -Old
+    $t0 = Get-Date
+    Start-Program
+    $win = Wait-Until { New-Look $script:proc.Id } 40
+    Record 'core' '0.10.0 settings with new_ui=0: the new look opens' ($null -ne $win) $(if ($win) { "after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { 'no new window' })
+    $s = Read-Settings
+    Record 'core' 'the move is saved for 0.10.0 settings (new_ui=1, new_ui_default=1, new_ui_only=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_default') -eq '1') -and ((Setting $s 'new_ui_only') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default') new_ui_only=$(Setting $s 'new_ui_only')")
+    Alive '0.10.0 settings'
+    Check-Crash '0.10.0 settings'
+    Stop-Program
+    Write-Settings 0 -Only
+    Start-Program
+    $win = Wait-Until { New-Look $script:proc.Id } 40
+    Record 'core' 'new_ui=0 after the move is ignored: the new look opens' ($null -ne $win)
+    Record 'core' 'and no classic window' ($null -eq (Classic $script:proc.Id))
+    Start-Sleep -Seconds 3
+    $s = Read-Settings
+    Record 'core' 'settings.txt says new_ui=1 again' ((Setting $s 'new_ui') -eq '1') ("new_ui=$(Setting $s 'new_ui') new_ui_only=$(Setting $s 'new_ui_only')")
+    Alive 'new_ui=0 after the move'
+    Check-Crash 'new_ui=0 after the move'
+    Stop-Program
+
+    # ------------------------------------------------------------ R. hidden a long while: suspended, then released
+    Say 'part R: the hidden window lets WebView2 go (BAHTH_WEBUI_RELEASE_SECS=20)'
+    Write-Settings 1 -Only
+    Remove-Item $logFile -Force -ErrorAction SilentlyContinue   # this part's lines only
+    $env:BAHTH_WEBUI_RELEASE_SECS = '20'
+    # (Other programs' WebView2 processes, if any, are not the program's.)
+    $baseline = WebView2-Count
+    try {
+        Start-Program
+        $win = Wait-Until { New-Look $script:proc.Id } 40
+        $hello = Wait-Until { (Log-Lines 'webui: page said hello').Count -gt 0 } 40
+        Record 'core' 'part R: the new look opens and its page loads' ($null -ne $win -and [bool]$hello)
+        if ($win -and $hello) {
+            Focus-Window $win.Handle
+            [N]::Chord($VK.CTRL, 0x4B)  # Ctrl+K: the search box, text selected
+            Start-Sleep -Milliseconds 300
+            [N]::Type('notepad')
+            Start-Sleep -Seconds 3
+            $box = Find-Uia $win.Handle ([Windows.Automation.ControlType]::ComboBox) '.'
+            $typed = $null
+            try { if ($box) { $typed = $box.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value } } catch { Say "search box value: $_" }
+            Say "search box before hiding: '$typed'"
+            $running = WebView2-Count
+            Record 'probe' 'WebView2 processes run while the window is on screen' ($running -gt 0) "msedgewebview2 processes: $running"
+            # Hidden to the tray, as by its close button (the tray icon is on).
+            $t0 = Get-Date
+            [void][N]::PostMessage($win.Handle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CLOSE
+            $gone = Wait-Until { $null -eq (New-Look $script:proc.Id) } 10
+            Record 'core' 'the close button hides the window to the tray' ([bool]$gone)
+            $susp = Wait-Until { (Log-Lines 'webui: suspended \(hidden\)').Count -gt 0 } 15
+            Record 'probe' 'the hidden page is suspended' ([bool]$susp) (((Log-Lines 'webui: (suspended|not suspended|can.t suspend)') | Select-Object -Last 1) -join '')
+            $released = Wait-Until { (Log-Lines 'webui: released after').Count -gt 0 } 90
+            Record 'core' 'log.txt: the page is released after the (shortened) time hidden' ([bool]$released) (((Log-Lines 'webui: released') | Select-Object -Last 1) -join '')
+            $none = Wait-Until { (WebView2-Count) -le $baseline } 90
+            Record 'core' 'every msedgewebview2 process exits while the window stays hidden' ([bool]$none) ("{0} left ({1} before the start) after {2:N0} s hidden: {3}" -f (WebView2-Count), $baseline, ((Get-Date) - $t0).TotalSeconds, ((@(Get-Process msedgewebview2 -ErrorAction SilentlyContinue) | ForEach-Object Id) -join ', '))
+            Alive 'released while hidden'
+            # Not a failure: no classic window, nothing in the settings.
+            Record 'core' 'the release brings no classic window' ($null -eq (Classic $script:proc.Id))
+            $bad = @(Log-Lines 'webui: .*(did not load|process failed|showing the page again|using the classic window)')
+            Record 'core' 'the release is not taken as a WebView2 failure' ($bad.Count -eq 0) ($bad -join ' | ')
+            $s = Read-Settings
+            Record 'core' 'the release sets no new_ui_failed and no new_ui_trying' (((Setting $s 'new_ui_failed') -ne '1') -and ((Setting $s 'new_ui_trying') -in @($null, '', '0'))) ("new_ui_failed=$(Setting $s 'new_ui_failed') new_ui_trying=$(Setting $s 'new_ui_trying')")
+            # Shown again (a second launch brings it to the front): the page comes back.
+            $tray = $script:proc
+            $second = Start-Process -FilePath $Exe -PassThru
+            [void]$second.WaitForExit(15000)
+            $script:proc = $tray
+            $win = Wait-Until { New-Look $script:proc.Id } 20
+            Record 'core' 'showing the window again after the release' ($null -ne $win)
+            $again = Wait-Until { (Log-Lines 'webui: recreated on show in \d+ ms').Count -gt 0 } 40
+            Record 'core' 'the page is created again on show' ([bool]$again) (((Log-Lines 'webui: (recreated|page said hello|page created)') | Select-Object -Last 3) -join ' | ')
+            Record 'core' 'and the classic window stays hidden after the show' ($null -eq (Classic $script:proc.Id))
+            if ($win -and $again) {
+                Start-Sleep -Seconds 2
+                $box = Find-Uia $win.Handle ([Windows.Automation.ControlType]::ComboBox) '.'
+                $kept = $null
+                try { if ($box) { $kept = $box.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value } } catch { Say "search box value: $_" }
+                if ($null -eq $kept -or $typed -ne 'notepad') { Record 'probe' 'the search box keeps the query (UI Automation ValuePattern)' ($kept -eq 'notepad') "before hiding '$typed', after '$kept'" }
+                else { Record 'core' 'the search box keeps the query after the page was created again' ($kept -eq 'notepad') "'$kept'" }
+                [void](Shot-Client $win 'recreated')
+            }
+            $bad = @(Log-Lines 'webui: .*(did not load|process failed|showing the page again|using the classic window)')
+            Record 'core' 'no WebView2 failure after the page was created again' ($bad.Count -eq 0) ($bad -join ' | ')
+        }
+        Alive 'after the release'
+        Check-Crash 'after the release'
+        if ($results | Where-Object Result -eq 'FAIL') { Diagnostics 'release' }
+        Stop-Program
+    } finally {
+        Remove-Item Env:BAHTH_WEBUI_RELEASE_SECS -ErrorAction SilentlyContinue
+    }
+
+    # ------------------------------------------------------------ F. the fallback is for one run only
+    Say 'part F: WebView2 failing (BAHTH_WEBUI_FAIL=1), then a normal start'
+    Write-Settings 1 -Only
+    Remove-Item $logFile -Force -ErrorAction SilentlyContinue   # this part's lines only
+    $env:BAHTH_WEBUI_FAIL = '1'
+    try {
+        Start-Program
+        $cw = Wait-Until { Classic $script:proc.Id } 40
+        Record 'core' 'WebView2 failing: the classic window takes over' ($null -ne $cw) (((Log-Lines 'webui:') | Select-Object -Last 4) -join ' | ')
+        Record 'core' 'and no new window is left on screen' ($null -eq (New-Look $script:proc.Id))
+        if ($cw) {
+            Start-Sleep -Seconds 2
+            $note = @(Get-Children $cw.Handle | Where-Object { $_.Visible -and $_.Class -eq 'Static' -and $_.Text -match 'WebView2' })
+            Record 'core' 'the classic window says WebView2 is not working' ($note.Count -gt 0) (($note | ForEach-Object Text) -join ' | ')
+            [void](Shot-Client $cw 'fallback')
+        }
+        $s = Read-Settings
+        Record 'core' 'the fallback does not turn the new look off (new_ui=1, new_ui_failed=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_failed') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_failed=$(Setting $s 'new_ui_failed')")
+        Alive 'fallback'
+        Check-Crash 'fallback'
+        Stop-Program
+    } finally {
+        Remove-Item Env:BAHTH_WEBUI_FAIL -ErrorAction SilentlyContinue
+    }
+    $t0 = Get-Date
+    Start-Program
+    $win = Wait-Until { New-Look $script:proc.Id } 40
+    Record 'core' 'after a fallback, the next start opens the new look again' ($null -ne $win) $(if ($win) { "after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { (((Log-Lines 'webui:') | Select-Object -Last 4) -join ' | ') })
+    Record 'core' 'and the classic window stays hidden' ($null -eq (Classic $script:proc.Id))
+    Record 'probe' 'log.txt says it is tried again, once' ((Log-Lines 'webui: the new look failed at the last start').Count -gt 0)
+    $hello = Wait-Until { (Log-Lines 'webui: page said hello').Count -gt 0 } 40
+    Record 'core' 'its page loads' ([bool]$hello)
+    # A page that works a minute forgets the failed start.
+    $cleared = Wait-Until { (Setting (Read-Settings) 'new_ui_failed') -eq '0' } 90
+    Record 'probe' 'new_ui_failed=0 again after the page worked a minute' ([bool]$cleared) ("new_ui_failed=" + (Setting (Read-Settings) 'new_ui_failed'))
+    Alive 'after the fallback'
+    Check-Crash 'after the fallback'
 } catch {
     Record 'core' 'the test ran to the end' $false "$_ at line $($_.InvocationInfo.ScriptLineNumber)"
 } finally {

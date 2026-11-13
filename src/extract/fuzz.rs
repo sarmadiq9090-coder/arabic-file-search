@@ -14,7 +14,6 @@
 use std::cell::RefCell;
 use std::io::{Cursor, Write};
 use std::panic::{self, AssertUnwindSafe};
-use std::path::PathBuf;
 use std::sync::Once;
 
 use super::*;
@@ -166,10 +165,9 @@ fn variants(sample: &[u8], rng: &mut Rng, flips: usize) -> Vec<Vec<u8>> {
     v
 }
 
-fn temp_dir() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("bahth_fuzz_tests_{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
+/// `name` in a folder of its own, removed when the guard is dropped.
+fn temp_path(name: &str) -> crate::test_temp::TempPath {
+    crate::test_temp::TempPath::in_own_dir("bahth_fuzz_tests", name)
 }
 
 /// Feeds `data` to the extractors for `ext`: the byte-level dispatcher with
@@ -184,7 +182,7 @@ fn check(ext: &str, data: &[u8], tally: &mut Tally, file_name: &str) {
         let _ = archive::member_text_inner(ext, data.to_vec());
     });
     // From disk, the way the search calls it.
-    let path = temp_dir().join(file_name);
+    let path = temp_path(file_name);
     std::fs::write(&path, data).unwrap();
     let disk = run(|| {
         let _ = extract_text(&path);
@@ -207,7 +205,7 @@ fn fuzz(ext: &str, sample: &[u8], seed: u64, flips: usize) {
     tally.report(ext);
 }
 
-fn zip_of(entries: &[(&str, &[u8])], stored: bool) -> Vec<u8> {
+pub(super) fn zip_of(entries: &[(&str, &[u8])], stored: bool) -> Vec<u8> {
     let mut zw = zip::ZipWriter::new(Cursor::new(Vec::new()));
     let opts = if stored {
         zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored)
@@ -251,14 +249,14 @@ const SLIDE_XML: &str = r#"<p:sld xmlns:p="p" xmlns:a="a"><p:cSld><p:spTree><p:s
 const ODT_XML: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="o" xmlns:text="t"><office:body><office:text><text:h>عنوان</text:h><text:p>نص<text:s text:c="99999999999999999999"/>x<text:tab/><text:line-break/></text:p><office:annotation><text:p>no</text:p></office:annotation></office:text></office:body></office:document-content>"#;
 const CONTAINER_XML: &str = r#"<?xml version="1.0"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/c%20o.opf"/></rootfiles></container>"#;
 const OPF_XML: &str = r#"<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="a" href="../OEBPS/t/ch1.xhtml#x" media-type="application/xhtml+xml"/><item id="b" href="/t/%D9%81.xhtml"/></manifest><spine><itemref idref="a"/><itemref idref="b"/><itemref idref="a"/></spine></package>"#;
-const XLSX_CT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>"#;
-const XLSX_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#;
-const XLSX_WB: &str = r#"<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="ورقة1" sheetId="1" r:id="rId1"/></sheets></workbook>"#;
-const XLSX_WBRELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#;
-const XLSX_SHEET: &str = r#"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:B2"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>مرحبا</t></is></c><c r="B1"><v>42</v></c></row><row r="2"><c r="XFD1048576" t="inlineStr"><is><t>تقرير</t></is></c></row></sheetData></worksheet>"#;
+pub(super) const XLSX_CT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>"#;
+pub(super) const XLSX_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#;
+pub(super) const XLSX_WB: &str = r#"<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="ورقة1" sheetId="1" r:id="rId1"/></sheets></workbook>"#;
+pub(super) const XLSX_WBRELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#;
+pub(super) const XLSX_SHEET: &str = r#"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:B2"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>مرحبا</t></is></c><c r="B1"><v>42</v></c></row><row r="2"><c r="XFD1048576" t="inlineStr"><is><t>تقرير</t></is></c></row></sheetData></worksheet>"#;
 const ODS_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:spreadsheet><table:table table:name="ورقة"><table:table-row><table:table-cell table:number-columns-repeated="3"><text:p>خلية</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
 
-fn utf16le(s: &str) -> Vec<u8> {
+pub(super) fn utf16le(s: &str) -> Vec<u8> {
     s.encode_utf16().flat_map(|u| u.to_le_bytes()).collect()
 }
 
@@ -284,7 +282,7 @@ fn eml_sample() -> Vec<u8> {
     .into_bytes()
 }
 
-fn cfb_of(streams: &[(&str, Vec<u8>)]) -> Vec<u8> {
+pub(super) fn cfb_of(streams: &[(&str, Vec<u8>)]) -> Vec<u8> {
     let mut comp = cfb::CompoundFile::create(Cursor::new(Vec::new())).unwrap();
     for (name, data) in streams {
         let mut s = comp.create_stream(name).unwrap();
@@ -312,7 +310,7 @@ fn msg_sample() -> Vec<u8> {
     ])
 }
 
-fn biff_record(kind: u16, data: &[u8]) -> Vec<u8> {
+pub(super) fn biff_record(kind: u16, data: &[u8]) -> Vec<u8> {
     let mut r = kind.to_le_bytes().to_vec();
     r.extend((data.len() as u16).to_le_bytes());
     r.extend(data);
@@ -622,7 +620,7 @@ fn hostile_pdfs_do_not_crash() {
     cases.push(tests::tiny_pdf(&"(".repeat(50_000)));
     cases.push(tests::tiny_pdf("x").replace_all(b"/Length ", b"/Length 99999999999"));
     for (i, pdf) in cases.into_iter().enumerate() {
-        let path = temp_dir().join(format!("hostile{i}.pdf"));
+        let path = temp_path(&format!("hostile{i}.pdf"));
         std::fs::write(&path, &pdf).unwrap();
         let handle = std::thread::Builder::new()
             .stack_size(2 * 1024 * 1024)
@@ -697,7 +695,7 @@ fn fuzz_tar_archives() {
 #[test]
 fn fuzz_7z_archive() {
     let docx = archive_docx();
-    let path = temp_dir().join("sample.7z");
+    let path = temp_path("sample.7z");
     {
         use sevenz_rust2::{ArchiveEntry, ArchiveWriter};
         let mut w = ArchiveWriter::create(&path).unwrap();
@@ -710,10 +708,10 @@ fn fuzz_7z_archive() {
 
 #[test]
 fn files_that_vanish_or_are_not_files() {
-    let dir = temp_dir().join("a_dir.txt");
+    let dir = temp_path("a_dir.txt");
     std::fs::create_dir_all(&dir).unwrap();
     assert!(extract_text(&dir).is_none());
-    assert!(extract_text(&temp_dir().join("missing.docx")).is_none());
+    assert!(extract_text(&temp_path("missing.docx")).is_none());
     assert!(extract_text(Path::new("")).is_none());
     assert!(extract_text(Path::new(".txt")).is_none());
 }

@@ -13,7 +13,7 @@
 
 use native_windows_gui as nwg;
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use winapi::ctypes::c_void;
 use std::rc::Rc;
 use std::sync::{Arc, Condvar, Mutex};
@@ -37,7 +37,7 @@ use winapi::um::winuser::{DestroyIcon, GetIconInfo, GetKeyState, ICONINFO, NMHDR
 
 use super::shell::wide;
 use super::{App, COL_NAME, autostart};
-use crate::thumb_cache::{Cached, ThumbCache};
+use crate::thumb_cache::{Cached, ThumbCache, TypeSlot, TypeSlots};
 
 /// On/off, a DWORD under `HKCU\Software\BahthSari`.
 const REG_VALUE: &str = "ThumbnailView";
@@ -60,6 +60,19 @@ const IID_IMAGE_LIST: GUID =
 const MIN_THUMB: i32 = 16;
 /// `SIIGBF_THUMBNAILONLY`: a real thumbnail or nothing (icons are ours).
 const SIIGBF_THUMBNAILONLY: i32 = 0x8;
+/// `SIIGBF_INCACHEONLY`: only a thumbnail Windows already has; the file is
+/// not read to make one.
+const SIIGBF_INCACHEONLY: i32 = 0x10;
+
+/// The `GetImage` flags for the file at `path`, and whether its contents are
+/// on this PC: for a cloud-only file (or one whose attributes can't be read)
+/// only a thumbnail Windows already keeps, since making one reads the file
+/// and so downloads it (whatever "Read contents of cloud-only files" says: a
+/// picture is not worth that).
+fn image_flags(path: &str) -> (i32, bool) {
+    let local = crate::cloud::probe(std::path::Path::new(path)).is_some_and(|s| !crate::cloud::contents_elsewhere(s.attrs));
+    if local { (SIIGBF_THUMBNAILONLY, true) } else { (SIIGBF_THUMBNAILONLY | SIIGBF_INCACHEONLY, false) }
+}
 
 #[repr(C)]
 struct ImageFactory {
@@ -86,8 +99,9 @@ struct Queue {
     waiting: Vec<Request>,
     /// Keys asked for and not yet taken back by the UI thread.
     pending: HashSet<String>,
-    /// Finished: key and tile bitmap (0 when the file has no thumbnail).
-    done: Vec<(String, usize)>,
+    /// Finished: key, tile bitmap (0 when the file has no thumbnail) and
+    /// whether the file was on this PC.
+    done: Vec<(String, usize, bool)>,
 }
 
 #[derive(Default)]
@@ -107,9 +121,9 @@ pub struct Thumbs {
     images: Cell<usize>,
     /// Tile edge in physical pixels.
     size: Cell<i32>,
-    cache: RefCell<Option<ThumbCache>>,
-    /// Image-list slot of the file-type icon of each extension ("/" folders).
-    type_icons: RefCell<HashMap<String, i32>>,
+    pub(super) cache: RefCell<Option<ThumbCache>>,
+    /// Image-list slots of the file-type icons ("/" folders), capped.
+    type_icons: RefCell<TypeSlots>,
     /// Number of results last arranged.
     count: Cell<usize>,
     /// The thread's queue, once it has been started.
@@ -140,7 +154,7 @@ fn save_enabled(on: bool) {
 // ---------------------------------------------------------------- pictures
 
 /// The 32-bit pixels of a bitmap, top row first.
-fn bitmap_pixels(hbm: HBITMAP) -> Option<(i32, i32, Vec<u32>)> {
+pub(super) fn bitmap_pixels(hbm: HBITMAP) -> Option<(i32, i32, Vec<u32>)> {
     if hbm.is_null() {
         return None;
     }
@@ -280,12 +294,19 @@ fn type_icon_handle(ext: &str) -> HICON {
 }
 
 /// The shell's thumbnail of a file as an `n`×`n` tile, or null when it has
-/// none (or the shell can't make thumbnails, as under Wine).
-fn shell_thumbnail(path: &str, n: i32) -> HBITMAP {
+/// none (or the shell can't make thumbnails, as under Wine), and whether the
+/// file was on this PC: a cloud-only file is never downloaded for it
+/// (`image_flags`), so its miss is only for now (`ThumbCache::insert_cloud_none`).
+pub(super) fn shell_thumbnail(path: &str, n: i32) -> (HBITMAP, bool) {
+    let wpath = wide(path);
+    let (flags, local) = image_flags(path);
+    (shell_image(&wpath, flags, n), local)
+}
+
+fn shell_image(wpath: &[u16], flags: i32, n: i32) -> HBITMAP {
     unsafe extern "system" {
         fn SHCreateItemFromParsingName(path: *const u16, bc: *mut c_void, riid: *const GUID, out: *mut *mut c_void) -> HRESULT;
     }
-    let wpath = wide(path);
     unsafe {
         let mut f: *mut ImageFactory = std::ptr::null_mut();
         let hr = SHCreateItemFromParsingName(
@@ -298,7 +319,7 @@ fn shell_thumbnail(path: &str, n: i32) -> HBITMAP {
             return std::ptr::null_mut();
         }
         let mut hbm: HBITMAP = std::ptr::null_mut();
-        let hr = ((*(*f).vtbl).get_image)(f, SIZE { cx: n, cy: n }, SIIGBF_THUMBNAILONLY, &mut hbm);
+        let hr = ((*(*f).vtbl).get_image)(f, SIZE { cx: n, cy: n }, flags, &mut hbm);
         ((*(*f).vtbl).release)(f);
         if hr < 0 || hbm.is_null() {
             return std::ptr::null_mut();
@@ -332,9 +353,9 @@ fn worker(shared: Arc<Shared>, notice: nwg::NoticeSender, n: i32) {
                 };
             }
         };
-        let tile = shell_thumbnail(&req.path, n) as usize;
+        let (tile, local) = shell_thumbnail(&req.path, n);
         let Ok(mut q) = shared.queue.lock() else { return };
-        q.done.push((req.key, tile));
+        q.done.push((req.key, tile as usize, local));
         drop(q);
         notice.notice();
     }
@@ -360,6 +381,15 @@ fn copy_text(text: &str, buf: *mut u16, max: i32) {
 impl App {
     /// Adds the Options item and the notice. Called from `build_ui` while
     /// the app is still being built.
+    /// The Options item is greyed out while the new look is the main
+    /// window (it switches the classic list's view).
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))]
+    pub(super) fn enable_thumbs_item(&self, on: bool) {
+        if !self.thumbs.menu_item.handle.blank() {
+            self.thumbs.menu_item.set_enabled(on);
+        }
+    }
+
     pub(super) fn build_thumbs(&mut self) -> Result<(), nwg::NwgError> {
         let on = load_enabled();
         nwg::MenuItem::builder()
@@ -497,6 +527,13 @@ impl App {
     /// Makes the image list and gives it to the list. False if it can't.
     fn ensure_image_list(&self) -> bool {
         if self.thumbs.images.get() != 0 {
+            // The memory guard drops the cache while the view is off
+            // (`memory.rs`): start a new one, and new type-icon slots with
+            // it (the old ones were pinned in the dropped cache).
+            if self.thumbs.cache.borrow().is_none() {
+                *self.thumbs.cache.borrow_mut() = Some(ThumbCache::new(MAX_IMAGES, MAX_ENTRIES));
+                *self.thumbs.type_icons.borrow_mut() = TypeSlots::default();
+            }
             return true;
         }
         let Some(h) = self.list.handle.hwnd() else { return false };
@@ -532,13 +569,19 @@ impl App {
     }
 
     /// Image-list slot of the file-type icon for an extension ("/" folders).
+    /// Past `MAX_TYPE_SLOTS` types, every other type shares the generic icon.
     fn type_tile(&self, ext: &str) -> i32 {
-        if let Some(&i) = self.thumbs.type_icons.borrow().get(ext) {
-            return i;
-        }
-        let Some(slot) = self.thumbs.cache.borrow_mut().as_mut().map(|c| c.pin_slot()) else { return 0 };
+        let slot = {
+            let mut cache = self.thumbs.cache.borrow_mut();
+            let Some(cache) = cache.as_mut() else { return 0 };
+            self.thumbs.type_icons.borrow_mut().slot(ext, cache)
+        };
+        let (slot, ext) = match slot {
+            TypeSlot::Known(s) => return s,
+            TypeSlot::New { slot, ext } => (slot, ext),
+        };
         let n = self.thumbs.size.get();
-        let icon = type_icon_handle(ext);
+        let icon = type_icon_handle(&ext);
         let mut tile = icon_tile(icon, n);
         if !icon.is_null() {
             unsafe { DestroyIcon(icon) };
@@ -548,7 +591,6 @@ impl App {
             tile = make_tile(0, 0, &[], n);
         }
         self.put_tile(slot, tile);
-        self.thumbs.type_icons.borrow_mut().insert(ext.to_string(), slot);
         slot
     }
 
@@ -613,7 +655,7 @@ impl App {
         let done = match shared.queue.lock() {
             Ok(mut q) => {
                 let done = std::mem::take(&mut q.done);
-                for (key, _) in &done {
+                for (key, _, _) in &done {
                     q.pending.remove(key);
                 }
                 done
@@ -624,11 +666,12 @@ impl App {
             return;
         }
         let mut any = false;
-        for (key, tile) in done {
+        for (key, tile, local) in done {
             let tile = tile as HBITMAP;
             if tile.is_null() {
                 if let Some(c) = self.thumbs.cache.borrow_mut().as_mut() {
-                    c.insert_none(key);
+                    // A cloud-only file is asked for again later (it may be downloaded by then).
+                    if local { c.insert_none(key) } else { c.insert_cloud_none(key) }
                 }
                 continue;
             }

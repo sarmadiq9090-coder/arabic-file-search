@@ -20,10 +20,17 @@ use quick_xml::events::Event;
 
 mod archive;
 mod bidi_fix;
+mod budget;
 mod epub;
 #[cfg(test)]
 mod fuzz;
+#[cfg(test)]
+pub(crate) mod hostile;
+#[cfg(test)]
+mod slow;
 mod mail;
+mod pdf_fix;
+mod pdf_guard;
 mod pdf_images;
 
 /// Files larger than this are never opened.
@@ -40,6 +47,12 @@ const MAX_WORKBOOK_UNZIPPED: u64 = 256 * 1024 * 1024;
 /// Upper bound for the cells calamine lays out densely (bounding box of each
 /// sheet, summed) when it opens an .xls file.
 const MAX_XLS_CELLS: u64 = 6_000_000;
+/// Upper bound for the shared-string text calamine copies into the cells of
+/// an .xls file: it clones the string for every cell that refers to it.
+const MAX_XLS_SHARED_TEXT: u64 = 64 * 1024 * 1024;
+/// Upper bound for the `uniqueCount` an xlsx shared-strings part may declare
+/// (calamine reserves 24 bytes for each before reading any).
+const MAX_SHARED_STRINGS: u64 = 10_000_000;
 
 const TEXT_EXTS: &[&str] = &[
     "txt", "md", "csv", "tsv", "log", "json", "xml", "html", "htm", "ini", "cfg", "yaml", "yml",
@@ -55,6 +68,73 @@ const OTHER_EXTS: &[&str] = &[
 /// Images searched through Windows OCR (see `crate::ocr`), when it is available.
 #[cfg(windows)]
 const IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif"];
+
+/// Tests only: true when the environment variable `var` is set, to turn a
+/// safety check off in a child process and show what it prevents
+/// (`extract::hostile`). Always false in the app.
+#[cfg(test)]
+fn unchecked(var: &str) -> bool {
+    std::env::var_os(var).is_some()
+}
+
+#[cfg(not(test))]
+fn unchecked(_var: &str) -> bool {
+    false
+}
+
+// ---------------------------------------------------------------------------
+// OCR pacing
+// ---------------------------------------------------------------------------
+
+thread_local! {
+    /// This thread fills the content index in the background (the warm-up).
+    static BACKGROUND: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Marks the calling thread as a background (warm-up) thread, whose OCR is
+/// paced by [`paced_ocr`].
+pub fn set_background(on: bool) {
+    BACKGROUND.with(|b| b.set(on));
+}
+
+/// One OCR at a time for all background threads: Windows runs recognition
+/// on its own thread pool at normal priority, whatever the priority of the
+/// thread asking for it, so the warm-up's idle priority does not slow it.
+static OCR_PERMIT: std::sync::Mutex<()> = std::sync::Mutex::new(());
+/// True while background OCR should wait (the user is typing or searching).
+static OCR_PAUSE: std::sync::OnceLock<fn() -> bool> = std::sync::OnceLock::new();
+
+/// Sets what makes background OCR wait (see [`paced_ocr`]). Once.
+#[cfg_attr(not(windows), allow(dead_code))] // only the Windows UI sets it
+pub fn set_ocr_pause(user_busy: fn() -> bool) {
+    let _ = OCR_PAUSE.set(user_busy);
+}
+
+/// Runs the OCR call `f`: at once on a foreground thread (a search the user
+/// is waiting for); on a background thread only with the one permit, and not
+/// while the pause signal says the user is busy. The waiting does not count
+/// against the file's time budget.
+#[cfg_attr(not(windows), allow(dead_code))] // OCR is Windows-only
+fn paced_ocr<R>(f: impl FnOnce() -> R) -> R {
+    paced_with(OCR_PAUSE.get().copied().unwrap_or(|| false), std::time::Duration::from_millis(250), f)
+}
+
+fn paced_with<R>(user_busy: fn() -> bool, poll: std::time::Duration, f: impl FnOnce() -> R) -> R {
+    if !BACKGROUND.with(std::cell::Cell::get) {
+        return f();
+    }
+    let waited = std::time::Instant::now();
+    let permit = OCR_PERMIT.lock().unwrap_or_else(|e| e.into_inner());
+    // At most a minute per image: someone always typing (or a stuck input
+    // signal) slows the warm-up down, it does not stop it.
+    while user_busy() && waited.elapsed() < std::time::Duration::from_secs(60) {
+        std::thread::sleep(poll);
+    }
+    budget::extend(waited.elapsed());
+    let r = f();
+    drop(permit);
+    r
+}
 
 /// Returns true if the extension (lowercase, no dot) is supported for content search.
 pub fn is_supported(ext: &str) -> bool {
@@ -94,14 +174,22 @@ pub fn extract_text(path: &Path) -> Option<String> {
     if !is_supported(&ext) {
         return None;
     }
-    let meta = std::fs::metadata(path).ok()?;
-    if !meta.is_file() || meta.len() > MAX_FILE_SIZE {
+    // Read without opening the file. A cloud-only one (OneDrive Files
+    // On-Demand) is not read unless the user allowed it: that downloads it.
+    let meta = crate::cloud::probe(path)?;
+    if meta.size > MAX_FILE_SIZE || !meta.readable() {
         return None;
     }
 
-    let text = crate::crash_log::quietly(|| extract_by_ext(path, &ext))
-        .ok()
-        .flatten()?;
+    let budget = budget::start();
+    let text = crate::crash_log::quietly(|| extract_by_ext(path, &ext)).ok().flatten();
+    // Over its time budget (see `budget`): no text, rather than part of it,
+    // so the file is stored as such and not read again at every start.
+    if budget::exceeded() {
+        return None;
+    }
+    drop(budget);
+    let text = text?;
     let text = normalize_arabic_forms(&text).into_owned();
     if text.trim().is_empty() {
         None
@@ -126,7 +214,7 @@ fn extract_by_ext(path: &Path, ext: &str) -> Option<String> {
         "epub" => epub::extract_epub(path),
         e if archive::is_archive_ext(e) => archive::extract_archive(path),
         #[cfg(windows)]
-        e if is_ocr_image(e) => crate::ocr::ocr_image_file(path),
+        e if is_ocr_image(e) => paced_ocr(|| crate::ocr::ocr_image_file(path)),
         _ => None,
     }
 }
@@ -145,11 +233,11 @@ fn read_capped(r: impl Read, cap: u64) -> Option<Vec<u8>> {
 /// The whole file, but never more than [`MAX_FILE_SIZE`]: the size checked
 /// before may be stale (a file still being written, or replaced meanwhile).
 fn read_file_capped(path: &Path) -> Option<Vec<u8>> {
-    read_capped(File::open(path).ok()?, MAX_FILE_SIZE)
+    read_capped(crate::cloud::open(path).ok()?, MAX_FILE_SIZE)
 }
 
 fn read_text_file(path: &Path) -> Option<String> {
-    Some(decode_bytes(&read_capped(File::open(path).ok()?, MAX_TEXT_READ)?))
+    Some(decode_bytes(&read_capped(crate::cloud::open(path).ok()?, MAX_TEXT_READ)?))
 }
 
 /// Decode bytes of unknown encoding: BOMs first, then a BOM-less UTF-16
@@ -211,7 +299,7 @@ fn strip_html(html: &str) -> String {
     let mut out = String::with_capacity(html.len() / 2);
     let lower = html.to_ascii_lowercase(); // same byte offsets as `html`
     let mut i = 0;
-    while i < html.len() {
+    while i < html.len() && !budget::tick() {
         let rest = &html[i..];
         if rest.starts_with("<!--") {
             i += rest.find("-->").map_or(rest.len(), |p| p + 3);
@@ -291,7 +379,7 @@ fn decode_html_entities(s: &str, out: &mut String) {
 type Zip = zip::ZipArchive<File>;
 
 fn open_zip(path: &Path) -> Option<Zip> {
-    zip::ZipArchive::new(File::open(path).ok()?).ok()
+    zip::ZipArchive::new(crate::cloud::open(path).ok()?).ok()
 }
 
 /// Reads one zip member as text (size-capped). Missing members yield None.
@@ -300,8 +388,22 @@ fn read_zip_entry<R: Read + Seek>(zip: &mut zip::ZipArchive<R>, name: &str) -> O
     if !zip_ratio_ok(entry.size(), entry.compressed_size()) {
         return None; // zip bomb
     }
-    Some(decode_bytes(&read_capped(entry, MAX_ZIP_ENTRY)?))
+    Some(decode_bytes(&read_inflated(entry, MAX_ZIP_ENTRY)?))
 }
+
+/// [`read_capped`] for decompressed data, charged to the file's inflation
+/// budget (see [`budget`]): `None`, and the file over its budget, once the
+/// file as a whole (its parts, archive members and the parts of documents
+/// inside them) unpacks to more than [`budget::INFLATE`].
+fn read_inflated(r: impl Read, cap: u64) -> Option<Vec<u8>> {
+    let room = budget::room(cap);
+    let data = read_capped(r, if room < cap { room + 1 } else { cap })?;
+    (!budget::inflate(data.len() as u64)).then_some(data)
+}
+
+/// Header and footer parts of a docx read, at most (Word writes up to
+/// three per section).
+const MAX_HEADER_PARTS: usize = 64;
 
 /// False for a zip member that expands suspiciously much (the same bound as
 /// for members of archives). The zip crate never reads past a member's
@@ -350,7 +452,7 @@ fn xml_to_text(xml: &str, flavor: XmlFlavor, out: &mut String) {
     };
 
     loop {
-        if out.len() > MAX_OUTPUT {
+        if out.len() > MAX_OUTPUT || budget::tick() {
             break;
         }
         let event = match reader.read_event() {
@@ -419,7 +521,10 @@ fn docx_text<R: Read + Seek>(mut zip: zip::ZipArchive<R>) -> Option<String> {
 
     // Secondary parts: headers, footers, notes, comments.
     let mut extra = numbered_entries(&zip, "word/header");
-    extra.extend(numbered_entries(&zip, "word/footer"));
+    extra.truncate(MAX_HEADER_PARTS);
+    let mut footers = numbered_entries(&zip, "word/footer");
+    footers.truncate(MAX_HEADER_PARTS);
+    extra.extend(footers);
     extra.extend(
         [
             "word/footnotes.xml",
@@ -473,7 +578,7 @@ fn odf_text<R: Read + Seek>(mut zip: zip::ZipArchive<R>) -> Option<String> {
 // ---------------------------------------------------------------------------
 
 fn extract_spreadsheet(path: &Path, ext: &str) -> Option<String> {
-    spreadsheet_text(std::io::BufReader::new(File::open(path).ok()?), ext)
+    spreadsheet_text(std::io::BufReader::new(crate::cloud::open(path).ok()?), ext)
 }
 
 /// Text of a spreadsheet (`ext` lowercase: xlsx, xlsm, xlsb, xls or ods).
@@ -491,21 +596,35 @@ fn spreadsheet_text<R: Read + Seek>(mut r: R, ext: &str) -> Option<String> {
         // cells (`table:number-columns-repeated`) in memory.
         "ods" => return odf_text(zip::ZipArchive::new(r).ok()?),
         "xls" => {
-            if !xls_size_ok(&mut r) {
+            if unchecked("BAHTH_TEST_UNCHECKED_SHEETS") {
+                r.rewind().ok()?;
+                return sheets_text(Sheets::Xls(Xls::new(r).ok()?));
+            }
+            let Some(workbook) = xls_checked_workbook(&mut r) else {
                 // Too big for calamine (or not a readable compound file):
                 // the strings still come out of the raw bytes.
                 r.rewind().ok()?;
                 let data = read_capped(r, MAX_FILE_SIZE)?;
-                // BIFF strings are not word-aligned: try both alignments.
+                // BIFF strings are not word-aligned: UTF-16 runs at both
+                // alignments, 8-bit runs once (they are the same either way).
                 let mut text = extract_doc_heuristic(&data);
-                text.push_str(&extract_doc_heuristic(data.get(1..).unwrap_or_default()));
+                text.push_str(&doc_runs_text(data.get(1..).unwrap_or_default(), false));
                 return Some(text);
-            }
-            r.rewind().ok()?;
-            Sheets::Xls(Xls::new(r).ok()?)
+            };
+            // calamine gets the very bytes that were checked, in a compound
+            // file of our own: it finds the workbook stream in its own way
+            // (first directory entry of that name, linked or not), which in
+            // a crafted file need not be the stream checked above.
+            // Version 3 (512-byte sectors), as Excel writes: calamine's own
+            // reader does not find the root directory of a large version-4 file.
+            let mut own = cfb::CompoundFile::create_with_version(cfb::Version::V3, std::io::Cursor::new(Vec::new())).ok()?;
+            own.create_stream("Workbook").and_then(|mut s| std::io::Write::write_all(&mut s, &workbook)).ok()?;
+            drop(workbook);
+            own.flush().ok()?;
+            return sheets_text(Sheets::Xls(Xls::new(own.into_inner()).ok()?));
         }
         "xlsx" | "xlsm" | "xlsb" => {
-            if !workbook_zip_ok(&mut r) {
+            if !unchecked("BAHTH_TEST_UNCHECKED_SHEETS") && !workbook_zip_ok(&mut r) {
                 return None;
             }
             r.rewind().ok()?;
@@ -520,11 +639,13 @@ fn spreadsheet_text<R: Read + Seek>(mut r: R, ext: &str) -> Option<String> {
     sheets_text(book)
 }
 
-/// True when no member of a zip-based workbook is a zip bomb and all of them
-/// together declare at most [`MAX_WORKBOOK_UNZIPPED`].
+/// True when no member of a zip-based workbook is a zip bomb, all of them
+/// together declare at most [`MAX_WORKBOOK_UNZIPPED`], and no shared-strings
+/// part declares more strings than it can hold (see [`shared_strings_count_ok`]).
 fn workbook_zip_ok<R: Read + Seek>(r: &mut R) -> bool {
     let Ok(mut zip) = zip::ZipArchive::new(r) else { return false };
     let mut total = 0u64;
+    let mut shared_strings = Vec::new();
     for i in 0..zip.len() {
         let Ok(f) = zip.by_index_raw(i) else { return false };
         if !zip_ratio_ok(f.size(), f.compressed_size()) {
@@ -532,26 +653,142 @@ fn workbook_zip_ok<R: Read + Seek>(r: &mut R) -> bool {
         }
         // Sheets are streamed cell by cell; only the other members (shared
         // strings above all) are read whole, so only they count.
-        let name = f.name().map(|n| n.to_ascii_lowercase()).unwrap_or_default();
+        let name = f.name().map(|n| n.replace('\\', "/").to_ascii_lowercase()).unwrap_or_default();
         if !(name.starts_with("xl/worksheets/") && (name.ends_with(".xml") || name.ends_with(".bin"))) {
             total = total.saturating_add(f.size());
         }
+        // Whatever folder the workbook is in (calamine looks names up
+        // without regard to case or the kind of slash).
+        if name.ends_with("sharedstrings.xml") {
+            shared_strings.push((i, f.size()));
+        }
     }
+    // calamine unpacks those parts: charged to the file's budget.
     total <= MAX_WORKBOOK_UNZIPPED
+        && !budget::inflate(total)
+        && shared_strings.into_iter().all(|(i, size)| zip.by_index(i).is_ok_and(|f| shared_strings_count_ok(f, size)))
 }
 
-/// True when calamine can open the .xls compound file in `r` without laying
-/// out more than [`MAX_XLS_CELLS`] cells (see [`xls_stream_size_ok`]).
-fn xls_size_ok<R: Read + Seek>(r: &mut R) -> bool {
-    let Ok(mut comp) = cfb::CompoundFile::open(r) else { return false };
+/// False when the shared-strings part in `part` (`size` bytes unpacked)
+/// declares a `uniqueCount` it cannot hold: calamine reserves memory for
+/// that many strings before reading one, and `uniqueCount="10000000000000"`
+/// in a 300-byte file made the allocation fail, which ends the process.
+/// Every string takes at least `<si/>` (5 bytes), and [`MAX_SHARED_STRINGS`]
+/// bounds the reservation whatever the size. Reads only up to the `<sst>` tag.
+fn shared_strings_count_ok(part: impl Read, size: u64) -> bool {
+    let mut xml = quick_xml::Reader::from_reader(std::io::BufReader::new(part.take(MAX_ZIP_ENTRY)));
+    // As calamine reads it.
+    let config = xml.config_mut();
+    config.check_end_names = false;
+    config.check_comments = false;
+    let mut buf = Vec::new();
+    loop {
+        buf.clear();
+        match xml.read_event_into(&mut buf) {
+            Ok(Event::Start(e) | Event::Empty(e)) if e.local_name().as_ref() == "sst" => {
+                return declared_counts_ok(AsRef::<str>::as_ref(&e).as_bytes(), size.min(MAX_SHARED_STRINGS * 5) / 5);
+            }
+            // Without an `<sst>` calamine reserves nothing (and gives up).
+            Ok(Event::Eof) | Err(_) => return true,
+            Ok(_) => {}
+        }
+    }
+}
+
+/// True when every `uniqueCount` in the raw text of the tag `tag` is a
+/// plain number of at most `max`. Read from the bytes, not through an
+/// attribute parser, so that no other reading of the tag can see a number
+/// this one missed; anything but `uniqueCount="digits"` is refused.
+fn declared_counts_ok(tag: &[u8], max: u64) -> bool {
+    const KEY: &[u8] = b"uniqueCount";
+    let mut rest = tag;
+    while let Some(at) = rest.windows(KEY.len()).position(|w| w == KEY) {
+        rest = &rest[at + KEY.len()..];
+        let Some(value) = rest.trim_ascii_start().strip_prefix(b"=").map(<[u8]>::trim_ascii_start) else { return false };
+        let Some((&quote @ (b'"' | b'\''), value)) = value.split_first() else { return false };
+        let Some(end) = value.iter().position(|&b| b == quote) else { return false };
+        let digits = &value[..end];
+        let number = std::str::from_utf8(digits).ok().filter(|d| !d.is_empty() && d.len() <= 12 && d.bytes().all(|b| b.is_ascii_digit()));
+        if !number.and_then(|d| d.parse::<u64>().ok()).is_some_and(|n| n <= max) {
+            return false;
+        }
+    }
+    true
+}
+
+/// The workbook stream of the .xls compound file in `r`, when calamine can
+/// read it within bounded memory (see [`xls_stream_size_ok`]).
+fn xls_checked_workbook<R: Read + Seek>(r: &mut R) -> Option<Vec<u8>> {
+    let mut comp = cfb::CompoundFile::open(r).ok()?;
     let stream = match comp.open_stream("Workbook") {
         Ok(s) => read_capped(s, MAX_FILE_SIZE),
-        Err(_) => match comp.open_stream("Book") {
-            Ok(s) => read_capped(s, MAX_FILE_SIZE),
-            Err(_) => return false,
-        },
+        Err(_) => read_capped(comp.open_stream("Book").ok()?, MAX_FILE_SIZE),
     };
-    stream.is_some_and(|s| xls_stream_size_ok(&s))
+    stream.filter(|s| xls_stream_size_ok(s))
+}
+
+/// For every string of an .xls shared string table (the `SST` record data
+/// in `first`, continued in the `CONTINUE` records `cont`), an upper bound
+/// of its length in UTF-8 bytes. Walks the table exactly as calamine's
+/// `parse_sst` does, so that string N here is string N there; `None` where
+/// calamine gives up on the table (and so on the file). `utf16`: the
+/// workbook's code page is UTF-16, as BIFF8 requires.
+fn xls_shared_string_sizes(first: &[u8], cont: &[&[u8]], utf16: bool) -> Option<Vec<u32>> {
+    let mut data = first.get(8..)?;
+    let mut cont = cont.iter().copied();
+    let mut sizes = Vec::new();
+    loop {
+        if data.is_empty() {
+            let Some(next) = cont.next() else { break };
+            data = next;
+        }
+        if data.is_empty() {
+            sizes.push(0);
+            continue;
+        }
+        let (cch, flags) = (usize::from(u16::from_le_bytes([data[0], *data.get(1)?])), *data.get(2)?);
+        data = &data[3..];
+        let mut wide = flags & 0x1 != 0;
+        // Formatting runs (4 bytes each) and phonetic data follow the text.
+        let mut after = [0usize; 2];
+        if flags & 0x8 != 0 {
+            after[0] = usize::from(u16::from_le_bytes([*data.first()?, *data.get(1)?])) * 4;
+            data = &data[2..];
+        }
+        if flags & 0x4 != 0 {
+            let cb = i32::from_le_bytes(data.get(..4)?.try_into().ok()?);
+            after[1] = usize::try_from(cb).ok()?;
+            data = &data[4..];
+        }
+        let (mut left, mut size) = (cch, 0u64);
+        while left > 0 {
+            let chars = if wide { data.len() / 2 } else { data.len() }.min(left);
+            // One UTF-16 unit is at most 3 bytes of UTF-8, one compressed
+            // character (U+0000 to U+00FF) at most 2; under any other code
+            // page calamine decodes two bytes per character, 3 bytes each.
+            size += chars as u64 * if !utf16 { 6 } else if wide { 3 } else { 2 };
+            data = &data[if wide { 2 * chars } else { chars }..];
+            left -= chars;
+            if left > 0 {
+                // The text goes on in the next record, after a flags byte.
+                let (&flags, more) = cont.next()?.split_first()?;
+                wide = flags & 0x1 != 0;
+                data = more;
+            }
+        }
+        for mut skip in after {
+            while skip > 0 {
+                if data.is_empty() {
+                    data = cont.next()?;
+                }
+                let n = skip.min(data.len());
+                data = &data[n..];
+                skip -= n;
+            }
+        }
+        sizes.push(u32::try_from(size).unwrap_or(u32::MAX));
+    }
+    Some(sizes)
 }
 
 /// BIFF records of an .xls workbook stream, as calamine walks them:
@@ -570,21 +807,43 @@ fn biff_records(stream: &[u8]) -> impl Iterator<Item = (u16, &[u8])> {
 /// Mirrors how calamine's `Xls::new` sizes its sheets: for every sheet the
 /// `BOUNDSHEET` records point at, the bounding box of its cell records and
 /// the capacity its `DIMENSIONS` record asks for. False when that comes to
-/// more than [`MAX_XLS_CELLS`].
+/// more than [`MAX_XLS_CELLS`], or when the shared strings its cells refer
+/// to (calamine clones the string for each such cell, so one 64 KB string
+/// and a 2 MB run of cells was 9 GB) come to more than
+/// [`MAX_XLS_SHARED_TEXT`].
 fn xls_stream_size_ok(stream: &[u8]) -> bool {
     let u16_at = |d: &[u8], i: usize| d.get(i..i + 2).map_or(0, |b| u32::from(u16::from_le_bytes([b[0], b[1]])));
     let u32_at = |d: &[u8], i: usize| d.get(i..i + 4).map_or(0, |b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]));
 
-    // Sheet positions, from the workbook globals (up to their EOF).
+    // Sheet positions and the shared strings, from the workbook globals (up
+    // to their EOF).
     let mut sheets: Vec<usize> = Vec::new();
-    for (typ, data) in biff_records(stream) {
+    let mut shared: Vec<u32> = Vec::new();
+    let mut utf16 = true;
+    let mut globals = biff_records(stream).peekable();
+    while let Some((typ, data)) = globals.next() {
         match typ {
             0x0085 if data.len() >= 4 => sheets.push(u32_at(data, 0) as usize),
+            // CodePage: 1200 and 1201 are UTF-16.
+            0x0042 => utf16 = matches!(u16_at(data, 0), 1200 | 1201),
+            // SST, with the CONTINUE records right after it; a later table
+            // replaces an earlier one.
+            0x00FC => {
+                let mut cont = Vec::new();
+                while let Some((_, more)) = globals.next_if(|(typ, _)| *typ == 0x003C) {
+                    cont.push(more);
+                }
+                match xls_shared_string_sizes(data, &cont, utf16) {
+                    Some(sizes) => shared = sizes,
+                    None => return false,
+                }
+            }
             0x000A => break,
             _ => {}
         }
     }
     let mut total: u64 = 0;
+    let mut shared_text: u64 = 0;
     for pos in sheets {
         let Some(sheet) = stream.get(pos..) else { continue };
         // (row min, row max, col min, col max) of the cells.
@@ -629,6 +888,13 @@ fn xls_stream_size_ok(stream: &[u8]) -> bool {
                 // Number, Label, RString, BoolErr, Rk, LabelSst, Formula.
                 0x0203 | 0x0204 | 0x00D6 | 0x0205 | 0x027E | 0x00FD | 0x0006 if data.len() >= 4 => {
                     add(u16_at(data, 0), u16_at(data, 2));
+                    // LabelSst: the cell gets its own copy of shared string N.
+                    if typ == 0x00FD && data.len() >= 10 {
+                        shared_text += u64::from(shared.get(u32_at(data, 6) as usize).copied().unwrap_or(0));
+                        if shared_text > MAX_XLS_SHARED_TEXT {
+                            return false;
+                        }
+                    }
                 }
                 // MulRk: one row, a run of columns.
                 0x00BD if data.len() >= 6 => {
@@ -673,6 +939,9 @@ fn owned_data(d: calamine::DataRef<'_>) -> Data {
 fn push_sheet_cells(cells: impl Iterator<Item = (u32, Data)>, out: &mut String) -> bool {
     let mut row = None;
     for (r, cell) in cells {
+        if budget::tick() {
+            return true;
+        }
         if matches!(cell, Data::Empty) {
             continue;
         }
@@ -735,15 +1004,50 @@ fn extract_pdf(path: &Path) -> Option<String> {
     // though `extract_text` has an outer guard as well. (It does not print to
     // stdout in normal operation; in a GUI-subsystem build there is no console
     // to print to anyway.)
-    let text = crate::crash_log::quietly(|| pdf_extract::extract_text_from_mem(&bytes)).ok()?;
+    let text = crate::crash_log::quietly(|| pdf_text(&bytes)).ok()?.ok()?;
     // A scanned PDF may have no text layer at all: OCR its page images.
     #[cfg(windows)]
     let text = pdf_images::ocr_if_scanned(&bytes, text.unwrap_or_default());
     #[cfg(not(windows))]
-    let text = text.ok()?;
+    let text = text?;
     // Before `extract_text` folds presentation forms: their shapes are the
     // best evidence of visual (reversed) Arabic line order.
     Some(bidi_fix::fix_visual_order(text))
+}
+
+/// A PDF whose structure pdf-extract cannot walk safely (see [`pdf_guard`]).
+struct UnsafePdf;
+
+/// The text layer of the PDF in `bytes`, as `pdf_extract::extract_text_from_mem`
+/// gives it (`None` when it cannot be read), but only after [`pdf_guard`]
+/// has found that walking the document ends: pdf-extract recurses without
+/// limit, and a stack overflow ends the process whatever catches panics.
+fn pdf_text(bytes: &[u8]) -> Result<Option<String>, UnsafePdf> {
+    let has_pages = |d: &lopdf::Document| !d.get_pages().is_empty();
+    // A table lopdf cannot read, or one that leads to no pages: rebuilt
+    // from the object headers, as viewers do (`pdf_fix`).
+    let mut doc = match lopdf::Document::load_mem(bytes) {
+        Ok(doc) if has_pages(&doc) => doc,
+        loaded => match pdf_fix::with_rebuilt_xref(bytes).and_then(|b| lopdf::Document::load_mem(&b).ok()).filter(has_pages) {
+            Some(doc) => doc,
+            None => match loaded {
+                Ok(doc) => doc,
+                Err(_) => return Ok(None),
+            },
+        },
+    };
+    if doc.is_encrypted() && doc.decrypt("").is_err() {
+        return Ok(None);
+    }
+    if !unchecked("BAHTH_TEST_UNCHECKED_PDF") && !pdf_guard::bounded(&doc) {
+        return Err(UnsafePdf);
+    }
+    // Fonts in StandardEncoding (the standard 14 fonts' own) or an encoding
+    // pdf-extract does not know would make it panic: no text at all.
+    pdf_fix::simple_font_encodings(&mut doc);
+    let mut text = String::new();
+    let done = pdf_extract::output_doc(&doc, &mut pdf_extract::PlainTextOutput::new(&mut text));
+    Ok(done.is_ok().then_some(text))
 }
 
 // ---------------------------------------------------------------------------
@@ -961,7 +1265,7 @@ fn rtf_to_text(data: &[u8]) -> String {
     };
     let mut ansi_cp: u16 = 1252;
     // Font number -> code page, learned from \fonttbl.
-    let mut font_cp: Vec<(i32, u16)> = Vec::new();
+    let mut font_cp: std::collections::HashMap<i32, u16> = std::collections::HashMap::new();
     let mut table_font: Option<i32> = None;
 
     let mut state = RtfGroup {
@@ -976,16 +1280,16 @@ fn rtf_to_text(data: &[u8]) -> String {
     // Fallback characters still to skip after a `\uN`.
     let mut pending_skip = 0usize;
 
-    let current_enc = |state: &RtfGroup, font_cp: &[(i32, u16)], ansi_cp: u16| {
-        let cp = state
-            .font
-            .and_then(|f| font_cp.iter().find(|(n, _)| *n == f).map(|(_, cp)| *cp))
-            .unwrap_or(ansi_cp);
+    let current_enc = |state: &RtfGroup, font_cp: &std::collections::HashMap<i32, u16>, ansi_cp: u16| {
+        let cp = state.font.and_then(|f| font_cp.get(&f).copied()).unwrap_or(ansi_cp);
         codepage_encoding(cp)
     };
 
     let mut i = 0;
     while i < data.len() {
+        if budget::tick() {
+            break;
+        }
         let b = data[i];
         match b {
             b'{' => {
@@ -1033,8 +1337,7 @@ fn rtf_to_text(data: &[u8]) -> String {
                             _ => None,
                         };
                         if let (Some(f), Some(cp)) = (table_font, cp) {
-                            font_cp.retain(|(n, _)| *n != f);
-                            font_cp.push((f, cp));
+                            font_cp.insert(f, cp);
                         }
                         continue;
                     }
@@ -1151,6 +1454,11 @@ fn runs_where<T: Copy>(items: &[T], keep: impl Fn(T) -> bool) -> impl Iterator<I
 /// Best-effort text recovery from a binary Word 97-2003 file: collects runs of
 /// UTF-16LE text and runs of printable 8-bit text (decoded as windows-1256).
 fn extract_doc_heuristic(data: &[u8]) -> String {
+    doc_runs_text(data, true)
+}
+
+/// [`extract_doc_heuristic`], with the 8-bit runs only when `byte_runs`.
+fn doc_runs_text(data: &[u8], byte_runs: bool) -> String {
     let mut runs: Vec<(usize, String)> = Vec::new();
 
     // UTF-16LE runs (Word stores Unicode text pieces this way, word-aligned).
@@ -1181,7 +1489,7 @@ fn extract_doc_heuristic(data: &[u8]) -> String {
 
     // Single-byte runs (Word "compressed" pieces), decoded as windows-1256.
     let is_byte_text = |b: u8| matches!(b, 0x09 | 0x0D | 0x20..=0x7E | 0x80..=0xFF);
-    for Range { start, end } in runs_where(data, is_byte_text) {
+    for Range { start, end } in runs_where(if byte_runs { data } else { &[] }, is_byte_text) {
         if end - start >= 5 {
             let (s, _) = WINDOWS_1256.decode_without_bom_handling(&data[start..end]);
             let total = s.chars().count();
@@ -1287,22 +1595,21 @@ fn normalize_arabic_forms(s: &str) -> Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_temp::TempPath;
     use std::io::{Cursor, Write};
-    use std::path::PathBuf;
 
-    fn temp_path(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("bahth_extract_tests_{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir.join(name)
+    /// `name` in a folder of its own, removed when the guard is dropped.
+    fn temp_path(name: &str) -> TempPath {
+        TempPath::in_own_dir("bahth_extract_tests", name)
     }
 
-    fn write_file(name: &str, bytes: &[u8]) -> PathBuf {
+    fn write_file(name: &str, bytes: &[u8]) -> TempPath {
         let p = temp_path(name);
         std::fs::write(&p, bytes).unwrap();
         p
     }
 
-    fn write_zip(name: &str, entries: &[(&str, &str)]) -> PathBuf {
+    fn write_zip(name: &str, entries: &[(&str, &str)]) -> TempPath {
         let p = temp_path(name);
         let mut zw = zip::ZipWriter::new(File::create(&p).unwrap());
         for (n, content) in entries {
@@ -1453,7 +1760,7 @@ mod tests {
     }
 
     /// A one-sheet xlsx whose worksheet XML is `sheet`.
-    fn write_xlsx(name: &str, sheet: &str) -> PathBuf {
+    fn write_xlsx(name: &str, sheet: &str) -> TempPath {
         let ct = r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>"#;
         let rels = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#;
         let wb = r#"<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="ورقة1" sheetId="1" r:id="rId1"/></sheets></workbook>"#;
@@ -1488,11 +1795,75 @@ mod tests {
     }
 
     #[test]
+    fn background_ocr_one_at_a_time_and_not_while_the_user_is_busy() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        use std::time::Duration;
+        static RUNNING: AtomicUsize = AtomicUsize::new(0);
+        static MOST: AtomicUsize = AtomicUsize::new(0);
+        static BUSY: AtomicBool = AtomicBool::new(false);
+        let fake_ocr = || {
+            let now = RUNNING.fetch_add(1, Ordering::SeqCst) + 1;
+            MOST.fetch_max(now, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(20));
+            RUNNING.fetch_sub(1, Ordering::SeqCst);
+        };
+        let busy = || BUSY.load(Ordering::SeqCst);
+        // Four warm-up threads: never two recognitions at once.
+        std::thread::scope(|s| {
+            for _ in 0..4 {
+                s.spawn(move || {
+                    set_background(true);
+                    for _ in 0..3 {
+                        paced_with(busy, Duration::from_millis(5), fake_ocr);
+                    }
+                });
+            }
+        });
+        assert_eq!(MOST.load(Ordering::SeqCst), 1);
+        // While the user is busy a background OCR waits, and the wait is not
+        // charged to the file's time budget.
+        BUSY.store(true, Ordering::SeqCst);
+        let waiter = std::thread::spawn(move || {
+            set_background(true);
+            let _short = budget::with_limit(Duration::from_millis(50));
+            let _b = budget::start();
+            let started = std::time::Instant::now();
+            paced_with(busy, Duration::from_millis(5), || {});
+            (started.elapsed(), budget::exceeded())
+        });
+        std::thread::sleep(Duration::from_millis(150));
+        BUSY.store(false, Ordering::SeqCst);
+        let (waited, over) = waiter.join().unwrap();
+        assert!(waited >= Duration::from_millis(140) && !over, "{waited:?} {over}");
+        // A foreground thread (a search) neither waits nor queues.
+        BUSY.store(true, Ordering::SeqCst);
+        let t = std::time::Instant::now();
+        paced_with(busy, Duration::from_millis(5), || {});
+        assert!(t.elapsed() < Duration::from_millis(100));
+        BUSY.store(false, Ordering::SeqCst);
+    }
+
+    #[test]
+    fn xls_raw_fallback_gives_each_text_once() {
+        // Not a workbook at all (a web page saved as .xls, common): the raw
+        // fallback read both byte alignments, and so gave all 8-bit text twice.
+        let page = "<html><body>تقرير المبيعات Sales report 2026</body></html>\n".repeat(20_000);
+        let (bytes, _, _) = WINDOWS_1256.encode(&page);
+        let t = spreadsheet_text(Cursor::new(bytes.as_ref()), "xls").unwrap();
+        assert_eq!(t.matches("Sales report").count(), 20_000, "{}", t.len());
+        assert!(t.contains("تقرير المبيعات"));
+        // UTF-16 text at an odd offset is still found.
+        let mut odd = vec![0u8];
+        odd.extend("نص بترميز يونيكود".encode_utf16().flat_map(u16::to_le_bytes));
+        assert!(spreadsheet_text(Cursor::new(odd), "xls").unwrap().contains("نص بترميز يونيكود"));
+    }
+
+    #[test]
     fn xls_oversized_sheets_do_not_reach_calamine() {
         use super::fuzz::xls_with;
         // An ordinary sheet goes through calamine.
         let ok = xls_with((0, 2, 0, 2), &[(0, 0, "خلية"), (1, 1, "ثانية")]);
-        assert!(xls_size_ok(&mut Cursor::new(&ok)));
+        assert!(xls_checked_workbook(&mut Cursor::new(&ok)).is_some());
         assert_eq!(spreadsheet_text(Cursor::new(&ok), "xls").unwrap(), "خلية\nثانية\n\n");
         // calamine reserves DIMENSIONS rows × columns up front, and lays out
         // the cells' bounding box densely: both used to abort the program.
@@ -1501,12 +1872,12 @@ mod tests {
             xls_with((0, 1, 0, 1), &[(0, 0, "خلية"), (65_535, 65_535, "بعيدة")]),
             xls_with((70_000, 1, 0, 1), &[(0, 0, "خلية")]), // first row after the last
         ] {
-            assert!(!xls_size_ok(&mut Cursor::new(&bad)));
+            assert!(xls_checked_workbook(&mut Cursor::new(&bad)).is_none());
             // The text still comes out of the raw bytes.
             let t = spreadsheet_text(Cursor::new(&bad), "xls").unwrap();
             assert!(t.contains("خلية"), "{t:?}");
         }
-        assert!(!xls_size_ok(&mut Cursor::new(b"not a compound file")));
+        assert!(xls_checked_workbook(&mut Cursor::new(b"not a compound file")).is_none());
     }
 
     #[test]
@@ -1681,6 +2052,66 @@ mod tests {
         let _ = extract_text(&p);
         let p = write_file("bad2.pdf", &[0xFFu8; 300]);
         assert!(extract_text(&p).is_none());
+    }
+
+    /// The FIN1 test PDFs, written by hand: PDF 1.4, one uncompressed
+    /// content stream, the standard Helvetica (Type 1, no embedded font, no
+    /// ToUnicode) with the encoding `enc` (an object of its own when it is a
+    /// dictionary), and a cross-reference table whose entries end in `eol`.
+    fn fin1_pdf(enc: &str, eol: &str, text: &str) -> Vec<u8> {
+        let stream = format!("BT\n/F1 12 Tf\n72 720 Td\n({text}) Tj\nET");
+        let font = match enc {
+            "" => "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_owned(),
+            e if e.starts_with("<<") => "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding 6 0 R >>".to_owned(),
+            e => format!("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding {e} >>"),
+        };
+        let mut objs = vec![
+            "<< /Type /Catalog /Pages 2 0 R >>".to_owned(),
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_owned(),
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>".to_owned(),
+            format!("<< /Length {} >>\nstream\n{stream}\nendstream", stream.len()),
+            font,
+        ];
+        if enc.starts_with("<<") {
+            objs.push(enc.to_owned());
+        }
+        let mut pdf = b"%PDF-1.4\r\n%\xE2\xE3\xCF\xD3\r\n".to_vec();
+        let mut offsets = Vec::new();
+        for (i, o) in objs.iter().enumerate() {
+            offsets.push(pdf.len());
+            pdf.extend(format!("{} 0 obj\r\n{o}\r\nendobj\r\n", i + 1).bytes());
+        }
+        let xref = pdf.len();
+        pdf.extend(format!("xref\r\n0 {}\r\n0000000000 65535 f{eol}", objs.len() + 1).bytes());
+        for off in offsets {
+            pdf.extend(format!("{off:010} 00000 n{eol}").bytes());
+        }
+        pdf.extend(format!("trailer\r\n<< /Size {} /Root 1 0 R >>\r\nstartxref\r\n{xref}\r\n%%EOF\r\n", objs.len() + 1).bytes());
+        pdf
+    }
+
+    #[test]
+    fn standard_14_font_pdfs_are_read() {
+        // FIN1 F2: none of these was found by a search inside documents.
+        for enc in ["/StandardEncoding", "", "/WinAnsiEncoding", "/MacRomanEncoding", "/PDFDocEncoding", "<< /Type /Encoding /BaseEncoding /StandardEncoding >>"] {
+            // A valid table (20-byte entries), and the common 19-byte one lopdf refuses.
+            for eol in ["\r\n", " \n", "\n"] {
+                let p = write_file("synthetic pdf BTX-P1.pdf", &fin1_pdf(enc, eol, "emeraldtest"));
+                let t = extract_text(&p).unwrap_or_default();
+                assert!(t.contains("emeraldtest"), "{enc} {eol:?}: {t:?}");
+            }
+        }
+        // Standard maps byte 39 to the right quote, as every viewer shows it.
+        let p = write_file("q.pdf", &fin1_pdf("/StandardEncoding", "\r\n", "don't"));
+        assert!(extract_text(&p).unwrap_or_default().contains("don\u{2019}t"));
+        // A table whose offsets point nowhere: rebuilt as well.
+        let mut pdf = fin1_pdf("/StandardEncoding", "\r\n", "emeraldtest");
+        let at = pdf.windows(4).position(|w| w == b"xref").unwrap();
+        // Every offset a million bytes too far.
+        let tail = String::from_utf8(pdf.split_off(at)).unwrap().replace("0000000", "0000001");
+        pdf.extend(tail.bytes());
+        let p = write_file("shifted.pdf", &pdf);
+        assert!(extract_text(&p).unwrap_or_default().contains("emeraldtest"));
     }
 
     #[test]

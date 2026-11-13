@@ -67,7 +67,7 @@ pub struct Floating {
 }
 
 fn rtl() -> bool {
-    !crate::i18n::is_en()
+    crate::i18n::is_rtl()
 }
 
 impl App {
@@ -85,7 +85,9 @@ impl App {
         if self.floating.hwnd.get() == 0 {
             let started = Instant::now();
             let ex = WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE;
-            let Some(hwnd) = surface::create_window(KIND_FLOATING, ex, "") else {
+            // Its name is what a screen reader says for it (it draws itself).
+            let name = trf!("خانة بحث سريع — انقرها أو اضغط {}", "InstaFind search box — click it or press {}", super::keys::hotkey_text());
+            let Some(hwnd) = surface::create_window(KIND_FLOATING, ex, &name) else {
                 log("floating box: could not create the window");
                 return;
             };
@@ -196,7 +198,7 @@ impl App {
             surface::draw_glyph(dc, &glyph_font, p.text, quick::glyph::SEARCH, &Rect::at(ix, 0, icon_w, h));
             surface::draw_text(dc, &text_font, p.muted, tr!("ابحث...", "Search..."), &Rect::at(tx, 0, text_w, h), rtl, false);
             // Always left-to-right, at the far end.
-            surface::draw_text(dc, &hint_font, faint, super::keys::HOTKEY_TEXT, &Rect::at(hx, 0, hint_w, h), false, !rtl);
+            surface::draw_text(dc, &hint_font, faint, super::keys::hotkey_text(), &Rect::at(hx, 0, hint_w, h), false, !rtl);
         });
         *self.floating.image.borrow_mut() = Some(canvas);
     }
@@ -371,11 +373,12 @@ impl App {
     }
 
     fn floating_menu(&self) {
+        let open = trf!("فتح نافذة البحث\t{}", "Open quick search\t{}", super::keys::hotkey_text());
         let items: [(usize, &str); 4] = [
-            (1, tr!("فتح نافذة البحث\tCtrl+Alt+F", "Open quick search\tCtrl+Alt+F")),
+            (1, &open),
             (2, tr!("النافذة الكاملة", "Full window")),
-            (3, tr!("إعادة المربع إلى مكانه", "Reset position")),
-            (4, tr!("إخفاء المربع العائم", "Hide the floating box")),
+            (3, tr!("إعادة الخانة إلى مكانها", "Reset position")),
+            (4, tr!("إخفاء خانة البحث العائمة", "Hide the floating search box")),
         ];
         let menu = unsafe { CreatePopupMenu() };
         if menu.is_null() {

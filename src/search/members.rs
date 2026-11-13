@@ -62,6 +62,7 @@ mod tests {
     fn content_hit_splits_archive_text() {
         // The text extract_text gives an archive (see extract::archive).
         let dir = std::env::temp_dir().join(format!("bahth_members_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         std::fs::create_dir_all(&dir).unwrap();
         let p = dir.join("أرشيف.zip");
         let mut zw = zip::ZipWriter::new(std::fs::File::create(&p).unwrap());

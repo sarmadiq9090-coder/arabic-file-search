@@ -11,14 +11,14 @@ use native_windows_gui as nwg;
 use std::cell::Cell;
 use std::rc::Rc;
 
-use winapi::shared::minwindef::{BOOL, DWORD, LPARAM, UINT, WPARAM};
+use winapi::shared::minwindef::{DWORD, LPARAM, UINT, WPARAM};
 use winapi::shared::windef::HWND;
 use winapi::shared::winerror::ERROR_SUCCESS;
 use winapi::um::winnt::REG_DWORD;
 use winapi::um::winreg::{RegQueryValueExW, RegSetValueExW};
 use winapi::um::winuser::{
-    BM_CLICK, EnumChildWindows, GA_ROOTOWNER, GetAncestor, GetClassNameW, GetDlgCtrlID, GetDlgItem,
-    GetForegroundWindow, GetLastActivePopup, IDOK, IsWindow, IsWindowEnabled, IsWindowVisible, MOD_ALT, MOD_CONTROL,
+    BM_CLICK, GA_ROOTOWNER, GW_CHILD, GW_HWNDNEXT, GetAncestor, GetClassNameW, GetDlgCtrlID, GetDlgItem,
+    GetForegroundWindow, GetLastActivePopup, GetWindow, IDOK, IsWindow, IsWindowEnabled, IsWindowVisible, MOD_ALT, MOD_CONTROL,
     MOD_NOREPEAT, PostMessageW, RegisterHotKey, SendMessageTimeoutW, SMTO_ABORTIFHUNG, SetForegroundWindow,
     UnregisterHotKey, WM_COMMAND, WM_GETTEXT, WM_GETTEXTLENGTH, WM_HOTKEY, WM_SETTEXT,
 };
@@ -33,12 +33,6 @@ pub(super) const HOTKEY_ID: i32 = 2;
 pub(super) const HOTKEY_TEXT: &str = "Ctrl+Alt+G";
 /// On/off switch, a DWORD under `HKCU\Software\BahthSari`.
 const REG_VALUE: &str = "QuickSwitch";
-
-/// Control ids of the file-name box in the common file dialogs: the combo
-/// box (cmb13) of the Vista-style and newer old-style dialogs, and the plain
-/// edit (edt1) of the oldest ones.
-const ID_FILENAME_COMBO: i32 = 0x47C;
-const ID_FILENAME_EDIT: i32 = 0x480;
 
 fn hint() -> &'static str {
     tr!(
@@ -95,17 +89,6 @@ fn class_name(h: HWND) -> String {
     String::from_utf16_lossy(&buf[..n.max(0) as usize])
 }
 
-/// Every descendant window of `parent`, in Z order, depth first.
-fn descendants(parent: HWND) -> Vec<HWND> {
-    unsafe extern "system" fn collect(h: HWND, l: LPARAM) -> BOOL {
-        unsafe { (*(l as *mut Vec<HWND>)).push(h) };
-        1
-    }
-    let mut out: Vec<HWND> = Vec::new();
-    unsafe { EnumChildWindows(parent, Some(collect), &mut out as *mut Vec<HWND> as LPARAM) };
-    out
-}
-
 /// Longest window text read from another program, in UTF-16 units: a
 /// long path (`\\?\` prefix) is at most 32,767 units.
 const MAX_TEXT: usize = 32_768;
@@ -147,30 +130,53 @@ fn set_window_text(h: HWND, text: &str) -> bool {
     sent != 0 && r != 0
 }
 
-/// The editable file-name box of a common file dialog, if it has one.
-fn filename_edit(dialog: HWND) -> Option<HWND> {
-    let all = descendants(dialog);
-    let id = |h: HWND| unsafe { GetDlgCtrlID(h) };
-    // The combo box (ComboBoxEx32 in a Save dialog, ComboBox in Open): its
-    // edit is a child of it, or of its inner ComboBox.
-    for &combo in all.iter().filter(|&&h| id(h) == ID_FILENAME_COMBO) {
-        if class_name(combo).eq_ignore_ascii_case("Edit") {
-            return Some(combo);
-        }
-        if let Some(&edit) = descendants(combo).iter().find(|&&h| class_name(h).eq_ignore_ascii_case("Edit")) {
-            return Some(edit);
+/// `h` and its child windows as `crate::file_dialog` reads them, at most
+/// `budget` windows and 16 levels deep (a dialog has a few dozen).
+fn describe(h: HWND, depth: u32, budget: &mut u32) -> crate::file_dialog::Node {
+    let mut node = crate::file_dialog::Node {
+        class: class_name(h),
+        id: unsafe { GetDlgCtrlID(h) },
+        hidden: unsafe { IsWindowVisible(h) } == 0,
+        handle: h as usize,
+        children: Vec::new(),
+    };
+    if depth < 16 {
+        let mut c = unsafe { GetWindow(h, GW_CHILD) };
+        while !c.is_null() && *budget > 0 {
+            *budget -= 1;
+            node.children.push(describe(c, depth + 1, budget));
+            c = unsafe { GetWindow(c, GW_HWNDNEXT) };
         }
     }
-    all.into_iter().find(|&h| id(h) == ID_FILENAME_EDIT && class_name(h).eq_ignore_ascii_case("Edit"))
+    node
 }
 
-/// Whether `h` is a common Open / Save As dialog: a dialog-class window
-/// with a file-name box, or with the Vista-style dialog's DirectUI view.
+/// The editable file-name box of a common file dialog, if it has one
+/// (`crate::file_dialog::filename_box`: the cmb13 combo of Open dialogs,
+/// the floating combo of the Windows 11 Save dialog, or edt1).
+fn filename_edit(dialog: HWND) -> Option<HWND> {
+    if dialog.is_null() || unsafe { IsWindow(dialog) } == 0 {
+        return None;
+    }
+    let tree = describe(dialog, 0, &mut 2000);
+    crate::file_dialog::filename_box(&tree).map(|b| b.handle as HWND)
+}
+
+/// Whether `h` is a common Open / Save As dialog: a file-name box and a
+/// view of the files (`crate::file_dialog`), not just any dialog with an
+/// edt1 box (Find, Print) or a DirectUI child.
 pub(super) fn is_file_dialog(h: HWND) -> bool {
     if h.is_null() || unsafe { IsWindow(h) } == 0 || class_name(h) != "#32770" {
         return false;
     }
-    filename_edit(h).is_some() || descendants(h).into_iter().any(|c| class_name(c) == "DirectUIHWND")
+    crate::file_dialog::is_file_dialog(&describe(h, 0, &mut 2000))
+}
+
+/// The class of the window in front, for the log when Ctrl+Alt+G finds no
+/// file dialog (a class name says which dialog it was, and nothing private).
+fn front_class() -> String {
+    let front = unsafe { GetForegroundWindow() };
+    if front.is_null() { "none".into() } else { class_name(front) }
 }
 
 /// The file dialog the user is looking at: the foreground window, or the
@@ -227,19 +233,35 @@ pub(super) fn switch_dialog_folder(dialog: HWND, folder: &str) -> bool {
         }
     }
     // The newer dialogs navigate asynchronously and may rewrite the box
-    // meanwhile, so give the name back once the click has been handled.
-    let edit_addr = edit as usize;
+    // meanwhile (a slow folder late), so the name goes back once the click
+    // has been handled and again whenever the dialog takes it away, for
+    // two seconds (`crate::file_dialog::after_switch`); the user's own
+    // typing after that is left alone.
+    let (dialog_addr, edit_addr) = (dialog as usize, edit as usize);
+    let typed = folder.to_string();
     // `std::thread::spawn` would panic if no thread can be made.
     crate::crash_log::spawn_named("quick-switch", move || {
-        let edit = edit_addr as HWND;
-        for _ in 0..2 {
+        use crate::file_dialog::{NameBox, after_switch};
+        let dialog = dialog_addr as HWND;
+        let mut edit = edit_addr as HWND;
+        for step in 0..8 {
             std::thread::sleep(std::time::Duration::from_millis(250));
-            if unsafe { IsWindow(edit) } == 0 {
+            if unsafe { IsWindow(dialog) } == 0 {
                 return;
             }
-            let now = window_text(edit);
-            if now != original {
-                set_window_text(edit, &original);
+            // The dialog may have made a new box for the new folder.
+            if unsafe { IsWindow(edit) } == 0 {
+                match filename_edit(dialog) {
+                    Some(e) => edit = e,
+                    None => return,
+                }
+            }
+            match after_switch(&window_text(edit), &original, &typed, step < 2) {
+                NameBox::Fine => {}
+                NameBox::Restore => {
+                    set_window_text(edit, &original);
+                }
+                NameBox::Stop => return,
             }
         }
     });
@@ -363,6 +385,17 @@ impl App {
     fn set_quick_target(&self, dialog: Option<HWND>) {
         self.quick.target.set(dialog.map_or(0, |h| h as usize));
         self.quick.menu_switch.set_enabled(dialog.is_some());
+        // The new look shows the same mode: a line with the hint, Enter
+        // moves the dialog, Esc cancels, and its result menu has the item.
+        self.webui_quick_switch(dialog.map(|_| hint()));
+    }
+
+    /// Whether a Save/Open dialog is still waiting to be moved (forgets
+    /// one that was closed meanwhile). Only the new look asks; mingw builds
+    /// have none.
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))]
+    pub(super) fn quick_switch_waiting(&self) -> bool {
+        self.quick_target().is_some()
     }
 
     /// Ctrl+Alt+G: remember the file dialog in front, if any, and show the search.
@@ -371,14 +404,17 @@ impl App {
             return;
         }
         let dialog = foreground_file_dialog();
-        log(&format!(
-            "quick switch: hotkey, file dialog {} (box {})",
-            if dialog.is_some() { "found" } else { "not in front" },
-            if dialog.and_then(filename_edit).is_some() { "found" } else { "none" },
-        ));
+        match dialog {
+            Some(d) => log(&format!(
+                "quick switch: hotkey, file dialog found (box {})",
+                if filename_edit(d).is_some() { "found" } else { "none" }
+            )),
+            None => log(&format!("quick switch: hotkey, file dialog not in front (front window class {})", front_class())),
+        }
         self.set_quick_target(dialog);
         self.show_window();
-        if dialog.is_some() {
+        // (The new look shows the hint on its own line while the mode lasts.)
+        if dialog.is_some() && !self.webui_in_use() {
             self.set_status(hint());
         }
     }
@@ -413,7 +449,7 @@ impl App {
 
     fn quick_switch_selected(&self) {
         if self.quick_target().is_none() {
-            self.set_status(&trf!("اضغط {HOTKEY_TEXT} في نافذة حفظ أو فتح أولاً.", "Press {HOTKEY_TEXT} in a Save or Open dialog first."));
+            self.set_status(&press_first());
             return;
         }
         match self.list.selected_item() {
@@ -423,24 +459,47 @@ impl App {
     }
 
     fn switch_to_row(&self, row: usize) {
-        let Some(dialog) = self.quick_target() else { return };
+        if self.quick_target().is_none() {
+            return;
+        }
         let Some((path, is_dir)) = self.state.borrow().row_entry(row).map(|e| (e.path.to_string(), e.is_dir)) else {
             return;
         };
-        let folder = result_folder(&path, is_dir);
         self.note_use(&path);
         self.remember_query();
-        // Out of the way first, so the dialog gets the focus back.
-        self.window.set_visible(false);
+        self.quick_switch_to(&path, is_dir);
+    }
+
+    /// Moves the waiting Save/Open dialog to the folder of `path` (a result
+    /// picked in either look; the folder itself when `is_dir`). The main
+    /// window in use gets out of the way first, so the dialog gets the
+    /// focus back, and comes back with a word when the move fails. True
+    /// when the dialog was moved.
+    pub(super) fn quick_switch_to(&self, path: &str, is_dir: bool) -> bool {
+        let Some(dialog) = self.quick_target() else {
+            self.set_status(&press_first());
+            return false;
+        };
+        let folder = result_folder(path, is_dir);
+        if !self.webui_step_aside() {
+            self.window.set_visible(false);
+        }
         if switch_dialog_folder(dialog, &folder) {
             self.set_quick_target(None);
             log("quick switch: moved a file dialog");
+            true
         } else {
             self.show_window();
             self.set_quick_target(None);
             self.set_status(tr!("تعذر نقل نافذة الحفظ/الفتح إلى هذا المجلد.", "Could not move the Save/Open dialog to this folder."));
+            false
         }
     }
+}
+
+/// Said when a result is picked for a dialog that is no longer waiting.
+fn press_first() -> String {
+    trf!("اضغط {HOTKEY_TEXT} في نافذة حفظ أو فتح أولاً.", "Press {HOTKEY_TEXT} in a Save or Open dialog first.")
 }
 
 #[cfg(test)]

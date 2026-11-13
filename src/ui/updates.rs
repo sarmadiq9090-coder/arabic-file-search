@@ -20,24 +20,48 @@ impl App {
     /// Looks for a newer release on GitHub in the background. The automatic
     /// check runs at most once a day and stays silent unless it finds one.
     pub(super) fn check_for_update(&self, manual: bool) {
-        // Installed with winget or Scoop: they update it, never the program
-        // itself (that would break their records of the file).
+        // Installed with winget, Scoop or Chocolatey, or from the Store: they
+        // update it, never the program itself (that would break their
+        // records of the file, or cannot work at all).
         if let Some(pm) = crate::update::managed_by() {
+            // No check runs: the new look's button, which said "Checking…"
+            // from the click, is itself again before the message box.
             if manual {
+                self.webui_settings_changed();
+            }
+            if manual && pm == crate::update::PackageManager::Store {
+                self.show_store_update_note();
+            } else if manual {
                 log(&format!("update: skipped, installed with {}", pm.name()));
                 self.set_status(&trf!("يُحدَّث عبر {}.", "Updated by {}.", pm.name()));
-                nwg::modal_info_message(&self.window, title(), &crate::update::managed_message(pm));
+                self.modal_info(title(), &crate::update::managed_message(pm));
+            }
+            return;
+        }
+        // In a folder this copy cannot write to (Program Files): a
+        // self-update would always fail, so none is offered.
+        if let Some(dir) = crate::update::read_only_folder() {
+            if manual {
+                self.webui_settings_changed();
+                log(&format!("update: skipped, cannot write to {dir}"));
+                self.modal_info(title(), &crate::update::read_only_message(&dir));
             }
             return;
         }
         if self.update_busy.replace(true) {
-            if manual {
-                self.set_status(tr!("جاري التحقق من التحديثات…", "Checking for updates…"));
+            if manual && self.update_checking.get() {
+                // The automatic check that is running answers this one too.
+                self.update_asked.set(true);
+                self.show_checking();
+            } else if manual {
+                self.set_status(tr!("جارٍ تنزيل التحديث…", "Downloading the update…"));
             }
             return;
         }
+        self.update_checking.set(true);
         if manual {
-            self.set_status(tr!("جاري التحقق من التحديثات…", "Checking for updates…"));
+            self.update_asked.set(true);
+            self.show_checking();
         }
         let slot = self.update_result.clone();
         let notice = self.update_notice.sender();
@@ -51,7 +75,25 @@ impl App {
         });
     }
 
+    /// Says at once that a check the user asked for is running: the status
+    /// line, and in the new look its button ("Checking…", disabled). The
+    /// answer comes later as a message box.
+    fn show_checking(&self) {
+        self.set_status(tr!("جارٍ التحقق من التحديثات…", "Checking for updates…"));
+        self.webui_settings_changed();
+    }
+
+    /// Whether a check the user asked for is still waiting for its answer.
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))]
+    pub(super) fn update_check_asked(&self) -> bool {
+        self.update_asked.get()
+    }
+
     pub(super) fn maybe_check_for_update(&self) {
+        // The Store updates its own copy; no check against GitHub.
+        if crate::store::is_packaged() {
+            return;
+        }
         let last = self.state.borrow().settings.update_check;
         if crate::update::should_check_now(last, index::now_secs().max(0) as u64) {
             self.check_for_update(false);
@@ -63,6 +105,11 @@ impl App {
         match event {
             UpdateEvent::Checked { manual, result } => {
                 self.update_busy.set(false);
+                self.update_checking.set(false);
+                // Asked for while an automatic check ran: answered like a manual one.
+                let manual = self.update_asked.replace(false) || manual;
+                // The button is back before a message box holds the window.
+                self.webui_settings_changed();
                 // A failed check (no network yet, rate limit) is retried at
                 // the next hourly tick instead of a day later.
                 match &result {
@@ -80,29 +127,41 @@ impl App {
                     Ok(None) if manual => {
                         let v = env!("CARGO_PKG_VERSION");
                         self.set_status(&trf!("لديك أحدث إصدار ({v}).", "You have the latest version ({v})."));
-                        nwg::modal_info_message(&self.window, title(), &trf!("لديك أحدث إصدار من البرنامج ({v}).", "You have the latest version of the program ({v})."));
+                        self.modal_info(title(), &trf!("لديك أحدث إصدار من البرنامج ({v}).", "You have the latest version of the program ({v})."));
                     }
                     Err(e) if manual => {
                         self.set_status(tr!("تعذر التحقق من التحديثات.", "Could not check for updates."));
-                        nwg::modal_error_message(&self.window, title(), &trf!("تعذر التحقق من التحديثات:\n{e}", "Could not check for updates:\n{e}"));
+                        self.modal_error(title(), &trf!("تعذر التحقق من التحديثات:\n{e}", "Could not check for updates:\n{e}"));
                     }
                     _ => {}
                 }
             }
             UpdateEvent::Installed(Ok(())) => {
-                self.set_status(tr!("اكتمل التحديث. جاري إعادة التشغيل…", "Update complete. Restarting…"));
-                match crate::update::restart_new_version() {
-                    Ok(()) => {
-                        // Save everything, then leave at once so the new copy
-                        // gets the single-instance lock without waiting for
-                        // the index to be freed.
-                        self.on_close();
-                        std::process::exit(0);
+                self.set_status(tr!("اكتمل التحديث. جارٍ إعادة التشغيل…", "Update complete. Restarting…"));
+                // Leaves only when the new version runs; otherwise the old
+                // program file goes back in place, so the install always has
+                // a program that starts.
+                let failed = match crate::update::restart_new_version() {
+                    Ok(child) => {
+                        self.hand_over(child, "update");
+                        tr!("الإصدار الجديد لم يعمل (ربما أوقفه برنامج الحماية).", "The new version did not start (perhaps blocked by security software).").to_string()
                     }
-                    Err(e) => {
+                    Err(e) => e,
+                };
+                match crate::update::roll_back_update() {
+                    Ok(()) => {
+                        log(&format!("update: rolled back to {} ({failed})", env!("CARGO_PKG_VERSION")));
                         self.update_busy.set(false);
-                        nwg::modal_info_message(
-                            &self.window,
+                        self.modal_error(
+                            title(),
+                            &trf!("تعذر تطبيق التحديث: {failed}\nأُعيد الإصدار الحالي ({}) وهو يعمل كما هو.", "The update could not be applied: {failed}\nThe current version ({}) was put back and keeps working.", env!("CARGO_PKG_VERSION")),
+                        );
+                    }
+                    Err(rb) => {
+                        log(&format!("update: the new version did not start ({failed}); rolling back failed: {rb}"));
+                        let e = failed;
+                        self.update_busy.set(false);
+                        self.modal_info(
                             title(),
                             &trf!("تم تثبيت الإصدار الجديد، لكن تعذرت إعادة التشغيل تلقائياً ({e}).\nأغلق البرنامج وافتحه من جديد.", "The new version is installed, but the program could not restart itself ({e}).\nClose the program and open it again."),
                         );
@@ -113,14 +172,15 @@ impl App {
                 log(&format!("update: install failed: {e}"));
                 self.update_busy.set(false);
                 self.set_status(tr!("تعذر التحديث.", "The update failed."));
-                nwg::modal_error_message(&self.window, title(), &trf!("تعذر تنزيل التحديث أو تثبيته:\n{e}\n\nالإصدار الحالي يعمل كما هو.", "Could not download or install the update:\n{e}\n\nThe current version keeps working as before."));
+                self.modal_error(title(), &trf!("تعذر تنزيل التحديث أو تثبيته:\n{e}\n\nالإصدار الحالي يعمل كما هو.", "Could not download or install the update:\n{e}\n\nThe current version keeps working as before."));
             }
         }
     }
 
     pub(super) fn offer_update(&self, rel: crate::update::Release) {
-        // An automatic check must not pop up over a hidden window; show it.
-        if !self.window.visible() {
+        // An automatic check must not pop up over a hidden window; show the
+        // main window in use (the new look's, or the classic one).
+        if !self.main_shown() {
             self.show_window();
         }
         let current = env!("CARGO_PKG_VERSION");
@@ -136,12 +196,15 @@ impl App {
             buttons: nwg::MessageButtons::YesNo,
             icons: nwg::MessageIcons::Question,
         };
-        if nwg::modal_message(&self.window, &params) != nwg::MessageChoice::Yes {
+        if self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) != nwg::MessageChoice::Yes {
             self.set_status(&trf!("الإصدار {} متاح. يمكنك التحديث لاحقاً من «خيارات».", "Version {} is available. You can update later from “Options”.", rel.version));
             return;
         }
         self.update_busy.set(true);
         self.save_settings();
+        if !crate::update::signature_checking_configured() {
+            log("update: signature checking not configured (update::TRUSTED_PUBLIC_KEYS is empty); checking SHA-256 only");
+        }
         let total = rel.exe_size;
         self.update_progress.0.store(0, Ordering::Relaxed);
         self.update_progress.1.store(total, Ordering::Relaxed);
@@ -161,11 +224,41 @@ impl App {
         });
     }
 
+    /// A message box over the main window in use: the new look's when it
+    /// is on screen (the classic window is hidden then), else the classic one.
+    pub(super) fn modal_info(&self, title: &str, text: &str) {
+        self.with_modal_owner(|owner| nwg::modal_info_message(nwg::ControlHandle::Hwnd(owner), title, text));
+    }
+
+    pub(super) fn modal_error(&self, title: &str, text: &str) {
+        self.with_modal_owner(|owner| nwg::modal_error_message(nwg::ControlHandle::Hwnd(owner), title, text));
+    }
+
     pub(super) fn poll_update_progress(&self) {
         let total = self.update_progress.1.load(Ordering::Relaxed);
         if total > 0 && self.update_busy.get() {
             let done = self.update_progress.0.load(Ordering::Relaxed);
-            self.set_status(&trf!("جاري تنزيل التحديث… {}٪", "Downloading the update… {}%", (done * 100 / total).min(100)));
+            self.set_status(&trf!("جارٍ تنزيل التحديث… {}٪", "Downloading the update… {}%", (done * 100 / total).min(100)));
+        }
+    }
+
+    /// Options ▸ Updates in the Microsoft Store version: the Store, not the
+    /// program, installs new versions, so nothing is downloaded; the user
+    /// is offered InstaFind's page in the Store instead.
+    pub(super) fn show_store_update_note(&self) {
+        log("update: Microsoft Store version; offering the Store page");
+        self.set_status(tr!("التحديثات تأتي من Microsoft Store.", "Updates come from Microsoft Store."));
+        let text = crate::store::update_message();
+        let params = nwg::MessageParams {
+            title: title(),
+            content: &text,
+            buttons: nwg::MessageButtons::YesNo,
+            icons: nwg::MessageIcons::Info,
+        };
+        if self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) == nwg::MessageChoice::Yes
+            && !super::shell::open(&crate::store::store_page_uri())
+        {
+            self.set_status(tr!("تعذر فتح Microsoft Store.", "Could not open Microsoft Store."));
         }
     }
 }

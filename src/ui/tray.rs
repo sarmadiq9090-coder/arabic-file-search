@@ -9,11 +9,14 @@ use std::cell::Cell;
 use winapi::shared::minwindef::{LPARAM, UINT, WPARAM};
 use winapi::shared::windef::{HGDIOBJ, HICON, HWND};
 use winapi::um::wingdi::{BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateBitmap, CreateDIBSection, DIB_RGB_COLORS, DeleteObject};
-use winapi::um::winuser::{CreateIconIndirect, DestroyIcon, GetDC, GetSystemMetrics, ICONINFO, ReleaseDC, SM_CXSMICON, WM_HOTKEY, WM_SETTINGCHANGE};
+use winapi::um::winuser::{
+    CreateIconIndirect, DestroyIcon, GetDC, GetSystemMetrics, ICONINFO, RegisterWindowMessageW, ReleaseDC, SM_CXSMICON, WM_HOTKEY,
+    WM_SETTINGCHANGE,
+};
 
-use super::keys::{ALT_SPACE_ID, HOTKEY_TEXT};
+use super::keys::{ALT_SPACE_ID, hotkey_text};
 use super::startup::log;
-use super::{App, autostart, surface, title};
+use super::{App, autostart, shell, surface, title};
 use crate::quick::Anchor;
 use crate::settings::{FloatingMode, HotkeyOpens};
 
@@ -97,9 +100,47 @@ pub struct QuickMenu {
     tray_icon: nwg::MenuItem,
 }
 
+/// What this run knows about the tray icon beyond the saved settings.
+#[derive(Default)]
+pub struct QuickState {
+    /// Tries left to put the tray icon back after Explorer restarted and
+    /// forgot it (`TaskbarCreated`); one try per timer tick.
+    tray_restore: Cell<u8>,
+    /// Alt+Space is on but another program held it: the tick it failed at,
+    /// retried from then on (`crate::quick::hotkey_retry_due`). The setting
+    /// stays on, so it is never lost to a race at start.
+    alt_space_since: Cell<Option<u32>>,
+}
+
+/// The quick-search menu's item about the global hotkey.
+fn hotkey_quick_label() -> String {
+    trf!("{} يفتح نافذة البحث الصغيرة (وإلا النافذة الكاملة)", "{} opens the quick search (otherwise the full window)", hotkey_text())
+}
+
+/// The Alt+Space menu item, with a note while another program holds it.
+fn alt_space_label(taken: bool) -> &'static str {
+    if taken {
+        tr!("Alt+Space يفتح نافذة البحث الصغيرة (يستخدمه برنامج آخر الآن)", "Alt+Space opens the quick search (another program has it for now)")
+    } else {
+        tr!("Alt+Space يفتح نافذة البحث الصغيرة", "Alt+Space opens the quick search")
+    }
+}
+
 /// Whether this run started with Windows (hidden, in the background).
 fn started_hidden() -> bool {
-    std::env::args().any(|a| a == autostart::STARTUP_ARG)
+    autostart::launched_at_sign_in()
+}
+
+/// THIRD-PARTY-NOTICES.txt beside the exe (the Store package ships it,
+/// packaging/msix/make_layout.py), else the copy on GitHub for the portable
+/// program, which is a single exe.
+fn notices_location() -> String {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.join("THIRD-PARTY-NOTICES.txt")))
+        .filter(|p| p.is_file())
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|| format!("{}/blob/main/THIRD-PARTY-NOTICES.txt", crate::feedback::REPO_URL))
 }
 
 impl App {
@@ -117,12 +158,12 @@ impl App {
         item(tr!("بدون خانة بحث فوق الساعة", "No search box above the clock"), mode == FloatingMode::Off, &mut q.off, &q.menu)?;
         item(tr!("إعادة الخانة إلى مكانها", "Put the box back by the clock"), false, &mut q.reset, &q.menu)?;
         item(
-            &trf!("{HOTKEY_TEXT} يفتح نافذة البحث الصغيرة (وإلا النافذة الكاملة)", "{HOTKEY_TEXT} opens the quick search (otherwise the full window)"),
+            &hotkey_quick_label(),
             settings.hotkey_opens == HotkeyOpens::Quick,
             &mut q.hotkey_quick,
             &q.menu,
         )?;
-        item(tr!("Alt+Space يفتح نافذة البحث الصغيرة", "Alt+Space opens the quick search"), settings.alt_space, &mut q.alt_space, &q.menu)?;
+        item(alt_space_label(false), settings.alt_space, &mut q.alt_space, &q.menu)?;
         item(tr!("أيقونة بجانب الساعة", "Icon in the notification area"), settings.tray_icon, &mut q.tray_icon, &q.menu)?;
         Ok(())
     }
@@ -165,17 +206,31 @@ impl App {
                 let off = app.state.borrow().settings.floating_mode == FloatingMode::Off;
                 app.set_floating_mode(if off { FloatingMode::Fade } else { FloatingMode::Off });
             } else if handle == app.tray_settings {
-                app.show_menu(&app.options_menu);
+                // Over the new look while it is the main window.
+                if !app.webui_options_menu() {
+                    app.show_menu(&app.options_menu);
+                }
             } else if handle == app.tray_about {
                 app.show_about();
             }
         });
         let weak = std::rc::Rc::downgrade(self);
+        // Explorer tells every top-level window when it has restarted (the
+        // floating box listens for itself, see `floating_message`).
+        let name = shell::wide("TaskbarCreated");
+        let taskbar_created = unsafe { RegisterWindowMessageW(name.as_ptr()) };
         let raw = nwg::bind_raw_event_handler(
             &self.window.handle,
             RAW_ID,
             crate::crash_log::guard_raw(move |_hwnd: HWND, msg: UINT, w: WPARAM, l: LPARAM| {
                 let app = weak.upgrade()?;
+                if crate::quick::is_taskbar_created(msg, taskbar_created) {
+                    // The new taskbar has no icon of ours: `NIM_MODIFY` (all
+                    // nwg does after the build) changes nothing until it is
+                    // added again. Done from the next timer ticks.
+                    app.quick_state.tray_restore.set(crate::quick::TRAY_RESTORE_TRIES);
+                    return None;
+                }
                 match msg {
                     WM_HOTKEY if w as i32 == ALT_SPACE_ID => {
                         app.show_quick(Anchor::CenterBottom);
@@ -224,6 +279,20 @@ impl App {
         self.tray.set_icon(&icon);
     }
 
+    /// Puts the tray icon back after Explorer restarted and forgot it: the
+    /// icon for the taskbar's colour, the tooltip, and shown or hidden as
+    /// the setting says. False when the shell did not take it (yet).
+    fn restore_tray_icon(&self) -> bool {
+        let h = self.mono_icons.get(surface::taskbar_dark());
+        let mut icon = nwg::Icon::default();
+        // The app icon the tray was built with, if the magnifier can't be made.
+        icon.handle = if h.is_null() { self.tray_icon.handle } else { h as _ };
+        let visible = self.state.borrow().settings.tray_icon;
+        let ok = self.tray.restore(&icon, Some(&format!("{} ({})", title(), hotkey_text())), visible);
+        log(&format!("tray icon after an Explorer restart: {}", if ok { "restored" } else { "not taken yet" }));
+        ok
+    }
+
     /// Ctrl+Alt+F opens the quick search (or the full window), as the
     /// Options item does; for the new main window's settings.
     #[cfg_attr(not(target_env = "msvc"), allow(dead_code))] // only the new window (MSVC) uses it
@@ -265,15 +334,51 @@ impl App {
         }
     }
 
+    /// Notes on the Alt+Space item that another program has it (for this
+    /// run only), or takes the note off.
+    fn set_alt_space_taken(&self, taken: bool) {
+        super::keys::set_menu_text(&self.quick_menu.alt_space, alt_space_label(taken));
+    }
+
+    /// The hotkey was changed in Settings: the labels that name it.
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))] // only the new window (MSVC) offers the choice
+    pub(super) fn hotkey_labels_changed(&self) {
+        super::keys::set_menu_text(&self.quick_menu.hotkey_quick, &hotkey_quick_label());
+        self.update_web_indicator();
+        // (The box above the clock draws the keys: redrawn as it wakes.)
+        self.wake_floating(false);
+    }
+
+    /// Alt+Space was held by another program at start: tries again now and
+    /// then, until it is free or the user turns it off.
+    fn retry_alt_space(&self, tick: u32) {
+        let Some(since) = self.quick_state.alt_space_since.get() else { return };
+        if !self.state.borrow().settings.alt_space {
+            self.quick_state.alt_space_since.set(None);
+            self.set_alt_space_taken(false);
+            return;
+        }
+        if crate::quick::hotkey_retry_due(tick, since) && self.register_alt_space() {
+            log("hotkey Alt+Space registered after all");
+            self.quick_state.alt_space_since.set(None);
+            self.set_alt_space_taken(false);
+        }
+    }
+
     fn toggle_alt_space(&self) {
+        // Whatever happens next, the user has decided: no more retries.
+        if self.quick_state.alt_space_since.take().is_some() {
+            self.set_alt_space_taken(false);
+        }
         let on = !self.quick_menu.alt_space.checked();
         if on && !self.register_alt_space() {
-            nwg::modal_info_message(
-                &self.window,
+            // Over the main window in use (the new look's when on screen).
+            self.modal_info(
                 title(),
-                tr!(
-                    "الاختصار Alt+Space مستخدم من برنامج آخر، فلا يمكن استخدامه هنا. يبقى Ctrl+Alt+F متاحاً.",
-                    "Alt+Space is already taken by another program, so it can't be used here. Ctrl+Alt+F still works."
+                &trf!(
+                    "الاختصار Alt+Space مستخدم من برنامج آخر، فلا يمكن استخدامه هنا. يبقى {} متاحاً.",
+                    "Alt+Space is already taken by another program, so it can't be used here. {} still works.",
+                    hotkey_text()
                 ),
             );
             return;
@@ -287,18 +392,26 @@ impl App {
     }
 
     fn show_about(&self) {
-        nwg::modal_info_message(
-            &self.window,
-            tr!("حول بحث سريع", "About InstaFind"),
-            &trf!(
-                "بحث سريع (InstaFind) — الإصدار {}\nبحث فوري عن الملفات وداخل المستندات، بالعربية والإنجليزية.\n\nاضغط {HOTKEY_TEXT} من أي مكان لتبحث.\n{}\n\nالدعم: {}\n{}",
-                "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {HOTKEY_TEXT} anywhere to search.\n{}\n\nSupport: {}\n{}",
-                env!("CARGO_PKG_VERSION"),
-                crate::feedback::REPO_URL,
-                crate::feedback::SUPPORT_EMAIL,
-                crate::feedback::support_page(crate::i18n::is_en())
-            ),
+        let hk = hotkey_text();
+        let text = trf!(
+            "بحث سريع (InstaFind) — الإصدار {}\nبحث فوري عن الملفات وداخل المستندات، بالعربية والإنجليزية.\n\nاضغط {hk} من أي مكان لتبحث.\n{}\n\nالدعم: {}\n{}\n\nتراخيص المكوّنات الخارجية التي يستعملها البرنامج في THIRD-PARTY-NOTICES.txt. هل تريد فتحه؟",
+            "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?",
+            env!("CARGO_PKG_VERSION"),
+            crate::feedback::REPO_URL,
+            crate::feedback::SUPPORT_EMAIL,
+            crate::feedback::support_page(crate::i18n::is_en())
         );
+        let params = nwg::MessageParams {
+            title: tr!("حول بحث سريع", "About InstaFind"),
+            content: &text,
+            buttons: nwg::MessageButtons::YesNo,
+            icons: nwg::MessageIcons::Info,
+        };
+        // Over the main window in use (the new look's when on screen), not
+        // the hidden classic window, so it comes in front and centred on it.
+        if self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) == nwg::MessageChoice::Yes {
+            super::shell::open(&notices_location());
+        }
     }
 
     /// Timer work of the quick search, from the main window's tick: the
@@ -306,6 +419,11 @@ impl App {
     /// not wait for it), the catalog a few seconds later, and the one-time
     /// question once the window is on screen.
     pub(super) fn quick_tick(&self, tick: u32) {
+        let left = self.quick_state.tray_restore.get();
+        if left > 0 {
+            let ok = self.restore_tray_icon();
+            self.quick_state.tray_restore.set(crate::quick::tray_restore_left(left, ok));
+        }
         let (mode, asked, alt_space, hotkey) = {
             let s = &self.state.borrow().settings;
             (s.floating_mode, s.floating_asked, s.alt_space, s.hotkey_opens)
@@ -315,11 +433,15 @@ impl App {
                 self.apply_floating();
             }
             if alt_space && !self.register_alt_space() {
-                log("hotkey Alt+Space is taken by another program");
-                self.quick_menu.alt_space.set_checked(false);
-                self.state.borrow_mut().settings.alt_space = false;
+                // Another program won the race at start. The setting stays
+                // on (it is saved with the others); the item says so for
+                // this run, and the hotkey is tried again from time to time.
+                log("hotkey Alt+Space is taken by another program; trying again later");
+                self.quick_state.alt_space_since.set(Some(tick));
+                self.set_alt_space_taken(true);
             }
         }
+        self.retry_alt_space(tick);
         // Warm the catalog when anything can open the quick search.
         let used = mode != FloatingMode::Off || alt_space || hotkey == HotkeyOpens::Quick;
         if tick == 25 && used {
@@ -332,27 +454,14 @@ impl App {
         }
     }
 
+    /// The floating box is an option, never a question (owner, 2026-11-13):
+    /// no dialog at first start. It stays off until the user turns it on in
+    /// Settings › "Search from anywhere" (or Options › "Search from
+    /// anywhere"); a choice made earlier is kept.
     fn ask_floating_once(&self) {
         self.state.borrow_mut().settings.floating_asked = true;
         self.save_settings();
-        let params = nwg::MessageParams {
-            title: title(),
-            content: tr!(
-                "هل تريد خانة البحث الصغيرة فوق الساعة؟ تقدر تغيّر هذا لاحقًا من الإعدادات.",
-                "Would you like the small search box above the clock? You can change this later in Options."
-            ),
-            buttons: nwg::MessageButtons::YesNo,
-            icons: nwg::MessageIcons::Question,
-        };
-        // Over the new main window when it is the one on screen.
-        let yes = self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) == nwg::MessageChoice::Yes;
-        log(&format!("first run: floating box {}", if yes { "on" } else { "off" }));
-        self.set_floating_mode(if yes { FloatingMode::Fade } else { FloatingMode::Off });
-        if yes {
-            self.set_status(&trf!(
-                "خانة البحث فوق الساعة: انقرها أو اضغط {HOTKEY_TEXT}. اسحبها من حافتها العليا لتنقلها.",
-                "The search box is above the clock: click it or press {HOTKEY_TEXT}. Drag its top edge to move it."
-            ));
-        }
+        log("first run: floating box off (no question; it is an option in Settings)");
+        self.set_floating_mode(FloatingMode::Off);
     }
 }

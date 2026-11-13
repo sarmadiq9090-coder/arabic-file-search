@@ -6,7 +6,7 @@
 //! file system of the installed program is Windows-only.
 //!
 //! All Windows functions block; call them from a background thread except
-//! `cleanup_old` and `wait_for_previous_instance_exit`, which are meant for
+//! `restore_old_if_missing` and `wait_for_previous_instance_exit`, which are meant for
 //! startup.
 
 
@@ -53,7 +53,130 @@ pub struct Release {
     /// SHA-256 of the program as hex, when GitHub publishes one (`digest`).
     /// Installing requires it (`required_sha256`).
     pub sha256: Option<String>,
+    /// The program's minisign signature (`<asset>.minisig`), if the release
+    /// has one. Required once `TRUSTED_PUBLIC_KEYS` is not empty.
+    pub sig_url: Option<String>,
 }
+
+// ---------------------------------------------------------------- signing keys
+
+// TODO(owner): paste the InstaFind minisign public keys here.
+//
+// Each entry is the SECOND line of a `minisign.pub` file (the base64 key that
+// starts with `RW`), NOT the "untrusted comment" line and never a secret key.
+// InstaFind has its own key pair (not Lemon's). Primary first, backup second:
+//
+//     pub const TRUSTED_PUBLIC_KEYS: &[&str] = &[
+//         "RWQ...primary...", // keys/minisign-primary.pub (signs releases in CI)
+//         "RWQ...backup...",  // keys/minisign-backup.pub (secret in the owner's password manager)
+//     ];
+//
+// How the keys are made and where the secrets live: docs/specs/signing.md.
+//
+// While this list is EMPTY, updates are checked by SHA-256 only (as before)
+// and the log says signature checking is not configured. As soon as it holds
+// a key, every update MUST come with a valid `<asset>.minisig` made by one of
+// these keys, with the trusted comment `instafind <tag>`, or it is refused.
+// This is decided at compile time only: there is no setting or switch.
+/// Production minisign public keys trusted to sign updates (see the comment above).
+pub const TRUSTED_PUBLIC_KEYS: &[&str] = &[];
+/// Largest `.minisig` file that is downloaded (a real one is about 350 bytes).
+#[cfg(windows)]
+pub const MAX_SIG_BYTES: u64 = 4096;
+
+/// The keys this build trusts (`TRUSTED_PUBLIC_KEYS`).
+pub fn trusted_keys() -> &'static [&'static str] {
+    TRUSTED_PUBLIC_KEYS
+}
+
+/// False while no key is compiled in: updates are then checked by SHA-256 only.
+pub fn signature_checking_configured() -> bool {
+    !trusted_keys().is_empty()
+}
+
+/// Name of the signature asset for a program asset: `bahth.exe.minisig`.
+pub fn sig_asset_name(asset: &str) -> String {
+    format!("{asset}.minisig")
+}
+
+/// The trusted comment a release signature must carry: `instafind v0.9.1`.
+/// The comment is signed too, so an older signed exe cannot be passed off as
+/// a newer release. (The CPU is not in it: `validate_pe` refuses another
+/// CPU's program.)
+pub fn expected_trusted_comment(tag: &str) -> String {
+    format!("instafind {}", tag.trim())
+}
+
+/// Why a signature check refused the update (`why` is technical, in English).
+pub fn signature_error(why: &str) -> String {
+    trf!(
+        "تعذّر التحقق من توقيع هذا التحديث ({}) لذلك لم يُثبَّت.\nيمكنك تنزيل الإصدار الجديد يدوياً من:\n{}",
+        "The update's signature could not be verified ({}), so it was not installed.\nYou can download the new version by hand from:\n{}",
+        why,
+        MANUAL_DOWNLOAD_URL
+    )
+}
+
+/// A signature that passed every check that does not need the program
+/// itself: it parses, is pre-hashed, was made by a trusted key, and its
+/// trusted comment names this release. `verifier` then checks the program
+/// as it downloads; only its `finalize` proves the comment and the file.
+pub struct SignatureCheck {
+    sig: minisign_verify::Signature,
+    key: minisign_verify::PublicKey,
+}
+
+impl SignatureCheck {
+    pub fn new(sig_text: &str, tag: &str, keys: &[&str]) -> Result<SignatureCheck, String> {
+        let sig = minisign_verify::Signature::decode(sig_text.trim_start_matches('\u{feff}'))
+            .map_err(|e| signature_error(&format!("the signature file is not valid: {e}")))?;
+        // The trusted key with this signature's key id. A malformed compiled-in
+        // key is skipped (a unit test makes sure there is none).
+        let (mut key, mut legacy) = (None, false);
+        for k in keys.iter().filter_map(|k| minisign_verify::PublicKey::from_base64(k.trim()).ok()) {
+            match k.verify_stream(&sig).map(drop) {
+                Ok(()) => {
+                    key = Some(k);
+                    break;
+                }
+                // Right key, but not pre-hashed: refused, never verified the old way.
+                Err(minisign_verify::Error::UnsupportedLegacyMode) => legacy = true,
+                Err(_) => {}
+            }
+        }
+        let Some(key) = key else {
+            return Err(signature_error(if legacy {
+                "legacy signatures are not accepted"
+            } else {
+                "it was not made by a trusted key"
+            }));
+        };
+        let expected = expected_trusted_comment(tag);
+        if sig.trusted_comment() != expected {
+            return Err(signature_error(&format!("the signature is for {:?}, not {expected:?}", sig.trusted_comment())));
+        }
+        Ok(SignatureCheck { sig, key })
+    }
+
+    /// Feed it the program's bytes with `update`, then call `finalize`.
+    pub fn verifier(&self) -> Result<minisign_verify::StreamVerifier<'_>, String> {
+        self.key.verify_stream(&self.sig).map_err(|e| signature_error(&e.to_string()))
+    }
+}
+
+/// Checks `data` against the minisign signature file `sig_text` for release
+/// `tag` (see `SignatureCheck`). An empty `keys` list never verifies. The
+/// updater does the same while streaming the download (`download_to`).
+#[cfg(test)]
+pub fn verify_signature(data: &[u8], sig_text: &str, tag: &str, keys: &[&str]) -> Result<(), String> {
+    let check = SignatureCheck::new(sig_text, tag, keys)?;
+    let mut v = check.verifier()?;
+    v.update(data);
+    v.finalize().map_err(|_| signature_error(BAD_SIGNATURE))
+}
+
+/// `finalize` failed: the program or the signature (its comment) was changed.
+pub const BAD_SIGNATURE: &str = "the program or its signature was altered";
 
 /// Web page that redirects to the newest release; used when the API refuses
 /// (it allows only 60 calls an hour per address without a login).
@@ -73,6 +196,30 @@ pub fn required_sha256(rel: &Release) -> Result<&str, String> {
     rel.sha256.as_deref().ok_or_else(missing_digest_message)
 }
 
+/// Said when the checksum could not be asked for (the GitHub API refused:
+/// it limits calls per address, the web page does not). Not an error of the
+/// release: the check is tried again later, and nothing is installed meanwhile.
+pub fn verify_later_message() -> String {
+    tr!("تعذّر التحقق الآن، سنحاول لاحقاً.", "Could not verify the update right now; we will try again later.").to_string()
+}
+
+/// A release found through the web page carries no checksum; `fetched` is
+/// the API's answer for it: `Ok(Some)` the checksum, `Ok(None)` the API
+/// answered without one (a real "no checksum"), `Err` the API could not be
+/// asked. Only then is the release held back, to be checked again later.
+pub fn with_digest(mut rel: Release, fetched: impl FnOnce(&str) -> Result<Option<String>, String>) -> Result<Release, String> {
+    if rel.sha256.is_some() {
+        return Ok(rel);
+    }
+    match fetched(&rel.tag) {
+        Ok(digest) => {
+            rel.sha256 = digest;
+            Ok(rel)
+        }
+        Err(_) => Err(verify_later_message()),
+    }
+}
+
 /// Why a release without a checksum is refused, and where to get it by hand.
 pub fn missing_digest_message() -> String {
     trf!(
@@ -89,6 +236,9 @@ pub fn missing_digest_message() -> String {
 pub enum PackageManager {
     Scoop,
     Winget,
+    Chocolatey,
+    /// The Microsoft Store (an MSIX package): Windows updates it.
+    Store,
 }
 
 impl PackageManager {
@@ -96,14 +246,20 @@ impl PackageManager {
         match self {
             PackageManager::Scoop => "Scoop",
             PackageManager::Winget => "winget",
+            PackageManager::Chocolatey => "Chocolatey",
+            PackageManager::Store => "Microsoft Store",
         }
     }
 
-    /// The command that updates InstaFind (`bucket/instafind.json`, `Sarmad.InstaFind`).
-    pub fn update_command(self) -> &'static str {
+    /// The command that updates InstaFind (`bucket/instafind.json`,
+    /// `Sarmad.InstaFind`, the Chocolatey package `instafind`); none for the
+    /// Store, which updates its apps by itself.
+    pub fn update_command(self) -> Option<&'static str> {
         match self {
-            PackageManager::Scoop => "scoop update instafind",
-            PackageManager::Winget => "winget upgrade Sarmad.InstaFind",
+            PackageManager::Scoop => Some("scoop update instafind"),
+            PackageManager::Winget => Some("winget upgrade Sarmad.InstaFind"),
+            PackageManager::Chocolatey => Some("choco upgrade instafind"),
+            PackageManager::Store => None,
         }
     }
 }
@@ -115,6 +271,10 @@ impl PackageManager {
 /// - winget: `Packages\` (portable installs) or `Links\` (their command
 ///   shims) under `%LOCALAPPDATA%\Microsoft\WinGet`, and the machine-wide
 ///   `%ProgramFiles%\WinGet` / `%ProgramFiles(x86)%\WinGet`.
+/// - Chocolatey: `lib\` (packages) or `bin\` (shims) under
+///   `%ChocolateyInstall%` or `%ProgramData%\chocolatey`.
+///
+/// (A Store copy is told by its package, see `managed_by`.)
 pub fn package_manager_for(exe: &str, var: impl Fn(&str) -> Option<String>) -> Option<PackageManager> {
     fn norm(p: &str) -> String {
         let p = p.replace('/', "\\");
@@ -147,17 +307,49 @@ pub fn package_manager_for(exe: &str, var: impl Fn(&str) -> Option<String>) -> O
     if winget.iter().any(|r| below(r, "Packages") || below(r, "Links")) {
         return Some(PackageManager::Winget);
     }
+    let choco = [var("ChocolateyInstall"), var("ProgramData").map(|d| format!("{d}\\chocolatey"))];
+    if choco.iter().any(|r| below(r, "lib") || below(r, "bin")) {
+        return Some(PackageManager::Chocolatey);
+    }
     None
+}
+
+/// Whether this copy can replace its own exe: a file can be created in its
+/// folder (not in Program Files without admin rights, a read-only share...).
+/// The probe file is removed again.
+pub fn folder_writable(dir: &std::path::Path) -> bool {
+    let probe = dir.join(format!("bahth.write-test.{}", std::process::id()));
+    let ok = std::fs::OpenOptions::new().write(true).create_new(true).open(&probe).is_ok();
+    if ok {
+        let _ = std::fs::remove_file(&probe);
+    }
+    ok
+}
+
+/// What the user is told instead of a self-update when this copy's folder
+/// cannot be written to.
+pub fn read_only_message(dir: &str) -> String {
+    trf!(
+        "لا يستطيع البرنامج تحديث نفسه في مكانه الحالي ({dir}) لأن الكتابة فيه غير مسموحة.\nنزّل الإصدار الجديد من fastkiwi.app أو انقل البرنامج إلى مجلد تملكه.",
+        "The program cannot update itself where it is ({dir}): that folder cannot be written to.\nDownload the new version from fastkiwi.app, or move the program to a folder of your own."
+    )
 }
 
 /// What the user is told instead of a self-update when a package manager
 /// installed this copy.
 pub fn managed_message(pm: PackageManager) -> String {
+    let Some(command) = pm.update_command() else {
+        return tr!(
+            "هذه النسخة من متجر Microsoft، والمتجر يحدّثها تلقائياً. للتحديث الآن افتح المتجر ثم «المكتبة» واضغط «الحصول على التحديثات».",
+            "This copy is from the Microsoft Store, which updates it by itself. To update now, open the Store, go to Library and choose Get updates."
+        )
+        .to_string();
+    };
     trf!(
         "هذه النسخة مثبّتة عبر {0}، لذلك يحدّثها {0} ولا يحدّث البرنامج نفسه بنفسه.\nللتحديث، شغّل هذا الأمر في الطرفية (Terminal):\n{1}",
         "This copy was installed with {0}, so it is updated by {0}, not by the program itself.\nTo update, run this in a terminal:\n{1}",
         pm.name(),
-        pm.update_command()
+        command
     )
 }
 
@@ -176,10 +368,11 @@ pub fn release_from_tag(tag: &str, current: &str) -> Option<Release> {
         return None;
     }
     let version = tag.trim().trim_start_matches(['v', 'V']).to_string();
+    let exe_url = format!("https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/{tag}/{ASSET_NAME}");
     Some(Release {
-        exe_url: format!(
-            "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/{tag}/{ASSET_NAME}"
-        ),
+        // Not known to exist: a missing one fails the download (404).
+        sig_url: Some(sig_asset_name(&exe_url)),
+        exe_url,
         version,
         tag: tag.to_string(),
         notes: String::new(),
@@ -296,7 +489,16 @@ pub fn parse_release_for(json: &str, current: &str, asset_name: &str) -> Result<
         .and_then(|d| d.strip_prefix("sha256:"))
         .map(|h| h.trim().to_ascii_lowercase())
         .filter(|h| h.len() == 64 && h.bytes().all(|b| b.is_ascii_hexdigit()));
-    Ok(Some(Release { version, tag, notes, exe_url, exe_size, sha256 }))
+    // Optional here, so the check still reports an unsigned release; the
+    // install refuses it when signatures are required.
+    let sig_name = sig_asset_name(asset_name);
+    let sig_url = v["assets"]
+        .as_array()
+        .and_then(|a| a.iter().find(|x| x["name"].as_str() == Some(sig_name.as_str())))
+        .and_then(|s| s["browser_download_url"].as_str())
+        .filter(|u| download_host_ok(u))
+        .map(str::to_string);
+    Ok(Some(Release { version, tag, notes, exe_url, exe_size, sha256, sig_url }))
 }
 
 /// The program is only ever downloaded from GitHub (`github.com`, which
@@ -310,9 +512,9 @@ pub fn download_host_ok(url: &str) -> bool {
             || host.ends_with(".githubusercontent.com"))
 }
 
-/// Checks that `head` (the first bytes of a file) is a PE image for this
-/// architecture: "MZ", a sane e_lfanew, "PE\0\0" and a matching machine type.
-pub fn validate_pe(head: &[u8]) -> Result<(), String> {
+/// The machine type of the PE image whose first bytes are `head`: "MZ", a
+/// sane e_lfanew and "PE\0\0" checked.
+pub fn pe_machine(head: &[u8]) -> Result<u16, String> {
     if head.len() < 0x40 || &head[..2] != b"MZ" {
         return Err("downloaded file is not a Windows program (no MZ)".into());
     }
@@ -324,8 +526,12 @@ pub fn validate_pe(head: &[u8]) -> Result<(), String> {
     if &head[lfanew..lfanew + 4] != b"PE\0\0" {
         return Err("downloaded file has no PE signature".into());
     }
-    let machine = u16::from_le_bytes([head[lfanew + 4], head[lfanew + 5]]);
-    let expected: Option<u16> = if cfg!(target_arch = "x86_64") {
+    Ok(u16::from_le_bytes([head[lfanew + 4], head[lfanew + 5]]))
+}
+
+/// The machine type this program is built for (`None` on another target).
+pub fn this_machine() -> Option<u16> {
+    if cfg!(target_arch = "x86_64") {
         Some(0x8664)
     } else if cfg!(target_arch = "x86") {
         Some(0x014c)
@@ -333,8 +539,23 @@ pub fn validate_pe(head: &[u8]) -> Result<(), String> {
         Some(0xaa64)
     } else {
         None
-    };
-    if let Some(m) = expected
+    }
+}
+
+/// The machine type of the program file at `path`, from its first 4 KB.
+#[cfg_attr(not(windows), allow(dead_code))] // older_copy (Windows)
+pub fn file_machine(path: &std::path::Path) -> Option<u16> {
+    use std::io::Read;
+    let mut head = Vec::with_capacity(4096);
+    std::fs::File::open(path).ok()?.take(4096).read_to_end(&mut head).ok()?;
+    pe_machine(&head).ok()
+}
+
+/// Checks that `head` (the first bytes of a file) is a PE image for this
+/// architecture: "MZ", a sane e_lfanew, "PE\0\0" and a matching machine type.
+pub fn validate_pe(head: &[u8]) -> Result<(), String> {
+    let machine = pe_machine(head)?;
+    if let Some(m) = this_machine()
         && machine != m
     {
         return Err(format!("downloaded program is for another CPU (machine {machine:#06x})"));
@@ -378,7 +599,7 @@ fn sibling(exe: &std::path::Path, suffix: &str) -> std::path::PathBuf {
 /// current one as `old`. On any failure `exe` is a working program again:
 /// the original is renamed back, or copied back if even that fails.
 #[cfg_attr(not(windows), allow(dead_code))]
-fn swap_in(exe: &std::path::Path, new: &std::path::Path, old: &std::path::Path) -> Result<(), String> {
+pub(crate) fn swap_in(exe: &std::path::Path, new: &std::path::Path, old: &std::path::Path) -> Result<(), String> {
     use std::fs;
     if !new.is_file() {
         return Err("the downloaded update is missing".into());
@@ -402,23 +623,6 @@ fn swap_in(exe: &std::path::Path, new: &std::path::Path, old: &std::path::Path) 
     Ok(())
 }
 
-/// What is left by an update next to `exe`. The old copy is only deleted
-/// while `exe` itself is there: if an interrupted update left nothing but
-/// `bahth.exe.old`, it is the user's only working program, so it is put
-/// back instead.
-#[cfg_attr(not(windows), allow(dead_code))]
-fn cleanup_beside(exe: &std::path::Path) {
-    use std::fs;
-    let (old, new) = (sibling(exe, ".old"), sibling(exe, ".new"));
-    if !exe.exists() && old.is_file() {
-        let _ = fs::rename(&old, exe).or_else(|_| fs::copy(&old, exe).map(drop));
-    }
-    if exe.is_file() {
-        let _ = fs::remove_file(&old);
-        let _ = fs::remove_file(&new);
-    }
-}
-
 #[cfg(windows)]
 pub use win::*;
 
@@ -436,6 +640,11 @@ mod win {
     use winapi::um::errhandlingapi::GetLastError;
     use winapi::um::winhttp::*;
 
+    /// Finding the server and connecting to it: a check the user waits for
+    /// must not hang for long when the network is down or blocked.
+    const CONNECT_TIMEOUT_MS: i32 = 10_000;
+    /// Sending the request and each wait for more of the answer (a large
+    /// download keeps going as long as data keeps coming).
     const TIMEOUT_MS: i32 = 15_000;
 
     fn wide(s: impl AsRef<OsStr>) -> Vec<u16> {
@@ -443,7 +652,7 @@ mod win {
     }
 
     /// Path of the installed program, captured the first time it is asked for
-    /// (at startup, through `cleanup_old`), before any rename can happen.
+    /// (at startup, through `restore_old_if_missing`), before any rename can happen.
     fn original_exe() -> Result<&'static Path, String> {
         static EXE: OnceLock<Option<PathBuf>> = OnceLock::new();
         EXE.get_or_init(|| {
@@ -501,7 +710,7 @@ mod win {
         }
         let session = Handle(h);
         unsafe {
-            WinHttpSetTimeouts(h, TIMEOUT_MS, TIMEOUT_MS, TIMEOUT_MS, TIMEOUT_MS);
+            WinHttpSetTimeouts(h, CONNECT_TIMEOUT_MS, CONNECT_TIMEOUT_MS, TIMEOUT_MS, TIMEOUT_MS);
             // Ask for TLS 1.2/1.3 explicitly (Windows 7 defaults lack 1.2).
             // TLS 1.3 is unknown to older systems, so fall back to 1.2 only.
             for mut protocols in [0x0000_2A00u32, 0x0000_0A00u32] {
@@ -636,10 +845,21 @@ mod win {
     /// Asks GitHub for the latest release. Some(..) only when it is newer than
     /// this build and has a `bahth.exe` asset.
     pub fn check_latest() -> Result<Option<Release>, String> {
+        // Microsoft Store version: the Store updates it (src/store.rs), so
+        // no release is ever offered and nothing is downloaded.
+        if crate::store::is_packaged() {
+            return Ok(None);
+        }
         match check_latest_api() {
             Ok(r) => Ok(r),
-            // The API limits calls per address; the web page does not.
-            Err(api_err) => check_latest_page().map_err(|_| api_err),
+            // The API limits calls per address; the web page does not. A
+            // release found there needs the API for its checksum: when it
+            // still refuses, the check counts as failed and is tried again
+            // at the next hourly tick, and no update is offered meanwhile.
+            Err(api_err) => match check_latest_page().map_err(|_| api_err)? {
+                Some(rel) => with_digest(rel, fetch_sha256).map(Some),
+                None => Ok(None),
+            },
         }
     }
 
@@ -667,15 +887,19 @@ mod win {
         parse_release(&text, env!("CARGO_PKG_VERSION"))
     }
 
-    /// The SHA-256 GitHub publishes for this CPU's program in release `tag`,
-    /// if the API answers (it may still be rate-limited).
-    fn fetch_sha256(tag: &str) -> Option<String> {
+    /// The SHA-256 GitHub publishes for this CPU's program in release `tag`:
+    /// `Ok(None)` when the API answered without one, `Err` when it could not
+    /// be asked (it may still be rate-limited).
+    fn fetch_sha256(tag: &str) -> Result<Option<String>, String> {
         if tag.is_empty() || !tag.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-') {
-            return None;
+            return Ok(None);
         }
-        let body = fetch_json(&format!("{RELEASE_BY_TAG_URL}{tag}"), MAX_JSON as u64).ok()?;
-        let rel = parse_release(std::str::from_utf8(&body).ok()?, env!("CARGO_PKG_VERSION")).ok()??;
-        (rel.tag == tag).then_some(rel.sha256).flatten()
+        let body = fetch_json(&format!("{RELEASE_BY_TAG_URL}{tag}"), MAX_JSON as u64)?;
+        let Ok(text) = std::str::from_utf8(&body) else { return Ok(None) };
+        Ok(match parse_release(text, env!("CARGO_PKG_VERSION")) {
+            Ok(Some(rel)) if rel.tag == tag => rel.sha256,
+            _ => None,
+        })
     }
 
     /// The package manager that installed this copy, if any (then it, not
@@ -687,11 +911,21 @@ mod win {
             let var = |k: &str| std::env::var(k).ok();
             let started = std::env::current_exe().ok();
             let resolved = original_exe().ok().map(Path::to_path_buf);
+            if crate::store::is_packaged() {
+                return Some(PackageManager::Store);
+            }
             started
                 .into_iter()
                 .chain(resolved)
                 .find_map(|p| package_manager_for(&p.to_string_lossy(), var))
         })
+    }
+
+    /// The folder of this copy when it cannot be written to (so a
+    /// self-update cannot work there).
+    pub fn read_only_folder() -> Option<String> {
+        let dir = original_exe().ok()?.parent()?;
+        (!folder_writable(dir)).then(|| dir.display().to_string())
     }
 
     /// GETs a small JSON document of at most `max` bytes (the exchange rates
@@ -720,26 +954,55 @@ mod win {
         if let Some(pm) = managed_by() {
             return Err(managed_message(pm));
         }
+        if let Some(dir) = read_only_folder() {
+            return Err(read_only_message(&dir));
+        }
         // Found through the web page (API rate-limited): ask the API once
         // more, for this release only, for the checksum. Without it, refuse.
-        let mut rel = rel.clone();
-        if rel.sha256.is_none() {
-            rel.sha256 = fetch_sha256(&rel.tag);
-        }
+        let rel = with_digest(rel.clone(), fetch_sha256)?;
         required_sha256(&rel)?;
         let rel = &rel;
+        // With trusted keys compiled in, the signature is mandatory: it is
+        // fetched and checked first, and the program is checked against it
+        // as it downloads, next to the SHA-256. No signature, no update;
+        // there is no fallback.
+        let sig = if signature_checking_configured() { Some(fetch_signature(rel)?) } else { None };
         let exe = original_exe()?.to_path_buf();
         let new = sibling(&exe, ".new");
         let old = sibling(&exe, ".old");
         let _ = fs::remove_file(&new);
-        let result = download_to(rel, &new, &progress).and_then(|()| swap_in(&exe, &new, &old));
+        let result = download_to(rel, &new, &progress, sig.as_ref()).and_then(|()| swap_in(&exe, &new, &old));
         if result.is_err() {
             let _ = fs::remove_file(&new);
         }
         result
     }
 
-    fn download_to(rel: &Release, new: &Path, progress: &dyn Fn(u64, u64)) -> Result<(), String> {
+    /// Downloads and pre-checks the release's `.minisig` (`SignatureCheck`).
+    fn fetch_signature(rel: &Release) -> Result<SignatureCheck, String> {
+        let url = rel.sig_url.as_deref().ok_or_else(|| signature_error("the release has no signature file"))?;
+        if !download_host_ok(url) {
+            return Err(signature_error("the signature file is not on GitHub"));
+        }
+        let mut body = Vec::new();
+        http_get(
+            url,
+            "application/octet-stream",
+            MAX_SIG_BYTES,
+            &mut |_| Ok(()),
+            &mut |chunk| {
+                body.extend_from_slice(chunk);
+                Ok(())
+            },
+            None,
+        )
+        .map_err(|e| signature_error(&format!("cannot download the signature file: {e}")))?;
+        let text = String::from_utf8(body).map_err(|_| signature_error("the signature file is not text"))?;
+        SignatureCheck::new(&text, &rel.tag, trusted_keys())
+    }
+
+    fn download_to(rel: &Release, new: &Path, progress: &dyn Fn(u64, u64), sig: Option<&SignatureCheck>) -> Result<(), String> {
+        let mut verifier = sig.map(SignatureCheck::verifier).transpose()?;
         if rel.exe_size > MAX_DOWNLOAD {
             return Err("the update has an invalid size".into());
         }
@@ -767,6 +1030,9 @@ mod win {
             &mut |chunk| {
                 out.write_all(chunk).map_err(|e| format!("cannot write the update: {e}"))?;
                 sha2::Digest::update(&mut hasher, chunk);
+                if let Some(v) = verifier.as_mut() {
+                    v.update(chunk);
+                }
                 done += chunk.len() as u64;
                 progress(done, total.get());
                 Ok(())
@@ -782,6 +1048,9 @@ mod win {
         if got != want {
             return Err(tr!("الملف الذي نُزّل لا يطابق بصمة الإصدار (SHA-256)", "the downloaded file does not match the release checksum (SHA-256)").into());
         }
+        if let Some(v) = verifier.as_mut() {
+            v.finalize().map_err(|_| signature_error(BAD_SIGNATURE))?;
+        }
         let size = fs::metadata(new).map_err(|e| e.to_string())?.len();
         if size != total.get() {
             return Err(format!("downloaded {size} bytes, expected {}", total.get()));
@@ -794,19 +1063,30 @@ mod win {
         validate_pe(&head)
     }
 
-    /// Starts the (new) program at its original path with `--updated`. The
-    /// caller should exit right after a successful return.
-    pub fn restart_new_version() -> Result<(), String> {
+    /// Starts the (new) program at its original path with `--updated` and
+    /// this process's id (`handover::PREV_PID_ARG`), and returns it so the
+    /// caller can see that it keeps running (`handover::took_over`) before
+    /// it leaves.
+    pub fn restart_new_version() -> Result<std::process::Child, String> {
         use std::os::windows::process::CommandExt;
         const DETACHED_PROCESS: u32 = 0x0000_0008;
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
         let exe = original_exe()?;
         let mut cmd = std::process::Command::new(exe);
-        cmd.arg("--updated").creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+        cmd.arg("--updated")
+            .arg(crate::ui::this_copy_arg())
+            .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
         if let Some(dir) = exe.parent() {
             cmd.current_dir(dir);
         }
-        cmd.spawn().map(drop).map_err(|e| format!("cannot start the new version: {e}"))
+        cmd.spawn().map_err(|e| format!("cannot start the new version: {e}"))
+    }
+
+    /// The new version did not start: puts the running (old) program back
+    /// as the installed one (`handover::roll_back`).
+    pub fn roll_back_update() -> Result<(), String> {
+        let exe = original_exe()?;
+        crate::handover::roll_back(exe, &sibling(exe, ".old"))
     }
 
     /// Call at startup, before the single-instance check, when the program was
@@ -834,12 +1114,85 @@ mod win {
         }
     }
 
-    /// Deletes a `bahth.exe.old` (and a stale `.new`) left by an update.
-    /// Call at every startup; errors are ignored.
-    pub fn cleanup_old() {
-        if let Ok(exe) = original_exe() {
-            cleanup_beside(exe);
+    /// At start: an interrupted update that left only `bahth.exe.old` gets
+    /// it back as `bahth.exe`. (Nothing is deleted here: see
+    /// [`remove_update_leftovers`].)
+    pub fn restore_old_if_missing() -> bool {
+        original_exe().is_ok_and(crate::handover::restore_if_missing)
+    }
+
+    /// The trial marker of a new version (see `handover::trial`).
+    pub fn trial_marker() -> PathBuf {
+        crate::index::cache_path().with_file_name("update-trial.txt")
+    }
+
+    /// Before any window: starts or settles the trial of a new version.
+    /// True when this process must leave at once (the old program was put
+    /// back and started instead).
+    pub fn settle_trial(updated: bool, log: &dyn Fn(&str)) -> bool {
+        let Ok(exe) = original_exe() else { return false };
+        let marker = trial_marker();
+        let old = crate::handover::sibling(exe, ".old");
+        match crate::handover::trial(updated, marker.exists(), old.is_file()) {
+            crate::handover::Trial::Run => false,
+            crate::handover::Trial::Begin => {
+                if let Err(e) = fs::write(&marker, env!("CARGO_PKG_VERSION")) {
+                    log(&format!("update trial: cannot write {}: {e}", marker.display()));
+                }
+                false
+            }
+            crate::handover::Trial::Forget => {
+                let _ = fs::remove_file(&marker);
+                false
+            }
+            crate::handover::Trial::RollBack => {
+                let tried = fs::read_to_string(&marker).unwrap_or_default();
+                match crate::handover::roll_back(exe, &old) {
+                    Ok(()) => {
+                        let _ = fs::remove_file(&marker);
+                        log(&format!("update trial: version {} never finished starting; put the previous version back", tried.trim()));
+                        let shown = tr!(
+                            "لم يعمل الإصدار الجديد من البرنامج، فأُعيد الإصدار السابق.",
+                            "The new version of the program did not start, so the previous version was put back."
+                        );
+                        message_box(shown);
+                        // As a relaunch: it waits for this process (which
+                        // holds the single-instance lock) to go, then runs.
+                        let restarted = std::process::Command::new(exe)
+                            .arg(crate::relocate::MOVED_ARG)
+                            .arg(crate::ui::this_copy_arg())
+                            .spawn()
+                            .is_ok();
+                        log(&format!("update trial: starting the previous version {}", if restarted { "now" } else { "failed; open it again" }));
+                        true
+                    }
+                    Err(e) => {
+                        log(&format!("update trial: version {} never finished starting; rolling back failed: {e}", tried.trim()));
+                        false
+                    }
+                }
+            }
         }
+    }
+
+    /// The first timer tick: the new version runs, its trial is over.
+    pub fn end_trial() {
+        let _ = fs::remove_file(trial_marker());
+    }
+
+    /// A short message before any window exists.
+    fn message_box(text: &str) {
+        use winapi::um::winuser::{MB_ICONINFORMATION, MB_OK, MessageBoxW};
+        let (text, title) = (wide(text), wide(env!("CARGO_PKG_NAME")));
+        unsafe { MessageBoxW(std::ptr::null_mut(), text.as_ptr(), title.as_ptr(), MB_OK | MB_ICONINFORMATION) };
+    }
+
+    /// Once this copy has shown it runs (its first timer tick): deletes
+    /// `bahth.exe.old` and `bahth.exe.new` left by an update, with a few
+    /// tries; one still locked is deleted at a later start. Blocks for a few
+    /// seconds at most; the line for the log, if there was anything.
+    pub fn remove_update_leftovers() -> Option<String> {
+        crate::handover::remove_leftovers(original_exe().ok()?, 5, Duration::from_millis(500))
     }
 }
 
@@ -995,11 +1348,243 @@ mod tests {
 
     #[test]
     fn managed_message_names_the_update_command() {
-        for (pm, cmd) in [(PackageManager::Scoop, "scoop update instafind"), (PackageManager::Winget, "winget upgrade Sarmad.InstaFind")] {
+        for (pm, cmd) in [
+            (PackageManager::Scoop, "scoop update instafind"),
+            (PackageManager::Winget, "winget upgrade Sarmad.InstaFind"),
+            (PackageManager::Chocolatey, "choco upgrade instafind"),
+        ] {
             let m = managed_message(pm);
             assert!(m.contains(pm.name()) && m.contains(cmd), "{m}");
-            assert_eq!(pm.update_command(), cmd);
+            assert_eq!(pm.update_command(), Some(cmd));
         }
+        assert_eq!(PackageManager::Store.update_command(), None);
+        let store = managed_message(PackageManager::Store);
+        assert!(store.contains("متجر Microsoft") || store.contains("Microsoft Store"), "{store}");
+    }
+
+    /// Behind a rate limit the web page finds the release and the API cannot
+    /// give its checksum: "try again later", never "no checksum", never an
+    /// install without one.
+    #[test]
+    fn a_checksum_that_cannot_be_asked_for_now_is_asked_again_later() {
+        let rel = parse_release(SAMPLE, "0.0.1").unwrap().unwrap();
+        let page = Release { sha256: None, ..rel.clone() };
+        // The API is still refused.
+        let e = with_digest(page.clone(), |_| Err("HTTP 403".into())).unwrap_err();
+        assert_eq!(e, verify_later_message());
+        assert!(!e.contains("SHA-256"), "{e}");
+        // The API answers with the checksum: offered, verifiable.
+        let got = with_digest(page.clone(), |tag| {
+            assert_eq!(tag, rel.tag);
+            Ok(Some("ab".repeat(32)))
+        })
+        .unwrap();
+        assert_eq!(required_sha256(&got).unwrap(), "ab".repeat(32));
+        // The API answers without one: the real refusal, at install time.
+        let none = with_digest(page, |_| Ok(None)).unwrap();
+        assert_eq!(required_sha256(&none).unwrap_err(), missing_digest_message());
+        // A release that has its checksum is not asked again.
+        let known = Release { sha256: Some("cd".repeat(32)), ..rel };
+        assert_eq!(with_digest(known.clone(), |_| panic!("not asked")).unwrap(), known);
+    }
+
+    #[test]
+    fn chocolatey_copies_are_recognised() {
+        let env = |k: &str| match k {
+            "ProgramData" => Some(r"C:\ProgramData".to_string()),
+            "ChocolateyInstall" => Some(r"D:\tools\choco".to_string()),
+            _ => None,
+        };
+        let pm = |exe: &str| package_manager_for(exe, env);
+        assert_eq!(pm(r"C:\ProgramData\chocolatey\lib\instafind\tools\bahth.exe"), Some(PackageManager::Chocolatey));
+        assert_eq!(pm(r"C:\ProgramData\chocolatey\bin\bahth.exe"), Some(PackageManager::Chocolatey));
+        assert_eq!(pm(r"D:\tools\choco\lib\instafind\tools\bahth.exe"), Some(PackageManager::Chocolatey));
+        assert_eq!(pm(r"C:\ProgramData\chocolatey\bahth.exe"), None);
+        assert_eq!(pm(r"C:\Users\sara\Downloads\bahth.exe"), None);
+    }
+
+    #[test]
+    fn a_folder_that_cannot_be_written_to_is_seen() {
+        let dir = std::env::temp_dir().join(format!("bahth_writable_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(folder_writable(&dir));
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0, "the probe is removed");
+        assert!(!folder_writable(&dir.join("missing")));
+        // A file in place of the folder (cannot hold a new file either).
+        let file = dir.join("file");
+        std::fs::write(&file, b"").unwrap();
+        assert!(!folder_writable(&file));
+        let m = read_only_message(r"C:\Program Files\InstaFind");
+        assert!(m.contains(r"C:\Program Files\InstaFind"), "{m}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    // ------------------------------------------------------------ signatures
+    // Fixtures: tests/fixtures/update-signing (TEST-ONLY keys, see regen.sh).
+
+    macro_rules! fixture {
+        ($name:literal) => {
+            include_str!(concat!("../tests/fixtures/update-signing/", $name))
+        };
+    }
+    const PAYLOAD: &str = fixture!("payload.bin");
+    const SIG_PRIMARY: &str = fixture!("payload.bin.minisig");
+    const SIG_BACKUP: &str = fixture!("payload.bin.backup.minisig");
+    const SIG_OTHER_KEY: &str = fixture!("payload.bin.other-key.minisig");
+    const SIG_WRONG_VERSION: &str = fixture!("payload.bin.wrong-version.minisig");
+    const SIG_WRONG_NAME: &str = fixture!("payload.bin.wrong-name.minisig");
+    const SIG_LEGACY: &str = fixture!("payload.bin.legacy.minisig");
+    const TEST_PUBS: [&str; 3] = [fixture!("test-primary.pub"), fixture!("test-backup.pub"), fixture!("test-other.pub")];
+    /// The tag the fixtures were signed for (`instafind v9.9.9`).
+    const SIGNED_TAG: &str = "v9.9.9";
+
+    /// The base64 key line of a `minisign.pub` file (its second line).
+    fn pub_key_line(pub_file: &str) -> &str {
+        pub_file.lines().nth(1).unwrap_or_default().trim()
+    }
+
+    /// Primary + backup test keys, as the production list will hold them.
+    fn test_keys() -> Vec<&'static str> {
+        vec![pub_key_line(TEST_PUBS[0]), pub_key_line(TEST_PUBS[1])]
+    }
+
+    fn assert_refused(r: Result<(), String>, needle: &str) {
+        let e = r.expect_err("verification should fail");
+        assert!(e.contains(needle) && e.contains(MANUAL_DOWNLOAD_URL), "{needle:?} not in: {e}");
+    }
+
+    #[test]
+    fn signature_valid_passes() {
+        let keys = test_keys();
+        verify_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, SIGNED_TAG, &keys).unwrap();
+        verify_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, SIGNED_TAG, &keys[..1]).unwrap();
+        verify_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, " v9.9.9 ", &keys).unwrap();
+        assert_eq!(expected_trusted_comment("v9.9.9"), "instafind v9.9.9");
+        // CRLF line endings or a BOM (file re-saved on Windows) still parse.
+        let crlf = format!("\u{feff}{}", SIG_PRIMARY.replace('\n', "\r\n"));
+        verify_signature(PAYLOAD.as_bytes(), &crlf, SIGNED_TAG, &keys).unwrap();
+        // Streamed in pieces, as the download does.
+        let check = SignatureCheck::new(SIG_PRIMARY, SIGNED_TAG, &keys).unwrap();
+        let mut v = check.verifier().unwrap();
+        for piece in PAYLOAD.as_bytes().chunks(7) {
+            v.update(piece);
+        }
+        v.finalize().unwrap();
+    }
+
+    #[test]
+    fn signature_backup_key_passes_only_when_trusted() {
+        let keys = test_keys();
+        verify_signature(PAYLOAD.as_bytes(), SIG_BACKUP, SIGNED_TAG, &keys).unwrap();
+        assert_refused(verify_signature(PAYLOAD.as_bytes(), SIG_BACKUP, SIGNED_TAG, &keys[..1]), "not made by a trusted key");
+    }
+
+    #[test]
+    fn signature_refusals() {
+        let keys = test_keys();
+        let data = PAYLOAD.as_bytes();
+        // The program was changed.
+        let mut tampered = data.to_vec();
+        tampered[0] ^= 1;
+        assert_refused(verify_signature(&tampered, SIG_PRIMARY, SIGNED_TAG, &keys), BAD_SIGNATURE);
+        assert_refused(verify_signature(&data[..data.len() - 1], SIG_PRIMARY, SIGNED_TAG, &keys), BAD_SIGNATURE);
+        // Made by a key the program does not trust.
+        assert_refused(verify_signature(data, SIG_OTHER_KEY, SIGNED_TAG, &keys), "not made by a trusted key");
+        // Signed for another version or another app (no replay of an old exe).
+        assert_refused(verify_signature(data, SIG_WRONG_VERSION, SIGNED_TAG, &keys), "\"instafind v9.9.8\"");
+        assert_refused(verify_signature(data, SIG_PRIMARY, "v9.9.8", &keys), "not \"instafind v9.9.8\"");
+        assert_refused(verify_signature(data, SIG_PRIMARY, "V9.9.9", &keys), "not \"instafind V9.9.9\"");
+        assert_refused(verify_signature(data, SIG_WRONG_NAME, SIGNED_TAG, &keys), "\"local-ai-chat v9.9.9\"");
+        // The trusted comment edited to name this release: the global signature fails.
+        let edited = SIG_WRONG_VERSION.replace("instafind v9.9.8", "instafind v9.9.9");
+        assert_refused(verify_signature(data, &edited, SIGNED_TAG, &keys), BAD_SIGNATURE);
+        // Legacy (not pre-hashed) signatures are refused, never verified the old way.
+        assert_refused(verify_signature(data, SIG_LEGACY, SIGNED_TAG, &keys), "legacy");
+        // Missing or malformed signature file.
+        for bad in ["", "not a signature", "untrusted comment: x\nRW\ntrusted comment: instafind v9.9.9\nAA==", &SIG_PRIMARY[..SIG_PRIMARY.len() / 2]] {
+            assert_refused(verify_signature(data, bad, SIGNED_TAG, &keys), "");
+        }
+        // No keys, or only broken ones: nothing verifies.
+        assert_refused(verify_signature(data, SIG_PRIMARY, SIGNED_TAG, &[]), "not made by a trusted key");
+        assert_refused(verify_signature(data, SIG_PRIMARY, SIGNED_TAG, &["", "RWnope", "untrusted comment: x"]), "not made by a trusted key");
+    }
+
+    #[test]
+    fn production_keys_never_contain_test_keys() {
+        for p in TEST_PUBS {
+            let t = pub_key_line(p);
+            assert!(t.starts_with("RW") && t.len() == 56, "bad fixture key {t:?}");
+            assert!(!TRUSTED_PUBLIC_KEYS.iter().any(|k| k.trim() == t), "a TEST key is in update::TRUSTED_PUBLIC_KEYS");
+            assert!(!TRUSTED_PUBLIC_KEYS.iter().any(|k| p.contains(k.trim())), "a TEST key is in update::TRUSTED_PUBLIC_KEYS");
+        }
+        // Every production key must parse: a typo would silently drop it.
+        for k in TRUSTED_PUBLIC_KEYS {
+            assert!(minisign_verify::PublicKey::from_base64(k.trim()).is_ok(), "TRUSTED_PUBLIC_KEYS entry {k:?} is not a minisign public key");
+        }
+        assert_eq!(trusted_keys(), TRUSTED_PUBLIC_KEYS);
+        assert_eq!(signature_checking_configured(), !TRUSTED_PUBLIC_KEYS.is_empty());
+        // The production signature cannot pass with the production list
+        // unless it holds the real key (and it never holds a test key).
+        if TRUSTED_PUBLIC_KEYS.is_empty() {
+            assert!(verify_signature(PAYLOAD.as_bytes(), SIG_PRIMARY, SIGNED_TAG, TRUSTED_PUBLIC_KEYS).is_err());
+        }
+    }
+
+    /// `keys/*.pub` (what CI's `sign` job checks against) and
+    /// `TRUSTED_PUBLIC_KEYS` (what the app accepts) must be set up together:
+    /// keys committed but not compiled in would sign releases nobody checks,
+    /// and keys compiled in but not committed would make `sign` publish
+    /// releases the app refuses. See keys/README.md.
+    #[test]
+    fn keys_dir_matches_trusted_keys() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("keys");
+        let mut committed = Vec::new();
+        for entry in std::fs::read_dir(&dir).expect("keys/ exists") {
+            let path = entry.unwrap().path();
+            match path.extension().and_then(|e| e.to_str()) {
+                Some("pub") => {
+                    let text = std::fs::read_to_string(&path).unwrap();
+                    let key = pub_key_line(&text).to_string();
+                    assert!(minisign_verify::PublicKey::from_base64(&key).is_ok(), "{} is not a minisign public key file", path.display());
+                    assert!(!TEST_PUBS.iter().any(|t| pub_key_line(t) == key), "{} is a TEST key", path.display());
+                    committed.push(key);
+                }
+                Some("key") => panic!("{} looks like a SECRET key: never commit one", path.display()),
+                _ => {}
+            }
+        }
+        let mut trusted: Vec<String> = TRUSTED_PUBLIC_KEYS.iter().map(|k| k.trim().to_string()).collect();
+        committed.sort();
+        trusted.sort();
+        assert_eq!(committed, trusted, "keys/*.pub and update::TRUSTED_PUBLIC_KEYS must hold the same keys (keys/README.md)");
+    }
+
+    #[test]
+    fn release_signature_asset() {
+        // No .minisig: still a release (the check reports it), sig_url None.
+        let r = parse_release(SAMPLE, "0.2.2").unwrap().unwrap();
+        assert_eq!(r.sig_url, None);
+        // Each CPU gets its own .minisig, and only from GitHub.
+        let sig = |name: &str, host: &str| {
+            format!(r#"{{"name": "{name}.minisig", "size": 300, "browser_download_url": "https://{host}/sarmadiq9090-coder/arabic-file-search/releases/download/v0.3.1/{name}.minisig"}},"#)
+        };
+        let with = SAMPLE.replace(
+            "\"assets\": [",
+            &format!("\"assets\": [{}{}{}", sig(ASSET_X64, "github.com"), sig(ASSET_ARM64, "github.com"), sig(ASSET_X86, "github.com")),
+        );
+        for name in [ASSET_X64, ASSET_ARM64, ASSET_X86] {
+            let r = parse_release_for(&with, "0.2.2", name).unwrap().unwrap();
+            assert_eq!(r.sig_url.as_deref(), Some(format!("{}.minisig", r.exe_url).as_str()), "{name}");
+            assert_eq!(sig_asset_name(name), format!("{name}.minisig"));
+        }
+        let evil = SAMPLE.replace("\"assets\": [", &format!("\"assets\": [{}", sig(ASSET_NAME, "evil.example")));
+        assert_eq!(parse_release(&evil, "0.2.2").unwrap().unwrap().sig_url, None);
+        // Found through the web page: the usual address next to the program.
+        let r = release_from_tag("v0.4.1", "0.4.0").unwrap();
+        assert_eq!(r.sig_url, Some(format!("{}.minisig", r.exe_url)));
+        assert!(download_host_ok(r.sig_url.as_deref().unwrap()));
     }
 
     #[test]
@@ -1291,24 +1876,5 @@ mod tests {
         assert_eq!(std::fs::read(&exe).unwrap(), b"v2");
         assert_eq!(std::fs::read(&old).unwrap(), b"v1");
         assert!(!new.exists());
-    }
-
-    #[test]
-    fn cleanup_keeps_the_only_program() {
-        let t = TempDir::new("cleanup");
-        let exe = t.0.join("bahth.exe");
-        let (new, old) = (sibling(&exe, ".new"), sibling(&exe, ".old"));
-        // Normal start after an update: leftovers go.
-        std::fs::write(&exe, b"v2").unwrap();
-        std::fs::write(&old, b"v1").unwrap();
-        std::fs::write(&new, b"half").unwrap();
-        cleanup_beside(&exe);
-        assert!(exe.exists() && !old.exists() && !new.exists());
-        // An interrupted update left only the old copy: it is put back.
-        std::fs::remove_file(&exe).unwrap();
-        std::fs::write(&old, b"v1").unwrap();
-        cleanup_beside(&exe);
-        assert_eq!(std::fs::read(&exe).unwrap(), b"v1");
-        assert!(!old.exists());
     }
 }

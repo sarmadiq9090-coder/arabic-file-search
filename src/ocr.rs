@@ -76,14 +76,14 @@ pub fn ocr_image_bytes(bytes: &[u8]) -> Option<String> {
 
 /// [`ocr_image_bytes`] on the file at `path` (at most [`MAX_IMAGE_FILE`]).
 pub fn ocr_image_file(path: &Path) -> Option<String> {
-    let meta = std::fs::metadata(path).ok()?;
-    if !meta.is_file() || meta.len() > MAX_IMAGE_FILE || !available() {
+    let meta = crate::cloud::probe(path)?;
+    if meta.size > MAX_IMAGE_FILE || !meta.readable() || !available() {
         return None;
     }
     // Capped again: the file may have grown since the size was checked.
     use std::io::Read;
     let mut bytes = Vec::new();
-    std::fs::File::open(path).ok()?.take(MAX_IMAGE_FILE).read_to_end(&mut bytes).ok()?;
+    crate::cloud::open(path).ok()?.take(MAX_IMAGE_FILE).read_to_end(&mut bytes).ok()?;
     ocr_image_bytes(&bytes)
 }
 
@@ -102,7 +102,26 @@ fn tag_of(lang: &Language) -> Option<String> {
     Some(lang.LanguageTag().ok()?.to_string_lossy())
 }
 
+/// Whether `HKEY_LOCAL_MACHINE\<key>` exists.
+fn hklm_key_exists(key: &str) -> bool {
+    use winapi::um::winnt::KEY_READ;
+    use winapi::um::winreg::{HKEY_LOCAL_MACHINE, RegCloseKey, RegOpenKeyExW};
+    let wide: Vec<u16> = key.encode_utf16().chain(Some(0)).collect();
+    let mut h = std::ptr::null_mut();
+    let ok = unsafe { RegOpenKeyExW(HKEY_LOCAL_MACHINE, wide.as_ptr(), 0, KEY_READ, &mut h) } == 0;
+    if ok {
+        unsafe { RegCloseKey(h) };
+    }
+    ok
+}
+
 fn pick_languages() -> windows::core::Result<Vec<String>> {
+    // An unregistered class would make the `windows` crate load a DLL by
+    // name from a search path that includes the program's own folder
+    // (`winrt_guard`): no OCR then, rather than that.
+    if crate::winrt_guard::first_missing(crate::winrt_guard::OCR_CLASSES, hklm_key_exists).is_some() {
+        return Ok(Vec::new());
+    }
     let avail = OcrEngine::AvailableRecognizerLanguages()?;
     let tags: Vec<String> = (0..avail.Size()?)
         .filter_map(|i| avail.GetAt(i).ok())

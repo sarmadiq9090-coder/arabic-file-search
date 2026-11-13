@@ -24,6 +24,21 @@ pub(super) fn confirm_text(cmd: &SystemCommand) -> String {
     system::confirm_text(cmd, crate::i18n::is_en())
 }
 
+/// Why `cmd` must not run (shown instead of the question), if it mustn't.
+pub(super) fn refusal(cmd: &SystemCommand) -> Option<String> {
+    system::refusal(cmd, crate::i18n::is_en())
+}
+
+/// Whether `cmd` is run on a background thread (see `quick::run_action`).
+pub(super) fn runs_in_background(cmd: &SystemCommand) -> bool {
+    system::runs_in_background(cmd)
+}
+
+/// The message when `cmd` failed.
+pub(super) fn failed_text(cmd: &SystemCommand) -> String {
+    system::failed_text(cmd, crate::i18n::is_en())
+}
+
 /// Runs a command the user confirmed. False (and a log line) when it failed.
 pub(super) fn run_system(cmd: &SystemCommand) -> bool {
     match system::run(cmd) {

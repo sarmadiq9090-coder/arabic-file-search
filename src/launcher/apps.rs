@@ -422,6 +422,7 @@ mod tests {
     #[test]
     fn walks_start_menu_shortcuts() {
         let dir = std::env::temp_dir().join(format!("bahth-startmenu-{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let sub = dir.join("Vendor").join("Tools");
         std::fs::create_dir_all(&sub).unwrap();
         for f in [dir.join("Word.lnk"), sub.join("Foo.url"), sub.join("Bar.appref-ms"), sub.join("notes.txt")] {

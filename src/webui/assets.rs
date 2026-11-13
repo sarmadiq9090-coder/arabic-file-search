@@ -2,7 +2,7 @@
 //! only from the `instafind://` protocol (no network port, nothing from the
 //! internet), each with a strict Content Security Policy.
 
-use crate::i18n::Lang;
+use crate::i18n::{Lang, Locale};
 
 /// The custom protocol's name. WebView2 sees it as `http://instafind.localhost/`
 /// and answers it inside the program; the request never reaches the network.
@@ -19,6 +19,17 @@ pub const ORIGIN: &str = "http://instafind.localhost";
 /// allows are checked with this.
 pub fn own_url(url: &str) -> bool {
     url.strip_prefix(ORIGIN).is_some_and(|rest| rest.is_empty() || rest.starts_with('/')) || url.starts_with(START_URL)
+}
+
+/// Where the page asks for a thumbnail: `/thumb/<key>`, the key a random
+/// one-time name the program gave for a row it listed (never a path).
+pub const THUMB_PREFIX: &str = "/thumb/";
+
+/// The thumbnail key in a request path, if it is exactly `/thumb/` and 32
+/// lowercase hex digits; anything else is not a thumbnail request.
+pub fn thumb_key(path: &str) -> Option<&str> {
+    let key = path.strip_prefix(THUMB_PREFIX)?;
+    (key.len() == 32 && key.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))).then_some(key)
 }
 
 /// Scripts, styles and fonts only from the program itself; no inline script,
@@ -41,19 +52,27 @@ const FILES: &[(&str, &[u8], &str)] = &[
     ("/fonts/IBMPlexSansArabic-SemiBold.woff2", include_bytes!("assets/fonts/IBMPlexSansArabic-SemiBold.woff2"), "font/woff2"),
 ];
 
-/// The page for `lang`, carrying this launch's `token`.
+/// The page for `lang`, carrying this launch's `token`: the interface
+/// language when `lang` is its original text (a translated language starts
+/// from English), else Arabic or English itself.
 ///
 /// The token must be plain hex (as [`super::bridge::new_token`] makes it):
-/// anything else is refused so it can't break out of its attribute.
+/// anything else is refused so it can't break out of its attribute. The
+/// language's texts go in a JSON data block (not a script: the CSP allows
+/// none inline), with every `<` escaped so nothing can close it.
 pub fn page(lang: Lang, token: &str) -> Option<String> {
     if token.is_empty() || !token.bytes().all(|b| b.is_ascii_hexdigit()) {
         return None;
     }
-    let (code, dir) = match lang {
-        Lang::Ar => ("ar", "rtl"),
-        Lang::En => ("en", "ltr"),
-    };
-    Some(PAGE.replace("{{LANG}}", code).replace("{{DIR}}", dir).replace("{{CSP}}", &meta_csp()).replace("{{TOKEN}}", token))
+    let l = if crate::i18n::current() == lang { crate::i18n::locale() } else { Locale::of(lang) };
+    let dir = if l.rtl { "rtl" } else { "ltr" };
+    Some(
+        PAGE.replace("{{LANG}}", l.code)
+            .replace("{{DIR}}", dir)
+            .replace("{{CSP}}", &meta_csp())
+            .replace("{{TOKEN}}", token)
+            .replace("{{I18N}}", &crate::i18n::page_data(l)),
+    )
 }
 
 /// [`CSP`] for the page's own `<meta>` copy, which may not hold
@@ -97,6 +116,17 @@ pub const HEADERS: &[(&str, &str)] = &[
 #[cfg(test)]
 mod tests {
     #[test]
+    fn thumbnail_keys_are_exact() {
+        let k = "0123456789abcdef0123456789abcdef";
+        assert_eq!(super::thumb_key(&format!("/thumb/{k}")), Some(k));
+        for bad in ["/thumb/", "/thumb/0123", "/thumb/0123456789ABCDEF0123456789ABCDEF", "/thumb/../app.js", "/thumb/C:\\x.jpg", "/thumbs/0123456789abcdef0123456789abcdef", "/thumb/0123456789abcdef0123456789abcdef/x"] {
+            assert_eq!(super::thumb_key(bad), None, "{bad}");
+        }
+        // Not served as a file either.
+        assert_eq!(super::serve("GET", &format!("/thumb/{k}"), "<html>").status, 404);
+    }
+
+    #[test]
     fn only_the_programs_own_urls() {
         for ok in ["http://instafind.localhost", "http://instafind.localhost/", "http://instafind.localhost/index.html", "instafind://localhost/", "instafind://localhost/app.js"] {
             assert!(super::own_url(ok), "{ok}");
@@ -134,6 +164,10 @@ mod tests {
         assert!(p.contains("default-src 'none'; script-src 'self';") && !p.contains("frame-ancestors"));
         assert!(CSP.ends_with("; frame-ancestors 'none'"));
         assert!(!p.contains("{{"));
+        // The language's data block: JSON, nothing that could end it.
+        let data = p.split(r#"<script type="application/json" id="i18n">"#).nth(1).unwrap().split("</script>").next().unwrap();
+        assert_eq!(serde_json::from_str::<serde_json::Value>(data).unwrap()["code"], "ar");
+        assert_eq!(p.matches("</script>").count(), 2);
         assert!(page(Lang::En, "abc").unwrap().contains(r#"<html lang="en" dir="ltr">"#));
         for bad in ["", "ab\"cd", "<script>", "12 34"] {
             assert!(page(Lang::Ar, bad).is_none(), "{bad}");
@@ -183,5 +217,14 @@ mod tests {
         let css = text("/app.css");
         assert!(!css.contains("http:") && !css.contains("https:") && !css.contains("@import"));
         assert!(!PAGE.contains("http:") && !PAGE.contains("https:") && !PAGE.contains("<script>") && !PAGE.contains("style=\""));
+    }
+
+    #[test]
+    fn no_way_back_to_the_classic_look() {
+        // Since 1.0 the new look is the only one: the page offers no switch.
+        let js = text("/app.js");
+        for gone in ["classic_look", "العودة إلى الشكل القديم", "Back to the classic look", "classic look"] {
+            assert!(!js.contains(gone), "app.js still has {gone:?}");
+        }
     }
 }

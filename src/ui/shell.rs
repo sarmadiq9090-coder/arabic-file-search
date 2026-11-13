@@ -10,6 +10,29 @@ use winapi::um::timezoneapi::{FileTimeToSystemTime, SystemTimeToTzSpecificLocalT
 use winapi::um::winnt::{FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL};
 use winapi::um::winuser::SW_SHOWNORMAL;
 
+/// Puts `text` on the clipboard for `owner`, trying again for a moment
+/// while another program holds the clipboard open. False when it is not
+/// there, so the caller can say so (the user would paste the old content).
+pub fn copy_text<C: Into<native_windows_gui::ControlHandle> + Copy>(owner: C, text: &str) -> bool {
+    let ok = crate::quick::retry_briefly(
+        6,
+        || native_windows_gui::Clipboard::set_data_text(owner, text),
+        || std::thread::sleep(std::time::Duration::from_millis(15)),
+    );
+    if !ok {
+        super::startup::log("clipboard: another program kept it open; nothing copied");
+    }
+    ok
+}
+
+/// What the user is told when [`copy_text`] failed.
+pub fn copy_failed_text() -> &'static str {
+    tr!(
+        "تعذر النسخ: برنامج آخر يستخدم الحافظة الآن. جرّب مرة أخرى.",
+        "Could not copy: another program is using the clipboard. Try again."
+    )
+}
+
 pub fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
@@ -46,6 +69,23 @@ pub fn open(path: &str) -> bool {
         )
     };
     r as isize > 32
+}
+
+/// Runs a shell verb of a file's own Windows menu, such as "properties"
+/// (the Properties window) or "openas" (Windows' "Open with" choice), over
+/// `owner`. True if Windows took it.
+pub fn invoke_verb(owner: Option<winapi::shared::windef::HWND>, path: &str, verb: &str) -> bool {
+    use winapi::um::shellapi::{SEE_MASK_INVOKEIDLIST, SHELLEXECUTEINFOW, ShellExecuteExW};
+    let (verb, file) = (wide(verb), wide(path));
+    let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+    info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+    // The verb comes from the item's own shell menu, as Explorer does it.
+    info.fMask = SEE_MASK_INVOKEIDLIST;
+    info.hwnd = owner.unwrap_or(std::ptr::null_mut());
+    info.lpVerb = verb.as_ptr();
+    info.lpFile = file.as_ptr();
+    info.nShow = SW_SHOWNORMAL;
+    unsafe { ShellExecuteExW(&mut info) != 0 }
 }
 
 /// Moves a file or folder to the Recycle Bin, with Windows' own
@@ -89,9 +129,38 @@ pub fn recycle_many(paths: &[String]) -> Vec<String> {
     paths.iter().filter(|p| !std::path::Path::new(p.as_str()).exists()).cloned().collect()
 }
 
-/// Opens Explorer with the file selected.
+/// Opens Explorer with the file selected. Explorer is started by its full
+/// path: a bare `explorer.exe` would be looked for in this exe's own folder
+/// first (Downloads, for a portable copy), where one could have been planted.
 pub fn reveal(path: &str) {
-    let _ = std::process::Command::new("explorer.exe").raw_arg(format!("/select,\"{path}\"")).spawn();
+    let Some(explorer) = windows_program("explorer.exe") else { return };
+    let _ = std::process::Command::new(explorer).raw_arg(format!("/select,\"{path}\"")).spawn();
+}
+
+/// A folder Windows reports through `get` (`GetSystemDirectoryW`,
+/// `GetWindowsDirectoryW`).
+fn windows_folder(get: unsafe extern "system" fn(*mut u16, u32) -> u32) -> Option<std::path::PathBuf> {
+    let mut buf = [0u16; 260];
+    let n = unsafe { get(buf.as_mut_ptr(), buf.len() as u32) } as usize;
+    (n > 0 && n < buf.len()).then(|| std::path::PathBuf::from(String::from_utf16_lossy(&buf[..n])))
+}
+
+/// The full path of a program that comes with Windows (`explorer.exe`,
+/// `control.exe`, `devmgmt.msc`, `regedit.exe`…): in the system folder
+/// (System32; SysWOW64 for the 32-bit exe on 64-bit Windows), then the
+/// 64-bit System32 as the 32-bit exe sees it (`Sysnative`, for tools that
+/// only exist there), then the Windows folder; `None` when it is in none of
+/// them (say `gpedit.msc` on Windows Home). Never a bare name, which
+/// `CreateProcess` and `ShellExecute` would look for in this exe's folder or
+/// the current folder first.
+pub fn windows_program(name: &str) -> Option<std::path::PathBuf> {
+    use winapi::um::sysinfoapi::{GetSystemDirectoryW, GetWindowsDirectoryW};
+    let windows = windows_folder(GetWindowsDirectoryW);
+    [windows_folder(GetSystemDirectoryW), windows.as_ref().map(|w| w.join("Sysnative")), windows]
+        .into_iter()
+        .flatten()
+        .map(|dir| dir.join(name))
+        .find(|p| p.is_file())
 }
 
 fn query_icon(name: &str, attrs: u32, flags: u32) -> (usize, i32) {

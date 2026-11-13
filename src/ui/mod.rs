@@ -21,6 +21,7 @@
 //! - `thumbs`: the thumbnail view of the results (Ctrl+T)
 //! - `startup`: start-up timing, logging, single instance, fonts
 //! - `lazy`: secondary windows created when they first open, for a quick start
+//! - `placement`: the main window opens centred above the taskbar and stays on screen
 //! - `quick`: the quick search popup (Ctrl+Alt+F, the floating box, the tray icon)
 //! - `floating`: the small search box above the taskbar clock
 //! - `tray`: the monochrome tray icon and menu, the new options, first-run question
@@ -28,6 +29,7 @@
 //! - `format`, `shell`: text formatting and Windows shell helpers
 //! - `webui`: the new main window (WebView2), opt-in while it is built
 
+mod accessible;
 mod app_matches;
 mod autostart;
 mod build;
@@ -45,15 +47,21 @@ mod lang_menu;
 mod keys;
 mod launcher_shim; // thin glue to crate::launcher, see the file
 mod lazy;
+mod memory;
+mod older_copy;
+mod placement;
 mod quick;
+mod quick_access;
 mod quickswitch;
 mod rating;
 mod relocate;
 mod replace_window;
+mod report;
 mod results;
 mod search_jobs;
 mod shell;
 mod startup;
+pub(crate) use startup::this_copy_arg;
 mod style;
 mod surface;
 mod thumbs;
@@ -62,6 +70,8 @@ mod updates;
 mod watching;
 mod web_server;
 mod webui;
+#[cfg(target_env = "msvc")]
+mod webui_thumbs;
 
 use native_windows_gui as nwg;
 use nwg::NativeUi;
@@ -78,14 +88,15 @@ use winapi::um::winuser::{
 };
 
 use crate::history::History;
-use crate::index::{Change, Entry, Index, ScanProgress};
+use crate::index::{Entry, Index, ScanProgress};
 use crate::search::{ContentHit, ContentProgress, Query};
 use crate::settings::Settings;
 
-use files::flush_index_save;
+use crate::leave::Leaving;
+use files::SAVES;
 use format::ARABIC_DIGITS;
 use history_menu::HistoryMenu;
-use keys::HOTKEY_ID;
+use keys::{HOTKEY_ID, hotkey_text};
 use search_jobs::NameResult;
 use startup::{LOOP_STARTED, activate_running_copy, phase, ui_font_family};
 use updates::UpdateEvent;
@@ -95,8 +106,8 @@ use watching::SubtreeScan;
 const WS_EX_LAYOUTRTL: u32 = 0x0040_0000;
 
 /// The window title; also how a second copy of the program finds the first.
-const TITLE: &str = "بحث سريع";
-const TITLE_EN: &str = "InstaFind";
+pub(super) const TITLE: &str = "بحث سريع";
+pub(super) const TITLE_EN: &str = "InstaFind";
 
 /// The window title in the interface language.
 fn title() -> &'static str {
@@ -111,6 +122,10 @@ const COL_SNIPPET: usize = 4;
 const COLUMNS: [(&str, i32); 5] =
     [("الاسم", 260), ("المسار الكامل", 460), ("الحجم", 90), ("تاريخ التعديل", 140), ("النص المطابق", 360)];
 const COLUMNS_EN: [&str; 5] = ["Name", "Full path", "Size", "Date modified", "Matching text"];
+/// The least width of each column when the default widths are fitted to
+/// the window (`crate::window_fit::fit_columns`): the size and the date keep
+/// their width, the text columns share the rest.
+const COLUMN_MIN: [i32; 5] = [160, 200, 90, 140, 160];
 
 /// A result row: an index into `State::rows_index` plus an optional snippet.
 struct Row {
@@ -163,8 +178,8 @@ struct State {
     shown_query: Option<Query>,
     /// Watches the drives so the index follows changes (see `watching`).
     watcher: Option<crate::watch::Watcher>,
-    /// Watcher changes waiting until the index may change.
-    changes: Vec<Change>,
+    /// Watcher changes waiting until the index may change (limited in size).
+    changes: crate::watch_pace::ChangeQueue,
     /// Folders being walked because their contents are unknown.
     subtree_scans: Vec<SubtreeScan>,
     /// Stats from the watcher, rescan pacing and index-copy pacing.
@@ -182,6 +197,28 @@ impl State {
     fn row_entry(&self, row: usize) -> Option<&Entry> {
         self.rows_index.entries.get(self.rows.get(row)?.entry as usize)
     }
+}
+
+/// Matching lines read again from a document on a background thread (they
+/// can take long: a big file is extracted again), for the classic window's
+/// row (by path) or a row of the new look's list.
+enum MatchesRead {
+    Classic { path: String, found: Option<(u32, Vec<(u32, String)>)> },
+    // (Only the MSVC build has the new look.)
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))]
+    Web { seq: u64, ver: u64, id: u32, found: Option<(u32, Vec<(u32, String)>)> },
+}
+
+/// The memory guard's state in the window (see `memory.rs`).
+#[derive(Default)]
+struct MemoryWatch {
+    guard: RefCell<crate::mem_guard::Guard>,
+    sampled: Cell<Option<std::time::Instant>>,
+    lined: Cell<Option<std::time::Instant>>,
+    /// After shedding: when to watch the drives again.
+    resume_at: Cell<Option<std::time::Instant>>,
+    /// When the idle trim last ran (`memory.rs`).
+    trimmed: Cell<Option<std::time::Instant>>,
 }
 
 #[derive(Default)]
@@ -221,12 +258,25 @@ pub struct App {
     /// Wakes the UI thread when an update check or download finishes.
     update_notice: nwg::Notice,
     update_result: Arc<Mutex<Option<UpdateEvent>>>,
+    /// Wakes the UI thread when matches read again in the background are ready.
+    matches_notice: nwg::Notice,
+    matches_read: Arc<Mutex<Vec<MatchesRead>>>,
     /// Wakes the UI thread when the drive watcher has a batch of changes.
     watch_notice: nwg::Notice,
     watch_inbox: Arc<Mutex<watching::Inbox>>,
+    /// The memory guard (`memory.rs`).
+    mem: MemoryWatch,
+    /// The saved index misses changes of the last session (its marker file
+    /// was found): scan the drives again once it is loaded.
+    reconcile: Cell<bool>,
     /// Bytes downloaded / total of a running update download.
     update_progress: Arc<(AtomicU64, AtomicU64)>,
     update_busy: Cell<bool>,
+    /// A check for updates is running (`update_busy` is also set for a download).
+    update_checking: Cell<bool>,
+    /// The user asked for that check (or asked while an automatic one ran):
+    /// its answer is shown, and the new look's button says "Checking…".
+    update_asked: Cell<bool>,
     /// Timer ticks since start, to delay the automatic update check.
     ticks: Cell<u32>,
     /// Built on first use: each one starts a COM file dialog, which is slow.
@@ -241,6 +291,10 @@ pub struct App {
     menu_rename: nwg::MenuItem,
     menu_delete: nwg::MenuItem,
     menu_matches: nwg::MenuItem,
+    /// Windows' own "Open with" and Properties for the selected result.
+    menu_open_with: nwg::MenuItem,
+    menu_properties_sep: nwg::MenuSeparator,
+    menu_properties: nwg::MenuItem,
     /// Lists every matching line of one document.
     matches_window: nwg::Window,
     matches_text: nwg::TextBox,
@@ -248,16 +302,20 @@ pub struct App {
     /// «جرّب الشكل الجديد»: only built when WebView2 is there (MSVC builds).
     menu_new_ui: nwg::MenuItem,
     menu_new_ui_sep: nwg::MenuSeparator,
+    /// Between the Options menu's groups (`build.rs`).
+    options_seps: [nwg::MenuSeparator; 5],
     menu_hotkey: nwg::MenuItem,
     menu_digits: nwg::MenuItem,
     menu_content_index: nwg::MenuItem,
+    /// Read cloud-only files too (downloads them); off by default.
+    menu_read_cloud: nwg::MenuItem,
     menu_auto_index: nwg::MenuItem,
     menu_hide_system: nwg::MenuItem,
     menu_update: nwg::MenuItem,
     menu_autostart: nwg::MenuItem,
     lang_menu: nwg::Menu,
-    menu_lang_ar: nwg::MenuItem,
-    menu_lang_en: nwg::MenuItem,
+    /// One item per interface language (`lang_menu.rs`).
+    menu_langs: Vec<(nwg::MenuItem, &'static crate::i18n::Locale)>,
     /// Options ▸ "Send feedback": report a problem, suggest an idea, discuss.
     feedback_menu: nwg::Menu,
     menu_feedback_bug: nwg::MenuItem,
@@ -285,6 +343,8 @@ pub struct App {
     mono_icons: tray::MonoIcons,
     /// Options ▸ "Search from anywhere".
     quick_menu: tray::QuickMenu,
+    /// This run's tray-icon state (put back after Explorer restarts).
+    quick_state: tray::QuickState,
     /// The quick search popup (built when it first opens).
     popup: quick::Popup,
     /// What to try when a search finds nothing, above the result list.
@@ -308,9 +368,14 @@ pub struct App {
     startup_logged: Cell<bool>,
     /// The indexing progress shown in the status bar's last part, if any.
     indexing_shown: RefCell<Option<String>>,
+    /// That part is the wider one, for the line about the documents' texts.
+    indexing_wide: Cell<bool>,
     /// The offer to move a copy out of Downloads or a temp folder was
     /// already considered this run (see `relocate`).
     move_checked: Cell<bool>,
+    /// The notice that this copy replaced an older one was shown (or there
+    /// was none: `older_copy::notice`).
+    replaced_told: Cell<bool>,
     state: RefCell<State>,
     /// Moving another program's Open / Save As dialog to a result's folder.
     quick: quickswitch::QuickSwitch,
@@ -320,6 +385,8 @@ pub struct App {
     replace: replace_window::ReplaceWindow,
     /// Folder sizes: the Size column of folders and the folder-sizes window.
     disk: disk_usage::DiskUsage,
+    /// Options ▸ "Report a problem…": the window and its menu items.
+    report: report::ReportWindow,
     /// Searching from a phone over the home network (off by default).
     web: web_server::WebUi,
     /// The thumbnail view of the results (Ctrl+T).
@@ -367,7 +434,7 @@ impl App {
         // The narrowest window in which nothing overlaps: the bottom button
         // row, or the scope row when it has a row of its own.
         use style::{GAP, MARGIN};
-        // (Export, also in the Options menu, steps aside when there is no room.)
+        // (Export, also in the result menu, steps aside when there is no room.)
         let bottom = w.bottom.iter().sum::<i32>() - w.bottom[3] + w.options + 5 * GAP + 2 * MARGIN;
         let scope_row =
             w.scope_label + style::MIN_SCOPE_W + w.scope_btn + w.all_btn + w.reindex + 4 * GAP + 2 * MARGIN;
@@ -446,7 +513,7 @@ impl App {
         let status_h = self.status_height();
         let y_btn = h - status_h - GAP - CTRL_H;
         let mut x = M;
-        // Export results is also in the Options menu, so in a narrow window
+        // Export results is also in the result menu, so in a narrow window
         // it gives up its place rather than overlap Options.
         let export_fits = wd.bottom.iter().sum::<i32>() + wd.options + 6 * GAP + 2 * M <= w;
         self.export_btn.set_visible(export_fits);
@@ -476,19 +543,16 @@ impl App {
         let y3 = self.place_suggestions(M, y3, w - 2 * M);
         // The Store rating question goes under the list, so its top rows stay put.
         let list_bottom = self.place_rating(M, y_btn - GAP, w - 2 * M);
+        // Above it, while the new look can't run: the line saying why.
+        let list_bottom = self.place_webui_note(M, list_bottom, w - 2 * M);
         style::place(&self.list.handle, M, y3, (w - 2 * M).max(100), (list_bottom - y3).max(50));
 
         // Status bar: messages on one side, the selected file's path on the
         // other, and while indexing runs its progress at the far end.
         if let Some(sb) = self.status.handle.hwnd() {
             let px = (w as f64 * nwg::scale_factor()) as i32;
-            if self.indexing_part_shown() {
-                let parts: [i32; 3] = [px * 9 / 20, px * 3 / 4, -1];
-                unsafe { SendMessageW(sb, SB_SETPARTS, 3, parts.as_ptr() as LPARAM) };
-            } else {
-                let parts: [i32; 2] = [px / 2, -1];
-                unsafe { SendMessageW(sb, SB_SETPARTS, 2, parts.as_ptr() as LPARAM) };
-            }
+            let parts = crate::indexing_status::status_parts(px, self.indexing_part());
+            unsafe { SendMessageW(sb, SB_SETPARTS, parts.len(), parts.as_ptr() as LPARAM) };
         }
     }
 
@@ -500,16 +564,35 @@ impl App {
 
     fn set_status(&self, text: &str) {
         self.status.set_text(0, text);
+        // (Seen in the new look too while it is the main window.)
+        self.webui_status_text(text);
     }
 
     // ---------------------------------------------------------------- tray & options
 
     fn hide_to_tray(&self) {
+        // "Hide to the taskbar tray" while the new look is the main window.
+        if self.webui_hide_main() {
+            return;
+        }
         self.remember_query();
+        // The program may now run for days and end with Windows itself:
+        // what was changed up to here (size, columns, options) is kept.
+        self.save_settings();
         self.window.set_visible(false);
+        self.hidden_balloon();
+    }
+
+    /// The first time the main window (either look) hides by the clock this
+    /// session: a balloon on the tray icon saying how to open it again and
+    /// how to exit (`crate::quick::hidden_hint`).
+    fn hidden_balloon(&self) {
         if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
+            // The hotkey, unless another program has it (its menu item is
+            // greyed then).
+            let hotkey = self.menu_hotkey.enabled().then_some(hotkey_text());
             self.tray.show(
-                tr!("البرنامج ما زال يعمل هنا. انقر الأيقونة أو شغّل البرنامج مرة أخرى لإظهاره فوراً.", "The program is still running here. Click the icon or start the program again to show it at once."),
+                &crate::quick::hidden_hint(crate::i18n::current(), hotkey),
                 Some(title()),
                 None,
                 None,
@@ -537,18 +620,26 @@ impl App {
     /// Whether the main window is on screen: the classic one, or the new
     /// one when it replaces it (the first-run offers wait for this).
     fn main_shown(&self) -> bool {
-        self.window.visible() || self.webui_visible()
+        // (Not while the new look's page is being created.)
+        (self.window.visible() || self.webui_visible()) && !self.webui_busy()
     }
 
     fn show_window(&self) {
         if self.webui_show() {
             return;
         }
+        // The screen may have changed while the window waited by the clock
+        // (a monitor unplugged, another resolution or scale): bring it back
+        // inside the work area before it shows.
+        if let Some(h) = self.window.handle.hwnd() {
+            placement::keep_on_screen(h);
+        }
         self.window.set_visible(true);
         if let Some(h) = self.window.handle.hwnd() {
             unsafe {
                 if IsIconic(h) != 0 {
                     ShowWindow(h, SW_RESTORE);
+                    placement::keep_on_screen(h);
                 }
                 SetForegroundWindow(h);
             }
@@ -565,12 +656,15 @@ impl App {
     }
 
     fn save_settings(&self) {
+        // The size of the main window in use: the new look's while it is
+        // the one (the classic window stays hidden then), else the classic.
+        let main = self.webui_window().unwrap_or(&self.window);
         let mut st = self.state.borrow_mut();
         let s = &mut st.settings;
-        if let Some(h) = self.window.handle.hwnd() {
+        if let Some(h) = main.handle.hwnd() {
             s.maximized = unsafe { IsZoomed(h) } != 0;
-            if !s.maximized && unsafe { IsIconic(h) } == 0 && self.window.visible() {
-                (s.width, s.height) = self.window.size();
+            if !s.maximized && unsafe { IsIconic(h) } == 0 && main.visible() {
+                (s.width, s.height) = main.size();
             }
         }
         // The icon view has no columns to measure.
@@ -584,12 +678,69 @@ impl App {
     }
 
     fn on_close(&self) {
-        self.stop_watching();
-        flush_index_save();
-        self.remember_query();
+        self.close(Leaving::Exit);
+    }
+
+    /// The new copy was started: watches it for `handover::TAKEOVER_GRACE`
+    /// and leaves if it keeps running (it ends this copy itself if this one
+    /// is slow to go). False when it ended at once: the handover failed and
+    /// this copy keeps running.
+    fn hand_over(&self, mut child: std::process::Child, what: &str) -> bool {
+        let pid = child.id();
+        match crate::handover::took_over(|| child.try_wait().ok().flatten().map(|s| s.code().unwrap_or(-1)), crate::handover::TAKEOVER_GRACE) {
+            Ok(()) => {
+                startup::log(&format!("handover ({what}): new copy (pid {pid}) is running; leaving"));
+                self.close_for_restart();
+                std::process::exit(0);
+            }
+            Err(code) => {
+                startup::log(&format!("handover ({what}): new copy (pid {pid}) ended at once with code {code}; this copy keeps running"));
+                false
+            }
+        }
+    }
+
+    /// Leaving to start again (after an update, a move to the permanent
+    /// place, a change of language): the new copy is already waiting.
+    fn close_for_restart(&self) {
+        self.close(Leaving::Restart);
+    }
+
+    /// Windows is shutting down or the user is signing out (WM_ENDSESSION):
+    /// save what there is and go, within the few seconds Windows allows.
+    /// Before 0.10.1 nothing answered this message, so the settings changed
+    /// since the last full close were lost and the index was never written.
+    fn session_end(&self) {
+        startup::log("session end: saving and leaving");
+        self.close(Leaving::SessionEnd);
+        std::process::exit(0);
+    }
+
+    /// Saves everything and ends the message loop, in bounded time
+    /// (`crate::leave`): the settings and the history first, then the index
+    /// with a fixed wait, and a watchdog that ends the process if any step
+    /// hangs. Before 0.10.1 the UI thread wrote the index here itself, behind
+    /// every save that was queued, for as long as that took.
+    fn close(&self, why: Leaving) {
+        let budget = why.budget();
+        crate::leave::watchdog(budget.deadline, move || {
+            // The files being read now are not crashes (`content_cache`).
+            crate::content_cache::clear_markers_now();
+            startup::log(&format!("exit: not done after {} s ({why:?}); ending the process", budget.deadline.as_secs()));
+            // Hard: nothing here may wait for a thread that is stuck.
+            unsafe {
+                winapi::um::processthreadsapi::TerminateProcess(winapi::um::processthreadsapi::GetCurrentProcess(), 0);
+            }
+        });
+        // First what is small and must not be lost.
         self.save_settings();
+        self.remember_query();
+        self.stop_watching();
         self.cancel_content();
         self.stop_warm();
+        // `process::exit` and `TerminateProcess` follow; with the static C
+        // runtime the `atexit` handler that clears these does not run then.
+        crate::content_cache::clear_markers_now();
         if let Some(job) = &self.state.borrow().scan {
             job.progress.cancel.store(true, Ordering::Relaxed);
         }
@@ -602,35 +753,83 @@ impl App {
         self.webui_close();
         // Gone at once, not left on screen while the index is freed.
         self.destroy_floating();
+        // The index is written last, by the saving thread, with every window
+        // already off the screen; this thread only waits for it, and only
+        // for the budget's `save_wait`. A save not done by then (a huge
+        // index, a disk that is busy or stuck) is given up: `index.bin`
+        // stays as the last finished save wrote it, and the marker of
+        // unsaved changes makes the next start scan again.
+        self.window.set_visible(false);
+        let started = std::time::Instant::now();
+        let outcome = SAVES.flush_within(budget.save_wait);
+        if outcome != crate::index_save::Flush::Nothing {
+            startup::log(&format!("exit: last index save {outcome:?} after {} ms ({why:?})", started.elapsed().as_millis()));
+        }
         nwg::stop_thread_dispatch();
     }
 }
 
 pub fn run() {
+    // The language first, before anything writes to the data folder: a
+    // fresh start that saved settings.txt first (the new look's one-time
+    // switch in `build_ui`) looked like a copy from before English and came
+    // up in Arabic on English Windows.
+    let _ = crate::i18n::current();
     crate::search::init_local_utc_offset();
     let updated = std::env::args().any(|a| a == "--updated");
     let moved = std::env::args().any(|a| a == crate::relocate::MOVED_ARG);
-    if moved {
-        // Started from the new place by the copy that is now exiting.
-        for _ in 0..6 {
-            crate::update::wait_for_previous_instance_exit();
+    if moved || updated {
+        // Started by the copy that is now leaving: it goes first, ended if
+        // it does not (`handover`), and then this copy is the only one.
+        let prev = crate::handover::previous_pid(std::env::args(), std::process::id());
+        startup::end_previous_copy(prev);
+        crate::update::wait_for_previous_instance_exit();
+        if moved {
+            startup::log("start: relaunched from the permanent place");
+        } else {
+            startup::log(&format!("start: relaunched after updating to {}", env!("CARGO_PKG_VERSION")));
         }
-        startup::log("start: relaunched from the permanent place");
-    }
-    if updated {
-        // The previous version is still closing; let it go first. A big
-        // index can take a while to free, so wait up to a minute.
-        for _ in 0..6 {
-            crate::update::wait_for_previous_instance_exit();
-        }
-        startup::log(&format!("start: relaunched after updating to {}", env!("CARGO_PKG_VERSION")));
     }
     if activate_running_copy(updated || moved) {
         return;
     }
-    // Only the copy that keeps running tidies up after an update.
-    crate::update::cleanup_old();
-    autostart::apply_default();
+    // No other copy runs: a newer download takes the place of the installed
+    // copy it is newer than, and the program starts from there.
+    if !updated && !moved && older_copy::replace_installed_elsewhere() {
+        return;
+    }
+    // The new version is on trial until its first timer tick; a start that
+    // finds an unfinished trial puts the previous version back and starts it.
+    if crate::update::settle_trial(updated, &|l| startup::log(l)) {
+        return;
+    }
+    if let Some(d) = files::test_save_delay() {
+        startup::log(&format!("test hook: {} set; every index save waits {} ms", crate::index_save::TEST_SAVE_DELAY_VAR, d.as_millis()));
+    }
+    // An interrupted update that left only bahth.exe.old: it is put back.
+    // The leftovers of an update are deleted once this copy has shown that it
+    // runs (`on_tick`), never before.
+    if crate::update::restore_old_if_missing() {
+        startup::log("start: put bahth.exe.old back as bahth.exe (an update had been interrupted)");
+    }
+    // Temp files of index saves that never finished (a copy closed or
+    // killed in the middle), unless written to in the last two minutes.
+    let stale = crate::index::remove_stale_tmp(&crate::index::cache_path(), std::time::Duration::from_secs(120));
+    if stale > 0 {
+        startup::log(&format!("start: removed {stale} unfinished index save file(s)"));
+    }
+    if let Some(full) = crate::store::package_full_name() {
+        // Before the first WinRT call, so a failure there is placed.
+        startup::log(&format!("store: starting {full}"));
+    }
+    if crate::store::is_packaged() {
+        autostart::apply_store_default();
+    } else {
+        autostart::apply_default(updated || moved || older_copy::replaced_version().is_some());
+    }
+    if let Some(line) = crate::store::startup_log_line() {
+        startup::log(&line);
+    }
     phase("single-instance");
     unsafe {
         winapi::um::objbase::CoInitialize(std::ptr::null_mut());

@@ -7,29 +7,24 @@ use crate::index::Entry;
 /// Show numbers with Arabic-Indic digits.
 pub(super) static ARABIC_DIGITS: AtomicBool = AtomicBool::new(false);
 
-/// Keeps a path reading left-to-right even when folder names are Arabic:
-/// the whole path is a left-to-right isolate (LRI … PDI), so it neither
-/// reorders nor is reordered by the Arabic text around it («\» stays
-/// between the folders it separates), with left-to-right marks around every
-/// separator for renderers that ignore isolates. Display only: never pass
-/// the result to the shell or the clipboard.
+/// A path as shown in the interface: left to right even when folder names
+/// are Arabic and the text around it is right to left
+/// ([`crate::bidi_layout::ltr_path`]). Display only: never pass the result
+/// to the shell or the clipboard.
 pub(super) fn ltr_path(path: &str) -> String {
-    // In the left-to-right (English) window a path with no right-to-left
-    // letters already reads correctly.
-    if crate::i18n::is_en() && !path.chars().any(|c| matches!(c, '\u{0590}'..='\u{08FF}' | '\u{FB1D}'..='\u{FEFC}')) {
-        return path.to_owned();
-    }
-    let mut s = String::with_capacity(path.len() + 24);
-    s.push_str("\u{2066}\u{200E}");
-    for c in path.chars() {
-        if c == '\\' {
-            s.push_str("\u{200E}\\\u{200E}");
-        } else {
-            s.push(c);
-        }
-    }
-    s.push_str("\u{200E}\u{2069}");
-    s
+    crate::bidi_layout::ltr_path(path, !crate::i18n::is_rtl())
+}
+
+/// A file name, folder name or document text as shown in the interface:
+/// its phone numbers, dates and versions read in the order they were typed
+/// ([`crate::bidi_layout::ordered_digits`]). Display only, as `ltr_path`.
+pub(super) fn shown_digits(text: &str) -> String {
+    crate::bidi_layout::ordered_digits(text, ui_rtl())
+}
+
+/// The interface reads right to left (Arabic, Persian, Urdu…).
+pub(super) fn ui_rtl() -> bool {
+    crate::i18n::is_rtl()
 }
 
 /// Reads a NUL-terminated UTF-16 string.
@@ -49,8 +44,10 @@ pub(super) fn digits(s: String) -> String {
     if !ARABIC_DIGITS.load(Ordering::Relaxed) {
         return s;
     }
+    // Persian, Urdu and Pashto write the Extended Arabic-Indic forms (۰۱۲۳).
+    let zero = if matches!(crate::i18n::locale().code, "fa" | "ur" | "ps") { 0x06F0 } else { 0x0660 };
     s.chars()
-        .map(|c| if c.is_ascii_digit() { char::from_u32(c as u32 - '0' as u32 + 0x0660).unwrap_or(c) } else { c })
+        .map(|c| if c.is_ascii_digit() { char::from_u32(c as u32 - '0' as u32 + zero).unwrap_or(c) } else { c })
         .collect()
 }
 
@@ -162,26 +159,6 @@ mod tests {
             let guarded = s.starts_with(['=', '+', '-', '@', '\t', '\r']);
             assert_eq!(inner, if guarded { format!("'{s}") } else { s.clone() }, "{s:?} -> {c:?}");
         }
-    }
-
-    #[test]
-    fn display_paths_keep_their_text() {
-        for s in random_strings(0x1234_5678_9ABC_DEF1, 3000) {
-            let shown = ltr_path(&s);
-            if shown == s {
-                continue; // the English window, no right-to-left letters
-            }
-            // Only an LTR isolate around it and left-to-right marks are added.
-            let inner = shown.strip_prefix('\u{2066}').and_then(|t| t.strip_suffix('\u{2069}')).unwrap_or_else(|| panic!("{shown:?}"));
-            assert_eq!(inner.replace('\u{200E}', ""), s.replace('\u{200E}', ""), "{s:?}");
-        }
-    }
-
-    #[test]
-    fn display_paths_are_ltr_isolates() {
-        let shown = ltr_path("C:\\المستندات\\تقرير.pdf");
-        assert!(shown.starts_with('\u{2066}') && shown.ends_with('\u{2069}'), "{shown:?}");
-        assert_eq!(shown.matches("\u{200E}\\\u{200E}").count(), 2, "{shown:?}");
     }
 
     #[test]

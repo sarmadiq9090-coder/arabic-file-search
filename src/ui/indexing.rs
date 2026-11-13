@@ -1,6 +1,6 @@
-//! The indexing progress on the first day: «جارِ الفهرسة… 36,000 من 432,000
-//! ملف» in a part of its own at the end of the status bar and under the quick
-//! popup's results, read from the counters the running drive scan and
+//! The indexing progress on the first day («أسماء الملفات جاهزة · تُقرأ
+//! محتويات المستندات: 36,000 من 432,000») in a part of its own at the end of
+//! the status bar and under the quick popup's results, read from the counters the running drive scan and
 //! content warm-up already keep (no thread of its own). The texts are in
 //! `crate::indexing_status`.
 
@@ -42,9 +42,26 @@ impl App {
         indexing_status::content_search_text(crate::i18n::current(), self.indexing(), checked, total, &fmt_num)
     }
 
-    /// Whether the status bar has the progress part now.
-    pub(super) fn indexing_part_shown(&self) -> bool {
-        self.indexing_shown.borrow().is_some()
+    /// What the empty result list says, or `None` for nothing: a search
+    /// inside documents still reading with nothing found yet, or the very
+    /// first index being built (no index to search yet).
+    pub(super) fn empty_list_text(&self) -> Option<String> {
+        let lang = crate::i18n::current();
+        let st = self.state.borrow();
+        if !st.rows.is_empty() {
+            return None;
+        }
+        if let Some(job) = &st.content {
+            let p = &job.progress;
+            return Some(indexing_status::reading_text(lang, p.checked.load(Ordering::Relaxed), p.total.load(Ordering::Relaxed), &fmt_num));
+        }
+        (st.scan.is_some() && st.index.entries.is_empty()).then(|| indexing_status::first_scan_text(lang).to_string())
+    }
+
+    /// Whether the status bar has the progress part now, and whether it is
+    /// the wider one (`indexing_status::status_parts`).
+    pub(super) fn indexing_part(&self) -> Option<bool> {
+        self.indexing_shown.borrow().is_some().then(|| self.indexing_wide.get())
     }
 
     /// Called by the timer: about once a second, brings the status bar's
@@ -53,14 +70,20 @@ impl App {
         if !tick.is_multiple_of(5) {
             return;
         }
-        let text = indexing_status::progress_text(crate::i18n::current(), self.indexing(), &fmt_num);
+        let state = self.indexing();
+        let text = indexing_status::progress_text(crate::i18n::current(), state, &fmt_num);
         if *self.indexing_shown.borrow() == text {
             return;
         }
         let appeared_or_went = self.indexing_shown.replace(text.clone()).is_some() != text.is_some();
-        if appeared_or_went {
-            // Two status bar parts or three.
+        // The line about the documents' texts is longer than the scan's.
+        let wide = matches!(state, Indexing::Contents { .. });
+        let resized = self.indexing_wide.replace(wide) != wide;
+        if appeared_or_went || resized {
+            // Two status bar parts or three, and how wide the third is.
             self.layout();
+            // The empty list's sentence about the first index comes or goes.
+            self.list.invalidate();
         }
         if let Some(t) = &text {
             self.status.set_text(STATUS_PART, t);

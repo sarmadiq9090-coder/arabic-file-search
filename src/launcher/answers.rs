@@ -2,12 +2,13 @@
 //! and Gregorian dates.
 
 use super::{Action, Context, Item, Kind, calc, currency, hijri, units};
+use crate::i18n::Lang;
 
 /// Score of an instant answer: it is exactly what was asked, so it leads.
 pub const ANSWER_SCORE: u32 = 1000;
 
 fn copy_hint(english: bool) -> &'static str {
-    if english { "Press Enter to copy" } else { "اضغط Enter للنسخ" }
+    Lang::from_english(english).pick("اضغط Enter للنسخ", "Press Enter to copy")
 }
 
 fn item(title: String, subtitle: String, copy: String) -> Item {
@@ -21,10 +22,13 @@ pub const RATES_CREDIT: &str = "Rates By Exchange Rate API";
 pub const RATES_CREDIT_URL: &str = "https://www.exchangerate-api.com";
 
 /// The row under every currency answer: the attribution, opening the
-/// provider's site on Enter or click. The credit itself stays in English
-/// (it is their wording); the line under it is in the interface language.
+/// provider's site on a click. It is a source line, not a second answer:
+/// the arrow keys pass over it (`crate::quick::selectable`), so Enter always
+/// copies the amount. The credit itself stays in English (it is their
+/// wording); the line under it is in the interface language.
 pub fn rates_credit(english: bool) -> Item {
-    let subtitle = if english { "Exchange-rate source · Enter opens exchangerate-api.com" } else { "مصدر أسعار الصرف · Enter يفتح موقع exchangerate-api.com" };
+    let subtitle = Lang::from_english(english)
+        .pick("مصدر أسعار الصرف · انقر لفتح موقع exchangerate-api.com", "Exchange-rate source · click to open exchangerate-api.com");
     Item {
         kind: Kind::Answer,
         title: RATES_CREDIT.to_string(),
@@ -80,6 +84,8 @@ pub fn answer(query: &str, ctx: &Context) -> Option<Item> {
     }
     // After the units: "100 pounds" is a weight; "100 gbp" is money.
     if let Some((title, copy, note)) = currency::answer(q, ctx.english, &currency::current()) {
+        // "approximate rate · 2026-11-10 · Enter copies"
+        let hint = Lang::from_english(ctx.english).pick("Enter للنسخ", "Enter copies");
         return Some(item(title, format!("{note} · {hint}"), copy));
     }
     let v = calc::evaluate(q)?;
@@ -142,11 +148,11 @@ mod tests {
         let i = answer("100 usd to iqd", &ctx(true)).unwrap();
         assert_eq!(i.kind, Kind::Answer);
         assert!(i.title.starts_with("100 USD = ") && i.title.ends_with(" IQD"), "{}", i.title);
-        assert!(i.subtitle.ends_with("Press Enter to copy"), "{}", i.subtitle);
+        assert!(i.subtitle.starts_with("approximate ") && i.subtitle.ends_with(" · Enter copies"), "{}", i.subtitle);
         assert!(matches!(&i.action, Action::CopyText(t) if !t.contains(',') && t.parse::<f64>().is_ok()));
         let i = answer("١٠٠ دولار", &ctx(false)).unwrap();
         assert!(i.title.starts_with("١٠٠ دولار = ") && i.title.ends_with(" دينار عراقي"), "{}", i.title);
-        assert!(i.subtitle.contains("يورو") && i.subtitle.contains("سعر"), "{}", i.subtitle);
+        assert!(i.subtitle.contains("يورو") && i.subtitle.contains("سعر تقريبي") && i.subtitle.ends_with(" · Enter للنسخ"), "{}", i.subtitle);
         for q in ["50 يورو بالدينار", "100$ to iqd", "1000 iqd usd", "100 ريال سعودي", "100 ليرة تركية"] {
             assert!(answer(q, &ctx(false)).is_some(), "{q}");
         }

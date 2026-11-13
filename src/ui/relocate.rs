@@ -51,7 +51,8 @@ impl App {
     /// Once (the first time it applies), offers to move a copy that runs
     /// from Downloads or a temp folder to a permanent place.
     pub(super) fn offer_move(&self) {
-        if self.state.borrow().settings.move_asked {
+        // The Store installs and updates its copy itself (WindowsApps).
+        if crate::store::is_packaged() || self.state.borrow().settings.move_asked {
             return;
         }
         let Ok(exe) = std::env::current_exe() else { return };
@@ -114,13 +115,18 @@ impl App {
             log("move offer: could not point start-with-Windows at the new place");
         }
         log(&format!("move offer: copied to {}; restarting from there", target.display()));
-        match restart_from(&target) {
-            Ok(()) => {
-                // As after an update: save everything and leave at once, so
-                // the new copy gets the single-instance lock.
-                self.on_close();
-                std::process::exit(0);
+        let started = restart_from(&target).map_err(|e| e.to_string());
+        let failed = match started {
+            // Leaves when the copy in the new place runs; keeps running here
+            // otherwise (the original download is left where it is).
+            Ok(child) => {
+                self.hand_over(child, "move");
+                Err(tr!("لم تعمل النسخة الجديدة", "the new copy did not start").to_string())
             }
+            Err(e) => Err(e),
+        };
+        match failed {
+            Ok(()) => {}
             Err(e) => {
                 log(&format!("move offer: restart failed: {e}"));
                 self.move_message(
@@ -134,10 +140,10 @@ impl App {
         }
     }
 
-    /// A message box over the main window, right to left in Arabic; true
+    /// A message box over the main window, right to left in a right-to-left language; true
     /// when "Yes" was chosen.
     fn move_message(&self, text: &str, flags: u32) -> bool {
-        let flags = flags | if crate::i18n::is_en() { 0 } else { MB_RTLREADING | MB_RIGHT };
+        let flags = flags | if crate::i18n::is_rtl() { MB_RTLREADING | MB_RIGHT } else { 0 };
         let caption = tr!("نقل البرنامج إلى مكان دائم", "Move the program to a permanent place");
         let (t, c) = (shell::wide(text), shell::wide(caption));
         // Over the new main window when it is the one on screen.
@@ -171,17 +177,20 @@ fn copy_to(exe: &Path, dir: &Path) -> io::Result<PathBuf> {
     copied.map(|()| target)
 }
 
-/// Starts `exe` with [`relocate::MOVED_ARG`], detached from this process.
-fn restart_from(exe: &Path) -> io::Result<()> {
+/// Starts `exe` with [`relocate::MOVED_ARG`] and this process's id,
+/// detached from this process.
+fn restart_from(exe: &Path) -> io::Result<std::process::Child> {
     use std::os::windows::process::CommandExt;
     const DETACHED_PROCESS: u32 = 0x0000_0008;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
     let mut cmd = std::process::Command::new(exe);
-    cmd.arg(relocate::MOVED_ARG).creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+    cmd.arg(relocate::MOVED_ARG)
+        .arg(super::startup::this_copy_arg())
+        .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
     if let Some(dir) = exe.parent() {
         cmd.current_dir(dir);
     }
-    cmd.spawn().map(drop)
+    cmd.spawn()
 }
 
 /// Releases a COM interface when dropped.
@@ -196,9 +205,14 @@ impl<T> Drop for Com<T> {
     }
 }
 
-/// Writes the shortcut `lnk` to `target` (the Start menu lists it at once).
+/// Writes the shortcut `lnk` to `target` (the Start menu lists it at once),
+/// creating its folder first: a user's Start menu Programs folder may not
+/// exist yet, and `IPersistFile::Save` does not create it.
 /// COM is already initialised on the UI thread (`ui::run`).
 fn create_shortcut(target: &Path, lnk: &Path) -> Result<(), String> {
+    if let Some(dir) = lnk.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+    }
     use std::ptr::null_mut;
     use winapi::shared::minwindef::TRUE;
     use winapi::shared::winerror::{FAILED, HRESULT};

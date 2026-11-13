@@ -19,16 +19,122 @@ fn main() {
         let msvc = std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc");
         if msvc {
             println!("cargo:rustc-link-arg-bins=/STACK:8388608");
+            // The exe is one portable file, often started straight from
+            // Downloads. Without this, Windows looks for the DLLs it imports
+            // (version.dll, winhttp.dll, dbghelp.dll… all but the "known
+            // DLLs") in the exe's own folder first, so a DLL of that name
+            // planted beside it would run at every start. 0x800 is
+            // LOAD_LIBRARY_SEARCH_SYSTEM32: the loader (Windows 10 1607 and
+            // later) takes the imports from System32 only. The exe ships no
+            // DLL of its own (the WebView2 loader is linked statically), and
+            // comctl32 v6 still comes from the manifest. `main` does the same
+            // for libraries loaded at run time (SetDefaultDllDirectories), and
+            // ci/check_imports.py fails the build if the flag is missing.
+            // MSVC only: GNU ld (the local mingw builds) has no such option.
+            println!("cargo:rustc-link-arg-bins=/DEPENDENTLOADFLAG:0x800");
+            // Exploit mitigations, explicit so a linker default changing
+            // cannot drop them (ci/check_imports.py checks each in the PE
+            // header): ASLR (/DYNAMICBASE: the exe loads at a random
+            // address; it keeps its relocations for that, a few hundred KB),
+            // DEP (/NXCOMPAT: data pages never run as code; no cost) and,
+            // on 64-bit only (x64, ARM64; it means nothing for a 32-bit
+            // image), ASLR over the whole 64-bit address space
+            // (/HIGHENTROPYVA; no cost). All three are already link.exe's
+            // defaults, and ARM64 requires the first two.
+            println!("cargo:rustc-link-arg-bins=/DYNAMICBASE");
+            println!("cargo:rustc-link-arg-bins=/NXCOMPAT");
+            if std::env::var("CARGO_CFG_TARGET_POINTER_WIDTH").as_deref() == Ok("64") {
+                println!("cargo:rustc-link-arg-bins=/HIGHENTROPYVA");
+            }
         } else {
             println!("cargo:rustc-link-arg-bins=-Wl,--stack,8388608");
         }
 
-        // Application icon as resource id 1 (shown by Explorer, taskbar and shortcuts).
-        embed_resource::compile("assets/bahth.rc", embed_resource::NONE)
-            .manifest_required()
-            .expect("unable to embed icon resource");
+        // Application icon as resource id 1 (shown by Explorer, taskbar and
+        // shortcuts) and the version resource: Task Manager, the taskbar and
+        // Explorer's Details tab show its FileDescription, "InstaFind",
+        // instead of the file name "bahth". The exe keeps its name
+        // (`bahth.exe`: every installed copy's updater looks for it).
+        let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR"));
+        let rc = out.join("bahth.rc");
+        let dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
+        let version = std::env::var("CARGO_PKG_VERSION").expect("CARGO_PKG_VERSION");
+        std::fs::write(&rc, resource_script(&dir, &version)).expect("unable to write the resource script");
+        embed_resource::compile(&rc, embed_resource::NONE).manifest_required().expect("unable to embed the resources");
     }
+    embed_languages();
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=assets/bahth.rc");
     println!("cargo:rerun-if-changed=assets/bahth.ico");
+}
+
+/// `OUT_DIR/i18n_files.rs`: every language file `i18n/<code>.json`
+/// (`source.json`, the list of English texts, is not one) as
+/// `("<code>", include_str!("…"))`, for `src/i18n.rs`. A language is
+/// offered only when its file is here.
+fn embed_languages() {
+    let dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR")).join("i18n");
+    println!("cargo:rerun-if-changed={}", dir.display());
+    let mut files: Vec<(String, std::path::PathBuf)> = std::fs::read_dir(&dir)
+        .map(|rd| {
+            rd.filter_map(Result::ok)
+                .filter_map(|e| {
+                    let path = e.path();
+                    let code = path.file_name()?.to_str()?.strip_suffix(".json")?.to_string();
+                    let ok = code != "source" && !code.is_empty() && code.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-');
+                    ok.then_some((code, path))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    files.sort();
+    let mut rs = String::from("&[\n");
+    for (code, path) in &files {
+        println!("cargo:rerun-if-changed={}", path.display());
+        rs.push_str(&format!("    ({code:?}, include_str!({:?})),\n", path.display().to_string()));
+    }
+    rs.push(']');
+    let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR"));
+    std::fs::write(out.join("i18n_files.rs"), rs).expect("unable to write i18n_files.rs");
+}
+
+/// The resource script: the icon (id 1) and a version resource for
+/// `version` ("0.10.1" gives 0,10,1,0). Plain ASCII, so rc.exe and windres
+/// read it the same way.
+fn resource_script(manifest_dir: &str, version: &str) -> String {
+    let mut parts = version.split(|c: char| !c.is_ascii_digit()).filter(|p| !p.is_empty()).map(|p| p.parse::<u16>().unwrap_or(0));
+    let (major, minor, patch) = (parts.next().unwrap_or(0), parts.next().unwrap_or(0), parts.next().unwrap_or(0));
+    let icon = format!("{manifest_dir}/assets/bahth.ico").replace('\\', "/");
+    format!(
+        r#"1 ICON "{icon}"
+
+1 VERSIONINFO
+FILEVERSION {major},{minor},{patch},0
+PRODUCTVERSION {major},{minor},{patch},0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0x0L
+FILEOS 0x40004L
+FILETYPE 0x1L
+FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "FastKiwi"
+            VALUE "FileDescription", "InstaFind"
+            VALUE "FileVersion", "{version}"
+            VALUE "InternalName", "bahth"
+            VALUE "LegalCopyright", "Copyright (c) 2026 Sarmad. All rights reserved."
+            VALUE "OriginalFilename", "bahth.exe"
+            VALUE "ProductName", "InstaFind"
+            VALUE "ProductVersion", "{version}"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+"#
+    )
 }

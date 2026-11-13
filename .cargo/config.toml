@@ -4,14 +4,23 @@
 # without the Visual C++ Redistributable (no VCRUNTIME140*.dll, MSVCP*.dll or
 # api-ms-win-crt-*.dll imports). CI checks every exe's imports with
 # ci/check_imports.py.
+#
+# Control Flow Guard (-C control-flow-guard; rustc then links with
+# /guard:cf): every indirect call in the program's own code is checked
+# against the table of valid call targets, so an overwritten function
+# pointer cannot jump into the middle of code. Costs a check per indirect
+# call (typically ~1% CPU) and a few tens of KB for the table. The
+# precompiled Rust standard library is not instrumented (it would need
+# build-std), but mixing is supported; ci/check_imports.py checks the
+# GUARD_CF flag in each published exe.
 [target.x86_64-pc-windows-msvc]
-rustflags = ["-C", "target-feature=+crt-static"]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "control-flow-guard"]
 
 [target.i686-pc-windows-msvc]
-rustflags = ["-C", "target-feature=+crt-static"]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "control-flow-guard"]
 
 [target.aarch64-pc-windows-msvc]
-rustflags = ["-C", "target-feature=+crt-static"]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "control-flow-guard"]
 
 # mingw cross-builds from Linux, for local checks only (nothing published is
 # built this way any more; the screenshot workflows media.yml and

@@ -3,6 +3,7 @@
 use std::sync::OnceLock;
 
 use super::windows::{exe_stem, program_match};
+use crate::i18n::Lang;
 use super::{Action, Context, Item, Kind, SystemCommand};
 
 /// Words for each command, as typed (normalised before matching).
@@ -37,8 +38,35 @@ const END_VERBS: &[&str] = &["إنهاء", "انهاء", "اغلاق", "إغلا
 const COMPUTER_WORDS: &[&str] = &["الجهاز", "الكمبيوتر", "الحاسوب", "الحاسب", "computer", "pc"];
 
 /// Processes Windows needs; ending them would crash or log off the session.
-pub const CRITICAL: &[&str] =
-    &["csrss", "wininit", "winlogon", "lsass", "smss", "services", "system", "registry", "svchost", "dwm", "fontdrvhost"];
+/// ApplicationFrameHost draws the frame of every Microsoft Store app: ending
+/// it closes all of them at once.
+pub const CRITICAL: &[&str] = &[
+    "csrss", "wininit", "winlogon", "lsass", "smss", "services", "system", "registry", "svchost", "dwm", "fontdrvhost",
+    "applicationframehost",
+];
+
+/// The host of Store apps' frames ([`CRITICAL`]). A Store app's window
+/// belongs to it when the app's own process could not be found (a minimized
+/// Store app has no content window inside its frame).
+const FRAME_HOST: &str = "applicationframehost";
+
+/// Why `cmd` must not run, as the message shown instead of the question:
+/// "end" on a Store app whose own process is unknown would end the host of
+/// every Store app's window.
+pub fn refusal(cmd: &SystemCommand, english: bool) -> Option<String> {
+    let SystemCommand::EndProcess { name, .. } = cmd else { return None };
+    if exe_stem(name) != FRAME_HOST {
+        return None;
+    }
+    Some(
+        Lang::from_english(english)
+            .pick(
+                "هذا تطبيق من متجر Microsoft لا يمكن معرفة برنامجه وهو مصغّر، وإنهاء إطاره يغلق كل تطبيقات المتجر معاً. أعد نافذته إلى الشاشة ثم جرّب مرة أخرى، أو أغلقه من نافذته.",
+                "This is a Microsoft Store app whose own program can't be found while its window is minimized, and ending its frame would close every Store app. Restore its window and try again, or close it from its own window.",
+            )
+            .to_string(),
+    )
+}
 
 /// [`COMMANDS`] with the words normalised once.
 fn command_words() -> &'static [(SystemCommand, Vec<String>)] {
@@ -98,53 +126,61 @@ fn word_match(q: &str, word: &str) -> u32 {
 }
 
 fn title(cmd: &SystemCommand, english: bool) -> String {
-    match (cmd, english) {
-        (SystemCommand::Shutdown, false) => "إيقاف تشغيل الجهاز".into(),
-        (SystemCommand::Shutdown, true) => "Shut down".into(),
-        (SystemCommand::Restart, false) => "إعادة تشغيل الجهاز".into(),
-        (SystemCommand::Restart, true) => "Restart".into(),
-        (SystemCommand::Sleep, false) => "السكون".into(),
-        (SystemCommand::Sleep, true) => "Sleep".into(),
-        (SystemCommand::Lock, false) => "قفل الجهاز".into(),
-        (SystemCommand::Lock, true) => "Lock".into(),
-        (SystemCommand::SignOut, false) => "تسجيل الخروج".into(),
-        (SystemCommand::SignOut, true) => "Sign out".into(),
-        (SystemCommand::EmptyRecycleBin, false) => "إفراغ سلة المحذوفات".into(),
-        (SystemCommand::EmptyRecycleBin, true) => "Empty Recycle Bin".into(),
-        (SystemCommand::EndProcess { name, .. }, false) => format!("إنهاء {name}"),
-        (SystemCommand::EndProcess { name, .. }, true) => format!("End {name}"),
+    let lang = Lang::from_english(english);
+    match cmd {
+        SystemCommand::Shutdown => lang.pick("إيقاف تشغيل الجهاز", "Shut down").into(),
+        SystemCommand::Restart => lang.pick("إعادة تشغيل الجهاز", "Restart").into(),
+        SystemCommand::Sleep => lang.pick("السكون", "Sleep").into(),
+        SystemCommand::Lock => lang.pick("قفل الجهاز", "Lock").into(),
+        SystemCommand::SignOut => lang.pick("تسجيل الخروج", "Sign out").into(),
+        SystemCommand::EmptyRecycleBin => lang.pick("إفراغ سلة المحذوفات", "Empty Recycle Bin").into(),
+        SystemCommand::EndProcess { name, .. } => end_title(name, english),
     }
+}
+
+/// "End <name>": the title of ending a program.
+fn end_title(name: &str, english: bool) -> String {
+    trf!(in Lang::from_english(english); "إنهاء {name}", "End {name}")
 }
 
 /// The question the UI shows before running `cmd`.
 pub fn confirm_text(cmd: &SystemCommand, english: bool) -> String {
-    match (cmd, english) {
-        (SystemCommand::Shutdown, false) => "هل تريد إيقاف تشغيل الجهاز الآن؟".into(),
-        (SystemCommand::Shutdown, true) => "Shut down the computer now?".into(),
-        (SystemCommand::Restart, false) => "هل تريد إعادة تشغيل الجهاز الآن؟".into(),
-        (SystemCommand::Restart, true) => "Restart the computer now?".into(),
-        (SystemCommand::Sleep, false) => "هل تريد وضع الجهاز في وضع السكون الآن؟".into(),
-        (SystemCommand::Sleep, true) => "Put the computer to sleep now?".into(),
-        (SystemCommand::Lock, false) => "هل تريد قفل الجهاز الآن؟".into(),
-        (SystemCommand::Lock, true) => "Lock the computer now?".into(),
-        (SystemCommand::SignOut, false) => "هل تريد تسجيل الخروج الآن؟ ستُغلق البرامج المفتوحة.".into(),
-        (SystemCommand::SignOut, true) => "Sign out now? Open programs will be closed.".into(),
-        (SystemCommand::EmptyRecycleBin, false) => "هل تريد إفراغ سلة المحذوفات؟ لا يمكن التراجع عن ذلك.".into(),
-        (SystemCommand::EmptyRecycleBin, true) => "Empty the Recycle Bin? This cannot be undone.".into(),
-        (SystemCommand::EndProcess { name, .. }, english) => {
-            let explorer = exe_stem(name) == "explorer";
-            match (english, explorer) {
-                (false, false) => format!("هل تريد إنهاء {name}؟ قد يضيع العمل غير المحفوظ."),
-                (true, false) => format!("End {name}? Unsaved work may be lost."),
-                (false, true) => format!(
-                    "هل تريد إنهاء {name}؟ سيختفي شريط المهام وسطح المكتب وتُغلق نوافذ المجلدات حتى يُعاد تشغيله."
-                ),
-                (true, true) => {
-                    format!("End {name}? The taskbar, desktop and folder windows disappear until it is restarted.")
-                }
+    let lang = Lang::from_english(english);
+    match cmd {
+        SystemCommand::Shutdown => lang.pick("هل تريد إيقاف تشغيل الجهاز الآن؟", "Shut down the computer now?").into(),
+        SystemCommand::Restart => lang.pick("هل تريد إعادة تشغيل الجهاز الآن؟", "Restart the computer now?").into(),
+        SystemCommand::Sleep => lang.pick("هل تريد وضع الجهاز في وضع السكون الآن؟", "Put the computer to sleep now?").into(),
+        SystemCommand::Lock => lang.pick("هل تريد قفل الجهاز الآن؟", "Lock the computer now?").into(),
+        SystemCommand::SignOut => {
+            lang.pick("هل تريد تسجيل الخروج الآن؟ ستُغلق البرامج المفتوحة.", "Sign out now? Open programs will be closed.").into()
+        }
+        SystemCommand::EmptyRecycleBin => {
+            lang.pick("هل تريد إفراغ سلة المحذوفات؟ لا يمكن التراجع عن ذلك.", "Empty the Recycle Bin? This cannot be undone.").into()
+        }
+        SystemCommand::EndProcess { name, .. } => {
+            if exe_stem(name) == "explorer" {
+                trf!(
+                    in lang;
+                    "هل تريد إنهاء {name}؟ سيختفي شريط المهام وسطح المكتب وتُغلق نوافذ المجلدات حتى يُعاد تشغيله.",
+                    "End {name}? The taskbar, desktop and folder windows disappear until it is restarted."
+                )
+            } else {
+                trf!(in lang; "هل تريد إنهاء {name}؟ قد يضيع العمل غير المحفوظ.", "End {name}? Unsaved work may be lost.")
             }
         }
     }
+}
+
+/// Whether `cmd` runs on a background thread: emptying a large Recycle Bin
+/// takes seconds to minutes, and the window must keep answering meanwhile.
+/// The others return at once (or end the session).
+pub fn runs_in_background(cmd: &SystemCommand) -> bool {
+    matches!(cmd, SystemCommand::EmptyRecycleBin)
+}
+
+/// The message when `cmd` failed.
+pub fn failed_text(cmd: &SystemCommand, english: bool) -> String {
+    trf!(in Lang::from_english(english); "تعذر تنفيذ: {}.", "Could not do this: {}.", title(cmd, english))
 }
 
 fn item(cmd: SystemCommand, subtitle: String, score: u32, english: bool) -> Item {
@@ -172,7 +208,7 @@ pub fn commands(query: &str, ctx: &Context) -> Vec<Item> {
     }
     let en = ctx.english;
     let mut out = Vec::new();
-    let sub = if en { "System command · asks to confirm" } else { "أمر نظام · يُطلب التأكيد قبل التنفيذ" };
+    let sub = Lang::from_english(en).pick("أمر نظام · يُطلب التأكيد قبل التنفيذ", "System command · asks to confirm");
     for (cmd, words) in command_words() {
         let best = words.iter().map(|w| word_match(&q, w)).max().unwrap_or(0);
         if best > 0 {
@@ -186,10 +222,14 @@ pub fn commands(query: &str, ctx: &Context) -> Vec<Item> {
             if w.pid == own || w.pid == 0 || seen.contains(&w.pid) {
                 continue;
             }
-            if CRITICAL.contains(&exe_stem(&w.exe).as_str()) {
+            let stem = exe_stem(&w.exe);
+            // A Store app whose own process is unknown: offered by its title,
+            // and refused with an explanation (`refusal`) when chosen.
+            let frame = stem == FRAME_HOST;
+            if CRITICAL.contains(&stem.as_str()) && !frame {
                 continue;
             }
-            let p = program_match(target, &w.exe);
+            let p = if frame { 0 } else { program_match(target, &w.exe) };
             let t = norm(&w.title).contains(target);
             if p == 0 && !t {
                 continue;
@@ -198,7 +238,11 @@ pub fn commands(query: &str, ctx: &Context) -> Vec<Item> {
             let name = if w.exe.is_empty() { w.title.clone() } else { w.exe.clone() };
             let cmd = SystemCommand::EndProcess { pid: w.pid, name };
             let score = if p >= 2 { 600 } else { 450 };
-            out.push(item(cmd, w.title.trim().to_string(), score, en));
+            let mut it = item(cmd, w.title.trim().to_string(), score, en);
+            if frame {
+                it.title = end_title(w.title.trim(), en);
+            }
+            out.push(it);
         }
     }
     out
@@ -363,6 +407,21 @@ mod tests {
     use super::super::windows::OpenWindow;
     use super::*;
 
+    #[test]
+    fn texts_follow_the_language() {
+        let end = |name: &str| SystemCommand::EndProcess { pid: 5, name: name.into() };
+        assert_eq!(confirm_text(&SystemCommand::Shutdown, true), "Shut down the computer now?");
+        assert_eq!(confirm_text(&SystemCommand::Lock, false), "هل تريد قفل الجهاز الآن؟");
+        assert_eq!(
+            confirm_text(&end("Explorer.exe"), true),
+            "End Explorer.exe? The taskbar, desktop and folder windows disappear until it is restarted."
+        );
+        assert_eq!(confirm_text(&end("a.exe"), false), "هل تريد إنهاء a.exe؟ قد يضيع العمل غير المحفوظ.");
+        assert_eq!(failed_text(&SystemCommand::Restart, true), "Could not do this: Restart.");
+        assert_eq!(failed_text(&end("a.exe"), false), "تعذر تنفيذ: إنهاء a.exe.");
+        assert_eq!(title(&SystemCommand::EmptyRecycleBin, true), "Empty Recycle Bin");
+    }
+
     fn ctx_with<'a>(english: bool, windows: &'a [OpenWindow]) -> Context<'a> {
         static NO_LAUNCHES: fn(&str) -> u32 = |_| 0;
         Context { english, windows_build: 0, windows, launches: &NO_LAUNCHES, picked: &NO_LAUNCHES, today: (2026, 11, 1) }
@@ -469,6 +528,39 @@ mod tests {
         assert_eq!(items[0].kind, Kind::Command);
     }
 
+    /// A minimized Store app: its frame belongs to ApplicationFrameHost and
+    /// its own process is unknown. It is offered by its title but refused,
+    /// never ending the host of every Store app; a restored one (its own exe
+    /// found) is ended as usual.
+    #[test]
+    fn store_app_frames_are_never_ended() {
+        let wins = vec![
+            OpenWindow { hwnd: 1, title: "Calculator".into(), exe: "ApplicationFrameHost.exe".into(), pid: 90 },
+            OpenWindow { hwnd: 2, title: "Photos".into(), exe: "ApplicationFrameHost.exe".into(), pid: 90 },
+            OpenWindow { hwnd: 3, title: "Microsoft Store".into(), exe: "WinStore.App.exe".into(), pid: 91 },
+        ];
+        let items = |q: &str, en: bool| commands(q, &ctx_with(en, &wins));
+        let calc = items("end calculator", true);
+        assert_eq!(calc.len(), 1);
+        assert_eq!(calc[0].title, "End Calculator");
+        let Action::System(cmd) = &calc[0].action else { panic!("{:?}", calc[0].action) };
+        assert!(refusal(cmd, true).is_some_and(|m| m.contains("Store app")));
+        assert!(refusal(cmd, false).is_some_and(|m| m.contains("المتجر")));
+        assert_eq!(items("انهاء calculator", false)[0].title, "إنهاء Calculator");
+        // Not by the host's own name.
+        assert!(items("kill applicationframehost", true).is_empty());
+        assert!(items("end frame", true).is_empty());
+        // The app's own process: ended as usual, no refusal.
+        let store = items("end store", true);
+        assert_eq!(store.len(), 1);
+        let Action::System(cmd) = &store[0].action else { panic!() };
+        assert_eq!(*cmd, EndProcess { pid: 91, name: "WinStore.App.exe".into() });
+        assert!(refusal(cmd, true).is_none());
+        assert!(refusal(&Shutdown, true).is_none());
+        assert!(refusal(&EndProcess { pid: 5, name: "chrome.exe".into() }, false).is_none());
+        assert!(CRITICAL.contains(&"applicationframehost"));
+    }
+
     #[test]
     fn titles_and_confirmations() {
         let i = commands("shutdown", &ctx_with(true, &[])).remove(0);
@@ -486,6 +578,16 @@ mod tests {
         assert!(confirm_text(&ex, true).contains("taskbar"));
         assert!(confirm_text(&ex, false).contains("شريط المهام"));
         assert!(commands("shutdown", &ctx_with(false, &[]))[0].score > commands("shut", &ctx_with(false, &[]))[0].score);
+    }
+
+    #[test]
+    fn only_slow_commands_leave_the_ui_thread() {
+        assert!(runs_in_background(&EmptyRecycleBin));
+        for c in [Shutdown, Restart, Sleep, Lock, SignOut, EndProcess { pid: 1, name: "a.exe".into() }] {
+            assert!(!runs_in_background(&c), "{c:?}");
+        }
+        assert_eq!(failed_text(&EmptyRecycleBin, true), "Could not do this: Empty Recycle Bin.");
+        assert_eq!(failed_text(&EmptyRecycleBin, false), "تعذر تنفيذ: إفراغ سلة المحذوفات.");
     }
 
     #[test]

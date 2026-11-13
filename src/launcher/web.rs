@@ -1,6 +1,7 @@
 //! Web shortcuts: "يوتيوب قرآن" searches YouTube, plus a "search the web" fallback.
 
 use super::{Action, Context, Item, Kind};
+use crate::i18n::Lang;
 
 /// Score of a site shortcut: the user named the site, so it leads.
 pub const SHORTCUT_SCORE: u32 = 900;
@@ -54,23 +55,16 @@ const PREFIXES: &[(&str, Site)] = &[
 ];
 
 fn site_name(site: Site, english: bool) -> &'static str {
-    match (site, english) {
-        (Site::YouTube, false) => "يوتيوب",
-        (Site::YouTube, true) => "YouTube",
-        (Site::Google, false) => "جوجل",
-        (Site::Google, true) => "Google",
-        (Site::Wikipedia, false) => "ويكيبيديا",
-        (Site::Wikipedia, true) => "Wikipedia",
-        (Site::Maps, false) => "خرائط جوجل",
-        (Site::Maps, true) => "Google Maps",
-        (Site::Translate, false) => "ترجمة جوجل",
-        (Site::Translate, true) => "Google Translate",
-        (Site::Images, false) => "صور جوجل",
-        (Site::Images, true) => "Google Images",
-        (Site::Amazon, false) => "أمازون",
-        (Site::Amazon, true) => "Amazon",
-        (Site::X, false) => "X (تويتر)",
-        (Site::X, true) => "X (Twitter)",
+    let lang = Lang::from_english(english);
+    match site {
+        Site::YouTube => lang.pick("يوتيوب", "YouTube"),
+        Site::Google => lang.pick("جوجل", "Google"),
+        Site::Wikipedia => lang.pick("ويكيبيديا", "Wikipedia"),
+        Site::Maps => lang.pick("خرائط جوجل", "Google Maps"),
+        Site::Translate => lang.pick("ترجمة جوجل", "Google Translate"),
+        Site::Images => lang.pick("صور جوجل", "Google Images"),
+        Site::Amazon => lang.pick("أمازون", "Amazon"),
+        Site::X => lang.pick("X (تويتر)", "X (Twitter)"),
     }
 }
 
@@ -158,13 +152,11 @@ pub fn shortcuts(query: &str, ctx: &Context, fallback: bool) -> Vec<Item> {
     let en = ctx.english;
     if let Some((site, terms)) = shortcut(&q) {
         let name = site_name(site, en);
-        let title = match (site, en) {
-            (Site::Translate, false) => format!("ترجم «{terms}»"),
-            (Site::Translate, true) => format!("Translate “{terms}”"),
-            (Site::Maps, false) => format!("ابحث في الخرائط عن «{terms}»"),
-            (Site::Maps, true) => format!("Search Google Maps for “{terms}”"),
-            (_, false) => format!("ابحث في {name} عن «{terms}»"),
-            (_, true) => format!("Search {name} for “{terms}”"),
+        let lang = Lang::from_english(en);
+        let title = match site {
+            Site::Translate => trf!(in lang; "ترجم «{terms}»", "Translate “{terms}”"),
+            Site::Maps => trf!(in lang; "ابحث في الخرائط عن «{terms}»", "Search Google Maps for “{terms}”"),
+            _ => trf!(in lang; "ابحث في {name} عن «{terms}»", "Search {name} for “{terms}”"),
         };
         return vec![web_item(title, url(site, &terms), SHORTCUT_SCORE)];
     }
@@ -173,7 +165,7 @@ pub fn shortcuts(query: &str, ctx: &Context, fallback: bool) -> Vec<Item> {
     let bare_prefix = PREFIXES.iter().any(|(p, _)| crate::normalize::normalize(p) == key);
     if fallback && !bare_prefix {
         let terms = q.split_whitespace().collect::<Vec<_>>().join(" ");
-        let title = if en { format!("Search the web for “{terms}”") } else { format!("ابحث في الويب عن «{terms}»") };
+        let title = trf!(in Lang::from_english(en); "ابحث في الويب عن «{terms}»", "Search the web for “{terms}”");
         return vec![web_item(title, url(Site::Google, &terms), FALLBACK_SCORE)];
     }
     Vec::new()

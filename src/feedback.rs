@@ -114,15 +114,69 @@ pub fn search_issue_url(info: &SystemInfo, query: &str, english: bool) -> String
     url
 }
 
+/// Options ▸ "Report a problem…" (`crate::report`): a new issue with the
+/// user's words in "what happened" and the report in "diagnostics", cut to
+/// keep the address within limits. True when it was cut: the window then
+/// puts the whole report on the clipboard, which the note asks to paste.
+pub fn report_issue_url(info: &SystemInfo, what: &str, details: &str) -> (String, bool) {
+    const CUT: &str = "\n… (shortened: the full report is on your clipboard; paste it here)";
+    let mut url = issue_url(Kind::Bug, info, None);
+    let what: String = what.chars().take(crate::report::MAX_WHAT).collect();
+    if !what.is_empty() {
+        let _ = write!(url, "&what={}", crate::web::percent_encode(&what));
+    }
+    let budget = MAX_URL.saturating_sub(url.len() + "&diagnostics=".len());
+    let text = fit_encoded_with(details, budget, CUT);
+    let cut = text != details;
+    let _ = write!(url, "&diagnostics={}", crate::web::percent_encode(&text));
+    (url, cut)
+}
+
+/// Mail programs and `ShellExecute` take a `mailto:` link of about 2,000
+/// characters at most (Arabic letters take 6 each once encoded), so the mail
+/// carries the user's words in short and the full report goes on the clipboard.
+const MAX_MAILTO: usize = 1800;
+
+/// Options ▸ "Report a problem…" ▸ "Send by email": a new mail to
+/// [`SUPPORT_EMAIL`] in the user's own mail program, with a short subject
+/// and the user's words (cut to fit), the version and Windows version, and a
+/// line asking to paste the full report, which the window has put on the
+/// clipboard. The mail program opens; nothing is sent until the user does.
+pub fn report_mailto(info: &SystemInfo, what: &str, english: bool) -> String {
+    let subject = if english {
+        format!("InstaFind {}: problem report", info.version)
+    } else {
+        format!("InstaFind {}: إبلاغ عن مشكلة", info.version)
+    };
+    let paste = if english {
+        "The full report is on the clipboard: paste it below (Ctrl+V)."
+    } else {
+        "التقرير الكامل منسوخ: الصقه هنا (Ctrl+V)."
+    };
+    let tail = format!("\n\nInstaFind {}, {}, {}\n\n{paste}\n\n", info.version, info.os, info.arch);
+    let enc = |s: &str| crate::web::percent_encode(&s.replace('\n', "\r\n"));
+    let mut url = format!("mailto:{SUPPORT_EMAIL}?subject={}&body=", enc(&subject));
+    let what: String = what.trim().chars().take(crate::report::MAX_WHAT).collect();
+    // (Line breaks are counted as two bytes more each: they go out as CRLF.)
+    let budget = MAX_MAILTO.saturating_sub(url.len() + enc(&tail).len() + 3 * what.matches('\n').count());
+    let what = fit_encoded_with(&what, budget, "…");
+    url.push_str(&enc(&format!("{what}{tail}")));
+    url
+}
+
 /// The longest start of `text` (whole lines where possible) whose
 /// percent-encoding fits in `budget` bytes, with a note when cut.
 fn fit_encoded(text: &str, budget: usize) -> String {
-    const CUT: &str = "\n… (shortened; the full report is in %LOCALAPPDATA%\\BahthSari\\crash.txt)";
+    fit_encoded_with(text, budget, "\n… (shortened; the full report is in %LOCALAPPDATA%\\BahthSari\\crash.txt)")
+}
+
+/// [`fit_encoded`] with `cut` as the note.
+fn fit_encoded_with(text: &str, budget: usize, cut: &str) -> String {
     let enc = |s: &str| crate::web::percent_encode(s).len();
     if enc(text) <= budget {
         return text.to_string();
     }
-    let budget = budget.saturating_sub(enc(CUT));
+    let budget = budget.saturating_sub(enc(cut));
     let mut out = String::new();
     let mut used = 0;
     for line in text.split_inclusive('\n') {
@@ -145,31 +199,85 @@ fn fit_encoded(text: &str, budget: usize) -> String {
         out.push_str(line);
     }
     out.truncate(out.trim_end().len());
-    out.push_str(CUT);
+    out.push_str(cut);
     out
 }
 
-/// Replaces the account name in `C:\Users\<name>\…` paths, which a panic
-/// message may contain, so a public issue does not show it.
+/// Replaces the account name in profile paths, which a panic message may
+/// contain, so a public issue does not show it: see [`anonymize_with`], with
+/// the names this account is known by (`USERNAME`, `USER` and the profile
+/// folder's own name).
 pub fn anonymize(text: &str) -> String {
+    let names: Vec<String> = ["USERNAME", "USER"]
+        .iter()
+        .filter_map(|v| std::env::var(v).ok())
+        .chain(["USERPROFILE", "HOME"].iter().filter_map(|v| {
+            let p = std::env::var(v).ok()?;
+            Some(p.trim_end_matches(['\\', '/']).rsplit(['\\', '/']).next()?.to_string())
+        }))
+        .collect();
+    let names: Vec<&str> = names.iter().map(String::as_str).collect();
+    anonymize_with(text, &names)
+}
+
+/// Characters a Windows account name can't hold: the end of a profile
+/// folder's name in a path, with the line breaks.
+const NOT_IN_NAME: [char; 18] = ['\\', '/', '"', '[', ']', ':', ';', '|', '=', ',', '+', '*', '?', '<', '>', '\n', '\r', '\t'];
+
+/// Replaces with `<user>` the whole folder name after `\Users\` and
+/// `\Documents and Settings\` (either slash, any case, also in UNC paths
+/// such as `\\server\Users\…`) up to the next character an account name
+/// can't hold, so `C:\Users\First Last\…` hides both words; then each of
+/// `names` (three characters or more) wherever it stands as a whole word.
+pub fn anonymize_with(text: &str, names: &[&str]) -> String {
+    const KEEP: [&str; 4] = ["public", "default", "default user", "all users"];
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     loop {
         let lower = rest.to_ascii_lowercase();
-        let found = ["\\users\\", "/users/"].iter().filter_map(|p| lower.find(p).map(|i| (i, p.len()))).min();
+        let found = ["\\users\\", "/users/", "\\documents and settings\\", "/documents and settings/"]
+            .iter()
+            .filter_map(|p| lower.find(p).map(|i| (i, p.len())))
+            .min();
         let Some((at, len)) = found else {
             out.push_str(rest);
-            return out;
+            break;
         };
         let start = at + len;
         out.push_str(&rest[..start]);
         let tail = &rest[start..];
-        let end = tail.find(['\\', '/', '\'', '"', ' ', '\n', '\r', ')', ':']).unwrap_or(tail.len());
+        let end = tail.find(NOT_IN_NAME).unwrap_or(tail.len());
         let name = &tail[..end];
-        let keep = ["public", "default", "all users"].iter().any(|k| name.eq_ignore_ascii_case(k)) || name.is_empty();
+        let keep = name.is_empty() || KEEP.iter().any(|k| name.eq_ignore_ascii_case(k));
         out.push_str(if keep { name } else { "<user>" });
         rest = &tail[end..];
     }
+    for name in names.iter().map(|n| n.trim()) {
+        if name.chars().count() >= 3 && !KEEP.iter().any(|k| name.eq_ignore_ascii_case(k)) && name != "<user>" {
+            out = replace_word(&out, name);
+        }
+    }
+    out
+}
+
+/// `text` with every whole-word `name` (ASCII letters in any case) replaced
+/// by `<user>`.
+fn replace_word(text: &str, name: &str) -> String {
+    let word = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0;
+    while i < text.len() {
+        let hit = text.get(i..i + name.len()).filter(|s| s.eq_ignore_ascii_case(name));
+        if hit.is_some() && !word(text[..i].chars().next_back()) && !word(text[i + name.len()..].chars().next()) {
+            out.push_str("<user>");
+            i += name.len();
+        } else {
+            let c = text[i..].chars().next().unwrap_or_default();
+            out.push(c);
+            i += c.len_utf8().max(1);
+        }
+    }
+    out
 }
 
 /// One report in `crash.txt`: when it was written and its text.
@@ -356,12 +464,82 @@ mod tests {
     }
 
     #[test]
+    fn report_mail_is_short_and_asks_to_paste() {
+        let url = report_mailto(&info(), "البحث لا يجد ملفاتي\nعلى القرص D", false);
+        let (to, q) = url.split_once('?').unwrap();
+        assert_eq!(to, "mailto:support@fastkiwi.app");
+        let q = crate::web::parse_form(q);
+        assert_eq!(q[0], ("subject".into(), "InstaFind 0.7.0: إبلاغ عن مشكلة".into()));
+        let body = &q.iter().find(|(k, _)| k == "body").unwrap().1;
+        assert!(body.starts_with("البحث لا يجد ملفاتي\r\nعلى القرص D\r\n\r\nInstaFind 0.7.0, Windows 11"), "{body}");
+        assert!(body.contains("الصقه هنا (Ctrl+V)"));
+        // Spaces as %20 (a mail program would show "+" as is), never a raw space or "&".
+        assert!(!url.contains(' ') && !url.contains('+') && url.matches('&').count() == 1, "{url}");
+        let en = report_mailto(&info(), "", true);
+        assert!(en.contains("subject=InstaFind%200.7.0%3A%20problem%20report&body=%0D%0A%0D%0AInstaFind%200.7.0"), "{en}");
+        assert!(en.contains("paste%20it%20below"));
+        // Long words (Arabic: 6 bytes a letter once encoded) are cut to fit a mail link.
+        for what in ["ب".repeat(crate::report::MAX_WHAT), "سطر\n".repeat(200)] {
+            let url = report_mailto(&info(), &what, false);
+            assert!(url.len() <= MAX_MAILTO, "{}", url.len());
+            let body = &crate::web::parse_form(url.split_once('?').unwrap().1).into_iter().find(|(k, _)| k == "body").unwrap().1;
+            assert!(body.contains("…\r\n\r\nInstaFind 0.7.0") && body.contains("Ctrl+V"), "{body}");
+        }
+        // As the report itself, at most MAX_WHAT characters of the user's words.
+        let url = report_mailto(&info(), &"a".repeat(5000), true);
+        assert!(url.len() <= MAX_MAILTO && url.contains(&format!("body={}%0D%0A", "a".repeat(crate::report::MAX_WHAT))), "{url}");
+    }
+
+    #[test]
+    fn report_url_fills_what_and_diagnostics() {
+        let (url, cut) = report_issue_url(&info(), "بطيء جداً", "InstaFind 0.7.0\nMemory: private 900 MB");
+        assert!(!cut);
+        assert!(url.contains("template=bug_report.yml"));
+        let q = query(&url);
+        assert!(q.contains(&("what".into(), "بطيء جداً".into())));
+        assert!(q.contains(&("diagnostics".into(), "InstaFind 0.7.0\nMemory: private 900 MB".into())));
+        assert!(q.contains(&("version".into(), "0.7.0".into())));
+        let (url, _) = report_issue_url(&info(), "", "x");
+        assert!(!query(&url).iter().any(|(k, _)| k == "what"));
+        // A long report is cut to fit, and says where the rest is.
+        let big: String = (0..400).map(|i| format!("1731400{i:03} memory: private {i} MB, entries 4000000, documents 300000\n")).collect();
+        let (url, cut) = report_issue_url(&info(), &"ب".repeat(2000), &big);
+        assert!(cut);
+        assert!(url.len() <= MAX_URL, "{}", url.len());
+        let q = query(&url);
+        let d = &q.iter().find(|(k, _)| k == "diagnostics").unwrap().1;
+        assert!(d.starts_with("1731400000 memory") && d.ends_with("on your clipboard; paste it here)"), "{d}");
+        assert_eq!(q.iter().find(|(k, _)| k == "what").unwrap().1.chars().count(), crate::report::MAX_WHAT);
+    }
+
+    #[test]
     fn user_names_are_hidden() {
         assert_eq!(anonymize("C:\\Users\\Saif\\a.txt and c:\\users\\bob"), "C:\\Users\\<user>\\a.txt and c:\\users\\<user>");
         assert_eq!(anonymize("C:\\Users\\Public\\x"), "C:\\Users\\Public\\x");
-        assert_eq!(anonymize("/Users/ana/x 'C:\\Users\\Ü ber'"), "/Users/<user>/x 'C:\\Users\\<user> ber'");
+        assert_eq!(anonymize_with("/Users/ana/x 'C:\\Users\\Ü ber'", &[]), "/Users/<user>/x 'C:\\Users\\<user>");
         assert_eq!(anonymize("no paths, \\users\\"), "no paths, \\users\\");
         assert_eq!(anonymize(""), "");
+    }
+
+    /// A profile folder with a space (`C:\\Users\\First Last`) leaked "Last".
+    #[test]
+    fn whole_profile_names_are_hidden() {
+        let a = |t: &str| anonymize_with(t, &[]);
+        assert_eq!(a("at C:\\Users\\First Last\\Desktop\\x.pdf"), "at C:\\Users\\<user>\\Desktop\\x.pdf");
+        assert_eq!(a("C:/Users/First Last/x"), "C:/Users/<user>/x");
+        assert_eq!(a("C:\\Documents and Settings\\Saif Ali\\x"), "C:\\Documents and Settings\\<user>\\x");
+        assert_eq!(a("\\\\server\\Users\\Saif Ali (Work)\\x"), "\\\\server\\Users\\<user>\\x");
+        assert_eq!(a("'C:\\Users\\O'Neil Smith\\a'"), "'C:\\Users\\<user>\\a'");
+        // A path ending at the profile: up to a character a name can't hold.
+        assert_eq!(a("dir \"C:\\Users\\سيف علي\": denied\nnext"), "dir \"C:\\Users\\<user>\": denied\nnext");
+        assert_eq!(a("C:\\Users\\Default User\\x"), "C:\\Users\\Default User\\x");
+        // The account name anywhere else in the text, when it is known.
+        let names = ["First Last", "flast"];
+        assert_eq!(
+            anonymize_with("D:\\Profiles\\FLAST\\a by First Last; flasts", &names),
+            "D:\\Profiles\\<user>\\a by <user>; flasts"
+        );
+        assert_eq!(anonymize_with("x", &["ab", ""]), "x");
     }
 
     #[test]

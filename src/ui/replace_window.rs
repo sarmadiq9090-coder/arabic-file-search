@@ -144,13 +144,18 @@ impl ReplaceWindow {
         self.repl_label.set_size(lw as u32, 24);
         self.repl.set_position(2 * m + lw, m + 38);
         self.repl.set_size(fw, 28);
+        // The two options share the field's width: their texts are much
+        // longer in some languages ("Groß-/Kleinschreibung ignorieren").
+        let cw = ((fw as i32 - m) / 2).max(220);
         self.ignore_case.set_position(2 * m + lw, m + 74);
-        self.ignore_case.set_size(220, 26);
-        self.regex.set_position(3 * m + lw + 220, m + 74);
-        self.regex.set_size(220, 26);
+        self.ignore_case.set_size(cw as u32, 26);
+        self.regex.set_position(3 * m + lw + cw, m + 74);
+        self.regex.set_size(cw as u32, 26);
         let by = m + 108;
         let mut x = m;
         for (b, bw) in [(&self.preview_btn, 130), (&self.apply_btn, 130), (&self.undo_btn, 200)] {
+            // Wider for a longer (translated) text: about 8 px a character.
+            let bw = bw.max(b.text().chars().count() as u32 * 8 + 36);
             b.set_position(x, by);
             b.set_size(bw, 32);
             x += bw as i32 + m;
@@ -214,7 +219,7 @@ impl App {
     }
 
     /// Builds the (hidden) window and binds its events, once.
-    fn ensure_replace(self: &Rc<Self>) -> bool {
+    pub(super) fn ensure_replace(self: &Rc<Self>) -> bool {
         self.replace.ui.is_built() || self.build_lazily("replace", |app| {
             app.build_replace_controls()?;
             Ok((vec![app.bind_replace_window()], Vec::new()))
@@ -295,7 +300,7 @@ impl App {
                 }
                 nwg::Event::OnTimerTick if handle == app.timer && r.state.borrow().busy => {
                     let n = r.progress.load(Ordering::Relaxed);
-                    r.set_status(&trf!("جارٍ العمل… ({} ملف)", "Working… ({} files)", fmt_num(n)));
+                    r.set_status(&trf!("جارٍ العمل… (عدد الملفات: {})", "Working… ({} files)", fmt_num(n)));
                 }
                 _ => {}
             }
@@ -336,21 +341,28 @@ impl App {
         }))
     }
 
-    /// Opens the window on the plain-text files of the current results.
-    fn open_replace(&self) {
+    /// Opens the window on the plain-text files of the current results (the
+    /// new look's while it is the main window).
+    pub(super) fn open_replace(&self) {
         let r = &self.replace;
         if !r.state.borrow().busy {
             let (files, others) = {
-                let st = self.state.borrow();
+                let results: Vec<(String, bool)> = match self.webui_results() {
+                    Some(rows) => rows.into_iter().map(|r| (r.path, r.size.is_none())).collect(),
+                    None => {
+                        let st = self.state.borrow();
+                        st.rows.iter().filter_map(|row| st.rows_index.entries.get(row.entry as usize)).map(|e| (e.path.to_string(), e.is_dir)).collect()
+                    }
+                };
                 let mut files = Vec::new();
                 let mut others = 0;
-                for e in st.rows.iter().filter_map(|row| st.rows_index.entries.get(row.entry as usize)) {
-                    if e.is_dir {
+                for (path, is_dir) in results {
+                    if is_dir {
                         continue;
                     }
-                    let ext = std::path::Path::new(&*e.path).extension().and_then(|x| x.to_str()).map(str::to_ascii_lowercase);
+                    let ext = std::path::Path::new(&path).extension().and_then(|x| x.to_str()).map(str::to_ascii_lowercase);
                     if ext.is_some_and(|x| crate::extract::is_plain_text(&x)) && files.len() < MAX_FILES {
-                        files.push(e.path.to_string());
+                        files.push(path);
                     } else {
                         others += 1;
                     }
@@ -363,10 +375,10 @@ impl App {
             let mut msg = if n == 0 {
                 tr!("لا توجد ملفات نصية عادية في النتائج الحالية. ابحث أولاً (مثلاً: ‎.txt).", "No plain text files in the current results. Search first (e.g. .txt).").to_string()
             } else {
-                trf!("سيُبحث في {} ملفاً نصياً من النتائج الحالية.", "{} plain text files from the current results will be searched.", fmt_num(n))
+                trf!("سيُبحث في الملفات النصية من النتائج الحالية، وعددها: {}.", "{} plain text files from the current results will be searched.", fmt_num(n))
             };
             if others > 0 {
-                msg.push_str(&trf!(" ({} نتيجة أخرى ليست ملفات نصية عادية وستُترك.)", " ({} other results are not plain text files and are left alone.)", fmt_num(others)));
+                msg.push_str(&trf!(" (نتائج أخرى ليست ملفات نصية عادية وستُترك، عددها: {}.)", " ({} other results are not plain text files and are left alone.)", fmt_num(others)));
             }
             r.set_status(&msg);
         }
@@ -440,7 +452,7 @@ impl App {
         let params = nwg::MessageParams {
             title: tr!("استبدال نص في الملفات", "Replace text in files"),
             content: &trf!(
-                "استبدال «{}» بـ «{}» في {} ملفاً ({} تطابقاً)؟\n\nتُحفظ نسخة احتياطية من كل ملف أولاً، ويمكنك التراجع عن آخر استبدال.",
+                "استبدال «{}» بـ «{}»؟ عدد الملفات: {}، عدد التطابقات: {}.\n\nتُحفظ نسخة احتياطية من كل ملف أولاً، ويمكنك التراجع عن آخر استبدال.",
                 "Replace “{}” with “{}” in {} files ({} matches)?\n\nA backup copy of each file is saved first, and you can undo the last replace.",
                 opts.find,
                 opts.replace,
@@ -471,7 +483,7 @@ impl App {
         let params = nwg::MessageParams {
             title: tr!("التراجع عن آخر استبدال", "Undo last replace"),
             content: &trf!(
-                "إرجاع {} ملفاً إلى ما كانت عليه قبل استبدال «{}» بـ «{}» ({})؟\n\nالملفات التي عُدّلت بعد الاستبدال لن تُمسّ.",
+                "إرجاع الملفات إلى ما كانت عليه قبل استبدال «{1}» بـ «{2}» ({3})؟ عدد الملفات: {0}.\n\nالملفات التي عُدّلت بعد الاستبدال لن تُمسّ.",
                 "Restore {} files to how they were before “{}” was replaced with “{}” ({})?\n\nFiles edited since the replace are left as they are.",
                 fmt_num(index.files.len()),
                 index.find,
@@ -521,14 +533,14 @@ impl App {
                     r.set_checked(i, row.can);
                 }
                 let mut msg = trf!(
-                    "{} تطابقاً في {} ملفاً. ملفات بلا تطابق: {}.",
+                    "عدد التطابقات: {}، في ملفات عددها: {}. ملفات بلا تطابق: {}.",
                     "{} matches in {} files. Files without a match: {}.",
                     fmt_num(total),
                     fmt_num(files),
                     fmt_num(none)
                 );
                 if skipped_n > 0 {
-                    msg.push_str(&trf!(" تُركت {} ملفات (السبب في القائمة).", " {} files skipped (reason in the list).", fmt_num(skipped_n)));
+                    msg.push_str(&trf!(" الملفات المتروكة: {} (السبب في القائمة).", " {} files skipped (reason in the list).", fmt_num(skipped_n)));
                 }
                 r.set_status(&msg);
                 let mut st = r.state.borrow_mut();
@@ -540,13 +552,13 @@ impl App {
                 r.clear_preview();
                 let total: usize = rep.done.iter().map(|(_, n)| n).sum();
                 let mut msg = trf!(
-                    "تم: {} استبدالاً في {} ملفاً.",
+                    "تم. عدد الاستبدالات: {}، في ملفات عددها: {}.",
                     "Done: {} replacements in {} files.",
                     fmt_num(total),
                     fmt_num(rep.done.len())
                 );
                 if !rep.skipped.is_empty() {
-                    msg.push_str(&trf!(" لم يُعدَّل {} ملفاً.", " {} files were not changed.", fmt_num(rep.skipped.len())));
+                    msg.push_str(&trf!(" ملفات لم تُعدَّل: {}.", " {} files were not changed.", fmt_num(rep.skipped.len())));
                 }
                 r.set_status(&msg);
                 let mut t = String::new();
@@ -563,12 +575,12 @@ impl App {
             }
             Done::Undone(Err(e)) => r.set_status(&e),
             Done::Undone(Ok(rep)) => {
-                let mut msg = trf!("أُرجع {} ملفاً.", "{} files restored.", fmt_num(rep.restored.len()));
+                let mut msg = trf!("أُرجعت الملفات. عددها: {}.", "{} files restored.", fmt_num(rep.restored.len()));
                 if !rep.conflicts.is_empty() {
-                    msg.push_str(&trf!(" {} ملفاً تغيّر بعد الاستبدال فتُرك كما هو.", " {} files changed after the replace and were left as they are.", fmt_num(rep.conflicts.len())));
+                    msg.push_str(&trf!(" ملفات تغيّرت بعد الاستبدال فتُركت كما هي: {}.", " {} files changed after the replace and were left as they are.", fmt_num(rep.conflicts.len())));
                 }
                 if !rep.failed.is_empty() {
-                    msg.push_str(&trf!(" تعذر إرجاع {} ملفاً.", " {} files could not be restored.", fmt_num(rep.failed.len())));
+                    msg.push_str(&trf!(" ملفات تعذر إرجاعها: {}.", " {} files could not be restored.", fmt_num(rep.failed.len())));
                 }
                 r.set_status(&msg);
                 let mut t = String::new();

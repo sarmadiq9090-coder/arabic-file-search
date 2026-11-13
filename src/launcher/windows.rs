@@ -11,6 +11,7 @@ pub struct OpenWindow {
 }
 
 use super::{Action, Context, Item, Kind};
+use crate::i18n::Lang;
 
 /// Other names of common programs, by lower-case exe stem.
 const ALIASES: &[(&str, &[&str])] = &[
@@ -126,7 +127,7 @@ pub fn matches(query: &str, ctx: &Context) -> Vec<Item> {
             (_, 2) => 500,
             _ => continue,
         };
-        let title = if ctx.english { format!("Switch to: {}", w.title.trim()) } else { format!("التبديل إلى: {}", w.title.trim()) };
+        let title = trf!(in Lang::from_english(ctx.english); "التبديل إلى: {}", "Switch to: {}", w.title.trim());
         out.push(Item { kind: Kind::Window, title, subtitle: w.exe.clone(), action: Action::FocusWindow(w.hwnd), score, icon_path: None, strong: false });
     }
     out

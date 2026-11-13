@@ -8,7 +8,7 @@
 use std::io::{self, Write};
 
 use crate::index::{Entry, Index};
-use crate::search::{Query, SortKey, search_names, sort_hits};
+use crate::search::{Query, SortKey, all_names, search_names, sort_hits};
 
 /// Exit codes: results found, no results, error (bad arguments, no index).
 pub const EXIT_FOUND: i32 = 0;
@@ -145,7 +145,9 @@ pub fn parse_args(args: &[String]) -> Result<Command, String> {
         }
     }
     o.query = words.join(" ");
-    if Query::parse(&o.query).is_empty() {
+    let q = Query::parse(&o.query);
+    // `*` or `*.*` alone is every file; nothing to look for is an error.
+    if q.is_empty() && !q.any_name {
         return Err(tr!("لا يوجد نص للبحث؛ استخدم -s \"كلمات\"", "no search text; use -s \"words\"").into());
     }
     Ok(Command::Search(o))
@@ -171,6 +173,7 @@ InstaFind {v} — command-line search
   bahth.exe -s \"فاتورة ext:pdf\" [options]
 
   -s, --search <text>   نص البحث بنفس صيغة البرنامج / search text, same syntax as the GUI
+                        «*» وحدها كل الملفات / \"*\" alone: every file
   -n, --max <N>         أقصى عدد للنتائج / at most N results
   --sort <key>          الترتيب: name | path | size | date / sort order
   --desc                ترتيب تنازلي / descending order
@@ -197,7 +200,7 @@ fn usage_en() -> String {
 Usage:
   bahth.exe -s \"invoice ext:pdf\" [options]
 
-  -s, --search <text>   search text, same syntax as the GUI
+  -s, --search <text>   search text, same syntax as the GUI (\"*\" alone: every file)
   -n, --max <N>         at most N results
   --sort <key>          sort order: name | path | size | date
   --desc                descending order
@@ -251,11 +254,28 @@ pub fn execute(cmd: &Command, load: impl FnOnce() -> Option<Index>, out: &mut dy
     Ok(if hits.is_empty() { EXIT_NONE } else { EXIT_FOUND })
 }
 
-/// Searches, sorts and limits as the options say.
+/// Searches, sorts and limits as the options say. When the query as typed
+/// finds nothing, tries the window's fallbacks (wrong keyboard layout,
+/// Arabizi, typos: [`crate::fuzzy::name_fallback`]) and prints what they find.
 fn find(entries: &[Entry], o: &Options) -> Vec<u32> {
-    let mut q = Query::parse(&o.query);
-    q.show_system |= crate::system_files::show_system(!o.include_system, &o.scope);
-    let mut hits = search_names(entries, &q, &o.scope);
+    let show_system = crate::system_files::show_system(!o.include_system, &o.scope);
+    let parse = |t: &str| {
+        let mut q = Query::parse(t);
+        q.show_system |= show_system;
+        q
+    };
+    let q = parse(&o.query);
+    // `-s *` (or `*.*`): every file in the scope. The window lists nothing
+    // for a box with only a wildcard (as for an empty one); a command asks
+    // for it on purpose.
+    let every = q.is_empty() && q.any_name;
+    let mut hits = if every { all_names(entries, &q, &o.scope) } else { search_names(entries, &q, &o.scope) };
+    if hits.is_empty()
+        && !every
+        && let Some((alt, _)) = crate::fuzzy::name_fallback(entries, &o.query, &o.scope, &parse)
+    {
+        hits = alt;
+    }
     if o.sort == SortKey::Relevance {
         if o.desc {
             hits.reverse();
@@ -547,7 +567,7 @@ mod tests {
 
     fn entry(path: &str, size: u64, mtime: i64, is_dir: bool) -> Entry {
         let mut e = Entry { path: path.into(), size, mtime, is_dir, norm_name: "".into() };
-        e.norm_name = crate::normalize::normalize(e.name()).into();
+        e.norm_name = crate::normalize::name_key(e.name()).into();
         e
     }
 
@@ -656,6 +676,78 @@ mod tests {
         assert_eq!(count(&["-s", "sys: فاتورة", "--count"]), "5\r\n");
         // A system folder as the scope shows what is inside it.
         assert_eq!(count(&["-s", "فاتورة", "--count", "--scope", r"C:\Windows"]), "1\r\n");
+    }
+
+    /// `bahth -s hgjrvdv` (the wrong keyboard layout) and `-s ta2rer`
+    /// (Arabizi) found nothing: the command line skipped the fallbacks the
+    /// window tries when a search finds nothing.
+    #[test]
+    fn wrong_layout_arabizi_and_typos_like_the_window() {
+        let index = || {
+            let mut index = sample();
+            index.entries.push(entry(r"C:\docs\التقرير السنوي.docx", 10, 1_700_000_000, false));
+            index.entries.push(entry(r"C:\docs\تقرير.pdf", 20, 1_700_000_000, false));
+            index.entries.push(entry(r"C:\Windows\Logs\تقرير النظام.log", 1, 1, false));
+            index.entries.sort_by(|a, b| a.path.cmp(&b.path));
+            index
+        };
+        let run = |a: &[&str]| run_cli(a, Some(index()));
+        let both = "C:\\docs\\التقرير السنوي.docx\r\nC:\\docs\\تقرير.pdf\r\n";
+        assert_eq!(run(&["-s", "hgjrvdv", "--sort", "path"]), (EXIT_FOUND, both.into(), String::new()));
+        assert_eq!(run(&["-s", "ta2rer", "--sort", "path"]), (EXIT_FOUND, both.into(), String::new()));
+        assert_eq!(run(&["-s", "تقريز", "--sort", "path"]).1, both); // a typo
+        // Filters and options still apply to what the fallback finds.
+        assert_eq!(run(&["-s", "hgjrvdv ext:pdf"]).1, "C:\\docs\\تقرير.pdf\r\n");
+        assert_eq!(run(&["-s", "ta2rer", "--count"]).1, "2\r\n");
+        assert_eq!(run(&["-s", "ta2rer", "--count", "--all"]).1, "3\r\n");
+        assert_eq!(run(&["-s", "hgjrvdv", "--scope", r"C:\Windows"]).1, "C:\\Windows\\Logs\\تقرير النظام.log\r\n");
+        // The queries ci/smoke.ps1 runs against its «تقرير مالي ٢٠٢٦.txt».
+        let smoke = r"C:\Users\a\Documents\bahth-smoke";
+        let with_smoke = || {
+            let mut index = index();
+            index.entries.push(entry(&format!(r"{smoke}\تقرير مالي ٢٠٢٦.txt"), 1, 1, false));
+            index.entries.sort_by(|a, b| a.path.cmp(&b.path));
+            index
+        };
+        for q in ["jrvdv lhgd", "ta2rer mali"] {
+            let (code, out, _) = run_cli(&["-s", q, "--scope", smoke], Some(with_smoke()));
+            assert_eq!((code, out.as_str()), (EXIT_FOUND, format!("{smoke}\\تقرير مالي ٢٠٢٦.txt\r\n").as_str()), "{q}");
+        }
+        // Only when the query as typed finds nothing, as in the window.
+        assert_eq!(run(&["-s", "report", "--count"]).1, "2\r\n");
+        assert_eq!(run(&["-s", "zzz", "--count"]), (EXIT_NONE, "0\r\n".into(), String::new()));
+    }
+
+    /// `bahth -s * --count` printed 0 and exited 1: `*` was searched for as
+    /// a letter, which no file name has. A wildcard alone (`*`, `*.*`,
+    /// `ext:*`) is every file now, with the usual filters and exit codes;
+    /// next to words it filters nothing, as `*.*` always did.
+    #[test]
+    fn a_lone_wildcard_is_every_file() {
+        let index = || {
+            let mut index = sample();
+            index.entries.push(entry(r"C:\Windows\Logs\فاتورة.log", 1, 1, false));
+            index
+        };
+        let run = |a: &[&str]| run_cli(a, Some(index()));
+        for q in ["*", "*.*", "**", "ext:*", "* *.*"] {
+            assert_eq!(run(&["-s", q, "--count"]), (EXIT_FOUND, "5\r\n".into(), String::new()), "{q}");
+        }
+        assert_eq!(run(&["-s", "*", "--count", "--all"]).1, "6\r\n");
+        assert_eq!(run(&["-s", "*", "--scope", r"C:\old", "--sort", "path"]).1, "C:\\old\\report, final.txt\r\nC:\\old\\فاتورة.pdf\r\n");
+        assert_eq!(run(&["-s", "*", "-n", "2", "--count"]).1, "2\r\n");
+        // Filters still apply.
+        assert_eq!(run(&["-s", "* ext:pdf", "--count"]).1, "2\r\n");
+        assert_eq!(run(&["-s", "* folder:", "--count"]).1, "1\r\n");
+        // Next to a word it is no filter, not a letter to find.
+        assert_eq!(run(&["-s", "فاتورة *", "--count"]), run(&["-s", "فاتورة", "--count"]));
+        // An empty index or scope: no results (exit 1), not an error.
+        assert_eq!(run_cli(&["-s", "*", "--count"], Some(Index::default())), (EXIT_NONE, "0\r\n".into(), String::new()));
+        assert_eq!(run(&["-s", "*", "--scope", r"D:\"]).0, EXIT_NONE);
+        // Still an error: nothing at all to look for.
+        assert!(parse_args(&args(&["-s", "ext:"])).is_err());
+        // Quoted, `*` is text to find, like any quoted word.
+        assert_eq!(run(&["-s", "\"*\"", "--count"]), (EXIT_NONE, "0\r\n".into(), String::new()));
     }
 
     #[test]

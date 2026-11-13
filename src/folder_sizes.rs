@@ -306,6 +306,13 @@ static CACHE: Mutex<Cache> = Mutex::new(Vec::new());
 /// One computation at a time: a second caller waits and reuses the result.
 static COMPUTE: Mutex<()> = Mutex::new(());
 
+/// Drops every cached result (the memory guard): computed again when asked.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn forget() {
+    CACHE.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    *RECENT.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
+
 /// The sizes for this index snapshot, if already computed. Never blocks on a
 /// computation, so the UI thread can call it while drawing.
 pub fn cached(index: &Arc<Index>) -> Option<Arc<FolderSizes>> {

@@ -48,32 +48,101 @@ pub fn group_digits(n: usize) -> String {
     out
 }
 
-/// "جارِ الفهرسة… 36,000 من 432,000 ملف" / "Indexing… 36,000 of 432,000
-/// files", or `None` when nothing is being indexed. `num` writes a count
-/// (thousands separators, and the digits the user chose).
+/// What is being indexed, or `None` when nothing is: "Indexing… 120,500
+/// files so far" while the drives are scanned, then, once every file name
+/// can be found and only the documents' texts are still being read, "File
+/// names ready · reading inside documents: 36,000 of 432,000" (a bare
+/// "Indexing…" there read as if searching by name was not ready yet).
+/// `num` writes a count (thousands separators, and the digits the user
+/// chose).
 pub fn progress_text(lang: Lang, state: Indexing, num: &dyn Fn(usize) -> String) -> Option<String> {
     if !state.running() {
         return None;
     }
     Some(match state {
-        Indexing::Names { found } => match lang {
-            Lang::Ar => format!("جارِ الفهرسة… {} ملف حتى الآن", num(found)),
-            Lang::En => format!("Indexing… {} files so far", num(found)),
-        },
+        Indexing::Names { found } => trf!(in lang; "جارٍ الفهرسة… عدد الملفات حتى الآن: {}", "Indexing… {} files so far", num(found)),
         Indexing::Contents { checked, total } => {
             let (checked, total) = (num(checked.min(total)), num(total));
-            match lang {
-                Lang::Ar => format!("جارِ الفهرسة… {checked} من {total} ملف"),
-                Lang::En => format!("Indexing… {checked} of {total} files"),
-            }
+            trf!(in lang; "أسماء الملفات جاهزة · تُقرأ محتويات المستندات: {checked} من {total}", "File names ready · reading inside documents: {checked} of {total}")
         }
         Indexing::Idle => return None,
     })
 }
 
+/// The right edges of the status bar's parts for a bar `width` pixels wide
+/// (`SB_SETPARTS`; -1 is "to the end"): messages and the selected file's
+/// path, and while indexing runs (`progress`) its progress in a third part
+/// at the end, wider when it is the longer "File names ready · reading
+/// inside documents…" line (`Some(true)`) so that line is not cut.
+pub fn status_parts(width: i32, progress: Option<bool>) -> Vec<i32> {
+    let w = width.max(0) as i64;
+    let at = |num: i64, den: i64| (w * num / den) as i32;
+    match progress {
+        None => vec![at(1, 2), -1],
+        Some(false) => vec![at(9, 20), at(3, 4), -1],
+        Some(true) => vec![at(3, 10), at(13, 25), -1],
+    }
+}
+
+/// Shown inside the empty result list while the very first index is being
+/// built, so the first minutes don't look dead.
+pub fn first_scan_text(lang: Lang) -> &'static str {
+    lang.pick(
+        "نجهّز قائمة ملفاتك لأول مرة (دقائق قليلة). ابحث الآن، وتكتمل النتائج عند الانتهاء.",
+        "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.",
+    )
+}
+
+/// Shown inside the empty result list while a search inside documents is
+/// still reading and has found nothing yet: how far it got.
+pub fn reading_text(lang: Lang, checked: usize, total: usize, num: &dyn Fn(usize) -> String) -> String {
+    let (checked, total) = (num(checked.min(total)), num(total));
+    trf!(
+        in lang;
+        "جارٍ البحث داخل المستندات… قرأنا {checked} من {total} حتى الآن، ولم نجد شيئاً بعد.",
+        "Still reading inside documents… {checked} of {total} so far, nothing found yet."
+    )
+}
+
+/// The sentence above the "try" buttons of a search that found nothing:
+/// the plain "nothing found", or while indexing runs that the results may
+/// be incomplete.
+pub fn nothing_found_lead(lang: Lang, state: Indexing) -> &'static str {
+    if state.running() {
+        lang.pick("لا نتائج حتى الآن، وقد تكون ناقصة أثناء الفهرسة. جرّب:", "No results yet; they may be incomplete while indexing. Try:")
+    } else {
+        lang.pick("لم نجد ملفات تطابق بحثك. جرّب:", "No files match your search. Try:")
+    }
+}
+
+/// Text for a Windows list's empty markup (`LVN_GETEMPTYMARKUP`): the
+/// markup's `<` and `&` taken out, at most `max` UTF-16 units, NUL-ended.
+pub fn empty_markup(text: &str, max: usize) -> Vec<u16> {
+    let mut out: Vec<u16> = text.chars().filter(|c| !matches!(c, '<' | '&' | '\0')).collect::<String>().encode_utf16().collect();
+    out.truncate(max.saturating_sub(1));
+    // Never half a surrogate pair at the cut.
+    if out.last().is_some_and(|u| (0xD800..0xDC00).contains(u)) {
+        out.pop();
+    }
+    out.push(0);
+    out
+}
+
 /// Said instead of "no results" while indexing runs.
 pub fn incomplete_text(lang: Lang) -> &'static str {
     lang.pick("قد تكون النتائج ناقصة أثناء الفهرسة", "Results may be incomplete while indexing")
+}
+
+/// Said after a search inside documents that read `n` documents in full
+/// because the content index's word index doesn't hold them yet (it is
+/// being built, or they changed since): such a search is slower, not less
+/// complete.
+pub fn word_index_incomplete_text(lang: Lang, n: usize) -> String {
+    let n = group_digits(n);
+    match lang {
+        Lang::Ar => format!("(قُرئ {n} مستنداً كاملاً لأن فهرس الكلمات لم يكتمل بعد؛ سيصبح البحث أسرع بعد اكتماله.)"),
+        Lang::En => format!("({n} documents were read in full: the word index is not complete yet, and searches get faster once it is.)"),
+    }
 }
 
 /// What a search that found nothing says while indexing runs, instead of
@@ -94,10 +163,7 @@ pub fn no_results_text(lang: Lang, state: Indexing) -> Option<&'static str> {
 pub fn content_search_text(lang: Lang, state: Indexing, checked: usize, total: usize, num: &dyn Fn(usize) -> String) -> Option<String> {
     let lead = no_results_text(lang, state)?;
     let (checked, total) = (num(checked.min(total)), num(total));
-    Some(match lang {
-        Lang::Ar => format!("{lead} تم فحص {checked} من {total} مستند…"),
-        Lang::En => format!("{lead} Checked {checked} of {total} documents…"),
-    })
+    Some(trf!(in lang; "{lead} المستندات المفحوصة: {checked} من {total}…", "{lead} Checked {checked} of {total} documents…"))
 }
 
 /// The heading of the quick popup's "No results — try" section while
@@ -151,14 +217,34 @@ mod tests {
     #[test]
     fn content_progress_reads_as_in_the_user_study() {
         let s = Indexing::Contents { checked: 36_000, total: 432_000 };
-        assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("جارِ الفهرسة… 36,000 من 432,000 ملف"));
-        assert_eq!(progress_text(Lang::En, s, &num).as_deref(), Some("Indexing… 36,000 of 432,000 files"));
+        // The names are all in by now: say so, and what is still being read.
+        assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("أسماء الملفات جاهزة · تُقرأ محتويات المستندات: 36,000 من 432,000"));
+        assert_eq!(progress_text(Lang::En, s, &num).as_deref(), Some("File names ready · reading inside documents: 36,000 of 432,000"));
+        for lang in [Lang::Ar, Lang::En] {
+            let t = progress_text(lang, s, &num).unwrap();
+            assert!(!t.contains("Indexing…") && !t.contains("الفهرسة…"), "{t}");
+        }
+    }
+
+    #[test]
+    fn the_status_bar_gives_the_longer_line_more_room() {
+        assert_eq!(status_parts(1100, None), [550, -1]);
+        assert_eq!(status_parts(1100, Some(false)), [495, 825, -1]);
+        // 528 of 1100 pixels for "File names ready · reading inside documents: …".
+        assert_eq!(status_parts(1100, Some(true)), [330, 572, -1]);
+        for w in [-5, 0, 1, 640, 1920, i32::MAX] {
+            for p in [None, Some(false), Some(true)] {
+                let parts = status_parts(w, p);
+                assert_eq!(parts.last(), Some(&-1));
+                assert!(parts[..parts.len() - 1].windows(2).all(|x| x[0] <= x[1]) && parts[0] >= 0, "{w} {p:?} {parts:?}");
+            }
+        }
     }
 
     #[test]
     fn name_scan_has_no_total_yet() {
         let s = Indexing::Names { found: 120_500 };
-        assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("جارِ الفهرسة… 120,500 ملف حتى الآن"));
+        assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("جارٍ الفهرسة… عدد الملفات حتى الآن: 120,500"));
         assert_eq!(progress_text(Lang::En, s, &num).as_deref(), Some("Indexing… 120,500 files so far"));
         // A scan that has found nothing yet is still running.
         assert!(Indexing::Names { found: 0 }.running());
@@ -179,7 +265,7 @@ mod tests {
     fn checked_never_shows_above_total() {
         let s = Indexing::Contents { checked: 12, total: 10 };
         assert!(!s.running());
-        assert_eq!(progress_text(Lang::En, Indexing::Contents { checked: 9, total: 10 }, &num).as_deref(), Some("Indexing… 9 of 10 files"));
+        assert_eq!(progress_text(Lang::En, Indexing::Contents { checked: 9, total: 10 }, &num).as_deref(), Some("File names ready · reading inside documents: 9 of 10"));
     }
 
     #[test]
@@ -194,7 +280,7 @@ mod tests {
         );
         assert_eq!(
             content_search_text(Lang::Ar, s, 36_000, 432_000, &num).as_deref(),
-            Some("لا نتائج حتى الآن — قد تكون النتائج ناقصة أثناء الفهرسة. تم فحص 36,000 من 432,000 مستند…")
+            Some("لا نتائج حتى الآن — قد تكون النتائج ناقصة أثناء الفهرسة. المستندات المفحوصة: 36,000 من 432,000…")
         );
     }
 
@@ -206,11 +292,11 @@ mod tests {
             popup_note(Lang::En, s, true, &num).as_deref(),
             Some("Results may be incomplete while indexing — Indexing… 1,000 files so far")
         );
-        assert!(popup_note(Lang::Ar, s, true, &num).unwrap().starts_with("قد تكون النتائج ناقصة أثناء الفهرسة — جارِ الفهرسة…"));
+        assert!(popup_note(Lang::Ar, s, true, &num).unwrap().starts_with("قد تكون النتائج ناقصة أثناء الفهرسة — جارٍ الفهرسة…"));
         // The names are all in while the content index fills: only the progress.
         let c = Indexing::Contents { checked: 10, total: 20 };
         assert!(!c.names_incomplete() && s.names_incomplete());
-        assert_eq!(popup_note(Lang::En, c, true, &num).as_deref(), Some("Indexing… 10 of 20 files"));
+        assert_eq!(popup_note(Lang::En, c, true, &num).as_deref(), Some("File names ready · reading inside documents: 10 of 20"));
     }
 
     #[test]
@@ -218,7 +304,7 @@ mod tests {
         // The window can show Arabic-Indic digits (Options); the formatter is passed in.
         let indic = |n: usize| group_digits(n).chars().map(|c| if c.is_ascii_digit() { char::from_u32(c as u32 - 48 + 0x0660).unwrap() } else { c }).collect::<String>();
         let s = Indexing::Contents { checked: 36_000, total: 432_000 };
-        assert_eq!(progress_text(Lang::Ar, s, &indic).as_deref(), Some("جارِ الفهرسة… ٣٦,٠٠٠ من ٤٣٢,٠٠٠ ملف"));
+        assert_eq!(progress_text(Lang::Ar, s, &indic).as_deref(), Some("أسماء الملفات جاهزة · تُقرأ محتويات المستندات: ٣٦,٠٠٠ من ٤٣٢,٠٠٠"));
     }
 
     #[test]
@@ -239,6 +325,29 @@ mod tests {
             let first = t.chars().next().unwrap();
             assert!(('\u{0600}'..='\u{06FF}').contains(&first), "{t}");
         }
+    }
+
+    #[test]
+    fn the_first_minutes_explain_themselves() {
+        assert_eq!(first_scan_text(Lang::Ar), "نجهّز قائمة ملفاتك لأول مرة (دقائق قليلة). ابحث الآن، وتكتمل النتائج عند الانتهاء.");
+        assert_eq!(first_scan_text(Lang::En), "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.");
+        assert_eq!(reading_text(Lang::En, 1_840, 4_210, &num), "Still reading inside documents… 1,840 of 4,210 so far, nothing found yet.");
+        assert_eq!(reading_text(Lang::Ar, 9, 4, &num), "جارٍ البحث داخل المستندات… قرأنا 4 من 4 حتى الآن، ولم نجد شيئاً بعد.");
+        assert_eq!(nothing_found_lead(Lang::En, Indexing::Idle), "No files match your search. Try:");
+        assert!(nothing_found_lead(Lang::Ar, Indexing::Names { found: 3 }).contains("ناقصة"));
+        for t in [first_scan_text(Lang::Ar).to_string(), reading_text(Lang::Ar, 1, 2, &num), nothing_found_lead(Lang::Ar, Indexing::Idle).to_string()] {
+            assert!(t.starts_with(|c| ('\u{0600}'..='\u{06FF}').contains(&c)), "{t}");
+        }
+    }
+
+    #[test]
+    fn empty_list_markup_is_plain_text_that_fits() {
+        let w = |s: &str| s.encode_utf16().chain([0]).collect::<Vec<u16>>();
+        assert_eq!(empty_markup("a<b>&c", 100), w("ab>c"));
+        assert_eq!(empty_markup(first_scan_text(Lang::Ar), 2084), w(first_scan_text(Lang::Ar)));
+        assert_eq!(empty_markup("abcdef", 4), w("abc"));
+        assert_eq!(empty_markup("ab😀", 4), w("ab"));
+        assert_eq!(empty_markup("x", 0), vec![0]);
     }
 
     #[test]

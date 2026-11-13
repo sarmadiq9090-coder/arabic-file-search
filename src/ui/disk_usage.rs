@@ -224,7 +224,8 @@ impl App {
             let Some(app) = weak.upgrade() else { return };
             match evt {
                 nwg::Event::OnMenuItemSelected if handle == app.disk.menu_options => {
-                    let scope = app.state.borrow().scope.clone();
+                    // (The new look's folder while it is the main window.)
+                    let scope = app.webui_scope().unwrap_or_else(|| app.state.borrow().scope.clone());
                     app.show_disk_usage(scope);
                 }
                 nwg::Event::OnMenuItemSelected if handle == app.disk.menu_row => {
@@ -386,7 +387,7 @@ impl App {
         let Some(sizes) = folder_sizes::cached(&index) else {
             d.list.clear();
             d.rows.borrow_mut().clear();
-            d.total_label.set_text(tr!("جاري حساب أحجام المجلدات…", "Calculating folder sizes…"));
+            d.total_label.set_text(tr!("جارٍ حساب أحجام المجلدات…", "Calculating folder sizes…"));
             self.request_sizes(index, true);
             return;
         };
@@ -414,7 +415,7 @@ impl App {
             trf!("أحجام المجلدات — {}", "Folder sizes — {}", name_of(&path))
         });
         d.total_label.set_text(&trf!(
-            "الحجم الكلي: {} في {} ملف · العناصر: {} · Backspace للرجوع، نقرتان للدخول",
+            "الحجم الكلي: {} · عدد الملفات: {} · العناصر: {} · Backspace للرجوع، نقرتان للدخول",
             "Total: {} in {} files · items: {} · Backspace goes up, double-click opens",
             fmt_bytes(total),
             fmt_num(files as usize),
@@ -442,7 +443,7 @@ impl App {
             let size: u64 = rest.iter().map(|c| c.size).sum();
             let files: u64 = rest.iter().map(|c| c.files).sum();
             let s = share(size);
-            let label = trf!("… و{} عنصراً آخر", "… and {} more items", fmt_num(rest.len()));
+            let label = trf!("… وعناصر أخرى: {}", "… and {} more items", fmt_num(rest.len()));
             d.list.insert_items_row(Some(MAX_ROWS as i32), &[label, fmt_bytes(size), percent(s), String::new(), fmt_num(files as usize)]);
             rows.push(UsageRow { path: String::new(), is_dir: false, share: s });
         }
