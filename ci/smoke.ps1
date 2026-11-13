@@ -1,4 +1,4 @@
-# Smoke test of the exact bahth.exe that would be published: starts the GUI on
+﻿# Smoke test of the exact bahth.exe that would be published: starts the GUI on
 # a real Windows machine, lets it index the drive, then drives the command line
 # against that index. Fails on a crash report, an early exit or a wrong result.
 # -Machine checks the exe is built for that CPU (x64, x86 or arm64), so a
