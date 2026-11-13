@@ -1,0 +1,24 @@
+{
+  "ui-stress": {
+    "looks": [
+      "classic",
+      "new"
+    ]
+  },
+  "torture-test": {
+    "groups": [
+      "soak",
+      "names",
+      "tree",
+      "churn",
+      "state",
+      "instances",
+      "content"
+    ]
+  },
+  "mem-test": {
+    "exes": ["branch"],
+    "scenarios": ["A", "B", "C", "E", "F", "G", "H", "O", "K", "M", "S", "Q"],
+    "save_delay_ms": 90000
+  }
+}
