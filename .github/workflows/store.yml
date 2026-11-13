@@ -8,8 +8,7 @@ run-name: store ${{ inputs.tag || github.event.release.tag_name || github.head_r
 #
 # - With a tag (Run workflow -> tag, or a published release), it packages
 #   that release's exact bahth.exe / bahth-x86.exe / bahth-arm64.exe.
-# - Without one (Run workflow with no tag, or a pull request touching the
-#   packaging), it builds the exes from this commit as build.yml does
+# - Without one (Run workflow with no tag), it builds the exes from this commit as build.yml does
 #   (MSVC, static C runtime, no build cache).
 # The identity comes from packaging/msix/identity.json. While it still has a
 # TODO, the TEST identity is used and the run says so: the Store would
