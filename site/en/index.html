@@ -63,12 +63,12 @@
   "@type": "FAQPage",
   "mainEntity": [
     { "@type": "Question", "name": "Is InstaFind free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. It is free to use on your own devices." } },
-    { "@type": "Question", "name": "Can it search inside PDF and Word files?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Tick “Also search inside documents” and press Enter. It reads docx, xlsx, xls, pptx, pdf, odt, ods, rtf, doc, txt, csv, e-mail (eml, msg), epub and source code, repairs reversed Arabic text in PDFs, and reads images and scanned PDFs with the OCR engine built into Windows 10 and 11." } },
+    { "@type": "Question", "name": "Can it search inside PDF and Word files?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Press the “Inside documents” button, then Enter. It reads docx, xlsx, xls, pptx, pdf, odt, ods, rtf, doc, txt, csv, e-mail (eml, msg), epub and source code, repairs reversed Arabic text in PDFs, and reads images and scanned PDFs with the OCR engine built into Windows 10 and 11." } },
     { "@type": "Question", "name": "Is it an alternative to Everything?", "acceptedAnswer": { "@type": "Answer", "text": "If you want instant filename search across all drives, like Everything, plus real Arabic matching and search inside documents, that is what InstaFind is built for." } },
     { "@type": "Question", "name": "Does it need an internet connection?", "acceptedAnswer": { "@type": "Answer", "text": "No. Indexing and search run on your PC. The only connections are the update check against GitHub and the exchange-rate download for currency conversion, about every 12 hours." } },
     { "@type": "Question", "name": "What are the requirements?", "acceptedAnswer": { "@type": "Answer", "text": "Windows 10 or 11, 64-bit. Text recognition in images needs the Windows language pack for each OCR language." } },
     { "@type": "Question", "name": "Why does SmartScreen warn me?", "acceptedAnswer": { "@type": "Answer", "text": "Because the file is not code-signed. Click More info, then Run anyway. Every release is published on GitHub, with its SHA256SUMS.txt checksums file." } },
-    { "@type": "Question", "name": "How do I uninstall it?", "acceptedAnswer": { "@type": "Answer", "text": "Turn off Start with Windows in Options…, then delete bahth.exe and the %LOCALAPPDATA%\\BahthSari\\ folder." } }
+    { "@type": "Question", "name": "How do I uninstall it?", "acceptedAnswer": { "@type": "Answer", "text": "Turn off Start with Windows in Settings → Startup, then delete bahth.exe and the %LOCALAPPDATA%\\BahthSari\\ folder." } }
   ]
 }
 </script>
@@ -146,8 +146,8 @@
         <p>Duplicate finder, folder sizes, thumbnail view, find &amp; replace in text files with undo, CSV export, drag &amp; drop into WhatsApp or mail, a command line and a Flow Launcher plugin.</p>
       </article>
       <article class="card">
-        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>English or Arabic interface</h3>
-        <p>Follows the Windows display language; switch any time in Options → Language / <span lang="ar">اللغة</span>. Starts with Windows in the background and updates itself with one click.</p>
+        <h3><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>English, Arabic and 38 more languages</h3>
+        <p>Follows the Windows display language; switch any time in Settings → Language. Languages other than English and Arabic are machine translations, marked as such. Starts with Windows in the background and updates itself with one click.</p>
       </article>
     </div>
   </div>
@@ -157,7 +157,7 @@
   <div class="wrap">
     <div class="section-head">
       <h2 id="arabic-title">Arabic file search that understands how people type</h2>
-      <p>Hamza forms, ta marbuta, alef maqsura, diacritics, tatweel and the <span lang="ar">ال</span> prefix are ignored; Arabic-Indic digits and Persian letters are accepted. When nothing matches, it retries with the other keyboard layout, then Arabizi, then near spellings.</p>
+      <p>Hamza forms, ta marbuta, alef maqsura, diacritics, tatweel and the <span lang="ar">ال</span> prefix are ignored; Arabic-Indic digits and Kurdish, Persian and Urdu letters are accepted. When nothing matches, it retries with the other keyboard layout, then Arabizi, then near spellings.</p>
     </div>
     <ul class="examples">
       <li><span class="q" lang="ar">احمد</span><span class="arrow" aria-label="finds">→</span><span class="r" lang="ar">أحمد</span><span class="why">Hamza forms don't matter</span></li>
@@ -267,7 +267,7 @@ scoop install instafind</code></pre>
     </details>
     <details>
       <summary>Can it search inside PDF and Word files?</summary>
-      <div><p>Yes. Tick <strong>Also search inside documents</strong> and press Enter. It reads docx, xlsx, xls, pptx, pdf, odt, ods, rtf, doc, txt, csv, e-mail (eml, msg), epub and source code, and repairs reversed Arabic text in PDFs. Images and scanned PDFs are read with the OCR engine built into Windows 10 and 11.</p></div>
+      <div><p>Yes. Press the <strong>Inside documents</strong> button, then Enter. It reads docx, xlsx, xls, pptx, pdf, odt, ods, rtf, doc, txt, csv, e-mail (eml, msg), epub and source code, and repairs reversed Arabic text in PDFs. Images and scanned PDFs are read with the OCR engine built into Windows 10 and 11.</p></div>
     </details>
     <details>
       <summary>Is it an alternative to Everything?</summary>
@@ -287,7 +287,7 @@ scoop install instafind</code></pre>
     </details>
     <details>
       <summary>How do I uninstall it?</summary>
-      <div><p>Turn off <em>Start with Windows</em> in <strong>Options…</strong>, then delete <code>bahth.exe</code> and the <code>%LOCALAPPDATA%\BahthSari\</code> folder.</p></div>
+      <div><p>Turn off <em>Start with Windows</em> in <strong>Settings → Startup</strong>, then delete <code>bahth.exe</code> and the <code>%LOCALAPPDATA%\BahthSari\</code> folder.</p></div>
     </details>
   </div>
 </section>
