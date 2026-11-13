@@ -425,6 +425,7 @@
       if (m.seq !== S.seq) return;
       S.total = Math.max(S.total, m.total); S.running = !m.done; S.progress = m.text || "";
       S.done = S.rows.length >= S.total;
+      list.setAttribute("aria-busy", String(S.running));
       if (!S.done) wantMore();
       if (S.view === "results" && !S.rows.length) renderRows(false);
       renderStatus(); renderStop();
@@ -717,8 +718,7 @@
     img.src = "/thumb/" + key;
   }
   function tileEl(r, i) {
-    const name = plainName(r);
-    const el = h("div", { class: "row tile" + (r.gone ? " gone" : ""), role: "option", id: "r" + i, "aria-selected": String(i === S.sel), "aria-label": `${name}, ${r.dir}${r.folder ? "" : ", " + size(r.size)}, ${when(r.mtime)}${r.gone ? ", " + T.gone : ""}` });
+    const el = h("div", Object.assign({ class: "row tile" + (r.gone ? " gone" : "") }, rowAria(r, i, "results")));
     el.dataset.i = i;
     el.append(h("span", { class: "tpic" }, badge(r, "ft big"), h("img", { alt: "", draggable: "false" })), h("span", { class: "tname" }, nameEl(r)));
     const key = thumbKeys.get(`${S.shown}:${S.ver}:${i}`);
@@ -731,10 +731,22 @@
     if (S.view === "results") { renderCols(); renderRows(true); }
   }
 
+  // What Narrator, NVDA and UI Automation get for a row: an option of its
+  // listbox ("Results" / the recent files), selected or not, named by the
+  // file, its folder, size, date and matches, with its place in the list
+  // (the whole count, or -1 while a document search still finds more).
+  function rowAria(r, i, listName) {
+    const name = plainName(r), results = listName === "results";
+    const label = [name, r.dir, r.folder ? T.folder : size(r.size), when(r.mtime), r.matches ? T.nMatches(r.matches) : "", r.gone ? T.gone : ""].filter(Boolean).join(", ");
+    return {
+      role: "option", id: (results ? "r" : "rr") + i, "aria-label": label,
+      "aria-selected": String(results ? i === S.sel : i === S.rsel),
+      "aria-posinset": String(i + 1), "aria-setsize": String(results ? (S.running ? -1 : Math.max(S.total, S.rows.length)) : S.recent.length),
+    };
+  }
   function rowEl(r, i, listName) {
     if (listName === "results" && gridOn()) return tileEl(r, i);
-    const name = plainName(r);
-    const el = h("div", { class: "row" + (r.gone ? " gone" : "") + (r.snippet ? " doc" : ""), role: "option", id: (listName === "recent" ? "rr" : "r") + i, "aria-selected": String(listName === "results" && i === S.sel), "aria-label": `${name}, ${r.dir}${r.folder ? "" : ", " + size(r.size)}, ${when(r.mtime)}${r.gone ? ", " + T.gone : ""}` });
+    const el = h("div", Object.assign({ class: "row" + (r.gone ? " gone" : "") + (r.snippet ? " doc" : "") }, rowAria(r, i, listName)));
     el.dataset.i = i;
     const nm = h("span", { class: "nm" }, h("span", { class: "n1" }, nameEl(r), r.matches > 1 ? h("span", { class: "cnt num" }, T.nMatches(r.matches)) : null), h("span", { class: "n2" }, pathEl(r.dir)));
     if (r.snippet) nm.append(h("span", { class: "n3" }, marked(r.snippet, "sn")));
@@ -796,6 +808,7 @@
   }
   function renderRows(refresh) {
     const top = list.scrollTop;
+    list.setAttribute("aria-busy", String(!!S.running));
     thumbSeen.disconnect();
     list.replaceChildren(...S.rows.map((r, i) => rowEl(r, i, "results")));
     if (!S.done || (S.running && !S.rows.length)) list.append(h("div", { class: "more", "aria-hidden": "true" }, S.running && !S.rows.length ? T.searching : T.moreRows));

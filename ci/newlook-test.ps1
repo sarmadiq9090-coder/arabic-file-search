@@ -506,7 +506,10 @@ try {
         $rowIn = { Find-UiaIn (Find-Uia $win.Handle ([Windows.Automation.ControlType]::List) '^(Results|النتائج)$') ([Windows.Automation.ControlType]::ListItem) '\S' }
         $row = Wait-Until $rowIn 60
         if (-not $row) {
-            Record 'probe' 'a result row to click (UI Automation)' $false ("list items: " + ((Uia-Names $win.Handle ([Windows.Automation.ControlType]::ListItem)) -join ' | '))
+            # Which lists UI Automation sees and how many rows each holds (the
+            # result rows are options of the "Results" listbox, with names).
+            $lists = @(Uia-Names $win.Handle ([Windows.Automation.ControlType]::List)) -join ' | '
+            Record 'probe' 'a result row to click (UI Automation)' $false ("lists: $lists; list items: " + ((Uia-Names $win.Handle ([Windows.Automation.ControlType]::ListItem)) -join ' | '))
         } else {
             $drags = (Log-Lines 'webui: drag').Count
             $c = Center $row

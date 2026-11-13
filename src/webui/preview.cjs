@@ -383,7 +383,10 @@ const SHOTS = [
   ["recent-keys-ar-light", "ar", "light", [["focus", "#recent"], ["key", "ArrowDown"], ["key", "Enter"], ["wait", 50]], { expect: { lastSent: "open", recentActive: "rr1", opens: 1 } }],
   ["recent-menu-en-dark", "en", "dark", [["focus", "#recent"], ["key", "Shift+F10"]], { expect: { menu: true, a11y: true } }],
   ["a11y-content-en-light", "en", "light", [["click", "#chip-content"]], { expect: { qName: "Search inside documents, then press Enter…", a11y: true } }],
-  ["a11y-results-ar-light", "ar", "light", [["type", "تقرير"], ["click", "#chip-sort"]], { expect: { menu: true, a11y: true } }],
+  ["a11y-results-ar-light", "ar", "light", [["type", "تقرير"], ["click", "#chip-sort"]], { expect: { menu: true, a11y: true, rowsA11y: true } }],
+  ["a11y-rows-en-dark", "en", "dark", [["type", "report"], ["key", "ArrowDown"]], { ariaOptions: 11, expect: { rowsA11y: true } }],
+  ["a11y-grid-ar-light", "ar", "light", [["type", "تقرير"], ["key", "Control+t"], ["wait", 200]], { expect: { rowsA11y: true } }],
+  ["a11y-docs-en-light", "en", "light", [["click", "#chip-content"], ["type", "lease agreement"], ["key", "Enter"], ["wait", 300]], { expect: { rowsA11y: true } }],
   // A long Arabic name in the preview wraps and lines up on the right, in either interface language; an English one on the left.
   ["pv-name-ar-light", "ar", "light", [["type", "123-45"]], { expect: { pvNameSide: "right" } }],
   ["pv-name-en-ui-ar-name-en-light", "en", "light", [["type", "فاتورة"]], { expect: { pvNameSide: "right" } }],
@@ -547,6 +550,12 @@ const SHOTS = [
         // The preview's name lines up with its own direction (an Arabic name on the right, even on several lines).
         pvNameSide: (() => { const n = document.querySelector(".pv-name"); if (!n || !visible(n)) return null; const b = n.getBoundingClientRect(), t = n.firstElementChild.getBoundingClientRect(); return Math.abs(b.right - t.right) < 2 ? "right" : Math.abs(b.left - t.left) < 2 ? "left" : "middle"; })(),
         recentActive: document.getElementById("recent").getAttribute("aria-activedescendant"),
+        // Every result row is an option of the named "Results" listbox, with a name, its selection and its place.
+        rowsA11y: (() => {
+          const l = document.getElementById("list"), rows = [...l.querySelectorAll(".row")];
+          const ok = l.getAttribute("role") === "listbox" && !!l.getAttribute("aria-label") && rows.every((r) => r.getAttribute("role") === "option" && r.parentElement === l && (r.getAttribute("aria-label") || "").length > 3 && /^(true|false)$/.test(r.getAttribute("aria-selected")) && +r.getAttribute("aria-posinset") >= 1 && r.hasAttribute("aria-setsize"));
+          return rows.length > 0 && ok && rows.filter((r) => r.getAttribute("aria-selected") === "true").length === 1;
+        })(),
         qName: document.getElementById("q").getAttribute("aria-label"),
         // Every visible menu, list and focusable control has a name a screen reader can say.
         a11y: (() => {
@@ -564,6 +573,13 @@ const SHOTS = [
       };
     }, lang);
     for (const b of check.bad) errors.push(`${name}: ${b}`);
+    // Chromium's own accessibility tree (what WebView2 hands to UI Automation)
+    // has each result row as an option of the "Results" listbox, with its name.
+    if (opts.ariaOptions) {
+      const tree = await pg.locator("#list").ariaSnapshot();
+      const options = (tree.match(/^\s*- option /gm) || []).length;
+      if (!/^- listbox "(Results|النتائج)"/.test(tree) || options < opts.ariaOptions) errors.push(`${name}: accessibility tree has ${options} options:\n${tree.slice(0, 400)}`);
+    }
     const want = opts.expect || {};
     if (check.stale && !("stale" in want)) errors.push(`${name}: a request named an older list: ${check.stale}`);
     for (const [k, v] of Object.entries(want)) {
