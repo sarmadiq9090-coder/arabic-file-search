@@ -822,13 +822,21 @@ function Classic-Handle {
     return $script:hClassic
 }
 function New-Handle {
-    if (Handle-Ok $script:hNew) { return $script:hNew }
-    $script:hNew = [IntPtr]::Zero
     $c = Classic-Handle
-    foreach ($w in @(App-Windows | Where-Object { $_.Class -eq 'NativeWindowsGuiWindow' })) {
-        if ($w.Handle -ne $c -and $w.Text -match $rx.Title) { $script:hNew = $w.Handle; break }
-    }
-    return $script:hNew
+    if ((Handle-Ok $script:hNew) -and $script:hNew -ne $c) { return $script:hNew }
+    $script:hNew = [IntPtr]::Zero
+    # Both main windows carry the program's title. While the classic one is
+    # not known yet (its Options button not built or not answering during
+    # the start), the hidden classic window could be taken for the new one
+    # and kept for the whole run (round 4: "on screen: none", and the real
+    # window then closed as an "extra" one). So: the visible match first,
+    # and a pick is kept only once the classic window is known.
+    $found = @(App-Windows | Where-Object { $_.Class -eq 'NativeWindowsGuiWindow' -and $_.Handle -ne $c -and $_.Text -match $rx.Title })
+    $pick = $found | Where-Object { $_.Visible } | Select-Object -First 1
+    if (-not $pick) { $pick = $found | Select-Object -First 1 }
+    if (-not $pick) { return [IntPtr]::Zero }
+    if ($c -ne [IntPtr]::Zero) { $script:hNew = $pick.Handle }
+    return $pick.Handle
 }
 # Which main window is on screen: classic, new, none (in the tray) or both.
 function Look-Now {
@@ -849,7 +857,8 @@ function Shown-Main {
 # Other windows of the program on screen (duplicates, folder sizes...).
 function Extra-Windows {
     $c = Classic-Handle; $n = New-Handle
-    @(App-Windows | Where-Object { $_.Visible -and $_.Class -eq 'NativeWindowsGuiWindow' -and $_.Handle -ne $c -and $_.Handle -ne $n -and $_.W -gt 150 -and $_.H -gt 100 })
+    # (A window with the program's own title is a main window, never an extra.)
+    @(App-Windows | Where-Object { $_.Visible -and $_.Class -eq 'NativeWindowsGuiWindow' -and $_.Handle -ne $c -and $_.Handle -ne $n -and $_.W -gt 150 -and $_.H -gt 100 -and $_.Text -notmatch $rx.Title })
 }
 function Focus-Window($Hwnd) {
     if ([S]::GetForegroundWindow() -eq $Hwnd) { return }
@@ -1019,7 +1028,14 @@ function Start-App([int]$Wait = 40) {
     Log "started the program, process $($script:proc.Id)"
     $w = Wait-Until { Shown-Main } $Wait
     if ($w) { Place-Main; $w = Shown-Main }
+    else { Log-Windows "no main window after $Wait s" }
     return $w
+}
+# What the test sees of the program's windows, in run.log (when a main
+# window is not found).
+function Log-Windows([string]$Why) {
+    Log "windows ($Why): classic $(Classic-Handle), new $(New-Handle)"
+    foreach ($w in @(App-Windows)) { Log ("  {0} {1} visible={2} {3}x{4} '{5}'" -f $w.Handle, $w.Class, $w.Visible, $w.W, $w.H, $w.Text) }
 }
 # After the program restarted itself (language): the new process.
 function Adopt-Restarted([int]$OldId, [int]$Wait = 45) {
