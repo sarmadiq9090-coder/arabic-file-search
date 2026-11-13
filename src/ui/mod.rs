@@ -48,8 +48,10 @@ mod keys;
 mod launcher_shim; // thin glue to crate::launcher, see the file
 mod lazy;
 mod memory;
+mod older_copy;
 mod placement;
 mod quick;
+mod quick_access;
 mod quickswitch;
 mod rating;
 mod relocate;
@@ -94,7 +96,7 @@ use crate::leave::Leaving;
 use files::SAVES;
 use format::ARABIC_DIGITS;
 use history_menu::HistoryMenu;
-use keys::{HOTKEY_ID, HOTKEY_TEXT};
+use keys::{HOTKEY_ID, hotkey_text};
 use search_jobs::NameResult;
 use startup::{LOOP_STARTED, activate_running_copy, phase, ui_font_family};
 use updates::UpdateEvent;
@@ -270,6 +272,11 @@ pub struct App {
     /// Bytes downloaded / total of a running update download.
     update_progress: Arc<(AtomicU64, AtomicU64)>,
     update_busy: Cell<bool>,
+    /// A check for updates is running (`update_busy` is also set for a download).
+    update_checking: Cell<bool>,
+    /// The user asked for that check (or asked while an automatic one ran):
+    /// its answer is shown, and the new look's button says "Checking…".
+    update_asked: Cell<bool>,
     /// Timer ticks since start, to delay the automatic update check.
     ticks: Cell<u32>,
     /// Built on first use: each one starts a COM file dialog, which is slow.
@@ -307,8 +314,8 @@ pub struct App {
     menu_update: nwg::MenuItem,
     menu_autostart: nwg::MenuItem,
     lang_menu: nwg::Menu,
-    menu_lang_ar: nwg::MenuItem,
-    menu_lang_en: nwg::MenuItem,
+    /// One item per interface language (`lang_menu.rs`).
+    menu_langs: Vec<(nwg::MenuItem, &'static crate::i18n::Locale)>,
     /// Options ▸ "Send feedback": report a problem, suggest an idea, discuss.
     feedback_menu: nwg::Menu,
     menu_feedback_bug: nwg::MenuItem,
@@ -366,6 +373,9 @@ pub struct App {
     /// The offer to move a copy out of Downloads or a temp folder was
     /// already considered this run (see `relocate`).
     move_checked: Cell<bool>,
+    /// The notice that this copy replaced an older one was shown (or there
+    /// was none: `older_copy::notice`).
+    replaced_told: Cell<bool>,
     state: RefCell<State>,
     /// Moving another program's Open / Save As dialog to a result's folder.
     quick: quickswitch::QuickSwitch,
@@ -580,7 +590,7 @@ impl App {
         if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
             // The hotkey, unless another program has it (its menu item is
             // greyed then).
-            let hotkey = self.menu_hotkey.enabled().then_some(HOTKEY_TEXT);
+            let hotkey = self.menu_hotkey.enabled().then_some(hotkey_text());
             self.tray.show(
                 &crate::quick::hidden_hint(crate::i18n::current(), hotkey),
                 Some(title()),
@@ -783,6 +793,11 @@ pub fn run() {
     if activate_running_copy(updated || moved) {
         return;
     }
+    // No other copy runs: a newer download takes the place of the installed
+    // copy it is newer than, and the program starts from there.
+    if !updated && !moved && older_copy::replace_installed_elsewhere() {
+        return;
+    }
     // The new version is on trial until its first timer tick; a start that
     // finds an unfinished trial puts the previous version back and starts it.
     if crate::update::settle_trial(updated, &|l| startup::log(l)) {
@@ -810,7 +825,7 @@ pub fn run() {
     if crate::store::is_packaged() {
         autostart::apply_store_default();
     } else {
-        autostart::apply_default();
+        autostart::apply_default(updated || moved || older_copy::replaced_version().is_some());
     }
     if let Some(line) = crate::store::startup_log_line() {
         startup::log(&line);

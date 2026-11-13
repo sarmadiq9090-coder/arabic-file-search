@@ -3,5 +3,5 @@ body:
     attributes:
       name: bahth_path
       label: "مسار bahth.exe / bahth.exe path"
-      description: "اتركه فارغاً للمسار الافتراضي %LOCALAPPDATA%\\Programs\\Bahth\\bahth.exe أو متغير BAHTH_EXE / Leave empty for the default path or the BAHTH_EXE env var"
+      description: "اتركه فارغاً للمسار الافتراضي %LOCALAPPDATA%\\Programs\\InstaFind\\bahth.exe (أو Programs\\Bahth أو instafind.exe من المتجر) أو متغير BAHTH_EXE / Leave empty for the default paths (Programs\\InstaFind, Programs\\Bahth, the Store's instafind.exe) or the BAHTH_EXE env var"
       defaultValue: ""

@@ -45,7 +45,9 @@ fn random_text(rng: &mut Rng, len: usize) -> String {
     const PIECES: &[&str] = &[
         "ا", "أ", "إ", "آ", "ة", "ه", "ى", "ي", "ئ", "ؤ", "و", "ء", "ل", "ك", "ک", "ی", "ﻻ", "ﷲ", "ﺑ", "ﹶ", "\u{064B}", "\u{0640}",
         "\u{0654}", "\u{200F}", "\u{1}", "\u{2}", "٣", "۴", "A", "b", "Z", "İ", "ß", "Σ", "é", "e\u{301}", "1", "_", "-", ".", " ",
-        "\n", "\t", "،", "؟", "\u{1F}\u{FDD0}", "x",
+        "\n", "\t", "،", "؟", "\u{1F}\u{FDD0}", "x", "ё", "Ё", "\u{0308}", "\u{0300}", "\u{0327}", "ç", "ş", "ğ", "\u{0711}",
+        "\u{0730}", "ܐ", "Ａ", "ｶ", "カ", "か", "\u{3099}", "東", "京", "ไทย", "\u{0E34}", "क", "\u{093C}", "ड़", "ک", "گ", "ۆ", "ێ", "ڕ",
+        "پ", "ٹ", "ے", "\u{06C1}", "ﬁ", "²", "Ⅻ", "ǅ",
     ];
     (0..len).map(|_| PIECES[rng.below(PIECES.len())]).collect()
 }
@@ -91,7 +93,7 @@ fn plan(alts: &[&[&[&str]]]) -> Plan {
     let mut p = Plan::default();
     let cond = alts
         .iter()
-        .map(|alt| alt.iter().map(|pats| p.piece(pats.iter().map(|s| s.as_bytes().to_vec()).collect())).collect())
+        .map(|alt| alt.iter().map(|pats| p.piece(pats.iter().map(|s| s.as_bytes().to_vec()).collect(), false)).collect())
         .collect();
     p.conds.push(cond);
     p
@@ -351,4 +353,54 @@ fn bench_doc_words() {
     let t = std::time::Instant::now();
     let total: usize = small.iter().map(|s| doc_words(s).list.len()).sum();
     println!("3000 small docs: {} ms ({total})", t.elapsed().as_millis());
+}
+
+/// What [`crate::normalize::VERSION`] promises: the same normalisation as
+/// when the word index was built. A change to `normalize` changes this
+/// fingerprint; then bump `normalize::VERSION` (the word index is built
+/// again from the stored texts) and put the new fingerprint here.
+#[test]
+fn normalize_version_is_bumped_with_its_output() {
+    let mut rng = Rng(0xfeed_f00d);
+    let mut sample = String::new();
+    for _ in 0..4000 {
+        let len = rng.below(12);
+        sample.push_str(&random_text(&mut rng, len));
+    }
+    // Every Unicode scalar up to the supplementary planes' CJK, one by one.
+    let all: String = (0..0x3_0000u32).filter_map(char::from_u32).collect();
+    let print = fnv(normalize(&sample).as_bytes()) ^ fnv(normalize(&all).as_bytes()).rotate_left(1);
+    assert_eq!(
+        (crate::normalize::VERSION, print),
+        (1, FINGERPRINT),
+        "normalize changed: bump normalize::VERSION and set FINGERPRINT to {print:#x}"
+    );
+}
+
+const FINGERPRINT: u64 = 0xcd1d_f56a_a91d_5c20;
+
+#[test]
+fn scripts_without_spaces_pass_whole_word_pieces() {
+    let dir = temp_dir("unspaced");
+    let index = Index::open(&dir, std::iter::empty());
+    let keys: Vec<u64> = ["東京タワーabc", "plain abc", "xabc"]
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            let k = key(&format!("C:\\u{i}.txt"));
+            index.replace(k, doc_words(t));
+            k
+        })
+        .collect();
+    assert!(doc_words("東京タワーabc").unspaced && !doc_words("plain abc").unspaced);
+    let mut p = Plan::default();
+    let piece = p.piece(vec![b"\nabc\n".to_vec()], true);
+    p.conds.push(vec![vec![piece]]);
+    for round in 0..2 {
+        // "abc" is a whole word after カ (ww: there); not inside "xabc".
+        assert_eq!(found_keys(&index, &p, &keys), [0, 1], "round {round}");
+        index.write_pending(true).unwrap();
+    }
+    // A piece from a real separator stays exact.
+    assert_eq!(found_keys(&index, &plan(&[&[&["\nabc\n"]]]), &keys), [1]);
 }

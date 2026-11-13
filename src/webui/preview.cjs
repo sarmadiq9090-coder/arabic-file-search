@@ -48,10 +48,21 @@ const TEST_PNG = (() => {
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
 })();
 const MIME = { ".js": "text/javascript", ".css": "text/css", ".woff2": "font/woff2" };
+// The language files (i18n/<code>.json), as src/i18n.rs embeds them: the
+// page gets the language's "js" texts and the list of languages to offer.
+const I18N_DIR = path.join(__dirname, "..", "..", "i18n");
+const LANG_FILES = Object.fromEntries(fs.readdirSync(I18N_DIR).filter((f) => f.endsWith(".json") && f !== "source.json")
+  .map((f) => [f.slice(0, -5), JSON.parse(fs.readFileSync(path.join(I18N_DIR, f), "utf8"))]));
+const LANGS = [{ code: "ar", native: "العربية", english: "Arabic", rtl: true, machine: false }, { code: "en", native: "English", english: "English", rtl: false, machine: false },
+  ...Object.entries(LANG_FILES).map(([code, f]) => ({ code, native: f.meta.name_native, english: f.meta.name_en, rtl: !!f.meta.rtl, machine: true })).sort((a, b) => a.native.toLowerCase() < b.native.toLowerCase() ? -1 : 1)];
+const dirOf = (lang) => (LANGS.find((l) => l.code === lang) || {}).rtl ? "rtl" : "ltr";
 function page(lang) {
+  if (lang !== "ar" && lang !== "en" && !LANG_FILES[lang]) throw new Error(`no i18n/${lang}.json`);
+  const data = { code: lang, rtl: dirOf(lang) === "rtl", js: (LANG_FILES[lang] || {}).js || {}, langs: LANGS };
   return fs.readFileSync(path.join(ASSETS, "index.html"), "utf8")
-    .replace("{{LANG}}", lang).replace("{{DIR}}", lang === "ar" ? "rtl" : "ltr")
-    .replace("{{CSP}}", CSP.replace("; frame-ancestors 'none'", "")).replace("{{TOKEN}}", "00112233445566778899aabbccddeeff");
+    .replace("{{LANG}}", lang).replace("{{DIR}}", dirOf(lang))
+    .replace("{{CSP}}", CSP.replace("; frame-ancestors 'none'", "")).replace("{{TOKEN}}", "00112233445566778899aabbccddeeff")
+    .replace("{{I18N}}", () => JSON.stringify(data).replace(/</g, "\\u003c"));
 }
 
 // The fake program: runs inside the page, answers like src/webui/bridge.rs.
@@ -74,6 +85,9 @@ function fakeProgram(cfg) {
     ["D:\\Archive\\2024", "تقارير قديمة", 0, 400 * 86400, true],
     // A phone number and a date after Arabic words: each must read as typed.
     [`${U}\\Documents\\الفواتير 2026-11`, "فاتورة رقم 1234 بتاريخ 2026-11-12 من شركة Microsoft هاتف 0770-123-4567.txt", 3 * 1024, 30 * 86400],
+    // A range with an en dash (U+2013) and a date with the division slash
+    // (U+2215): 2024–2026, not 2026–2024.
+    [`${U}\\Documents\\الخطط 2024\u20132026`, "خطة الأعوام 2024\u20132026 حتى 12\u221511\u22152026.txt", 5 * 1024, 35 * 86400],
   ] : [
     [`${U}\\Documents\\Work\\Finance`, "Sales report 2026.xlsx", 48 * 1024, 7 * 60],
     [`${U}\\Documents\\Reports\\2026`, "Annual report final.pdf", 2.4 * 1048576, 26 * 3600],
@@ -111,7 +125,7 @@ function fakeProgram(cfg) {
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id", "name"],
     save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], options_menu: [], report_problem: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], thumbs: ["seq", "ver", "ids"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
-    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], rating: ["rate"], check_updates: [], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
+    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], rating: ["rate"], check_updates: [], hotkey: ["key"], phone_allow: [], phone_window: [], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
@@ -128,13 +142,22 @@ function fakeProgram(cfg) {
   };
   const row = (f, id, term) => {
     const r = { id, name: mark(f.name, term || ""), dir: f.dir, size: f.size, mtime: f.mtime, ext: f.ext, folder: f.folder };
+    // The archive drive is unplugged: its entries stay, with a quiet note.
+    if (f.dir.startsWith("D:\\Archive")) r.offline = true;
     if (f.snippet) { r.snippet = mark(f.snippet, term); r.matches = f.count; }
     return r;
   };
   const status = cfg.indexing
     ? { type: "status", state: "names", files: 36000, text: ar ? "جارٍ الفهرسة… عدد الملفات حتى الآن: 36,000" : "Indexing… 36,000 files so far" }
     : { type: "status", state: "ready", files: 1204331, text: null };
-  const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1", store: !!cfg.store };
+  const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1", store: !!cfg.store,
+    hotkey: "ctrl_alt_f", hotkey_taken: !!cfg.hotkeyTaken, hotkeys: [["ctrl_alt_f", "Ctrl+Alt+F"], ["ctrl_alt_space", "Ctrl+Alt+Space"], ["ctrl_shift_f", "Ctrl+Shift+F"], ["win_alt_f", "Win+Alt+F"]],
+    phone: cfg.store ? null : { on: !!(cfg.phoneOn || cfg.phoneRefused), running: false, url: "", pin: "", link: "", note: "", allow: false, idle_off: false } };
+  // As web_server.rs `phone_settings`: running on the home network, or on but refused by the network.
+  const phoneUp = () => Object.assign(settings.phone, { on: true, running: true, url: "http://192.168.1.20:8765/", pin: "4821 0937", link: "http://192.168.1.20:8765/?t=00112233445566778899aabbccddeeff", note: "", allow: false, idle_off: false });
+  if (cfg.phoneOn) phoneUp();
+  if (cfg.phoneIdle) settings.phone.idle_off = true;
+  if (cfg.phoneRefused) Object.assign(settings.phone, { note: ar ? "لم يبدأ البحث من الهاتف: ويندوز لا يعدّ هذه الشبكة خاصة (منزلية).\nالشبكة الحالية: Cafe-WiFi" : "Phone search did not start: Windows does not mark this network as private (home).\nThis network: Cafe-WiFi", allow: true });
   const history = {
     type: "history",
     recent: ar ? ["تقرير المبيعات", "عقد الإيجار", "فاتورة الكهرباء .pdf", "صور العيد"] : ["sales report", "lease agreement", "electricity bill .pdf", "holiday photos"],
@@ -162,6 +185,11 @@ function fakeProgram(cfg) {
         if (m.op !== "more" && m.op !== "matches" && m.op !== "thumbs") { window.__stale.push(m.op); send({ type: "notice", text: ar ? "تغيّرت القائمة للتو، فلم يُنفَّذ شيء. حاول مرة أخرى." : "The list just changed, so nothing was done. Try again." }); }
         return;
       }
+    }
+    if (m.op === "check_updates" && !cfg.store) {
+      // As the program: "Checking…" on its next tick, the answer (a message box) after a while.
+      setTimeout(() => window.__instafind.recv({ ...settings, checking_updates: true }), 30);
+      setTimeout(() => window.__instafind.recv({ ...settings, checking_updates: false }), 400);
     }
     if (m.op === "hello") {
       send({ type: "hello", kinds: KINDS, sizes: SIZES, dates: DATES, kind: 0, sort: "best", desc: false, digits: false, version: "0.9.1", switched: !!cfg.switched, store: !!cfg.store });
@@ -232,8 +260,20 @@ function fakeProgram(cfg) {
       cfg.scope = m.id === 0 ? `${U}\\Documents\\${ar ? "العقود" : "Contracts"}\\` : "";
       send({ type: "scope", path: cfg.scope, search: false });
       send({ type: "apply", q: ar ? "عقد العمل" : "employment contract", kind: 1, content: m.id === 0 });
+    } else if (m.op === "set" && m.key === "phone") {
+      if (!settings.phone) window.__fakeErrors.push("phone switch in the Store edition");
+      else if (m.on) phoneUp(); else Object.assign(settings.phone, { on: false, running: false, url: "", pin: "", link: "", note: "", allow: false });
+      send({ ...settings });
+    } else if (m.op === "phone_allow") {
+      phoneUp(); send({ ...settings });
     } else if (m.op === "set") {
       settings[m.key] = m.on; send({ ...settings });
+    } else if (m.op === "hotkey") {
+      // As the program: Windows refuses keys another program has (here Ctrl+Shift+F); the old ones stay.
+      if (!settings.hotkeys.some(([code]) => code === m.key)) window.__fakeErrors.push("unknown hotkey " + m.key);
+      if (m.key === "ctrl_shift_f") send({ type: "notice", text: ar ? "الاختصار Ctrl+Shift+F يستخدمه برنامج آخر أيضاً. اختر غيره." : "Another program has Ctrl+Shift+F too. Pick another one.", warn: true });
+      else { settings.hotkey = m.key; settings.hotkey_taken = false; }
+      send({ ...settings });
     } else if (m.op === "lang") {
       settings.next_lang = m.lang; send({ ...settings });
     } else if (m.op === "switch_to" || m.op === "switch_cancel") {
@@ -336,29 +376,39 @@ const SHOTS = [
   ["history-ar-light", "ar", "light", [["click", "#hist-btn"]], { expect: { menu: true } }],
   ["history-en-dark", "en", "dark", [["key", "ArrowDown"]], { expect: { menu: true } }],
   ["saved-ar-light", "ar", "light", [["click", "#hist-btn"], ["click", "#hist [role=menuitem]"], ["wait", 300]], { expect: { content: true } }],
-  ["settings-ar-light", "ar", "light", [["click", "#set-btn"], ["click", "#settings .seg[lang=en]"], ["click", "#set-floating"]], { expect: { settings: true } }],
+  ["settings-ar-light", "ar", "light", [["click", "#set-btn"], ["click", "#settings [data-lang=en]"], ["click", "#set-floating"]], { expect: { settings: true } }],
   ["settings-en-dark", "en", "dark", [["key", "Control+,"]], { expect: { settings: true } }],
   // Dragging a row out asks the program to drag that file (once), naming its list version.
   ["drag-en-light", "en", "light", [["type", "report"], ["drag", "#r1"]], { expect: { drags: 1, dialog: false } }],
   ["drag-recent-ar-light", "ar", "light", [["drag", "#rr0"]], { expect: { lastSent: "drag", drags: 1 } }],
   // After a drag the next click elsewhere still works (Windows' drag loop takes the mouseup).
+  // A page created again after the hidden window's WebView2 was closed: its search and filters come back and run.
+  ["restore-ar-light", "ar", "light", [["eval", "window.__instafind.recv({ type: 'restore', q: 'تقرير', kind: 0, size: 2, date: 4, content: false })"], ["wait", 100]], { expect: { q: "تقرير", chipsOn: 2, lastSearch: "تقرير|0|2|4|false" } }],
+  ["restore-content-en-dark", "en", "dark", [["eval", "window.__instafind.recv({ type: 'restore', q: 'lease agreement', kind: 1, size: 0, date: 0, content: true })"], ["wait", 300]], { expect: { q: "lease agreement", inside: true, content: true, rows: 3, lastSearch: "lease agreement|1|0|0|true" } }],
   ["drag-then-click-en-light", "en", "light", [["type", "report"], ["drag", "#r1"], ["wait", 50], ["click", "#set-btn"]], { expect: { drags: 1, settings: true } }],
   // A program the search names: a button above the results; a click asks for it by its place.
   ["apps-ar-light", "ar", "light", [["type", "كروم"], ["wait", 100], ["click", "#apps [data-app=\"0\"]"], ["wait", 50]], { expect: { apps: 1, lastSent: "app" } }],
   // «فتح قائمة الخيارات…»: the program's Options menu (tools, support, updates).
   ["options-menu-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#options-menu"], ["wait", 50]], { expect: { settings: true, lastSent: "options_menu" } }],
   // «الإبلاغ عن مشكلة…»: the program's report window (it shows what would be shared first).
-  ["report-problem-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#report-problem"], ["wait", 50]], { expect: { settings: true, lastSent: "report_problem" } }],
+  ["report-problem-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#report-problem"], ["wait", 50]], { expect: { settings: true, lastSent: "report_problem", reportSays: "email+public" } }],
+  // "Report a problem" says it goes by email or on GitHub's page, and that the page is public.
+  ["report-email-en-dark", "en", "dark", [["key", "Control+,"], ["eval", "document.getElementById('report-problem').scrollIntoView()"]], { expect: { settings: true, reportSays: "email+public" } }],
   // A name split into base and extension keeps its matches marked, in the extension too.
   ["names-split-ar-light", "ar", "light", [["type", "xlsx"]], { expect: { marks: 2, fnames: 2 } }],
   // «…بتاريخ 2026-11-12 … هاتف 0770-123-4567.txt»: the date and the phone read
   // as typed, in the list, its folder, the preview and the status bar's
   // file count, a match inside the phone marked.
   ["digit-runs-ar-light", "ar", "light", [["type", "123-45"]], { expect: { rows: 1, marks: 1, runs: 7 } }],
+  // «خطة الأعوام 2024–2026 …»: a range with an en dash reads as typed too.
+  ["digit-range-ar-dark", "ar", "dark", [["type", "الأعوام"]], { expect: { rows: 1, marks: 1, runs: 7 } }],
   // Ctrl+Alt+G in a Save/Open dialog: a line says what Enter does; Enter moves the dialog to the
   // selected result's folder (not open it), Esc cancels; the result menu has the move first.
   ["qswitch-ar-light", "ar", "light", [["eval", QS_ON.ar], ["type", "تقرير"], ["key", "ArrowDown"]], { expect: { qswitch: true } }],
   ["qswitch-enter-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["key", "Enter"], ["wait", 50]], { expect: { lastSent: "switch_to", opens: 0, qswitch: false } }],
+  // FIN1 F6: nothing found while a dialog waits: no suggestion is Enter's default, Enter starts nothing.
+  ["qswitch-nores-en-light", "en", "light", [["eval", QS_ON.en], ["type", "lease 2024"], ["key", "Enter"], ["wait", 50]], { expect: { view: "view-nores", qswitch: true, q: "lease 2024", suggKbd: 0, lastSent: "search", statusText: "No result to move the dialog to. Change the search, or press Esc to cancel." } }],
+  ["qswitch-nores-ar-dark", "ar", "dark", [["eval", QS_ON.ar], ["type", "عقد الايجار 2024"], ["key", "ArrowDown"], ["key", "Enter"], ["wait", 50]], { expect: { view: "view-nores", qswitch: true, q: "عقد الايجار 2024", suggKbd: 0, lastSent: "search" } }],
   ["qswitch-esc-en-dark", "en", "dark", [["eval", QS_ON.en], ["type", "report"], ["key", "Escape"], ["wait", 50]], { expect: { lastSent: "switch_cancel", qswitch: false, q: "report" } }],
   ["qswitch-ctx-ar-dark", "ar", "dark", [["eval", QS_ON.ar], ["type", "تقرير"], ["rclick", "#r1"]], { expect: { menu: true, ctxFirst: "فتح مجلدها في نافذة الحفظ/الفتح" } }],
   // The quick popup's suggestions carry over: inside documents runs a document search, all types clears the type.
@@ -374,9 +424,12 @@ const SHOTS = [
   // The Store build's rating question: a row above the status line that keeps the focus in the box; one answer.
   ["rating-ar-light", "ar", "light", [["type", "تقرير"], ["eval", "window.__instafind.recv({ type: 'rating' })"], ["wait", 50]], { expect: { rating: true, focus: "q" } }],
   ["rating-later-en-dark", "en", "dark", [["type", "report"], ["eval", "window.__instafind.recv({ type: 'rating' })"], ["click", "#rate-later"], ["wait", 50]], { expect: { rating: false, lastSent: "rating" } }],
-  // "Check for updates" beside "Report a problem" (both mandatory); the Store version says the Store, in its privacy line too.
-  ["updates-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#check-updates"], ["wait", 50]], { expect: { settings: true, lastSent: "check_updates", updBtn: "التحقق من التحديثات…" } }],
-  ["updates-store-en-dark", "en", "dark", [["key", "Control+,"]], { store: true, expect: { settings: true, updBtn: "Updates from Microsoft Store…", trustStore: true } }],
+  // "Check for updates" beside "Report a problem" (both mandatory); the Store version says the Store, in its privacy line too
+  // (which never mentions phone search: the Store edition has none).
+  // The button says at once that the check runs (FIN1 F5), waits, and is itself again with the answer.
+  ["updates-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#check-updates"], ["wait", 50]], { expect: { settings: true, lastSent: "check_updates", updBtn: "جارٍ التحقق من التحديثات…|busy", focus: "check-updates" } }],
+  ["updates-done-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#check-updates"], ["eval", "document.getElementById('check-updates').click()"], ["wait", 700]], { expect: { settings: true, updBtn: "Check for updates…|ready", updChecks: 1 } }],
+  ["updates-store-en-dark", "en", "dark", [["key", "Control+,"]], { store: true, expect: { settings: true, updBtn: "Updates from Microsoft Store…|ready", trustStore: true } }],
   ["trust-store-ar-light", "ar", "light", [], { store: true, expect: { trustStore: true } }],
   // Accessibility: the recent files from the keyboard (Tab, arrows, Enter), named menus, the box's name
   // following its hint, and every focusable control with a name.
@@ -391,6 +444,35 @@ const SHOTS = [
   ["pv-name-ar-light", "ar", "light", [["type", "123-45"]], { expect: { pvNameSide: "right" } }],
   ["pv-name-en-ui-ar-name-en-light", "en", "light", [["type", "فاتورة"]], { expect: { pvNameSide: "right" } }],
   ["pv-name-en-dark", "en", "dark", [["type", "report"]], { expect: { pvNameSide: "left" } }],
+  // «كيف أبحث؟»: the ? button and F1 open the card; an example clicked goes in the box and searches.
+  ["help-ar-light", "ar", "light", [["click", "#help-btn"]], { expect: { dialog: true, helpEx: 16, helpKeys: true, a11y: true } }],
+  ["help-f1-en-dark", "en", "dark", [["key", "F1"]], { expect: { dialog: true, helpEx: 16, helpKeys: true, focus: "hx0" } }],
+  ["help-example-ar-dark", "ar", "dark", [["key", "F1"], ["click", "#hx6"], ["wait", 100]], { expect: { dialog: false, q: "حجم:>10م", lastSent: "search", focus: "q" } }],
+  ["help-more-en-light", "en", "light", [["click", "#help-more"]], { width: 900, height: 640, expect: { dialog: true, helpEx: 16 } }],
+  // Ctrl+Alt+F taken by another program: Settings says so and offers other keys; a pick is used at once.
+  ["hotkey-taken-ar-light", "ar", "light", [["key", "Control+,"]], { hotkeyTaken: true, expect: { settings: true, hkTaken: true, hkKbd: "Ctrl+Alt+F", a11y: true } }],
+  ["hotkey-pick-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#hk-ctrl_alt_space"], ["wait", 50]], { hotkeyTaken: true, expect: { settings: true, lastSent: "hotkey", hkTaken: false, hkKbd: "Ctrl+Alt+Space", hkOn: "hk-ctrl_alt_space" } }],
+  ["hotkey-refused-ar-dark", "ar", "dark", [["key", "Control+,"], ["click", "#hk-ctrl_shift_f"], ["wait", 50]], { hotkeyTaken: true, expect: { settings: true, hkTaken: true, warn: true, hkOn: "hk-ctrl_alt_f" } }],
+  // Search from phone in Settings: the switch, the address, the PIN and a QR code of the link; none in the Store edition.
+  ["phone-on-ar-light", "ar", "light", [["key", "Control+,"], ["eval", "document.getElementById('set-phone').scrollIntoView()"]], { phoneOn: true, expect: { settings: true, phoneQr: true, phonePin: "4821 0937", a11y: true } }],
+  ["phone-turn-on-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#set-phone"], ["wait", 50], ["eval", "document.getElementById('phone-qr').scrollIntoView()"]], { expect: { settings: true, lastSent: "set", phoneQr: true } }],
+  ["phone-refused-ar-dark", "ar", "dark", [["key", "Control+,"], ["eval", "document.getElementById('phone-allow').scrollIntoView()"]], { phoneRefused: true, expect: { settings: true, phoneQr: false, phoneAllow: true } }],
+  ["phone-allow-en-light", "en", "light", [["key", "Control+,"], ["click", "#phone-allow"], ["wait", 50]], { phoneRefused: true, expect: { settings: true, lastSent: "phone_allow", phoneQr: true } }],
+  ["phone-more-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#phone-more"], ["wait", 50]], { expect: { settings: true, lastSent: "phone_window", phoneQr: false } }],
+  // Off by itself after two hours with no request: Settings says so.
+  ["phone-idle-off-ar-light", "ar", "light", [["key", "Control+,"], ["eval", "document.getElementById('set-phone').scrollIntoView()"]], { phoneIdle: true, expect: { settings: true, phoneQr: false, phoneIdle: true } }],
+  ["phone-store-en-light", "en", "light", [["key", "Control+,"]], { store: true, expect: { settings: true, phoneRow: false } }],
+  // «جرّب هذه»: each example is a button in a named list; clicking one searches for it.
+  ["tip-click-ar-light", "ar", "light", [["click", "#tips .tq"], ["wait", 100]], { expect: { q: "تقرير .pdf", view: "view-results", uia: true } }],
+  ["uia-settings-en-dark", "en", "dark", [["key", "Control+,"]], { phoneOn: true, expect: { settings: true, uia: true, a11y: true } }],
+  // Translated languages (i18n/*.json): direction, fonts, the language list
+  // (scrolling, each name in its own script, machine translations marked)
+  // and long or CJK texts without overflow.
+  ...["ckb", "syr", "zgh", "fr", "de", "ru", "ja", "ur"].filter((l) => LANG_FILES[l]).flatMap((l) => [
+    [`main-${l}-light`, l, "light", [["type", "report"], ["key", "ArrowDown"]]],
+    [`settings-${l}-dark`, l, "dark", [["key", "Control+,"]], { langs: LANGS.length, expect: { settings: true } }],
+    [`nores-${l}-light`, l, "light", [["type", "zzqq 2024"]]],
+  ]),
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
@@ -398,7 +480,7 @@ const SHOTS = [
   const browser = await chromium.launch(exe ? { executablePath: exe } : {});
   const errors = [];
   for (const [name, lang, theme, steps, opts = {}] of SHOTS) {
-    const ctx = await browser.newContext({ viewport: { width: opts.width || 1280, height: opts.height || 800 }, deviceScaleFactor: 2, colorScheme: theme, locale: lang === "ar" ? "ar" : "en-US" });
+    const ctx = await browser.newContext({ viewport: { width: opts.width || 1280, height: opts.height || 800 }, deviceScaleFactor: 2, colorScheme: theme, locale: lang === "en" ? "en-US" : lang });
     const pg = await ctx.newPage();
     const thumbAsks = [];
     pg.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
@@ -419,7 +501,7 @@ const SHOTS = [
       if (!file.startsWith(ASSETS) || !fs.existsSync(file)) return route.fulfill({ status: 404, headers, body: "" });
       route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || "application/octet-stream", headers, body: fs.readFileSync(file) });
     });
-    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches, store: !!opts.store });
+    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches, store: !!opts.store, hotkeyTaken: !!opts.hotkeyTaken, phoneOn: !!opts.phoneOn, phoneRefused: !!opts.phoneRefused, phoneIdle: !!opts.phoneIdle });
     await pg.goto(ORIGIN + "/");
     await pg.waitForFunction(() => document.querySelector("#menu-kind") && document.querySelector("#menu-kind").children.length > 0);
     for (const [what, a, b] of steps) {
@@ -444,13 +526,14 @@ const SHOTS = [
     }
     await pg.evaluate(() => document.fonts.ready);
     await pg.waitForTimeout(100);
-    const check = await pg.evaluate((lang) => {
+    const check = await pg.evaluate(([lang, wantDir, expectLangs]) => {
       const bad = [...window.__fakeErrors];
       const visible = (el) => el && !el.closest("[hidden]") && el.getClientRects().length > 0;
       if (document.documentElement.scrollWidth > innerWidth) bad.push("horizontal overflow");
-      if ([...document.fonts].filter((f) => f.status === "loaded").length < 2) bad.push("fonts not loaded");
-      if (document.documentElement.dir !== (lang === "ar" ? "rtl" : "ltr")) bad.push("page direction");
-      if (getComputedStyle(document.body).direction !== (lang === "ar" ? "rtl" : "ltr")) bad.push("body direction");
+      // (A language whose script IBM Plex lacks starts with a Windows font instead.)
+      if (getComputedStyle(document.body).fontFamily.startsWith('"IF Sans"') && [...document.fonts].filter((f) => f.status === "loaded").length < 2) bad.push("fonts not loaded");
+      if (document.documentElement.dir !== wantDir) bad.push("page direction");
+      if (getComputedStyle(document.body).direction !== wantDir) bad.push("body direction");
       // Every path: left to right, its folder names placed left to right in order.
       for (const p of document.querySelectorAll(".path")) {
         if (getComputedStyle(p).direction !== "ltr") bad.push("path not LTR: " + p.textContent);
@@ -459,7 +542,25 @@ const SHOTS = [
       }
       // The empty search box's hint reads in the page's direction («ابحث باسم الملف…», its ellipsis at the end).
       const box = document.querySelector("#q");
-      if (!box.value && getComputedStyle(box).direction !== (lang === "ar" ? "rtl" : "ltr")) bad.push("search hint not in the page's direction");
+      if (!box.value && getComputedStyle(box).direction !== wantDir) bad.push("search hint not in the page's direction");
+      // The language list: every language, each name in its own language, translations marked.
+      if (expectLangs) {
+        const opts = [...document.querySelectorAll("#settings .lopt")];
+        if (opts.length !== expectLangs) bad.push(`languages listed: ${opts.length} of ${expectLangs}`);
+        const list = document.querySelector("#settings .langs");
+        if (list && list.scrollHeight > list.clientHeight && getComputedStyle(list).overflowY !== "auto") bad.push("language list does not scroll");
+        for (const o of opts) {
+          const n = o.querySelector(".lname");
+          if (!n || !n.lang) bad.push("language name without lang");
+          if (o.dataset.lang !== "ar" && o.dataset.lang !== "en" && !o.querySelector("small")) bad.push(`${o.dataset.lang}: not marked as a machine translation`);
+          if (o.scrollWidth > o.clientWidth + 1) bad.push(`${o.dataset.lang}: name overflows`);
+        }
+        if (lang !== "ar" && lang !== "en" && !document.querySelector("#lang-help")) bad.push("no help-improve-the-translation link");
+      }
+      // Nothing cut off sideways: buttons and labels fit (long German/Russian words, CJK).
+      if (lang !== "ar" && lang !== "en") for (const el of document.querySelectorAll("button, .srow label, .chip, h2, h3")) {
+        if (visible(el) && el.scrollWidth > el.clientWidth + 2 && getComputedStyle(el).overflow !== "hidden" && getComputedStyle(el).textOverflow !== "ellipsis") bad.push(`overflows: ${el.id || el.className} «${el.textContent.trim().slice(0, 40)}»`);
+      }
       // Names, snippets and matching lines pick their own direction.
       for (const el of document.querySelectorAll(".pv-name .t, .row .n3 .sn, .lines .lt, .field input")) if (visible(el) && getComputedStyle(el).unicodeBidi !== "plaintext" && el.tagName !== "BDI" && !(el.classList.contains("fname") && el.dir) && !el.matches(":placeholder-shown")) bad.push("text without its own direction: " + el.className);
       // Phone numbers, dates and versions (app.js DIGIT_RUN) read as typed:
@@ -538,7 +639,7 @@ const SHOTS = [
         termsAr: document.getElementById("cols").textContent.includes("تاريخ التعديل") && document.getElementById("status-text").textContent.startsWith("عدد النتائج: "),
         // Arabic counts read «label: n», never «n نتيجة/ملف» (no noun to agree with the number).
         countsAr: !/[0-9٠-٩] ?(نتيجة|نتائج|ملف|مستند|تطابق)/.test(document.body.innerText),
-        dateTime: /[0-9٠-٩]{1,2}:[0-9٠-٩]{2}/.test([...document.querySelectorAll(".facts dd")].map((d) => d.textContent).join(" ")),
+        dateTime: /[0-9٠-٩]{1,2}:[0-9٠-٩]{2}/.test([...document.querySelectorAll(".facts .v")].map((d) => d.textContent).join(" ")),
         actbar: visible(document.getElementById("actbar")) ? document.querySelectorAll("#actbar .btn").length : 0,
         labels: [...document.querySelectorAll(".hbtn .hlbl")].every((l) => visible(l) && l.textContent.trim()),
         rowH: [...document.querySelectorAll("#list .row")].every((r) => r.getBoundingClientRect().height <= 36),
@@ -564,14 +665,48 @@ const SHOTS = [
           if (bad.length) window.__fakeErrors.push("no accessible name: " + bad.map((el) => el.id || el.className).join(", "));
           return !bad.length;
         })(),
-        updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent : null; })(),
-        trustStore: [...document.querySelectorAll('[data-i18n="trust"], .settings .muted')].filter(visible).every((el) => el.textContent.includes("Microsoft Store") && !el.textContent.includes("GitHub")),
+        phoneQr: !!visible(document.querySelector("#phone-qr path")) && document.querySelector("#phone-qr path").getAttribute("d").length > 1000,
+        phonePin: (document.getElementById("phone-pin") || {}).textContent || null,
+        phoneAllow: !!visible(document.getElementById("phone-allow")),
+        phoneRow: !!document.getElementById("set-phone"),
+        phoneIdle: !!visible(document.querySelector("#phone-note.idle")),
+        hkTaken: !!visible(document.getElementById("hk-taken")),
+        hkKbd: document.getElementById("hk-kbd").textContent,
+        hkOn: (document.querySelector('.hkrow [aria-checked="true"]') || {}).id || null,
+        helpEx: document.querySelectorAll(".dlg.help .hx").length || null,
+        helpKeys: [...document.querySelectorAll(".dlg.help .hk-list kbd")].some((k) => k.textContent === "F1"),
+        reportSays: (() => { const l = document.getElementById("report-problem-d"); if (!l || !visible(l)) return null; const t = l.textContent; return [/email|البريد/.test(t) ? "email" : "", /public|عامة/.test(t) ? "public" : ""].filter(Boolean).join("+"); })(),
+        updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent + (b.getAttribute("aria-disabled") === "true" ? "|busy" : "|ready") : null; })(),
+        updChecks: window.__sent.filter((m) => m.op === "check_updates").length,
+        suggKbd: document.querySelectorAll("#sugg kbd").length,
+        statusText: document.getElementById("status-text").textContent,
+        trustStore: [...document.querySelectorAll('[data-i18n="trust"], .settings .muted')].filter(visible).every((el) => el.textContent.includes("Microsoft Store") && !el.textContent.includes("GitHub") && !/phone|الهاتف/.test(el.textContent)),
         clearItem: (() => { const it = document.getElementById("hist-clear"); return it ? `${it.textContent}|${it.getAttribute("aria-disabled") === "true" ? "off" : "on"}` : null; })(),
         recentRows: document.querySelectorAll("#recent .row").length,
-        inside: document.getElementById("chip-content").getAttribute("aria-pressed") === "true",
+        inside: document.getElementById("chip-content").getAttribute("aria-checked") === "true",
+        lastSearch: (() => { const m = window.__sent.filter((x) => x.op === "search").pop(); return m ? [m.q, m.kind, m.size, m.date, m.content].join("|") : null; })(),
+        // Real-PC UIA findings: buttons named by their text (the card describes them), named lists
+        // whose items hold each label with its value, clickable examples as buttons, switches as switches.
+        uia: (() => {
+          const bad = [];
+          for (const id of ["check-updates", "report-problem", "options-menu"]) {
+            const b = document.getElementById(id);
+            if (b && (document.querySelector(`label[for="${id}"]`) || !document.getElementById(b.getAttribute("aria-describedby") || "-"))) bad.push(id + " named by a label or not described");
+          }
+          for (const l of document.querySelectorAll('[role="list"]')) {
+            if (!l.closest("[hidden]") && !(l.getAttribute("aria-label") || l.getAttribute("aria-labelledby"))) bad.push("unnamed list " + (l.id || l.className));
+            for (const c of l.children) if (c.getAttribute("role") !== "listitem") bad.push("list child not an item in " + (l.id || l.className));
+          }
+          if (document.querySelector(".facts dd, .facts dt")) bad.push("facts as dt/dd");
+          if (document.querySelector(".tips code, .tips [role=listitem] :not(button):not(span)")) bad.push("tips example not a button");
+          for (const el of document.querySelectorAll(".sw, #chip-content, .viewbtns .view")) if (el.getAttribute("role") !== "switch" || !/^(true|false)$/.test(el.getAttribute("aria-checked"))) bad.push("not a switch: " + el.id);
+          if (document.querySelector(".status .keys[aria-hidden]")) bad.push("key hints hidden");
+          if (bad.length) window.__fakeErrors.push("uia: " + bad.join("; "));
+          return !bad.length;
+        })(),
         ctxFirst: (() => { const it = document.querySelector("#ctx:not([hidden]) [role=menuitem] span"); return it ? it.textContent : null; })(),
       };
-    }, lang);
+    }, [lang, dirOf(lang), opts.langs]);
     for (const b of check.bad) errors.push(`${name}: ${b}`);
     // Chromium's own accessibility tree (what WebView2 hands to UI Automation)
     // has each result row as an option of the "Results" listbox, with its name.
@@ -587,7 +722,8 @@ const SHOTS = [
       if (!ok) errors.push(`${name}: expected ${k} = ${JSON.stringify(v)}, got ${JSON.stringify(k === "renamed" ? check.names : check[k])}`);
     }
     console.log(name, JSON.stringify({ view: check.view, dir: check.dir, rows: check.rows, active: check.active, menu: check.menu, dialog: check.dialog, chipsOn: check.chipsOn }));
-    await pg.screenshot({ path: path.join(out, `${name}.png`) });
+    // (Headless Chromium now and then fails a capture of a tall page: tried again.)
+    for (let t = 0; ; t++) { try { await pg.screenshot({ path: path.join(out, `${name}.png`) }); break; } catch (e) { if (t > 3) throw e; await pg.waitForTimeout(500); } }
     await ctx.close();
   }
   await browser.close();

@@ -70,6 +70,7 @@ name = "bahth"
 version = "0.10.0"
 dependencies = [
  "aho-corasick",
+ "bahth-i18n-macros",
  "bincode",
  "calamine",
  "cfb",
@@ -97,9 +98,14 @@ dependencies = [
  "webview2-com",
  "winapi",
  "windows",
+ "windows-core",
  "wry",
  "zip",
 ]
+
+[[package]]
+name = "bahth-i18n-macros"
+version = "0.1.0"
 
 [[package]]
 name = "base64"

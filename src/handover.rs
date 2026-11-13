@@ -80,8 +80,18 @@ pub fn end_previous(
     wait: impl Fn(Duration) -> Option<bool>,
     terminate: impl FnOnce() -> bool,
 ) -> (Previous, String) {
+    end_previous_within(pid, OLD_COPY_WAIT, wait, terminate)
+}
+
+/// [`end_previous`] with its own wait (`budget`) before the copy is ended.
+pub fn end_previous_within(
+    pid: u32,
+    budget: Duration,
+    wait: impl Fn(Duration) -> Option<bool>,
+    terminate: impl FnOnce() -> bool,
+) -> (Previous, String) {
     let started = Instant::now();
-    let outcome = match wait(OLD_COPY_WAIT) {
+    let outcome = match wait(budget) {
         None => Previous::Gone,
         Some(true) => Previous::Exited,
         Some(false) if terminate() && wait(Duration::from_secs(2)) != Some(false) => Previous::Terminated,
@@ -91,7 +101,7 @@ pub fn end_previous(
     let line = match outcome {
         Previous::Gone => format!("handover: previous copy (pid {pid}) had already ended"),
         Previous::Exited => format!("handover: previous copy (pid {pid}) ended after {ms} ms"),
-        Previous::Terminated => format!("handover: previous copy (pid {pid}) still running after {} s; ended it", OLD_COPY_WAIT.as_secs()),
+        Previous::Terminated => format!("handover: previous copy (pid {pid}) still running after {} s; ended it", budget.as_secs()),
         Previous::Stuck => format!("handover: previous copy (pid {pid}) still running and could not be ended; starting anyway"),
     };
     (outcome, line)
@@ -246,6 +256,292 @@ pub fn trial(updated: bool, marker: bool, old: bool) -> Trial {
 /// started with, which may not be the one saved since.
 pub fn window_titles<'a>(current: &'a str, other: &'a str) -> [&'a str; 2] {
     [current, other]
+}
+
+// ------------------------------------------------- a newer copy starts
+
+// A start that finds another copy running (the single-instance lock held)
+// used to bring that copy to the front and leave, so the downloaded 1.0
+// started while 0.10.0 sat by the clock left the user on 0.10.0 without a
+// word. The owner's decision (2026-11-13): a newer copy replaces the older
+// one, with no question:
+//
+// - The older copy is asked to leave ([`LEAVE_MESSAGE`], the same polite
+//   way out as every handover, `Leaving::Restart`) and ended if it does not
+//   go in time ([`end_previous_within`]). A copy of 0.10.0 or older knows
+//   neither message ([`WayOut`]).
+// - Its program file is replaced by this one ([`replace_installed`]: the
+//   updater's swap, keeping `bahth.exe.old` for the trial and the roll-back
+//   of an update), and the program starts again from there with
+//   `--updated`, so the start-with-Windows entry, the Start-menu shortcut
+//   and the data stay as they are. A copy started from Downloads or a temp
+//   folder is deleted by the copy that took its place ([`download_to_remove`]).
+// - A folder that must not be written to (Program Files, a package
+//   manager's, read-only) or a copy in Downloads or a temp folder keeps its
+//   file: the old copy is closed and this one runs from where it is.
+// - An older or the same version, a Store copy and a portable one: the
+//   running copy comes to the front, as before.
+// - Whatever fails, a working copy is left: the file swap is undone, and an
+//   old copy that cannot be ended keeps running.
+
+/// Asked through the running copy's main window (`SendMessageTimeout`):
+/// it answers with [`pack_identity`]. Copies before 1.0 answer 0.
+pub const IDENTIFY_MESSAGE: &str = "BahthSari.Identify.v1";
+/// Posted to the running copy's main window: save and leave, a newer copy
+/// takes over (`Leaving::Restart`).
+pub const LEAVE_MESSAGE: &str = "BahthSari.LeaveForNewerCopy.v1";
+/// `--replaced=<version>`: this copy took the place of that version (for
+/// the notice after the switch, [`replaced_notice`]).
+pub const REPLACED_ARG: &str = "--replaced";
+/// `--remove-download=<path>`: the downloaded copy this one replaced, to be
+/// deleted once this copy runs ([`download_to_remove`]).
+pub const REMOVE_DOWNLOAD_ARG: &str = "--remove-download";
+
+/// How the running copy is asked to go.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WayOut {
+    /// [`LEAVE_MESSAGE`]: it saves and leaves (1.0 and later).
+    Ask,
+    /// WM_CLOSE: a copy before 1.0 whose close button really exits (no
+    /// icon by the clock, no floating box) saves and leaves.
+    Close,
+    /// A copy before 1.0 whose close button only hides it (and shows a
+    /// balloon "still running here"): nothing asks it to leave, so it is
+    /// ended at once. It loses only what it had not saved yet (its settings
+    /// since the last close; unsaved index changes are scanned again).
+    End,
+}
+
+impl WayOut {
+    /// `answered`: the copy answered [`IDENTIFY_MESSAGE`]; `close_exits`:
+    /// its settings say the close button exits.
+    pub fn for_copy(answered: bool, close_exits: bool) -> WayOut {
+        match (answered, close_exits) {
+            (true, _) => WayOut::Ask,
+            (false, true) => WayOut::Close,
+            (false, false) => WayOut::End,
+        }
+    }
+
+    /// How long it is waited for before it is ended.
+    pub fn wait(self) -> Duration {
+        match self {
+            WayOut::Ask | WayOut::Close => OLD_COPY_WAIT,
+            WayOut::End => Duration::ZERO,
+        }
+    }
+}
+
+/// The answer to [`IDENTIFY_MESSAGE`]: a positive 32-bit value (an LRESULT
+/// on 32-bit Windows too) with the version (9 bits major, 10 bits minor and
+/// patch, each capped), whether this is the Store copy, and a marker bit.
+pub fn pack_identity(version: &str, packaged: bool) -> isize {
+    let v = crate::update::parse_version(version).unwrap_or_default();
+    let part = |i: usize, max: u64| v.get(i).copied().unwrap_or(0).min(max) as isize;
+    (1 << 30) | (isize::from(packaged) << 29) | (part(0, 511) << 20) | (part(1, 1023) << 10) | part(2, 1023)
+}
+
+/// The version and the Store flag of an [`IDENTIFY_MESSAGE`] answer; `None`
+/// for no answer (0, a copy before 1.0) or anything else.
+pub fn unpack_identity(v: isize) -> Option<(String, bool)> {
+    if v < 0 || v >> 31 != 0 || v & (1 << 30) == 0 {
+        return None;
+    }
+    let packaged = v & (1 << 29) != 0;
+    Some((format!("{}.{}.{}", (v >> 20) & 511, (v >> 10) & 1023, v & 1023), packaged))
+}
+
+/// A copy of the program: its version (from its answer or its file's
+/// version resource), its exe and whether it is the Store copy.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CopyInfo {
+    pub version: Option<String>,
+    pub exe: Option<String>,
+    pub packaged: bool,
+}
+
+/// The folder of the running (older) copy's exe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Folder {
+    /// Its own folder, which this copy can write to: the file is replaced.
+    Writable,
+    /// Downloads or a temp folder: not a place to put the new program in.
+    Transient,
+    /// Installed by winget, Scoop or Chocolatey, which own the file.
+    Managed,
+    /// Program Files or a folder that cannot be written to.
+    Protected,
+}
+
+/// What a start does when another copy runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SecondStart {
+    /// Brings the running copy to the front and leaves (the reason, for
+    /// the log).
+    Front(&'static str),
+    /// Closes the running copy, puts this program in place of its file and
+    /// starts it from there.
+    ReplaceInstalled,
+    /// Closes the running copy and runs from here (the reason its file is
+    /// kept, for the log).
+    ReplaceProcess(&'static str),
+}
+
+/// Whether two exe paths name the same file (case, `/`, `\\?\`). The image
+/// of a copy that was updated in place may be `bahth.exe.old`: the same
+/// install as `bahth.exe`.
+pub fn same_exe(a: &str, b: &str) -> bool {
+    let norm = |p: &str| {
+        let n = crate::relocate::normalize(p);
+        match n.strip_suffix(".exe.old\\") {
+            Some(base) => format!("{base}.exe\\"),
+            None => n,
+        }
+    };
+    norm(a) == norm(b)
+}
+
+/// The decision when this copy (`this`; `this_managed`: installed by a
+/// package manager) starts while `running` runs from a `folder` (see the
+/// notes above).
+pub fn second_start(this: &CopyInfo, this_managed: bool, running: &CopyInfo, folder: Folder) -> SecondStart {
+    use crate::update::is_newer;
+    let (Some(mine), Some(theirs)) = (this.version.as_deref(), running.version.as_deref()) else {
+        return SecondStart::Front("the running copy's version is not known");
+    };
+    if this.packaged != running.packaged {
+        return SecondStart::Front("a Store copy and a portable copy never replace each other");
+    }
+    if !is_newer(mine, theirs) {
+        let same_place = matches!((&this.exe, &running.exe), (Some(a), Some(b)) if same_exe(a, b));
+        return SecondStart::Front(if is_newer(theirs, mine) {
+            "a newer copy is running"
+        } else if same_place {
+            "the same copy"
+        } else {
+            "the same version runs from another folder"
+        });
+    }
+    if this.packaged {
+        // (Two versions of the Store package: Windows replaces it itself.)
+        return SecondStart::Front("the Store updates its own copy");
+    }
+    let Some(theirs_exe) = running.exe.as_deref() else {
+        return SecondStart::ReplaceProcess("the running copy's file is not known");
+    };
+    if this.exe.as_deref().is_some_and(|mine| same_exe(mine, theirs_exe)) {
+        return SecondStart::ReplaceProcess("this is already the program file of the running copy");
+    }
+    if this_managed {
+        return SecondStart::ReplaceProcess("this copy is installed by a package manager, which owns its file");
+    }
+    match folder {
+        Folder::Writable => SecondStart::ReplaceInstalled,
+        Folder::Transient => SecondStart::ReplaceProcess("the running copy is in Downloads or a temp folder"),
+        Folder::Managed => SecondStart::ReplaceProcess("the running copy is installed by a package manager, which owns its file"),
+        Folder::Protected => SecondStart::ReplaceProcess("the running copy's folder is protected or cannot be written to"),
+    }
+}
+
+/// No other copy runs, and this one (`this_transient`: started from
+/// Downloads or a temp folder) is newer than the copy installed at
+/// `installed` (the start-with-Windows entry's exe, or the permanent place
+/// the move offer uses): true when that file is to be replaced by this one,
+/// as when the older copy runs.
+pub fn replaces_installed(this: &CopyInfo, this_transient: bool, installed: &CopyInfo, folder: Folder) -> bool {
+    this_transient && second_start(this, false, installed, folder) == SecondStart::ReplaceInstalled
+}
+
+/// What tells Program Files apart (`var` reads an environment variable):
+/// the file of a copy installed there is never replaced.
+pub fn in_program_files(exe: &str, var: impl Fn(&str) -> Option<String>) -> bool {
+    let dir = crate::relocate::normalize(exe);
+    ["ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"]
+        .iter()
+        .filter_map(|k| var(k).filter(|v| !v.trim().is_empty()))
+        .any(|root| dir.starts_with(&crate::relocate::normalize(&root)))
+}
+
+/// The folder kind of `exe` from what was found about it.
+pub fn folder_kind(managed: bool, protected: bool, transient: bool, writable: bool) -> Folder {
+    if managed {
+        Folder::Managed
+    } else if protected || !writable {
+        Folder::Protected
+    } else if transient {
+        Folder::Transient
+    } else {
+        Folder::Writable
+    }
+}
+
+/// Copies the program `src` (this one) next to `exe` as `exe.new`, a new
+/// file (so a download's "from the internet" mark is not carried over), and
+/// swaps it in with the updater's `swap_in`: `exe` becomes `exe.old` (the
+/// update trial and its roll-back use it), the copy becomes `exe`. Each
+/// swap is tried `tries` times, `pause` apart (the old copy, or a scanner,
+/// may still hold the file). On failure `exe` is as it was and `exe.new` is
+/// gone.
+pub fn replace_installed(src: &Path, exe: &Path, tries: u32, pause: Duration) -> Result<(), String> {
+    use std::io::{self, Write};
+    let new = sibling(exe, ".new");
+    let old = sibling(exe, ".old");
+    let copied = (|| {
+        let mut from = std::fs::File::open(src)?;
+        let mut to = std::fs::File::create(&new)?;
+        let n = io::copy(&mut from, &mut to)?;
+        to.flush()?;
+        to.sync_all()?;
+        if n != std::fs::metadata(src)?.len() {
+            return Err(io::Error::other("the copy is incomplete"));
+        }
+        Ok(())
+    })();
+    if let Err(e) = copied {
+        let _ = std::fs::remove_file(&new);
+        return Err(format!("cannot copy the program next to {}: {e}", exe.display()));
+    }
+    let mut last = Ok(());
+    for i in 0..tries.max(1) {
+        if i > 0 {
+            std::thread::sleep(pause);
+        }
+        last = crate::update::swap_in(exe, &new, &old);
+        if last.is_ok() {
+            break;
+        }
+    }
+    if last.is_err() {
+        let _ = std::fs::remove_file(&new);
+    }
+    last.map_err(|e| format!("{e} (after {} tries)", tries.max(1)))
+}
+
+/// The value of `--name=<value>` in `args`, if any (not empty).
+pub fn arg_value(args: impl IntoIterator<Item = String>, name: &str) -> Option<String> {
+    args.into_iter().find_map(|a| Some(a.strip_prefix(name)?.strip_prefix('=')?.to_string())).filter(|v| !v.trim().is_empty())
+}
+
+/// The short notice after the switch.
+pub fn replaced_notice(old: &str, new: &str) -> String {
+    trf!("تم استبدال النسخة القديمة ({old}) بالنسخة {new}.", "Replaced the old copy ({old}) with {new}.")
+}
+
+/// The downloaded copy named by [`REMOVE_DOWNLOAD_ARG`] that this copy may
+/// delete: only an exe in Downloads or a temp folder (`transient`), never
+/// this copy's own file, and only when it is the same version of the
+/// program as this one (`version_of`: its file's version resource).
+pub fn download_to_remove(
+    named: Option<&str>,
+    own_exe: &str,
+    transient: impl Fn(&str) -> bool,
+    version_of: impl Fn(&str) -> Option<String>,
+    own_version: &str,
+) -> Option<PathBuf> {
+    let p = named?.trim();
+    let is_exe = Path::new(p).extension().is_some_and(|e| e.eq_ignore_ascii_case("exe"));
+    let same_version = || version_of(p).is_some_and(|v| !crate::update::is_newer(&v, own_version) && !crate::update::is_newer(own_version, &v));
+    (is_exe && !same_exe(p, own_exe) && transient(p) && same_version()).then(|| PathBuf::from(p))
 }
 
 #[cfg(test)]
@@ -431,6 +727,190 @@ mod tests {
         // No trial: a normal start, an old file or not.
         assert_eq!(trial(false, false, true), Trial::Run);
         assert_eq!(trial(false, false, false), Trial::Run);
+    }
+
+    fn copy(version: &str, exe: &str, packaged: bool) -> CopyInfo {
+        CopyInfo { version: (!version.is_empty()).then(|| version.into()), exe: (!exe.is_empty()).then(|| exe.into()), packaged }
+    }
+
+    const DL: &str = "C:\\Users\\Sara\\Downloads\\bahth.exe";
+    const MOVED: &str = "C:\\Users\\Sara\\AppData\\Local\\Programs\\InstaFind\\bahth.exe";
+    const STORE: &str = "C:\\Program Files\\WindowsApps\\FastKiwi.InstaFind_1.0.0.0_x64__abc\\bahth.exe";
+
+    /// The PC test: the downloaded 1.0 starts while 0.10.0 runs by the clock.
+    #[test]
+    fn a_newer_copy_replaces_the_older_one() {
+        let new = copy("1.0.0", DL, false);
+        let old = copy("0.10.0", MOVED, false);
+        assert_eq!(second_start(&new, false, &old, Folder::Writable), SecondStart::ReplaceInstalled);
+        // Patch and minor steps count, and 1.0 is newer than 0.10.0.
+        assert_eq!(second_start(&copy("1.0.1", DL, false), false, &copy("1.0.0", MOVED, false), Folder::Writable), SecondStart::ReplaceInstalled);
+        assert_eq!(second_start(&copy("0.10.0", DL, false), false, &copy("0.9.1", MOVED, false), Folder::Writable), SecondStart::ReplaceInstalled);
+        // Its file kept, the old copy closed, this one runs from here.
+        for (folder, why) in [(Folder::Transient, "Downloads"), (Folder::Managed, "package manager"), (Folder::Protected, "protected")] {
+            match second_start(&new, false, &old, folder) {
+                SecondStart::ReplaceProcess(r) => assert!(r.contains(why), "{folder:?}: {r}"),
+                other => panic!("{folder:?}: {other:?}"),
+            }
+        }
+        // This copy is winget's: its own file stays the program.
+        assert!(matches!(second_start(&new, true, &old, Folder::Writable), SecondStart::ReplaceProcess(_)));
+        // The older copy's file was overwritten in place (same path): just close it.
+        assert!(matches!(second_start(&copy("1.0.0", MOVED, false), false, &old, Folder::Writable), SecondStart::ReplaceProcess(_)));
+        // The image of a copy updated in place.
+        let renamed = copy("0.10.0", &format!("{MOVED}.old"), false);
+        assert!(matches!(second_start(&copy("1.0.0", MOVED, false), false, &renamed, Folder::Writable), SecondStart::ReplaceProcess(_)));
+        // Its file not known (QueryFullProcessImageName refused): not replaced.
+        assert!(matches!(second_start(&new, false, &copy("0.10.0", "", false), Folder::Writable), SecondStart::ReplaceProcess(_)));
+    }
+
+    #[test]
+    fn otherwise_the_running_copy_comes_to_the_front() {
+        let front = |this: &CopyInfo, running: &CopyInfo| match second_start(this, false, running, Folder::Writable) {
+            SecondStart::Front(why) => why,
+            other => panic!("{this:?} / {running:?}: {other:?}"),
+        };
+        // An older copy started while a newer one runs.
+        assert_eq!(front(&copy("0.10.0", DL, false), &copy("1.0.0", MOVED, false)), "a newer copy is running");
+        // The same version: the same copy, or another folder (logged).
+        assert_eq!(front(&copy("1.0.0", MOVED, false), &copy("1.0.0", MOVED, false)), "the same copy");
+        assert_eq!(front(&copy("1.0.0", &MOVED.to_uppercase().replace('\\', "/"), false), &copy("1.0.0", MOVED, false)), "the same copy");
+        assert_eq!(front(&copy("1.0.0", DL, false), &copy("1.0.0", MOVED, false)), "the same version runs from another folder");
+        assert_eq!(front(&copy("1.0", DL, false), &copy("1.0.0.0", MOVED, false)), "the same version runs from another folder");
+        // Store and portable never replace each other, either way.
+        for (this, running) in [(copy("1.0.0", DL, false), copy("0.10.0", STORE, true)), (copy("1.1.0", STORE, true), copy("1.0.0", MOVED, false))] {
+            assert_eq!(front(&this, &running), "a Store copy and a portable copy never replace each other");
+        }
+        assert_eq!(front(&copy("1.1.0", STORE, true), &copy("1.0.0", STORE, true)), "the Store updates its own copy");
+        // The running copy's version not known.
+        assert_eq!(front(&copy("1.0.0", DL, false), &copy("", MOVED, false)), "the running copy's version is not known");
+        // A version that does not parse is never "newer".
+        assert_eq!(front(&copy("1.0.0", DL, false), &CopyInfo { version: Some("x".into()), ..Default::default() }), "the same version runs from another folder");
+    }
+
+    #[test]
+    fn a_newer_download_replaces_an_installed_copy_that_is_not_running() {
+        let new = copy("1.0.0", DL, false);
+        assert!(replaces_installed(&new, true, &copy("0.10.0", MOVED, false), Folder::Writable));
+        // Not from a copy the user put somewhere of their own, not an older
+        // or the same version, not a protected or managed folder.
+        assert!(!replaces_installed(&new, false, &copy("0.10.0", MOVED, false), Folder::Writable));
+        assert!(!replaces_installed(&new, true, &copy("1.0.0", MOVED, false), Folder::Writable));
+        assert!(!replaces_installed(&new, true, &copy("1.1.0", MOVED, false), Folder::Writable));
+        assert!(!replaces_installed(&new, true, &copy("0.10.0", MOVED, false), Folder::Protected));
+        assert!(!replaces_installed(&new, true, &copy("0.10.0", MOVED, false), Folder::Managed));
+        assert!(!replaces_installed(&new, true, &copy("0.10.0", DL, false), Folder::Writable), "its own file");
+        assert!(!replaces_installed(&copy("1.0.0", DL, true), true, &copy("0.10.0", MOVED, false), Folder::Writable));
+    }
+
+    #[test]
+    fn the_folder_of_the_running_copy() {
+        assert_eq!(folder_kind(false, false, false, true), Folder::Writable);
+        assert_eq!(folder_kind(false, false, true, true), Folder::Transient);
+        assert_eq!(folder_kind(true, false, false, true), Folder::Managed);
+        assert_eq!(folder_kind(false, true, false, true), Folder::Protected);
+        assert_eq!(folder_kind(false, false, false, false), Folder::Protected);
+        let env = |k: &str| match k {
+            "ProgramFiles" => Some("C:\\Program Files".to_string()),
+            "ProgramFiles(x86)" => Some("C:\\Program Files (x86)".to_string()),
+            "ProgramW6432" => Some(String::new()),
+            _ => None,
+        };
+        assert!(in_program_files("C:\\Program Files\\InstaFind\\bahth.exe", env));
+        assert!(in_program_files("c:/program files (x86)/InstaFind/bahth.exe", env));
+        assert!(!in_program_files("C:\\Program Files Old\\bahth.exe", env));
+        assert!(!in_program_files(MOVED, env));
+        assert!(!in_program_files(MOVED, |_| None));
+    }
+
+    #[test]
+    fn the_running_copy_says_its_version() {
+        for (v, packaged) in [("1.0.0", false), ("0.10.0", true), ("12.345.678", false), ("511.1023.1023", true)] {
+            let n = pack_identity(v, packaged);
+            assert!(n > 0 && n <= i32::MAX as isize, "fits a 32-bit LRESULT");
+            assert_eq!(unpack_identity(n), Some((v.to_string(), packaged)));
+        }
+        assert_eq!(unpack_identity(pack_identity("1.2", false)), Some(("1.2.0".into(), false)));
+        assert_eq!(unpack_identity(pack_identity("v2.0.1.7", false)), Some(("2.0.1".into(), false)));
+        // A copy that does not know the message, or a strange answer.
+        for bad in [0, 1, -1, 5 << 20, isize::MIN, 1 << 31] {
+            assert_eq!(unpack_identity(bad), None, "{bad}");
+        }
+        assert_ne!(IDENTIFY_MESSAGE, LEAVE_MESSAGE);
+    }
+
+    #[test]
+    fn the_older_copy_is_asked_to_go_as_it_can_be() {
+        assert_eq!(WayOut::for_copy(true, false), WayOut::Ask);
+        assert_eq!(WayOut::for_copy(true, true), WayOut::Ask);
+        // 0.10.0 without an icon by the clock: its close button exits.
+        assert_eq!(WayOut::for_copy(false, true), WayOut::Close);
+        // 0.10.0 by the clock: WM_CLOSE would only hide it, with a balloon.
+        assert_eq!(WayOut::for_copy(false, false), WayOut::End);
+        assert_eq!(WayOut::Ask.wait(), OLD_COPY_WAIT);
+        assert_eq!(WayOut::Close.wait(), OLD_COPY_WAIT);
+        assert_eq!(WayOut::End.wait(), Duration::ZERO);
+        // No wait: it is ended at once (the wait sees it still there).
+        let (out, line) = end_previous_within(3, WayOut::End.wait(), |b| Some(b > Duration::ZERO && b != WayOut::End.wait()), || true);
+        assert_eq!(out, Previous::Terminated, "{line}");
+    }
+
+    #[test]
+    fn the_new_program_takes_the_old_ones_place() {
+        let t = TempDir::new("replace");
+        let exe = t.0.join("bahth.exe");
+        let src = t.0.join("download.exe");
+        fs::write(&exe, b"v0.10").unwrap();
+        fs::write(&src, b"v1.0").unwrap();
+        replace_installed(&src, &exe, 3, Duration::ZERO).unwrap();
+        assert_eq!(fs::read(&exe).unwrap(), b"v1.0");
+        // The old program kept for the trial's roll-back, which works.
+        assert_eq!(fs::read(sibling(&exe, ".old")).unwrap(), b"v0.10");
+        assert!(!sibling(&exe, ".new").exists());
+        assert!(src.is_file(), "the download is removed later, by the new copy");
+        roll_back(&exe, &sibling(&exe, ".old")).unwrap();
+        assert_eq!(fs::read(&exe).unwrap(), b"v0.10");
+        // A source that cannot be read: nothing changes.
+        let _ = fs::remove_file(sibling(&exe, ".new"));
+        assert!(replace_installed(&t.0.join("missing.exe"), &exe, 2, Duration::ZERO).is_err());
+        assert_eq!(fs::read(&exe).unwrap(), b"v0.10");
+        assert!(!sibling(&exe, ".new").exists());
+        // A place where the swap cannot happen (no folder): refused after its tries, nothing left.
+        let nowhere = t.0.join("no-such-folder").join("bahth.exe");
+        let e = replace_installed(&src, &nowhere, 2, Duration::ZERO).unwrap_err();
+        assert!(e.contains("cannot copy"), "{e}");
+        // The old program file missing: the swap fails, tried again, refused.
+        let lonely = t.0.join("other.exe");
+        let e = replace_installed(&src, &lonely, 3, Duration::ZERO).unwrap_err();
+        assert!(e.contains("after 3 tries"), "{e}");
+        assert!(!lonely.exists() && !sibling(&lonely, ".new").exists());
+    }
+
+    #[test]
+    fn the_switch_is_passed_on_and_told() {
+        let args = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let a = args(&["bahth.exe", "--updated", "--replaced=0.10.0", "--remove-download=C:\\Users\\Sara\\Downloads\\bahth (1).exe"]);
+        assert_eq!(arg_value(a.clone(), REPLACED_ARG).as_deref(), Some("0.10.0"));
+        assert_eq!(arg_value(a, REMOVE_DOWNLOAD_ARG).as_deref(), Some("C:\\Users\\Sara\\Downloads\\bahth (1).exe"));
+        assert_eq!(arg_value(args(&["bahth.exe", "--replaced", "--replaced="]), REPLACED_ARG), None);
+        assert_eq!(arg_value(args(&["bahth.exe", "--replacedx=1"]), REPLACED_ARG), None);
+        // (Tests run in Arabic.)
+        assert_eq!(replaced_notice("0.10.0", "1.0.0"), "تم استبدال النسخة القديمة (0.10.0) بالنسخة 1.0.0.");
+    }
+
+    #[test]
+    fn only_the_downloaded_copy_of_this_version_is_deleted() {
+        let transient = |p: &str| p.to_lowercase().contains("\\downloads\\");
+        let v = |ver: &'static str| move |_: &str| Some(ver.to_string());
+        let pick = |named: Option<&str>, version: &dyn Fn(&str) -> Option<String>| download_to_remove(named, MOVED, transient, version, "1.0.0");
+        assert_eq!(pick(Some(DL), &v("1.0.0")), Some(PathBuf::from(DL)));
+        assert_eq!(pick(Some(DL), &v("1.0.0.0")), Some(PathBuf::from(DL)));
+        assert_eq!(pick(None, &v("1.0.0")), None);
+        assert_eq!(pick(Some(DL), &v("0.10.0")), None, "another version");
+        assert_eq!(pick(Some(DL), &|_| None), None, "not the program");
+        assert_eq!(pick(Some("C:\\Users\\Sara\\Downloads\\notes.txt"), &v("1.0.0")), None);
+        assert_eq!(pick(Some("D:\\Tools\\bahth.exe"), &v("1.0.0")), None, "a folder of the user's own");
+        assert_eq!(download_to_remove(Some(DL), DL, transient, v("1.0.0"), "1.0.0"), None, "never its own file");
     }
 
     #[test]

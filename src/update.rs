@@ -580,7 +580,7 @@ fn sibling(exe: &std::path::Path, suffix: &str) -> std::path::PathBuf {
 /// current one as `old`. On any failure `exe` is a working program again:
 /// the original is renamed back, or copied back if even that fails.
 #[cfg_attr(not(windows), allow(dead_code))]
-fn swap_in(exe: &std::path::Path, new: &std::path::Path, old: &std::path::Path) -> Result<(), String> {
+pub(crate) fn swap_in(exe: &std::path::Path, new: &std::path::Path, old: &std::path::Path) -> Result<(), String> {
     use std::fs;
     if !new.is_file() {
         return Err("the downloaded update is missing".into());
@@ -621,6 +621,11 @@ mod win {
     use winapi::um::errhandlingapi::GetLastError;
     use winapi::um::winhttp::*;
 
+    /// Finding the server and connecting to it: a check the user waits for
+    /// must not hang for long when the network is down or blocked.
+    const CONNECT_TIMEOUT_MS: i32 = 10_000;
+    /// Sending the request and each wait for more of the answer (a large
+    /// download keeps going as long as data keeps coming).
     const TIMEOUT_MS: i32 = 15_000;
 
     fn wide(s: impl AsRef<OsStr>) -> Vec<u16> {
@@ -686,7 +691,7 @@ mod win {
         }
         let session = Handle(h);
         unsafe {
-            WinHttpSetTimeouts(h, TIMEOUT_MS, TIMEOUT_MS, TIMEOUT_MS, TIMEOUT_MS);
+            WinHttpSetTimeouts(h, CONNECT_TIMEOUT_MS, CONNECT_TIMEOUT_MS, TIMEOUT_MS, TIMEOUT_MS);
             // Ask for TLS 1.2/1.3 explicitly (Windows 7 defaults lack 1.2).
             // TLS 1.3 is unknown to older systems, so fall back to 1.2 only.
             for mut protocols in [0x0000_2A00u32, 0x0000_0A00u32] {

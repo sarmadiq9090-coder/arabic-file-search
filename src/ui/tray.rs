@@ -14,7 +14,7 @@ use winapi::um::winuser::{
     WM_SETTINGCHANGE,
 };
 
-use super::keys::{ALT_SPACE_ID, HOTKEY_TEXT};
+use super::keys::{ALT_SPACE_ID, hotkey_text};
 use super::startup::log;
 use super::{App, autostart, shell, surface, title};
 use crate::quick::Anchor;
@@ -112,6 +112,11 @@ pub struct QuickState {
     alt_space_since: Cell<Option<u32>>,
 }
 
+/// The quick-search menu's item about the global hotkey.
+fn hotkey_quick_label() -> String {
+    trf!("{} يفتح نافذة البحث الصغيرة (وإلا النافذة الكاملة)", "{} opens the quick search (otherwise the full window)", hotkey_text())
+}
+
 /// The Alt+Space menu item, with a note while another program holds it.
 fn alt_space_label(taken: bool) -> &'static str {
     if taken {
@@ -153,7 +158,7 @@ impl App {
         item(tr!("بدون خانة بحث فوق الساعة", "No search box above the clock"), mode == FloatingMode::Off, &mut q.off, &q.menu)?;
         item(tr!("إعادة الخانة إلى مكانها", "Put the box back by the clock"), false, &mut q.reset, &q.menu)?;
         item(
-            &trf!("{HOTKEY_TEXT} يفتح نافذة البحث الصغيرة (وإلا النافذة الكاملة)", "{HOTKEY_TEXT} opens the quick search (otherwise the full window)"),
+            &hotkey_quick_label(),
             settings.hotkey_opens == HotkeyOpens::Quick,
             &mut q.hotkey_quick,
             &q.menu,
@@ -283,7 +288,7 @@ impl App {
         // The app icon the tray was built with, if the magnifier can't be made.
         icon.handle = if h.is_null() { self.tray_icon.handle } else { h as _ };
         let visible = self.state.borrow().settings.tray_icon;
-        let ok = self.tray.restore(&icon, Some(&format!("{} ({HOTKEY_TEXT})", title())), visible);
+        let ok = self.tray.restore(&icon, Some(&format!("{} ({})", title(), hotkey_text())), visible);
         log(&format!("tray icon after an Explorer restart: {}", if ok { "restored" } else { "not taken yet" }));
         ok
     }
@@ -332,14 +337,16 @@ impl App {
     /// Notes on the Alt+Space item that another program has it (for this
     /// run only), or takes the note off.
     fn set_alt_space_taken(&self, taken: bool) {
-        use winapi::um::winuser::{MENUITEMINFOW, MIIM_STRING, SetMenuItemInfoW};
-        let Some((menu, id)) = self.quick_menu.alt_space.handle.hmenu_item() else { return };
-        let text = shell::wide(alt_space_label(taken));
-        let mut info: MENUITEMINFOW = unsafe { std::mem::zeroed() };
-        info.cbSize = std::mem::size_of::<MENUITEMINFOW>() as UINT;
-        info.fMask = MIIM_STRING;
-        info.dwTypeData = text.as_ptr() as *mut u16;
-        unsafe { SetMenuItemInfoW(menu, id, 0, &info) };
+        super::keys::set_menu_text(&self.quick_menu.alt_space, alt_space_label(taken));
+    }
+
+    /// The hotkey was changed in Settings: the labels that name it.
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))] // only the new window (MSVC) offers the choice
+    pub(super) fn hotkey_labels_changed(&self) {
+        super::keys::set_menu_text(&self.quick_menu.hotkey_quick, &hotkey_quick_label());
+        self.update_web_indicator();
+        // (The box above the clock draws the keys: redrawn as it wakes.)
+        self.wake_floating(false);
     }
 
     /// Alt+Space was held by another program at start: tries again now and
@@ -368,9 +375,10 @@ impl App {
             // Over the main window in use (the new look's when on screen).
             self.modal_info(
                 title(),
-                tr!(
-                    "الاختصار Alt+Space مستخدم من برنامج آخر، فلا يمكن استخدامه هنا. يبقى Ctrl+Alt+F متاحاً.",
-                    "Alt+Space is already taken by another program, so it can't be used here. Ctrl+Alt+F still works."
+                &trf!(
+                    "الاختصار Alt+Space مستخدم من برنامج آخر، فلا يمكن استخدامه هنا. يبقى {} متاحاً.",
+                    "Alt+Space is already taken by another program, so it can't be used here. {} still works.",
+                    hotkey_text()
                 ),
             );
             return;
@@ -384,9 +392,10 @@ impl App {
     }
 
     fn show_about(&self) {
+        let hk = hotkey_text();
         let text = trf!(
-            "بحث سريع (InstaFind) — الإصدار {}\nبحث فوري عن الملفات وداخل المستندات، بالعربية والإنجليزية.\n\nاضغط {HOTKEY_TEXT} من أي مكان لتبحث.\n{}\n\nالدعم: {}\n{}\n\nتراخيص المكوّنات الخارجية التي يستعملها البرنامج في THIRD-PARTY-NOTICES.txt. هل تريد فتحه؟",
-            "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {HOTKEY_TEXT} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?",
+            "بحث سريع (InstaFind) — الإصدار {}\nبحث فوري عن الملفات وداخل المستندات، بالعربية والإنجليزية.\n\nاضغط {hk} من أي مكان لتبحث.\n{}\n\nالدعم: {}\n{}\n\nتراخيص المكوّنات الخارجية التي يستعملها البرنامج في THIRD-PARTY-NOTICES.txt. هل تريد فتحه؟",
+            "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?",
             env!("CARGO_PKG_VERSION"),
             crate::feedback::REPO_URL,
             crate::feedback::SUPPORT_EMAIL,

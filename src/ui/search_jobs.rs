@@ -120,8 +120,15 @@ impl App {
         let progress = Arc::new(ScanProgress::default());
         let result = Arc::new(Mutex::new(None));
         let (p, r) = (progress.clone(), result.clone());
+        let old = st.index.clone();
         let started_thread = crate::crash_log::spawn_named("index-build", move || {
             background_priority();
+            // Drives that are not connected now keep their entries (marked
+            // in the results): copied out first, so the old index is not
+            // held while the walk runs.
+            let kept_roots = crate::drives::kept_roots(&old.roots, crate::drives::look());
+            let kept = old.copies_under(&kept_roots);
+            drop(old);
             // A save still being written holds a snapshot of the old index:
             // let it end first, so the walk's new index is the second copy
             // in memory and not the third. (Not for ever: a stuck disk must
@@ -132,10 +139,15 @@ impl App {
             let started = std::time::Instant::now();
             // `None` after a panic (logged by the hook): the scan still ends,
             // keeping the index there was, instead of indexing forever.
-            let idx = crate::crash_log::catch(|| Index::build(&index::list_drives(), &p));
-            if let Some(idx) = &idx {
-                log(&format!("index build: {} entries in {} ms", idx.entries.len(), started.elapsed().as_millis()));
-            }
+            let built = crate::crash_log::catch(|| Index::build_measured(&index::list_drives(), &p));
+            let idx = built.map(|(mut idx, walk)| {
+                log(&format!("index build: {} entries in {} ms ({walk})", idx.entries.len(), started.elapsed().as_millis()));
+                if !kept_roots.is_empty() {
+                    let n = idx.keep_entries(&kept_roots, kept);
+                    log(&format!("index build: kept {n} entries of drives not connected now: {}", kept_roots.join(" ")));
+                }
+                idx
+            });
             // A scan stopped half-way (the program is closing) has only part
             // of the files: it must not replace the saved index.
             if let Some(idx) = idx.as_ref().filter(|_| !p.cancel.load(Ordering::Relaxed)) {
@@ -461,6 +473,9 @@ impl App {
                     log(&line);
                 }
             });
+            // The download a newer copy came from, when it took an older
+            // copy's place (`older_copy`).
+            super::older_copy::remove_download_later();
         }
         self.poll_load();
         self.poll_scan();
@@ -476,6 +491,15 @@ impl App {
         self.webui_tick(t);
         if t % 18_000 == 50 {
             self.maybe_check_for_update();
+        }
+        // «تم استبدال النسخة القديمة …», once, when the window (and the new
+        // look's page) is there to show it.
+        if t >= 4 && !self.replaced_told.get() && self.main_shown() && (!self.webui_in_use() || self.webui_ready()) {
+            self.replaced_told.set(true);
+            if let Some(text) = super::older_copy::notice() {
+                log(&format!("replace: notice shown: {text}"));
+                self.set_status(&text);
+            }
         }
         // Offer to report a crash of the last run once the window is up
         // (not while the program waits hidden in the tray).

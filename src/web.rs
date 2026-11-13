@@ -609,8 +609,8 @@ li{background:#fff;border-radius:8px;padding:10px 12px;margin-bottom:8px;box-sha
 .f,.i{color:#aab}.m{color:#99a}input{background:#22262b;color:#e6e8eb;border-color:#444}.n a{color:#8ab4f8}}";
 
 fn page(title: &str, body: &str) -> String {
-    let lang = crate::i18n::current();
-    let (code, dir) = (lang.code(), lang.pick("rtl", "ltr"));
+    let lang = crate::i18n::locale();
+    let (code, dir) = (lang.code, if lang.rtl { "rtl" } else { "ltr" });
     format!(
         "<!doctype html><html lang=\"{code}\" dir=\"{dir}\"><head><meta charset=\"utf-8\">\
 <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\
@@ -840,8 +840,14 @@ struct Secrets {
 }
 
 /// What the connection threads share with the UI.
+/// Search from phone turns itself off after this long with no request
+/// (`crate::ui::web_server` checks while it runs).
+pub const IDLE_OFF: Duration = Duration::from_secs(2 * 60 * 60);
+
 pub struct Shared {
     secrets: RwLock<Secrets>,
+    /// The last request from a device on the network (or the start).
+    last_request: Mutex<Instant>,
     pub allow_download: AtomicBool,
     /// The "hide system files" option is off: results include them.
     pub show_system: AtomicBool,
@@ -853,6 +859,7 @@ impl Shared {
     pub fn new(token: String, pin: String, allow_download: bool) -> Shared {
         Shared {
             secrets: RwLock::new(Secrets { token, pin }),
+            last_request: Mutex::new(Instant::now()),
             allow_download: AtomicBool::new(allow_download),
             show_system: AtomicBool::new(false),
             index: RwLock::new(Arc::default()),
@@ -883,6 +890,19 @@ impl Shared {
     pub fn current_secrets(&self) -> (String, String) {
         let s = self.secrets();
         (s.token, s.pin)
+    }
+
+    /// A request came at `now` (or the server started): the idle time
+    /// starts again.
+    pub fn note_request(&self, now: Instant) {
+        let mut last = self.last_request.lock().unwrap_or_else(|e| e.into_inner());
+        *last = (*last).max(now);
+    }
+
+    /// Whether nothing asked for anything for [`IDLE_OFF`] up to `now`.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    pub fn idle_expired(&self, now: Instant) -> bool {
+        now.saturating_duration_since(*self.last_request.lock().unwrap_or_else(|e| e.into_inner())) >= IDLE_OFF
     }
 
     fn limiter(&self) -> std::sync::MutexGuard<'_, Limiters> {
@@ -949,6 +969,8 @@ pub fn handle(req: &Request, peer: IpAddr, shared: &Shared, now: Instant) -> Res
     if !host_ok(req.header("host")) {
         return Response::text(400, "Bad Host");
     }
+    // A device of the home network asked for a page (the PIN page too).
+    shared.note_request(now);
     let is_get = req.method == "GET" || req.method == "HEAD";
     let is_login = req.path == "/login" && req.method == "POST";
     if !is_get && !is_login {
@@ -1386,6 +1408,27 @@ mod tests {
         let s = shared_with(vec![entry(r"C:\Users\سارة\العمل\المالية\تقرير.pdf", 10, false)]);
         let page = search_page("تقرير", &s.index(), true, false);
         assert!(page.contains("<bdi dir=\"ltr\"><bdi>C:</bdi>\\<bdi>Users</bdi>\\<bdi>سارة</bdi>\\<bdi>العمل</bdi>\\<bdi>المالية</bdi></bdi>"), "{page}");
+    }
+
+    #[test]
+    fn idle_time_counts_from_the_last_request() {
+        let s = shared_with(vec![entry(r"C:\docs\report.pdf", 10, false)]);
+        let t0 = Instant::now();
+        s.note_request(t0);
+        assert!(!s.idle_expired(t0 + IDLE_OFF - Duration::from_secs(1)));
+        assert!(s.idle_expired(t0 + IDLE_OFF));
+        // Any page a phone asks for counts, the PIN page too.
+        let later = t0 + Duration::from_secs(90 * 60);
+        assert_eq!(handle(&get("/", None), LAN, &s, later).status, 401);
+        assert!(!s.idle_expired(t0 + IDLE_OFF));
+        assert!(s.idle_expired(later + IDLE_OFF));
+        // A request refused before it reaches the server's pages does not.
+        handle(&get("/", None), "8.8.8.8".parse().unwrap(), &s, later + IDLE_OFF);
+        assert!(s.idle_expired(later + IDLE_OFF));
+        // An older time never moves it back.
+        s.note_request(t0);
+        assert!(!s.idle_expired(later + Duration::from_secs(60)));
+        assert_eq!(IDLE_OFF, Duration::from_secs(7200));
     }
 
     #[test]

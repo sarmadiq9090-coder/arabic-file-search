@@ -2,7 +2,7 @@
 //! only from the `instafind://` protocol (no network port, nothing from the
 //! internet), each with a strict Content Security Policy.
 
-use crate::i18n::Lang;
+use crate::i18n::{Lang, Locale};
 
 /// The custom protocol's name. WebView2 sees it as `http://instafind.localhost/`
 /// and answers it inside the program; the request never reaches the network.
@@ -52,19 +52,27 @@ const FILES: &[(&str, &[u8], &str)] = &[
     ("/fonts/IBMPlexSansArabic-SemiBold.woff2", include_bytes!("assets/fonts/IBMPlexSansArabic-SemiBold.woff2"), "font/woff2"),
 ];
 
-/// The page for `lang`, carrying this launch's `token`.
+/// The page for `lang`, carrying this launch's `token`: the interface
+/// language when `lang` is its original text (a translated language starts
+/// from English), else Arabic or English itself.
 ///
 /// The token must be plain hex (as [`super::bridge::new_token`] makes it):
-/// anything else is refused so it can't break out of its attribute.
+/// anything else is refused so it can't break out of its attribute. The
+/// language's texts go in a JSON data block (not a script: the CSP allows
+/// none inline), with every `<` escaped so nothing can close it.
 pub fn page(lang: Lang, token: &str) -> Option<String> {
     if token.is_empty() || !token.bytes().all(|b| b.is_ascii_hexdigit()) {
         return None;
     }
-    let (code, dir) = match lang {
-        Lang::Ar => ("ar", "rtl"),
-        Lang::En => ("en", "ltr"),
-    };
-    Some(PAGE.replace("{{LANG}}", code).replace("{{DIR}}", dir).replace("{{CSP}}", &meta_csp()).replace("{{TOKEN}}", token))
+    let l = if crate::i18n::current() == lang { crate::i18n::locale() } else { Locale::of(lang) };
+    let dir = if l.rtl { "rtl" } else { "ltr" };
+    Some(
+        PAGE.replace("{{LANG}}", l.code)
+            .replace("{{DIR}}", dir)
+            .replace("{{CSP}}", &meta_csp())
+            .replace("{{TOKEN}}", token)
+            .replace("{{I18N}}", &crate::i18n::page_data(l)),
+    )
 }
 
 /// [`CSP`] for the page's own `<meta>` copy, which may not hold
@@ -156,6 +164,10 @@ mod tests {
         assert!(p.contains("default-src 'none'; script-src 'self';") && !p.contains("frame-ancestors"));
         assert!(CSP.ends_with("; frame-ancestors 'none'"));
         assert!(!p.contains("{{"));
+        // The language's data block: JSON, nothing that could end it.
+        let data = p.split(r#"<script type="application/json" id="i18n">"#).nth(1).unwrap().split("</script>").next().unwrap();
+        assert_eq!(serde_json::from_str::<serde_json::Value>(data).unwrap()["code"], "ar");
+        assert_eq!(p.matches("</script>").count(), 2);
         assert!(page(Lang::En, "abc").unwrap().contains(r#"<html lang="en" dir="ltr">"#));
         for bad in ["", "ab\"cd", "<script>", "12 34"] {
             assert!(page(Lang::Ar, bad).is_none(), "{bad}");

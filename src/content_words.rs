@@ -53,8 +53,9 @@ use serde::{Deserialize, Serialize};
 use crate::content_cache::{fnv, read_at};
 
 /// Bumped whenever the on-disk format of the word index changes (or what a
-/// word is): the index is then built again from the stored texts.
-const VERSION: u32 = 1;
+/// word is): the index is then built again from the stored texts. (A new
+/// normalisation, [`crate::normalize::VERSION`], does the same.)
+const VERSION: u32 = 2;
 const SEG_MAGIC: [u8; 8] = *b"BHTHWSG\0";
 const MANIFEST: &str = "words.man";
 const SEG_PREFIX: &str = "words-";
@@ -204,11 +205,15 @@ fn count_bits(bits: &[u64], min: u32, end: u32) -> u32 {
 // ---------------------------------------------------------------------------
 
 /// The distinct words of a document's normalised text, as `\nword\n…\n`
-/// (empty when it has none), and whether one was longer than [`MAX_WORD`].
+/// (empty when it has none), whether one was longer than [`MAX_WORD`], and
+/// whether it has a character of a script written without spaces
+/// (`search::is_unspaced`: CJK, kana, Thai…), where a whole word may start
+/// or end inside one of these words.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Words {
     list: String,
     long: bool,
+    unspaced: bool,
 }
 
 impl Words {
@@ -237,10 +242,21 @@ struct Tokens {
     /// The distinct words of the chunks before (big documents only).
     seen: HashSet<Box<str>>,
     long: bool,
+    unspaced: bool,
     word: String,
 }
 
 impl Tokens {
+    /// The next character of the normalised text.
+    fn feed(&mut self, c: char) {
+        if crate::search::is_word_char(c) {
+            self.unspaced |= crate::search::is_unspaced(c);
+            self.word.push(c);
+        } else {
+            self.end();
+        }
+    }
+
     fn end(&mut self) {
         if self.word.is_empty() {
             return;
@@ -297,7 +313,7 @@ impl Tokens {
             self.spill();
             self.seen.iter().for_each(|w| push(w));
         }
-        Words { list, long: self.long }
+        Words { list, long: self.long, unspaced: self.unspaced }
     }
 }
 
@@ -306,34 +322,20 @@ impl Tokens {
 /// Normalised one character at a time, so the whole normalised
 /// text is never held.
 pub fn doc_words(text: &str) -> Words {
-    let mut t = Tokens { chunk: String::new(), ends: Vec::new(), seen: HashSet::new(), long: false, word: String::new() };
+    let mut t = Tokens { chunk: String::new(), ends: Vec::new(), seen: HashSet::new(), long: false, unspaced: false, word: String::new() };
+    // The normalised text not taken into words yet: its last character
+    // stays, since the next one may compose with it (a combining accent).
     let mut buf = String::new();
     for c in text.chars() {
-        if c.is_ascii() {
-            // normalize: ASCII is lower-cased, and \u{1} \u{2} dropped.
-            if c.is_ascii_alphanumeric() {
-                t.word.push(c.to_ascii_lowercase());
-            } else if c != crate::normalize::FORM_SEP && c != crate::normalize::SPELLING_SEP {
-                t.end();
-            }
-            continue;
-        }
-        // Arabic letters that normalise to themselves (not the alef and
-        // hamza forms, ة, ى, nor the tatweel): letters, so part of a word.
-        if ('\u{0621}'..='\u{064A}').contains(&c) && !matches!(c, 'أ' | 'إ' | 'آ' | 'ة' | 'ى' | 'ئ' | 'ؤ' | '\u{0640}') {
-            t.word.push(c);
-            continue;
-        }
-        buf.clear();
         crate::normalize::push_normalized(&mut buf, c);
-        for n in buf.chars() {
-            if crate::search::is_word_char(n) {
-                t.word.push(n);
-            } else {
-                t.end();
-            }
+        if let Some((last, _)) = buf.char_indices().next_back()
+            && last > 0
+        {
+            buf[..last].chars().for_each(|n| t.feed(n));
+            buf.drain(..last);
         }
     }
+    buf.chars().for_each(|n| t.feed(n));
     t.finish()
 }
 
@@ -347,22 +349,32 @@ pub fn doc_words(text: &str) -> Words {
 /// the document's words, written `\nword\n`, contains one of its patterns
 /// (`abc` inside a word, `\nabc` at its start, `abc\n` at its end, `\nabc\n`
 /// the whole word). A document with a word longer than [`MAX_WORD`] holds
-/// every piece.
+/// every piece, and one with a character of a script written without
+/// spaces every `edge` piece.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Plan {
-    /// Each piece's patterns.
-    pub pieces: Vec<Vec<Vec<u8>>>,
+    pub pieces: Vec<Piece>,
     /// Conditions → alternatives → piece numbers.
     pub conds: Vec<Vec<Vec<usize>>>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Piece {
+    pub patterns: Vec<Vec<u8>>,
+    /// Its start or end in a word comes from a whole-word edge (`ww:`, the
+    /// lossy forms), not a separator in the query: with CJK, kana or Thai
+    /// such an edge may fall inside a word of the index.
+    pub edge: bool,
+}
+
 impl Plan {
     /// The number of the piece with these patterns, added if new.
-    pub fn piece(&mut self, patterns: Vec<Vec<u8>>) -> usize {
-        match self.pieces.iter().position(|p| *p == patterns) {
+    pub fn piece(&mut self, patterns: Vec<Vec<u8>>, edge: bool) -> usize {
+        let piece = Piece { patterns, edge };
+        match self.pieces.iter().position(|p| *p == piece) {
             Some(i) => i,
             None => {
-                self.pieces.push(patterns);
+                self.pieces.push(piece);
                 self.pieces.len() - 1
             }
         }
@@ -382,13 +394,29 @@ pub enum Found {
 /// Per piece: the documents found so far, or `None` once it narrows nothing.
 struct Acc {
     bits: Vec<Option<Vec<u64>>>,
+    edges: Vec<bool>,
     words: Vec<usize>,
     bytes: Vec<usize>,
 }
 
 impl Acc {
-    fn new(pieces: usize, end: u32) -> Acc {
-        Acc { bits: (0..pieces).map(|_| Some(bitset(end))).collect(), words: vec![0; pieces], bytes: vec![0; pieces] }
+    fn new(plan: &Plan, end: u32) -> Acc {
+        let n = plan.pieces.len();
+        Acc {
+            bits: (0..n).map(|_| Some(bitset(end))).collect(),
+            edges: plan.pieces.iter().map(|p| p.edge).collect(),
+            words: vec![0; n],
+            bytes: vec![0; n],
+        }
+    }
+
+    /// A document of a script without spaces: every edge piece holds.
+    fn set_edges(&mut self, id: u32) {
+        for (b, _) in self.bits.iter_mut().zip(&self.edges).filter(|(_, e)| **e) {
+            if let Some(b) = b {
+                set_bit(b, id);
+            }
+        }
     }
 
     fn wants(&self, piece: usize) -> bool {
@@ -456,8 +484,8 @@ impl Matcher {
     fn new(plan: &Plan) -> Option<Matcher> {
         let mut pats: Vec<&[u8]> = Vec::new();
         let mut owners: Vec<Vec<usize>> = Vec::new();
-        for (p, list) in plan.pieces.iter().enumerate() {
-            for pat in list {
+        for (p, piece) in plan.pieces.iter().enumerate() {
+            for pat in &piece.patterns {
                 match pats.iter().position(|x| *x == pat.as_slice()) {
                     Some(i) => owners[i].push(p),
                     None => {
@@ -486,8 +514,9 @@ impl Matcher {
 // ---------------------------------------------------------------------------
 
 /// Trailer: magic, version, min, end, docs, blocks, table offset and length,
-/// long-postings offset and length, table checksum, trailer checksum.
-const TRAILER: usize = 8 + 4 * 5 + 8 + 4 + 8 + 4 + 8 + 8;
+/// long-postings offset and length, unspaced-postings offset and length,
+/// table checksum, trailer checksum.
+const TRAILER: usize = 8 + 4 * 5 + 8 + 4 + 8 + 4 + 8 + 4 + 8 + 8;
 
 /// Each word's postings, as a byte range of its block's postings.
 type Ranges = Vec<(u32, u32)>;
@@ -514,6 +543,9 @@ struct Segment {
     blocks: Vec<Block>,
     long_off: u64,
     long_len: u32,
+    /// Documents with a character of a script written without spaces.
+    unspaced_off: u64,
+    unspaced_len: u32,
 }
 
 fn seg_path(dir: &Path, serial: u64) -> PathBuf {
@@ -548,13 +580,15 @@ impl Segment {
         let (min, end, docs, n) = (le_u32(&t, 12), le_u32(&t, 16), le_u32(&t, 20), le_u32(&t, 24) as usize);
         let (table_off, table_len) = (le_u64(&t, 28), le_u32(&t, 36) as u64);
         let (long_off, long_len) = (le_u64(&t, 40), le_u32(&t, 48));
+        let (unspaced_off, unspaced_len) = (le_u64(&t, 52), le_u32(&t, 60));
         let data_end = bytes - TRAILER as u64;
-        if min > end || table_off.checked_add(table_len).is_none_or(|e| e > data_end) || long_off.checked_add(u64::from(long_len)).is_none_or(|e| e > table_off) {
+        let fits = |off: u64, len: u32| off.checked_add(u64::from(len)).is_some_and(|e| e <= table_off);
+        if min > end || table_off.checked_add(table_len).is_none_or(|e| e > data_end) || !fits(long_off, long_len) || !fits(unspaced_off, unspaced_len) {
             return Err(corrupt());
         }
         let mut table = vec![0u8; table_len as usize];
         read_at(&file, &mut table, table_off)?;
-        if fnv(&table) != le_u64(&t, 52) {
+        if fnv(&table) != le_u64(&t, 64) {
             return Err(corrupt());
         }
         let mut blocks = Vec::with_capacity(n.min(table.len() / 30));
@@ -582,7 +616,7 @@ impl Segment {
         if at != table.len() {
             return Err(corrupt());
         }
-        Ok(Segment { serial, path, file, min, end, docs, bytes, blocks, long_off, long_len })
+        Ok(Segment { serial, path, file, min, end, docs, bytes, blocks, long_off, long_len, unspaced_off, unspaced_len })
     }
 
     /// Reads block `b`: its vocabulary and word lengths, and with `postings`
@@ -613,18 +647,23 @@ impl Segment {
         Ok((buf, ranges))
     }
 
-    fn read_long(&self) -> io::Result<Vec<u8>> {
-        let mut buf = vec![0u8; self.long_len as usize];
-        read_at(&self.file, &mut buf, self.long_off)?;
-        Ok(buf)
+    /// The documents with an over-long word (`unspaced` false) or with a
+    /// character of a script without spaces (true).
+    fn read_special(&self, unspaced: bool) -> io::Result<Vec<u32>> {
+        let (off, len) = if unspaced { (self.unspaced_off, self.unspaced_len) } else { (self.long_off, self.long_len) };
+        let mut buf = vec![0u8; len as usize];
+        read_at(&self.file, &mut buf, off)?;
+        let mut ids = Vec::new();
+        if !decode_ids(&buf, self.min, self.end, |id| ids.push(id)) {
+            return Err(corrupt());
+        }
+        Ok(ids)
     }
 
     /// Adds what this segment holds for the plan's pieces to `acc`.
     fn lookup(&self, m: &Matcher, acc: &mut Acc) -> io::Result<()> {
-        let long = self.read_long()?;
-        if !decode_ids(&long, self.min, self.end, |id| acc.set_all(id)) {
-            return Err(corrupt());
-        }
+        self.read_special(false)?.into_iter().for_each(|id| acc.set_all(id));
+        self.read_special(true)?.into_iter().for_each(|id| acc.set_edges(id));
         let mut hits: Vec<(u32, usize)> = Vec::new();
         for b in &self.blocks {
             let (buf, ranges) = self.read_block(b, false)?;
@@ -771,20 +810,24 @@ impl SegWriter {
     }
 
     /// Ends the segment with the documents that have an over-long word
-    /// (`long`, ascending) and `docs` documents in all, syncs it and puts it
-    /// in place. `None` (and no file) when it holds nothing.
-    fn finish(mut self, dir: &Path, serial: u64, long: &[u32], docs: u32) -> io::Result<Option<Segment>> {
+    /// (`long`, ascending), those with a character of a script without
+    /// spaces (`unspaced`) and `docs` documents in all, syncs it and puts
+    /// it in place. `None` (and no file) when it holds nothing.
+    fn finish(mut self, dir: &Path, serial: u64, long: &[u32], unspaced: &[u32], docs: u32) -> io::Result<Option<Segment>> {
         self.flush_block()?;
         if self.words_total == 0 && long.is_empty() {
             drop(self.out);
             let _ = fs::remove_file(&self.tmp);
             return Ok(None);
         }
-        let mut long_bytes = Vec::new();
-        encode_ids(&mut long_bytes, long.iter().copied(), self.min);
-        let long_off = self.pos;
-        self.out.write_all(&long_bytes)?;
-        self.pos += long_bytes.len() as u64;
+        let mut specials = [(0u64, 0u32); 2];
+        for (slot, ids) in specials.iter_mut().zip([long, unspaced]) {
+            let mut bytes = Vec::new();
+            encode_ids(&mut bytes, ids.iter().copied(), self.min);
+            *slot = (self.pos, bytes.len() as u32);
+            self.out.write_all(&bytes)?;
+            self.pos += bytes.len() as u64;
+        }
         let table_off = self.pos;
         self.out.write_all(&self.table)?;
         let mut t = Vec::with_capacity(TRAILER);
@@ -794,8 +837,10 @@ impl SegWriter {
         }
         t.extend_from_slice(&table_off.to_le_bytes());
         t.extend_from_slice(&(self.table.len() as u32).to_le_bytes());
-        t.extend_from_slice(&long_off.to_le_bytes());
-        t.extend_from_slice(&(long_bytes.len() as u32).to_le_bytes());
+        for (off, len) in specials {
+            t.extend_from_slice(&off.to_le_bytes());
+            t.extend_from_slice(&len.to_le_bytes());
+        }
         t.extend_from_slice(&fnv(&self.table).to_le_bytes());
         let sum = fnv(&t);
         t.extend_from_slice(&sum.to_le_bytes());
@@ -892,18 +937,13 @@ fn merge_segments(dir: &Path, serial: u64, segs: &[Arc<Segment>], live: &[u64]) 
         }
         w.add(&word, ids.iter().copied())?;
     }
-    let mut long = Vec::new();
+    let (mut long, mut unspaced) = (Vec::new(), Vec::new());
     for s in segs {
-        if !decode_ids(&s.read_long()?, s.min, s.end, |id| {
-            if has_bit(live, id) {
-                long.push(id);
-            }
-        }) {
-            return Err(corrupt());
-        }
+        long.extend(s.read_special(false)?.into_iter().filter(|&id| has_bit(live, id)));
+        unspaced.extend(s.read_special(true)?.into_iter().filter(|&id| has_bit(live, id)));
     }
     let docs = count_bits(live, min, end);
-    w.finish(dir, serial, &long, docs)
+    w.finish(dir, serial, &long, &unspaced, docs)
 }
 
 // ---------------------------------------------------------------------------
@@ -931,6 +971,8 @@ struct DocRec {
 #[derive(Serialize, Deserialize)]
 struct Manifest {
     version: u32,
+    /// [`crate::normalize::VERSION`] the words were normalised with.
+    norm: u32,
     next_serial: u64,
     next_id: u32,
     segments: Vec<SegRef>,
@@ -945,6 +987,7 @@ struct PendingDoc {
     id: u32,
     list: Box<str>,
     long: bool,
+    unspaced: bool,
 }
 
 #[derive(Default)]
@@ -1041,7 +1084,7 @@ impl Index {
             return None;
         }
         let m: Manifest = bincode::deserialize(payload).ok()?;
-        if m.version != VERSION {
+        if m.version != VERSION || m.norm != crate::normalize::VERSION {
             return None;
         }
         let mut segs: Vec<Arc<Segment>> = Vec::new();
@@ -1085,7 +1128,7 @@ impl Index {
         st.next_id += 1;
         st.ids.insert(key, id);
         st.pending_bytes += words.list.len() + std::mem::size_of::<PendingDoc>();
-        st.pending.push(PendingDoc { id, list: words.list.into_boxed_str(), long: words.long });
+        st.pending.push(PendingDoc { id, list: words.list.into_boxed_str(), long: words.long, unspaced: words.unspaced });
     }
 
     /// The document at `key` is gone from the store.
@@ -1153,7 +1196,7 @@ impl Index {
             })
             .collect();
         let segments = st.segments.iter().map(|s| SegRef { serial: s.serial, min: s.min, end: s.end, bytes: s.bytes }).collect();
-        let m = Manifest { version: VERSION, next_serial: st.next_serial, next_id: st.next_id, segments, docs };
+        let m = Manifest { version: VERSION, norm: crate::normalize::VERSION, next_serial: st.next_serial, next_id: st.next_id, segments, docs };
         drop(st);
         let mut bytes = bincode::serialize(&m).map_err(io::Error::other)?;
         bytes.extend_from_slice(&fnv(&bytes).to_le_bytes());
@@ -1272,13 +1315,16 @@ impl Index {
             if st.broken {
                 return Found::Unavailable;
             }
-            let mut acc = Acc::new(plan.pieces.len(), st.next_id);
+            let mut acc = Acc::new(plan, st.next_id);
             for d in st.writing.iter().flat_map(|w| w.iter()).chain(&st.pending) {
                 if d.long {
                     acc.set_all(d.id);
-                } else {
-                    m.doc(d.list.as_bytes(), |p| acc.set(p, d.id));
+                    continue;
                 }
+                if d.unspaced {
+                    acc.set_edges(d.id);
+                }
+                m.doc(d.list.as_bytes(), |p| acc.set(p, d.id));
             }
             (st.segments.clone(), st.next_id, acc)
         };
@@ -1331,10 +1377,13 @@ fn write_pending_segment(dir: &Path, serial: u64, min: u32, end: u32, pending: &
     // Word → ids (ascending: the documents are in id order); then only the
     // distinct words are sorted.
     let mut by_word: HashMap<&[u8], Vec<u32>> = HashMap::new();
-    let mut long = Vec::new();
+    let (mut long, mut unspaced) = (Vec::new(), Vec::new());
     for d in &docs {
         if d.long {
             long.push(d.id);
+        }
+        if d.unspaced {
+            unspaced.push(d.id);
         }
         for w in d.list.as_bytes().split(|&b| b == b'\n').filter(|w| !w.is_empty()) {
             by_word.entry(w).or_default().push(d.id);
@@ -1346,7 +1395,7 @@ fn write_pending_segment(dir: &Path, serial: u64, min: u32, end: u32, pending: &
     for (word, ids) in &words {
         w.add(word, ids.iter().copied())?;
     }
-    w.finish(dir, serial, &long, docs.len() as u32)
+    w.finish(dir, serial, &long, &unspaced, docs.len() as u32)
 }
 
 #[cfg(test)]

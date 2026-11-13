@@ -32,6 +32,8 @@ lopdf = { version = "0.42", default-features = false }
 flate2 = "1.1.10"
 tar = { version = "0.4.46", default-features = false }
 sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["bzip2", "deflate", "ppmd"] }
+# trf! in a translated interface language (src/i18n.rs): no dependencies.
+bahth-i18n-macros = { path = "i18n-macros" }
 
 [dev-dependencies]
 # The encoder, only to build .7z archives in the tests.
@@ -41,11 +43,20 @@ sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["comp
 native-windows-gui = { version = "1.0.13", default-features = false, features = ["list-view", "animation-timer", "clipboard", "menu", "file-dialog", "status-bar", "high-dpi", "tray-notification", "combobox", "notice", "textbox", "frame"] }
 winapi = { version = "0.3", features = ["winuser", "consoleapi", "wincon", "processenv", "commctrl", "shellapi", "fileapi", "winbase", "combaseapi", "objbase", "timezoneapi", "minwinbase", "libloaderapi", "uxtheme", "synchapi", "errhandlingapi", "sysinfoapi", "winerror", "handleapi", "processthreadsapi", "wingdi", "oleidl", "ole2", "objidl", "unknwnbase", "guiddef", "windef", "minwindef", "usp10", "winhttp", "winnt", "winreg", "dbt", "ioapiset", "shobjidl_core", "shlobj", "knownfolders", "shtypes",
     # Quick search: open windows (windows.rs) and system commands (system.rs).
-    "dwmapi", "powerbase", "powrprof", "reason", "securitybaseapi"] }
+    "dwmapi", "powerbase", "powrprof", "reason", "securitybaseapi",
+    # A newer copy reads the running (older) copy's version resource (src/ui/older_copy.rs).
+    "winver"] }
 
 # Windows.Media.Ocr for text in images and scanned PDFs (src/ocr.rs);
 # ApplicationModel(_Activation): the Store version's StartupTask (src/store.rs).
-windows = { version = "0.62", features = ["ApplicationModel", "ApplicationModel_Activation", "Foundation", "Foundation_Collections", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage", "Storage_Streams", "Win32_System_WinRT"] }
+# Win32_UI_Accessibility (+ Com, Ole, Variant, Foundation): the quick popup's
+# result list for screen readers (src/ui/quick_access.rs, an IAccessible) and
+# the annotated names of native controls (src/ui/accessible.rs).
+windows = { version = "0.62", features = ["ApplicationModel", "ApplicationModel_Activation", "Foundation", "Foundation_Collections", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage", "Storage_Streams", "Win32_System_WinRT",
+    "Win32_Foundation", "Win32_System_Com", "Win32_System_Ole", "Win32_System_Variant", "Win32_UI_Accessibility"] }
+# The `#[implement]` macro (that IAccessible) names this crate directly; the
+# same version the `windows` crate uses.
+windows-core = "0.62.2"
 
 # The new interface (src/webui/): WebView2 through wry, hosted in a Win32
 # window. MSVC only: with the GNU target webview2-com links WebView2Loader.dll

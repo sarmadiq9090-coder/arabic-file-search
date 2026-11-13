@@ -1,10 +1,12 @@
 //! Options ▸ «الإبلاغ عن مشكلة…» / "Report a problem…" (also in the tray
 //! menu and the new look's Settings ▸ More): a small window with a box for
 //! what happened, a read-only preview of exactly what would be shared
-//! (`crate::report` builds and filters it), and two buttons: copy it, or
-//! open the bug form on GitHub with it filled in. The program sends
-//! nothing by itself and makes no network call: the browser opens, and the
-//! user reads the page and presses "Submit" there.
+//! (`crate::report` builds and filters it), and three buttons: copy it,
+//! open a mail to the support address in the user's own mail program (the
+//! full report on the clipboard, to paste), or open the bug form on GitHub
+//! with it filled in (a public page, which the window says). The program
+//! sends nothing by itself and makes no network call: the mail program or
+//! the browser opens, and the user presses "Send" or "Submit" there.
 
 use native_windows_gui as nwg;
 use std::cell::RefCell;
@@ -56,6 +58,8 @@ pub struct ReportUi {
     preview_frame: nwg::Frame,
     preview: nwg::TextBox,
     copy_btn: nwg::Button,
+    /// «إرسال بالبريد»: the user's mail program (`feedback::report_mailto`).
+    mail_btn: nwg::Button,
     open_btn: nwg::Button,
     note: nwg::Label,
 }
@@ -129,17 +133,17 @@ impl App {
             .parent(p)
             .font(f)
             .text(tr!(
-                "لن يُرسل شيء إلا إذا ضغطت أنت. أسماء الملفات والمسارات تُحذف من التقرير.",
-                "Nothing is sent unless you press a button. File names and paths are removed from the report."
+                "لن يُرسل شيء إلا إذا ضغطت أنت. أسماء الملفات والمسارات تُحذف من التقرير. صفحة GitHub عامة يراها أي أحد؛ أما البريد فلا يقرؤه غيرنا.",
+                "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us."
             ))
-            .position((12, 10))
-            .size((616, 44))
+            .position((12, 8))
+            .size((616, 66))
             .build(&mut r.privacy)?;
         nwg::Label::builder()
             .parent(p)
             .font(f)
             .text(tr!("ماذا حدث؟ (اختياري، باختصار)", "What happened? (optional, briefly)"))
-            .position((12, 58))
+            .position((12, 78))
             .size((616, 24))
             .build(&mut r.what_label)?;
         nwg::TextBox::builder()
@@ -147,14 +151,14 @@ impl App {
             .font(f)
             .limit(report::MAX_WHAT)
             .flags(nwg::TextBoxFlags::VISIBLE | nwg::TextBoxFlags::VSCROLL | nwg::TextBoxFlags::AUTOVSCROLL | nwg::TextBoxFlags::TAB_STOP)
-            .position((12, 84))
+            .position((12, 104))
             .size((616, 64))
             .build(&mut r.what)?;
         nwg::Label::builder()
             .parent(p)
             .font(f)
             .text(tr!("هذا بالضبط ما سيُشارَك:", "This is exactly what will be shared:"))
-            .position((12, 156))
+            .position((12, 174))
             .size((616, 24))
             .build(&mut r.preview_label)?;
         // The report is technical English and reads left to right, aligned
@@ -168,8 +172,8 @@ impl App {
             .parent(p)
             .flags(nwg::FrameFlags::VISIBLE)
             .ex_flags(crate::i18n::rtl_only(WS_EX_NOINHERITLAYOUT))
-            .position((12, 182))
-            .size((616, 300))
+            .position((12, 200))
+            .size((616, 282))
             .build(&mut r.preview_frame)?;
         nwg::TextBox::builder()
             .parent(&r.preview_frame)
@@ -178,7 +182,7 @@ impl App {
             .flags(nwg::TextBoxFlags::VISIBLE | nwg::TextBoxFlags::VSCROLL | nwg::TextBoxFlags::AUTOVSCROLL | nwg::TextBoxFlags::TAB_STOP)
             .ex_flags(0)
             .position((0, 0))
-            .size((616, 300))
+            .size((616, 282))
             .build(&mut r.preview)?;
         if let Some(h) = r.preview.handle.hwnd() {
             unsafe {
@@ -190,12 +194,19 @@ impl App {
                 SetWindowPos(h, std::ptr::null_mut(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
             }
         }
-        nwg::Button::builder().parent(p).font(f).text(tr!("نسخ", "Copy")).position((12, 494)).size((140, 34)).build(&mut r.copy_btn)?;
+        nwg::Button::builder().parent(p).font(f).text(tr!("نسخ", "Copy")).position((12, 494)).size((120, 34)).build(&mut r.copy_btn)?;
         nwg::Button::builder()
             .parent(p)
             .font(f)
-            .text(tr!("فتح صفحة الإبلاغ", "Open the report page"))
-            .position((164, 494))
+            .text(tr!("إرسال بالبريد", "Send by email"))
+            .position((142, 494))
+            .size((200, 34))
+            .build(&mut r.mail_btn)?;
+        nwg::Button::builder()
+            .parent(p)
+            .font(f)
+            .text(tr!("صفحة GitHub (عامة)", "GitHub page (public)"))
+            .position((352, 494))
             .size((240, 34))
             .build(&mut r.open_btn)?;
         nwg::Label::builder().parent(p).font(f).text("").position((12, 536)).size((616, 52)).build(&mut r.note)?;
@@ -218,6 +229,7 @@ impl App {
                 nwg::Event::OnKeyEsc => r.window.set_visible(false),
                 nwg::Event::OnTextInput if handle == r.what => app.render_report(),
                 nwg::Event::OnButtonClick if handle == r.copy_btn => app.report_copy(),
+                nwg::Event::OnButtonClick if handle == r.mail_btn => app.report_mail(),
                 nwg::Event::OnButtonClick if handle == r.open_btn => app.report_open(),
                 _ => {}
             }
@@ -295,6 +307,44 @@ impl App {
         } else {
             r.note.set_text(shell::copy_failed_text());
         }
+    }
+
+    /// A new mail to the support address in the user's mail program, with
+    /// the user's words in short; the whole report goes on the clipboard
+    /// first (a `mailto:` link holds only a little), to paste in the mail.
+    /// Nothing is sent: the user presses "Send" in the mail program.
+    fn report_mail(&self) {
+        let r = &self.report;
+        let Some(built) = r.current.borrow().clone() else { return };
+        let english = crate::i18n::current() == crate::i18n::Lang::En;
+        let url = feedback::report_mailto(&SystemInfo::current(), &built.what, english);
+        let copied = shell::copy_text(&r.window, &crlf(&built.text()));
+        if !shell::open(&url) {
+            log("report: could not open the mail program");
+            r.note.set_text(&if copied {
+                trf!(
+                    "لا يوجد برنامج بريد يفتح هنا. نُسخ التقرير: الصقه في رسالة إلى {} من بريدك (من الهاتف أو المتصفح).",
+                    "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).",
+                    feedback::SUPPORT_EMAIL
+                )
+            } else {
+                trf!("لا يوجد برنامج بريد يفتح هنا. اضغط «نسخ» وأرسل التقرير إلى {}.", "No mail program opened. Press “Copy” and send the report to {}.", feedback::SUPPORT_EMAIL)
+            });
+            return;
+        }
+        r.note.set_text(&if copied {
+            trf!(
+                "فُتحت رسالة إلى {} في برنامج البريد. التقرير الكامل منسوخ: الصقه في الرسالة (Ctrl+V) ثم اضغط «إرسال». لم يُرسل شيء بعد.",
+                "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.",
+                feedback::SUPPORT_EMAIL
+            )
+        } else {
+            trf!(
+                "فُتحت رسالة إلى {} في برنامج البريد (تعذر نسخ التقرير: اضغط «نسخ» ثم الصقه فيها). لم يُرسل شيء بعد.",
+                "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.",
+                feedback::SUPPORT_EMAIL
+            )
+        });
     }
 
     /// The bug form on GitHub with the report filled in; when it does not

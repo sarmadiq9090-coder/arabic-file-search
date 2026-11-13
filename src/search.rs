@@ -37,11 +37,12 @@ pub struct Term {
     /// Normalised alternatives (the words as typed, also without an
     /// article), matched anywhere; never empty.
     pub alts: Vec<String>,
-    /// The other spellings of its hamza seats ([`query_forms`], and inside
-    /// documents [`crate::normalize::document_forms`]). They are lossy («ريس»
-    /// for «رئيس» is also the end of «باريس», «نهاي» for «نهائي» the start
-    /// of «نهاية»), so they match only as whole words, after an optional
-    /// article ([`lossy_matches`]).
+    /// The other spellings of its hamza seats and of a گ typed for ق
+    /// ([`query_forms`], and inside documents
+    /// [`crate::normalize::document_forms`]). They are lossy («ريس» for
+    /// «رئيس» is also the end of «باريس», «نهاي» for «نهائي» the start of
+    /// «نهاية», «قول» for «گول» is not «goal»), so they match only as whole
+    /// words, after an optional article ([`lossy_matches`]).
     pub word_alts: Vec<String>,
 }
 
@@ -152,19 +153,42 @@ fn merge_spans(mut spans: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
     merged
 }
 
-/// Letters and digits make up words; anything else (spaces, punctuation,
-/// `_`, `-`, `.`) separates them. Unicode-aware, so Arabic works.
+/// Letters, digits and the marks on them (Indic and Thai vowel signs) make
+/// up words; anything else (spaces, punctuation, `_`, `-`, `.`) separates
+/// them. Unicode-aware, so Arabic works.
 pub(crate) fn is_word_char(c: char) -> bool {
-    c.is_alphanumeric()
+    c.is_alphanumeric() || !c.is_ascii() && unicode_normalization::char::is_combining_mark(c)
+}
+
+/// Scripts written without spaces between words: CJK ideographs, kana,
+/// Thai, Lao, Khmer and Myanmar. Each of their characters may start or end
+/// a word ([`joined`]), so whole-word matching (`ww:`) finds a word inside
+/// a sentence of them.
+pub(crate) fn is_unspaced(c: char) -> bool {
+    matches!(
+        c,
+        '\u{0E00}'..='\u{0EFF}' | '\u{1000}'..='\u{109F}' | '\u{1780}'..='\u{17FF}' | '\u{3040}'..='\u{30FF}' | '\u{31F0}'..='\u{31FF}'
+            | '\u{3400}'..='\u{4DBF}' | '\u{4E00}'..='\u{9FFF}' | '\u{F900}'..='\u{FAFF}' | '\u{20000}'..='\u{3FFFF}'
+    )
+}
+
+/// True when `a` and `b`, side by side, are in the same word: both word
+/// characters, neither of a script written without spaces.
+fn joined(a: char, b: char) -> bool {
+    is_word_char(a) && is_word_char(b) && !is_unspaced(a) && !is_unspaced(b)
+}
+
+/// True when the match `hay[s..e]` (not empty) neither continues the word
+/// before it nor goes on into the next.
+fn ends_at_word_edges(hay: &str, s: usize, e: usize) -> bool {
+    let (first, last) = (hay[s..].chars().next(), hay[..e].chars().next_back());
+    let glued = |a: Option<char>, b: Option<char>| a.zip(b).is_some_and(|(a, b)| joined(a, b));
+    !glued(hay[..s].chars().next_back(), first) && !glued(last, hay[e..].chars().next())
 }
 
 /// Start offsets of the occurrences of `w` in `hay` that are whole words.
 fn word_matches<'a>(hay: &'a str, w: &'a str) -> impl Iterator<Item = usize> + 'a {
-    hay.match_indices(w).map(|(s, _)| s).filter(move |&s| {
-        !w.is_empty()
-            && !hay[..s].chars().next_back().is_some_and(is_word_char)
-            && !hay[s + w.len()..].chars().next().is_some_and(is_word_char)
-    })
+    hay.match_indices(w).map(|(s, _)| s).filter(move |&s| !w.is_empty() && ends_at_word_edges(hay, s, s + w.len()))
 }
 
 /// What may come before a word alternative in the same word: an article
@@ -177,12 +201,16 @@ const WORD_ALT_PREFIXES: [&str; 7] = ["وال", "بال", "كال", "فال", "�
 /// word («باريس», «نهاية»).
 fn lossy_matches<'a>(hay: &'a str, w: &'a str) -> impl Iterator<Item = usize> + 'a {
     hay.match_indices(w).map(|(s, _)| s).filter(move |&s| {
-        if w.is_empty() || hay[s + w.len()..].chars().next().is_some_and(is_word_char) {
+        if w.is_empty() || ends_at_word_edges(hay, s, s + w.len()) {
+            return !w.is_empty();
+        }
+        let last = w.chars().next_back();
+        if last.zip(hay[s + w.len()..].chars().next()).is_some_and(|(a, b)| joined(a, b)) {
             return false;
         }
         let before = &hay[..s];
-        let word_start = before.char_indices().rev().take_while(|&(_, c)| is_word_char(c)).last().map_or(s, |(i, _)| i);
-        word_start == s || WORD_ALT_PREFIXES.contains(&&before[word_start..])
+        let word_start = before.char_indices().rev().take_while(|&(_, c)| is_word_char(c) && !is_unspaced(c)).last().map_or(s, |(i, _)| i);
+        WORD_ALT_PREFIXES.contains(&&before[word_start..])
     })
 }
 
@@ -391,13 +419,14 @@ pub struct Query {
     pub show_system: bool,
     /// Problems found while parsing (in Arabic), for the UI to show.
     pub warnings: Vec<String>,
-    /// The first term's alternatives with ؤ and ئ kept as typed
-    /// ([`normalize_spelling`]). A hamza seat matches its other spellings
+    /// The first term's alternatives as typed ([`normalize_spelling`]: ؤ, ئ,
+    /// گ, ş, é… kept). A hamza seat matches its other spellings
     /// (see [`crate::normalize`]: «مسئول», «مسؤول» and «مسوول» find each
     /// other); among equally good matches the names spelled as typed come first.
     pub spelled: Vec<String>,
-    /// True when the first term has a hamza seat ([`Self::spelled`] differs
-    /// from its plain spelling or has other spellings).
+    /// True when the first term has a hamza seat or a letter the spelling as
+    /// typed keeps (گ, ş, é…): [`Self::spelled`] differs from its plain
+    /// spelling or has other spellings.
     pub spelled_seat: bool,
     /// A wildcard for any name was typed: `*` alone (or `**`), `*.*` or
     /// `ext:*`. It filters nothing, like Explorer's `*.*`, so a query of
@@ -609,9 +638,10 @@ fn split_op(v: &str) -> (&str, &str) {
     ("", v)
 }
 
-/// The value with Arabic digits, case and letter forms folded and `٫` as `.`.
+/// The value with Arabic digits, case and letter forms folded and `٫` as `.`
+/// ([`normalize`] does it all).
 fn fold_value(v: &str) -> String {
-    normalize(unquote(v)).replace('\u{066B}', ".")
+    normalize(unquote(v))
 }
 
 // ------------------------------------------------------------------ sizes
@@ -1075,7 +1105,7 @@ impl Query {
                 _ => q.terms.push(term),
             }
         }
-        q.spelled_seat = q.spelled.iter().any(|a| a.contains(['ؤ', 'ئ']) || !query_forms(a).is_empty());
+        q.spelled_seat = q.spelled.iter().any(|a| normalize(a) != *a || !query_forms(a).is_empty());
         if q.franco {
             for t in &mut q.terms {
                 let latin: Vec<String> = t.alts.iter().filter(|a| crate::franco::is_arabizi(a)).cloned().collect();
@@ -1515,7 +1545,7 @@ pub fn search_content(
     // Keyed by the file on disk, not the index entry, which may be stale.
     let text_of = |e: &Entry| content_cache::text_of(cache, &e.path);
     let recheck = |path: &str| content_cache::stamp(std::path::Path::new(path));
-    let index = cache.map(|c| WordFilter { cache: c, recheck: (!current).then_some(&recheck as &(dyn Fn(&str) -> Option<(u64, i64)> + Sync)) });
+    let index = cache.map(|c| WordFilter { cache: c, recheck: (!current).then_some(&recheck as &StampOf) });
     search_documents(entries, q, scope, progress, hits, HitLimits::DEFAULT, &text_of, index);
     if let Some(c) = cache.filter(|_| q.has_text_criteria()) {
         let _ = c.flush();
@@ -1632,13 +1662,16 @@ fn search_documents(
     }
 }
 
+/// A file's size and modification time on disk ([`content_cache::stamp`]).
+type StampOf = dyn Fn(&str) -> Option<(u64, i64)> + Sync;
+
 /// The word index for [`search_documents`]: the store it is part of, and
 /// how to ask the disk for a document's size and time when the entries may
 /// be stale (`None`: they are current).
 #[derive(Clone, Copy)]
 struct WordFilter<'a> {
     cache: &'a ContentCache,
-    recheck: Option<&'a (dyn Fn(&str) -> Option<(u64, i64)> + Sync)>,
+    recheck: Option<&'a StampOf>,
 }
 
 /// How an alternative of a term matches a text (see [`text_matches`]).
@@ -1707,9 +1740,13 @@ fn alt_pieces(plan: &mut crate::content_words::Plan, alt: &str, how: AltMatch) -
         .map(|(off, w)| {
             // Something not a letter or digit before or after it in the
             // alternative: the document word starts or ends there too.
-            let first = off == 0;
+            let (first, last) = (off == 0, off + w.len() == alt.len());
             let start = !first || how == AltMatch::Whole;
-            let end = off + w.len() < alt.len() || how != AltMatch::Inside;
+            let end = !last || how != AltMatch::Inside;
+            // A start or end that is only a whole-word edge: in a script
+            // written without spaces it may be inside a word of the index
+            // (such documents pass these pieces, see `content_words::Plan`).
+            let edge = how != AltMatch::Inside && (first || last);
             let mut pats = Vec::new();
             if first && how == AltMatch::Lossy {
                 pats.push(pattern(true, w, end));
@@ -1717,7 +1754,7 @@ fn alt_pieces(plan: &mut crate::content_words::Plan, alt: &str, how: AltMatch) -
             } else {
                 pats.push(pattern(start, w, end));
             }
-            plan.piece(pats)
+            plan.piece(pats, edge)
         })
         .collect();
     Some(pieces)

@@ -231,6 +231,8 @@ fn random_queries(rng: &mut Rng, texts: &[String], n: usize) -> Vec<String> {
         };
         let (a, b) = (word(), word());
         let pick = rng.below(9);
+        // Now and then glued to a script written without spaces.
+        let (a, b) = if rng.below(10) == 0 { (format!("{a}カ"), b) } else { (a, b) };
         out.push(match pick {
             0 => a,
             1 => format!("{a} {b}"),
@@ -258,6 +260,8 @@ fn the_word_index_finds_what_a_full_scan_finds() {
     // word, a stale one.
     texts[3] = "\u{1F}\u{FDD0}تقارير\\a.txt\nتقرير مالي نهائي\n\u{1F}\u{FDD0}b.txt\nannual report\n".into();
     texts[4] = format!("{} report", "x".repeat(300));
+    texts[5] = "東京タワーreport カrepor 中文mail سلامmail".into();
+    texts[6] = "Ёлка café naïve ﬁnal Ａｂｃ".into();
     let cache = ContentCache::open(&dir).unwrap();
     let mut entries = fill(&cache, texts.len(), &|i| texts[i].clone());
     // Indexed in memory, then partly written as segments, then reopened.
@@ -318,7 +322,20 @@ fn hamza_and_article_forms_are_looked_up() {
     let dir = temp_dir("forms");
     let cache = ContentCache::open(&dir).unwrap();
     // (Number 7 is stored as "no text", see `fill`.)
-    let texts = ["قال الرئيس", "زار باريس", "والريس حضر", "المسئول هنا", "لا شيء", "مسؤول", "نهاية الأمر", "شئ ما", "شئ ما", "e-mail me"];
+    let texts = [
+        "قال الرئيس",
+        "زار باريس",
+        "والريس حضر",
+        "المسئول هنا",
+        "لا شيء",
+        "مسؤول",
+        "نهاية الأمر",
+        "شئ ما",
+        "شئ ما",
+        "e-mail me",
+        "東京タワーmail",
+        "Ёлка café",
+    ];
     let entries = fill(&cache, texts.len(), &|i| texts[i].to_string());
     for (q, want) in [
         // As typed it is found anywhere (also in «باريس»); its other
@@ -329,7 +346,12 @@ fn hamza_and_article_forms_are_looked_up() {
         ("شيء", vec![4, 8]),
         ("باريس", vec![1]),
         ("e-mail", vec![9]),
-        ("ww:mail", vec![9]),
+        // A whole word next to kana: the edge falls inside an index word.
+        ("ww:mail", vec![9, 10]),
+        ("ww:タワー", vec![10]),
+        ("東京", vec![10]),
+        ("елка", vec![11]),
+        ("ww:cafe", vec![11]),
     ] {
         let (full, _) = run(&entries, &cache, &at(q), false);
         let (fast, p) = run(&entries, &cache, &at(q), true);

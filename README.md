@@ -34,7 +34,7 @@
 
 1. نزّل [`bahth.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe) من [أحدث إصدار](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest). ملف واحد، لا يحتاج تثبيتاً.
    - لأجهزة ARM64 (مثل Snapdragon) نزّل [`bahth-arm64.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-arm64.exe)، ولويندوز 32 بت نزّل [`bahth-x86.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-x86.exe). كل نسخة تحدّث نفسها بنسختها.
-2. ضعه في مجلد دائم، مثلاً `%LOCALAPPDATA%\Programs\Bahth\` (هذا المسار تستعمله إضافات `integrations/`)، ثم شغّله.
+2. شغّله. إن شغّلته من مجلد التنزيلات يعرض عليك مرة واحدة نقل نفسه إلى `%LOCALAPPDATA%\Programs\InstaFind\` (هذا المسار تبحث فيه إضافات `integrations/`، ومعه `Programs\Bahth\` القديم)، أو ضعه أنت في مجلد دائم.
 3. إن ظهر تحذير SmartScreen لأن الملف غير موقّع رقمياً: «مزيد من المعلومات» ← «تشغيل على أي حال».
 
 أو ثبّته بأمر واحد عبر [Scoop](https://scoop.sh):
@@ -87,8 +87,9 @@ scoop install instafind
 
 ### البحث
 - **نتائج فورية بالاسم** أثناء الكتابة في كل الأقراص أو في مجلد تختاره، مع فلاتر جاهزة: مستندات، صور، صوت، فيديو، مضغوطات، برامج، مجلدات.
-- **عربية حقيقية**: لا فرق بين أ إ آ ا، ولا ة ه، ولا ى ي، ويتجاهل التشكيل والتطويل و«ال»، ويقبل الأرقام العربية (٠١٢٣) والحروف الفارسية.
-- **يسامح الأخطاء**: إن لم يجد شيئاً جرّب وحده لوحة المفاتيح الأخرى، ثم الفرانكو (`3abd` ← عبد)، ثم الكلمات القريبة إملائياً (`تقريز` ← التقرير). و`جذر:` يبحث بجذر الكلمة.
+- **عربية حقيقية**: لا فرق بين أ إ آ ا، ولا ة ه، ولا ى ي، ويتجاهل التشكيل والتطويل و«ال»، ويقبل الأرقام العربية (٠١٢٣) وفواصلها (١٢٫٥) والحروف الفارسية والعراقية والكردية (گ چ پ ڤ ژ ێ ۆ ڕ ڵ: «گراج» تجد «كراج»، و«گاع» تجد «قاع» أيضاً).
+- **لغات أخرى**: يتجاهل علامات الحروف اللاتينية واليونانية («cafe» تجد «Café»، و«ogrenci» تجد «Öğrenci»)، ويقرأ ё كـ е، والحروف كاملة العرض ونصفها، والكاتاكانا كالهيراغانا، والكورية والهندية والبنغالية والتاميلية والتيلوغوية والغوجاراتية والبنجابية والكنّادية والمالايالامية والأوديا مُركّبةً ودون ZWJ/ZWNJ والنقطة (nukta)، وحروف الأردية والبشتو والسندية والأويغورية. الصينية المبسطة والتقليدية لا تتطابقان بعد.
+- **يسامح الأخطاء**: إن لم يجد شيئاً جرّب وحده لوحة المفاتيح الأخرى (العربية، ومعها الفارسية والكردية السورانية والروسية والأوكرانية والتركية Q والفرنسية AZERTY إن كانت مثبّتة في ويندوز)، ثم الفرانكو (`3abd` ← عبد)، ثم الكلمات القريبة إملائياً (`تقريز` ← التقرير). و`جذر:` يبحث بجذر الكلمة.
 - **صيغة بحث قوية**: عبارة بين علامتي تنصيص، «أو» و«ليس»، نوع الملف، الحجم، تاريخ التعديل، التعبيرات المنتظمة، الكلمة كاملة، والتقارب بين كلمتين. انظر [الجدول أدناه](#طريقة-البحث).
 - **إخفاء ملفات النظام** (مفعّل افتراضياً): مجلد Windows وسلة المحذوفات وملفات الصفحات ومجلدات المؤقت والذاكرة المخبأة داخل AppData لا تظهر في النتائج. يُطفأ من «خيارات ← إخفاء ملفات النظام»، أو اكتب `نظام:` لبحث واحد. مجلد Program Files وملفاتك تبقى ظاهرة.
 - **الملفات الأكثر فتحاً أولاً**، وخط تحت الجزء المطابق، وترتيب بالنقر على عنوان أي عمود.
@@ -107,13 +108,14 @@ scoop install instafind
 - **أحجام المجلدات**: عمود الحجم يشمل المجلدات، ونافذة تبيّن ما يملأ القرص.
 - **عرض المصغرات** للصور والمستندات (Ctrl+T).
 - **استبدال نص في عدة ملفات نصية** مع معاينة ونسخة احتياطية وزر تراجع.
-- **البحث من الهاتف** عبر شبكة المنزل: مطفأ افتراضياً، برمز دخول، وللقراءة فقط.
+- **البحث من الهاتف** عبر شبكة المنزل: مطفأ افتراضياً، برمز دخول أو رمز QR من الإعدادات، وللقراءة فقط، ويتوقف وحده بعد ساعتين دون استخدام.
 - **سحب النتيجة وإفلاتها** في واتساب أو البريد أو Word، وCtrl+C ينسخ الملف نفسه، وF2 لإعادة التسمية، وDelete إلى سلة المحذوفات.
 - **تصدير النتائج** إلى CSV يفتحه Excel بالعربية.
 - **سطر الأوامر** و**إضافة Flow Launcher** وأمثلة PowerShell وAutoHotkey.
 
 ### الراحة
 - **واجهة عربية أو إنجليزية**: تتبع لغة ويندوز، وتُغيَّر من «خيارات ← Language / اللغة».
+- **لغات أخرى للواجهة (ترجمة آلية تُراجَع، وتُعلَّم «(ترجمة آلية)» في قائمة اللغات)**: الكردية (السورانية والكرمانجية)، الفارسية، الأردية، البشتوية، الأويغورية، السريانية (الآشورية)، التركية، الأذربيجانية، الأوزبكية، الفرنسية، الإسبانية، البرتغالية (البرازيل)، الألمانية، الروسية، الأوكرانية، الأمازيغية (تيفيناغ)، السواحيلية، الهوسا، الصومالية، الهندية، المراثية، البنغالية، البنجابية، الغوجاراتية، الأوديا، التاميلية، التيلوغوية، الكنادية، المالايالامية، الإندونيسية، الملايوية، الفيتنامية، التايلاندية، الصينية (المبسطة والتقليدية)، اليابانية، الكورية. تظهر اللغة في القائمة حين تُضاف ترجمتها (`i18n/`).
 - **يعمل مع ويندوز** في الخلفية، وEsc أو زر الإغلاق يخفيانه إلى الأيقونة بجانب الساعة (للخروج: «خروج» من قائمة الأيقونة)، ونسخة واحدة فقط منه.
 - تواريخ نسبية («أمس»، «قبل 5 دقائق»)، وخيار الأرقام العربية، وأيقونات أنواع الملفات.
 - أي خطأ داخلي يُسجَّل في `log.txt` و`crash.txt` ولا يُغلق البرنامج.
@@ -147,7 +149,7 @@ scoop install instafind
 
 | المفتاح | العمل |
 |---|---|
-| Ctrl+Alt+F | نافذة البحث الصغيرة من أي مكان (Tab للإجراءات، Esc للإغلاق) |
+| Ctrl+Alt+F | نافذة البحث الصغيرة من أي مكان (Tab للإجراءات، Esc للإغلاق). إن كان برنامج آخر يستعمله فاختر غيره من الإعدادات ← البحث من أي مكان |
 | Ctrl+Alt+G | في نافذة حفظ أو فتح: الانتقال إلى مجلد نتيجة |
 | Enter / Ctrl+Enter | فتح الملف / فتح مجلده مع تحديده |
 | السهم للأسفل | من خانة البحث إلى النتائج (وفي خانة فارغة: السجل) |
@@ -208,7 +210,7 @@ InstaFind is a free file search tool for Windows, written in Rust. It indexes al
 
 1. Download [`bahth.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe) from the [latest release](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest). It is a single file; nothing to install.
    - On ARM64 PCs (e.g. Snapdragon) download [`bahth-arm64.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-arm64.exe); on 32-bit Windows, [`bahth-x86.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-x86.exe). Each one updates itself with its own build.
-2. Put it in a permanent folder, for example `%LOCALAPPDATA%\Programs\Bahth\` (the path the `integrations/` plugins expect), and run it.
+2. Run it. Started from Downloads, it offers once to move itself to `%LOCALAPPDATA%\Programs\InstaFind\` (where the `integrations/` plugins look, along with the older `Programs\Bahth\`); or put it in a permanent folder yourself.
 3. If SmartScreen warns because the file is not code-signed: **More info → Run anyway**.
 
 Or install it with [Scoop](https://scoop.sh):
@@ -261,8 +263,9 @@ InstaFind's second includes starting the command-line tool and loading the index
 
 #### Search
 - **Instant filename search** across all drives or one folder, with ready-made filters: documents, pictures, audio, video, archives, programs, folders.
-- **Real Arabic matching**: hamza forms, ta marbuta, alef maqsura, diacritics, tatweel and the `ال` prefix are ignored; Arabic-Indic digits and Persian letters are accepted.
-- **Forgiving**: when nothing matches, it retries with the other keyboard layout, then Arabizi (`3abd` → عبد), then near spellings (one or two typos). `root:` searches by the Arabic triliteral root.
+- **Real Arabic matching**: hamza forms, ta marbuta, alef maqsura, diacritics, tatweel and the `ال` prefix are ignored; Arabic-Indic digits and separators (١٢٫٥) and Persian, Iraqi and Kurdish letters (گ چ پ ڤ ژ ێ ۆ ڕ ڵ) are accepted: گراج finds كراج, and گاع also finds قاع.
+- **Other languages**: Latin and Greek accents are ignored (`cafe` finds `Café`, `ogrenci` finds `Öğrenci`), ё is е, full-width and half-width forms and katakana/hiragana match, Korean and the Indic scripts (Devanagari, Bengali, Tamil, Telugu, Gujarati, Gurmukhi, Kannada, Malayalam, Odia) are composed and matched without ZWJ/ZWNJ or nukta, and Urdu, Pashto, Sindhi and Uyghur letters match. Simplified and Traditional Chinese do not match each other yet.
+- **Forgiving**: when nothing matches, it retries with the other keyboard layout (Arabic, and Persian, Central Kurdish, Russian, Ukrainian, Turkish Q and French AZERTY when installed in Windows), then Arabizi (`3abd` → عبد), then near spellings (one or two typos). `root:` searches by the Arabic triliteral root.
 - **Rich query syntax**: phrases, OR, NOT, extensions, size, date modified, regex, whole word, and word proximity. See [Query syntax](#query-syntax).
 - **System files hidden** (on by default): the Windows folder, Recycle Bin, page files and temp/cache folders under AppData stay out of the results. Turn it off in **Options → Hide system files**, or type `sys:` for one search. Program Files and your own files always show.
 - **Often-opened files first**, match underlining, sort by any column, search history and saved searches (Ctrl+H).
@@ -280,13 +283,14 @@ InstaFind's second includes starting the command-line tool and loading the index
 - **Folder sizes** in the Size column and a disk-usage window.
 - **Thumbnail view** (Ctrl+T).
 - **Find & replace in text files** with preview, backups and undo.
-- **Search from your phone** over the home network: off by default, PIN-protected, read-only.
+- **Search from your phone** over the home network: off by default, PIN-protected (or scan the QR code in Settings), read-only, and it turns itself off after two hours unused.
 - **Drag & drop** results into WhatsApp, mail or Word; Ctrl+C copies the file itself; F2 renames; Delete sends to the Recycle Bin.
 - **Export** results to CSV that opens correctly in Excel.
 - **Command line**, a **Flow Launcher** plugin, and PowerShell / AutoHotkey examples.
 
 #### Comfort
 - **English or Arabic interface**: follows the Windows display language; switch in **Options → Language / اللغة**.
+- **More interface languages** (machine translations under review, marked "(machine translation)" in the language list): Kurdish (Sorani, Kurmanji), Persian, Urdu, Pashto, Uyghur, Syriac (Assyrian Neo-Aramaic), Turkish, Azerbaijani, Uzbek, French, Spanish, Portuguese (Brazil), German, Russian, Ukrainian, Tamazight (Tifinagh), Swahili, Hausa, Somali, Hindi, Marathi, Bengali, Punjabi, Gujarati, Odia, Tamil, Telugu, Kannada, Malayalam, Indonesian, Malay, Vietnamese, Thai, Chinese (Simplified, Traditional), Japanese, Korean. A language is offered once its translation file is in `i18n/`.
 - **Starts with Windows** in the background; Esc or the close button hides it to the tray (quit with *Exit* in the tray menu), single instance.
 - Relative dates, optional Arabic digits, file-type icons.
 - Internal errors are written to `log.txt` and `crash.txt` instead of closing the app.
@@ -320,7 +324,7 @@ Every filter also has an Arabic spelling (`حجم:`, `تاريخ:`, `كلمة:`,
 
 | Key | Action |
 |---|---|
-| Ctrl+Alt+F | quick-search popup from anywhere (Tab for actions, Esc to close) |
+| Ctrl+Alt+F | quick-search popup from anywhere (Tab for actions, Esc to close); if another program has it, pick other keys in Settings ▸ Search from anywhere |
 | Ctrl+Alt+G | in a Save/Open dialog: jump to a result's folder |
 | Enter / Ctrl+Enter | open the file / open its folder with the file selected |
 | Down arrow | from the search box to the results (in an empty box: history) |

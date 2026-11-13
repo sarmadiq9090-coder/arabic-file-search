@@ -11,6 +11,9 @@
      file name, a path or a document is set with textContent, never as HTML
      (app.js). -->
 <link rel="stylesheet" href="app.css">
+<!-- The interface language's texts and the languages to offer, as JSON
+     (src/i18n.rs page_data; data, not a script). -->
+<script type="application/json" id="i18n">{{I18N}}</script>
 <script src="app.js" defer></script>
 </head>
 <body>
@@ -18,17 +21,20 @@
   <div class="head" role="search">
     <label class="field" id="field">
       <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
-      <input id="q" role="combobox" aria-expanded="false" aria-controls="list" aria-autocomplete="list" dir="auto" autocomplete="off" spellcheck="false" data-i18n-placeholder="ph" data-i18n-label="ph">
+      <input id="q" role="combobox" aria-expanded="false" aria-controls="list" aria-autocomplete="list" aria-keyshortcuts="Control+F F3" dir="auto" autocomplete="off" spellcheck="false" data-i18n-placeholder="ph" data-i18n-label="ph">
       <span class="meta" id="meta"></span>
     </label>
+    <button class="hbtn" id="help-btn" type="button" aria-keyshortcuts="F1" data-i18n-label="helpH" data-i18n-title="helpKey">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.4c-.6.3-1 .8-1 1.5v.4M12 16.8v.2"/></svg>
+    </button>
     <span class="popwrap">
-      <button class="hbtn" id="hist-btn" type="button" aria-haspopup="menu" aria-expanded="false" data-i18n-label="history" data-i18n-title="historyKey">
+      <button class="hbtn" id="hist-btn" type="button" aria-keyshortcuts="Control+H" aria-haspopup="menu" aria-expanded="false" data-i18n-label="history" data-i18n-title="historyKey">
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
         <span class="hlbl" data-i18n="history"></span>
       </button>
       <div class="menu pop" id="hist" role="menu" aria-labelledby="hist-btn" hidden></div>
     </span>
-    <button class="hbtn" id="set-btn" type="button" aria-pressed="false" data-i18n-label="settings" data-i18n-title="settingsKey">
+    <button class="hbtn" id="set-btn" type="button" aria-keyshortcuts="Control+Comma" aria-pressed="false" data-i18n-label="settings" data-i18n-title="settingsKey">
       <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       <span class="hlbl" data-i18n="settings"></span>
     </button>
@@ -48,7 +54,7 @@
   <div class="body" id="view-results" hidden>
     <section class="results">
       <div class="cols" id="cols"></div>
-      <div class="list" id="list" role="listbox" tabindex="0" data-i18n-label="results"></div>
+      <div class="list" id="list" role="listbox" tabindex="0" aria-keyshortcuts="Enter Control+Enter Shift+F10 F2 F4 Delete Control+C Control+Shift+C" data-i18n-label="results"></div>
       <div class="actbar" id="actbar"></div>
     </section>
     <aside class="preview" id="preview" data-i18n-label="preview"></aside>
@@ -63,7 +69,7 @@
       </section>
       <section>
         <div class="sec-h"><span data-i18n="tryThese"></span></div>
-        <div class="tips" id="tips"></div>
+        <div class="tips" id="tips" role="list" data-i18n-label="tryThese"></div>
         <div class="trust"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span data-i18n="trust"></span></div>
       </section>
     </div>
@@ -88,7 +94,7 @@
     <span class="dot" id="dot"></span><span class="num" id="status-text"></span>
     <button class="btn small" id="stop" type="button" hidden data-i18n="stop"></button>
     <span class="grow"></span>
-    <span class="keys" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="kNav"></span></span><span><kbd>Enter</kbd> <span data-i18n="kOpen"></span></span><span><kbd>Ctrl+Enter</kbd> <span data-i18n="kFolder"></span></span><span><kbd>Shift+F10</kbd> <span data-i18n="kMenu"></span></span><span><kbd>Ctrl+Alt+F</kbd></span></span>
+    <span class="keys" role="note" data-i18n-label="kLabel"><span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="kNav"></span></span><span><kbd>Enter</kbd> <span data-i18n="kOpen"></span></span><span><kbd>Ctrl+Enter</kbd> <span data-i18n="kFolder"></span></span><span><kbd>Shift+F10</kbd> <span data-i18n="kMenu"></span></span><span><kbd id="hk-kbd">Ctrl+Alt+F</kbd></span></span>
   </footer>
   <div class="menu ctx" id="ctx" role="menu" data-i18n-label="more" hidden></div>
   <div class="veil" id="veil" hidden>

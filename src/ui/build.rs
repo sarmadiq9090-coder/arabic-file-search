@@ -17,7 +17,7 @@ use winapi::um::commctrl::{
 use winapi::um::winuser::{NMHDR, SendMessageW, WM_NOTIFY, WM_SETFONT};
 
 use super::format::{ARABIC_DIGITS, wide_to_string};
-use super::keys::{HOTKEY_ID, HOTKEY_TEXT};
+use super::keys::{HOTKEY_ID, hotkey_text};
 use super::{autostart, placement, shell, style};
 use super::startup::{phase, ui_font_family, work_area};
 use super::{App, COLUMNS, WS_EX_LAYOUTRTL, title};
@@ -54,6 +54,8 @@ impl NativeUi<AppUi> for App {
     fn build_ui(mut app: App) -> Result<AppUi, nwg::NwgError> {
         let had_file = Settings::exists();
         let mut settings = Settings::load();
+        // Every label that names the global hotkey is built with the one chosen.
+        super::keys::set_current_hotkey(settings.hotkey);
         // 1.0: the new look is the only one (see the method); a classic
         // user is moved once, and told so once in the new look.
         let was_on = settings.new_ui;
@@ -295,11 +297,11 @@ impl NativeUi<AppUi> for App {
         nwg::TrayNotification::builder()
             .parent(w)
             .icon(Some(&app.tray_icon))
-            .tip(Some(&format!("{} ({HOTKEY_TEXT})", title())))
+            .tip(Some(&format!("{} ({})", title(), hotkey_text())))
             .visible(settings.tray_icon)
             .build(&mut app.tray)?;
         nwg::Menu::builder().popup(true).parent(w).build(&mut app.tray_menu)?;
-        nwg::MenuItem::builder().text(&trf!("فتح نافذة البحث\t{HOTKEY_TEXT}", "Open quick search\t{HOTKEY_TEXT}")).parent(&app.tray_menu).build(&mut app.tray_quick)?;
+        nwg::MenuItem::builder().text(&trf!("فتح نافذة البحث\t{}", "Open quick search\t{}", hotkey_text())).parent(&app.tray_menu).build(&mut app.tray_quick)?;
         nwg::MenuItem::builder()
             .text(tr!("إظهار خانة البحث العائمة", "Show the floating search box"))
             .check(settings.floating_mode != crate::settings::FloatingMode::Off)
@@ -330,7 +332,7 @@ impl NativeUi<AppUi> for App {
             .parent(&app.options_menu)
             .build(&mut app.menu_digits)?;
         app.build_thumbs()?;
-        super::lang_menu::build(&app.options_menu, &mut app.lang_menu, &mut app.menu_lang_ar, &mut app.menu_lang_en)?;
+        super::lang_menu::build(&app.options_menu, &mut app.lang_menu, &mut app.menu_langs)?;
         nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[0])?;
 
         nwg::MenuItem::builder()
@@ -356,7 +358,7 @@ impl NativeUi<AppUi> for App {
         nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[1])?;
 
         nwg::MenuItem::builder()
-            .text(&trf!("إظهار البرنامج من أي مكان\t{HOTKEY_TEXT}", "Show the program from anywhere\t{HOTKEY_TEXT}"))
+            .text(&trf!("إظهار البرنامج من أي مكان\t{}", "Show the program from anywhere\t{}", hotkey_text()))
             .parent(&app.options_menu)
             .build(&mut app.menu_hotkey)?;
         app.build_quick_menus(&settings)?;
@@ -507,18 +509,18 @@ impl NativeUi<AppUi> for App {
                         app.delete_selected();
                     } else if handle == app.menu_hotkey {
                         if app.state.borrow().settings.hotkey_opens == crate::settings::HotkeyOpens::Quick {
-                            app.set_status(&trf!("اضغط {HOTKEY_TEXT} من أي برنامج لفتح نافذة البحث الصغيرة.", "Press {HOTKEY_TEXT} in any program to open the quick search."));
+                            app.set_status(&trf!("اضغط {} من أي برنامج لفتح نافذة البحث الصغيرة.", "Press {} in any program to open the quick search.", hotkey_text()));
                         } else {
-                            app.set_status(&trf!("اضغط {HOTKEY_TEXT} من أي برنامج لإظهار بحث سريع أو إخفائه.", "Press {HOTKEY_TEXT} in any program to show or hide InstaFind."));
+                            app.set_status(&trf!("اضغط {} من أي برنامج لإظهار بحث سريع أو إخفائه.", "Press {} in any program to show or hide InstaFind.", hotkey_text()));
                         }
                     } else if handle == app.menu_autostart {
                         let on = !app.menu_autostart.checked();
                         if autostart::set_enabled(on) {
                             app.menu_autostart.set_checked(on);
-                            app.set_status(if on {
-                                tr!("سيعمل البرنامج في الخلفية عند تشغيل ويندوز، وتُظهره بـ Ctrl+Alt+F.", "The program will run in the background when Windows starts; show it with Ctrl+Alt+F.")
+                            app.set_status(&if on {
+                                trf!("سيعمل البرنامج في الخلفية عند تشغيل ويندوز، وتُظهره بـ {}.", "The program will run in the background when Windows starts; show it with {}.", hotkey_text())
                             } else {
-                                tr!("لن يعمل البرنامج تلقائياً مع ويندوز.", "The program will not start with Windows.")
+                                tr!("لن يعمل البرنامج تلقائياً مع ويندوز.", "The program will not start with Windows.").to_string()
                             });
                         } else {
                             app.set_status(&autostart::change_failed_message());
@@ -595,6 +597,18 @@ impl NativeUi<AppUi> for App {
                     weak.upgrade()?.session_end();
                 }
                 return Some(0);
+            }
+            // A newer copy asks who this one is, or asks it to leave (`older_copy`).
+            if msg >= 0xC000 {
+                let leave = || {
+                    if let Some(app) = weak.upgrade() {
+                        app.close_for_restart();
+                        std::process::exit(0);
+                    }
+                };
+                if let Some(answer) = super::older_copy::on_message(msg, w, l, leave) {
+                    return Some(answer);
+                }
             }
             if msg != WM_NOTIFY || l == 0 {
                 return None;

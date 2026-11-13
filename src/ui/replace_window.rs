@@ -144,13 +144,18 @@ impl ReplaceWindow {
         self.repl_label.set_size(lw as u32, 24);
         self.repl.set_position(2 * m + lw, m + 38);
         self.repl.set_size(fw, 28);
+        // The two options share the field's width: their texts are much
+        // longer in some languages ("Groß-/Kleinschreibung ignorieren").
+        let cw = ((fw as i32 - m) / 2).max(220);
         self.ignore_case.set_position(2 * m + lw, m + 74);
-        self.ignore_case.set_size(220, 26);
-        self.regex.set_position(3 * m + lw + 220, m + 74);
-        self.regex.set_size(220, 26);
+        self.ignore_case.set_size(cw as u32, 26);
+        self.regex.set_position(3 * m + lw + cw, m + 74);
+        self.regex.set_size(cw as u32, 26);
         let by = m + 108;
         let mut x = m;
         for (b, bw) in [(&self.preview_btn, 130), (&self.apply_btn, 130), (&self.undo_btn, 200)] {
+            // Wider for a longer (translated) text: about 8 px a character.
+            let bw = bw.max(b.text().chars().count() as u32 * 8 + 36);
             b.set_position(x, by);
             b.set_size(bw, 32);
             x += bw as i32 + m;

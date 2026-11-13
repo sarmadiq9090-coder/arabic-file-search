@@ -53,7 +53,7 @@ mod imp {
     use super::super::startup::log;
     use super::super::{App, WS_EX_LAYOUTRTL, autostart, content_index, shell, surface, title};
     use crate::history::SavedSearch;
-    use crate::i18n::{self, Lang};
+    use crate::i18n;
     use crate::search::{self, ContentHit, ContentProgress};
     use crate::settings::{FloatingMode, HotkeyOpens};
     use crate::webui::bridge::{self, ContentState, List, Lists, Miss, Outbound, Params, Request, Setting, SettingsOut, Shown, Sort};
@@ -62,6 +62,10 @@ mod imp {
     /// Children of the window are not mirrored in Arabic (only its caption
     /// buttons are): WebView2 lays the page out right to left itself.
     const WS_EX_NOINHERITLAYOUT: u32 = 0x0010_0000;
+
+    /// Microsoft's free WebView2 download page, offered by the classic
+    /// window's line when WebView2 is not installed.
+    const WEBVIEW2_DOWNLOAD: &str = "https://developer.microsoft.com/microsoft-edge/webview2/";
 
     /// A page that has not said hello this long after it was created or
     /// reloaded is taken as failed (a blank window).
@@ -132,7 +136,7 @@ mod imp {
         /// The folder searched, "" for all drives (the page never sets it).
         scope: RefCell<String>,
         /// The language chosen for the next start, when it was changed.
-        next_lang: Cell<Option<Lang>>,
+        next_lang: Cell<Option<&'static crate::i18n::Locale>>,
         last_status: RefCell<String>,
         /// The classic search box's text last handed to the page (the quick
         /// popup's "open in the full window" puts its search there).
@@ -201,6 +205,21 @@ mod imp {
         /// A search the quick popup handed over (its text and how to run
         /// it), sent once the page is there.
         handover: RefCell<Option<(String, super::Handover)>>,
+        /// Since when the window has been hidden (to the tray) without a
+        /// break; `None` while on screen (`crate::webui::idle_action`).
+        hidden_since: Cell<Option<Instant>>,
+        /// The hidden page was asked to suspend (once per hide).
+        suspend_asked: Cell<bool>,
+        /// The page was closed on purpose after a long while hidden, to free
+        /// WebView2's memory: not a failure, and the next show creates it again.
+        released: Cell<bool>,
+        /// When the window was shown to create a released page again, until
+        /// that page says hello.
+        recreate_since: Cell<Option<Instant>>,
+        /// What the page searched last, with its filters.
+        page_search: RefCell<Option<bridge::Restore>>,
+        /// `page_search` when the page was released, for the next page.
+        restore: RefCell<Option<bridge::Restore>>,
     }
 
     impl App {
@@ -306,18 +325,39 @@ mod imp {
                 return;
             }
             if show && !self.webui.note.is_built() {
+                // Not installed at all: the line offers Microsoft's free
+                // download page, opened in the browser on a click.
+                let missing = !available();
                 let mut label = nwg::Label::default();
                 let built = nwg::Label::builder()
                     .parent(&self.window)
                     .font(Some(&self.font))
                     .v_align(nwg::VTextAlign::Center)
-                    .text(tr!(
-                        "يعمل البرنامج بالشكل البسيط لأن مكوّن WebView2 في ويندوز لا يعمل.",
-                        "Running in the simple look because Windows' WebView2 component is not working."
-                    ))
+                    .text(if missing {
+                        tr!(
+                            "يعمل البرنامج بالشكل البسيط لأن مكوّن WebView2 غير مثبّت. انقر هنا لتنزيله مجاناً من Microsoft.",
+                            "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft."
+                        )
+                    } else {
+                        tr!(
+                            "يعمل البرنامج بالشكل البسيط لأن مكوّن WebView2 في ويندوز لا يعمل.",
+                            "Running in the simple look because Windows' WebView2 component is not working."
+                        )
+                    })
                     .build(&mut label);
                 match built {
-                    Ok(()) => self.webui.note.set(label),
+                    Ok(()) => {
+                        if missing {
+                            let at = label.handle;
+                            // (Kept bound for the run, as the line itself.)
+                            let _ = self.bind_main_events(move |evt, _data, handle| {
+                                if evt == nwg::Event::OnLabelClick && handle == at && !shell::open(WEBVIEW2_DOWNLOAD) {
+                                    log("webui: could not open the WebView2 download page");
+                                }
+                            });
+                        }
+                        self.webui.note.set(label);
+                    }
                     Err(e) => log(&format!("webui: the note could not be shown: {e}")),
                 }
             }
@@ -427,6 +467,10 @@ mod imp {
                     use winapi::um::winuser::{SIZE_MINIMIZED, SIZE_RESTORED, WM_SHOWWINDOW, WM_SIZE};
                     if msg == WM_SHOWWINDOW && w != 0 {
                         super::super::placement::keep_on_screen(h);
+                        // (Shown by any means: the page is visible and resumed.)
+                        if let Some(app) = weak.upgrade() {
+                            app.webui_back_on_screen();
+                        }
                     }
                     if msg == WM_SIZE {
                         if w == SIZE_MINIMIZED {
@@ -436,17 +480,7 @@ mod imp {
                         }
                     }
                     if msg == WM_ACTIVATE && (w & 0xFFFF) as u16 != WA_INACTIVE {
-                        let app = weak.upgrade()?;
-                        // (Not while the page is being created or closed.)
-                        if let Ok(host) = app.webui.host.try_borrow() {
-                            match &*host {
-                                Some(host) => host.set_idle(false),
-                                // Brought to the front without a page yet
-                                // (a second launch after a start in the tray).
-                                None if app.webui.active.get() => app.webui.host_pending.set(true),
-                                None => {}
-                            }
-                        }
+                        weak.upgrade()?.webui_back_on_screen();
                     }
                     None
                 }),
@@ -470,6 +504,7 @@ mod imp {
             let hwnd = self.webui.parts.window.handle.hwnd().ok_or("no window handle")?;
             self.webui.me.replace(Rc::downgrade(self));
             self.webui.leaving.set(false);
+            self.webui.released.set(false);
             self.webui.ready.set(false);
             self.webui.failed.set(None);
             self.webui.loading_since.set(None);
@@ -486,8 +521,10 @@ mod imp {
                 let on_failed = {
                     let weak = Rc::downgrade(self);
                     move |browser_gone: bool| {
+                        // (Not the page closed on purpose, `webui_release`.)
                         if let Some(app) = weak.upgrade()
                             && app.webui.active.get()
+                            && !app.webui.released.get()
                         {
                             log(&format!("webui: a WebView2 process failed (browser: {browser_gone})"));
                             let before = app.webui.failed.get().unwrap_or(false);
@@ -740,6 +777,11 @@ mod imp {
             self.webui.active.get() && self.webui.parts.window.visible()
         }
 
+        /// Whether the page has loaded and takes messages.
+        pub(in super::super) fn webui_ready(&self) -> bool {
+            self.webui.ready.get()
+        }
+
         /// Runs `f` with the window a message box of the program belongs to
         /// (the first-run offers, the crash report): the new main window
         /// when it is the one on screen, so the box comes over it and keeps
@@ -785,9 +827,10 @@ mod imp {
                     log(&format!("webui: window on screen {} ms after launch", super::super::startup::ms_since_process_start()));
                 }
             }
+            // (Also from WM_SHOWWINDOW, but a window already on screen gets none.)
+            self.webui_back_on_screen();
             let has_page = match &*self.webui.host.borrow() {
                 Some(host) => {
-                    host.set_idle(false);
                     host.focus();
                     true
                 }
@@ -821,13 +864,108 @@ mod imp {
             true
         }
 
-        /// The window out of the way (to the tray), its page in its
-        /// low-memory mode.
+        /// The window out of the way (to the tray), its page not visible
+        /// and in its low-memory mode. The timer then suspends the page, and
+        /// closes it after a long while hidden (`webui_idle`).
         fn webui_put_away(&self) {
             self.webui.parts.window.set_visible(false);
-            if let Some(host) = &*self.webui.host.borrow() {
-                host.set_idle(true);
+            if self.webui.hidden_since.get().is_none() {
+                self.webui.hidden_since.set(Some(Instant::now()));
+                self.webui.suspend_asked.set(false);
             }
+            if let Ok(host) = self.webui.host.try_borrow()
+                && let Some(host) = &*host
+            {
+                host.set_hidden(true);
+            }
+        }
+
+        /// The window is on screen again (shown by any means, or brought to
+        /// the front): its page is visible, at normal memory and resumed, or,
+        /// when there is none yet (a start in the tray) or it was released
+        /// while hidden, it is created on the next tick.
+        fn webui_back_on_screen(&self) {
+            self.webui.hidden_since.set(None);
+            self.webui.suspend_asked.set(false);
+            // (Not while the page is being created or closed.)
+            let Ok(host) = self.webui.host.try_borrow() else { return };
+            match &*host {
+                Some(host) => host.set_hidden(false),
+                None if self.webui.active.get() => {
+                    self.webui.host_pending.set(true);
+                    if self.webui.released.get() && self.webui.recreate_since.get().is_none() {
+                        self.webui.recreate_since.set(Some(Instant::now()));
+                    }
+                }
+                None => {}
+            }
+        }
+
+        /// Whether a modal dialog or menu is open (it disables its owner:
+        /// the new window or the hidden classic one), a dialog runs inside
+        /// the page's own handler, or a page is being created.
+        fn webui_modal_open(&self) -> bool {
+            let disabled = |h: Option<HWND>| h.is_some_and(|h| unsafe { IsWindowEnabled(h) } == 0);
+            self.webui.in_page_call.get()
+                || self.webui.switching.get()
+                || self.webui.options_pending.get()
+                || disabled(self.webui.parts.window.handle.hwnd())
+                || disabled(self.window.handle.hwnd())
+        }
+
+        /// The timer's look at the hidden window's page: suspended once
+        /// hidden, closed after `crate::webui::release_after` hidden
+        /// (`crate::webui::idle_action`).
+        fn webui_idle(&self) {
+            // A window shown by some way that told nothing.
+            if self.webui.hidden_since.get().is_some() && self.webui.parts.window.visible() {
+                self.webui_back_on_screen();
+            }
+            let Ok(has_page) = self.webui.host.try_borrow().map(|h| h.is_some()) else { return };
+            let idle = crate::webui::Idle {
+                hidden_for: self.webui.hidden_since.get().map(|t| t.elapsed()),
+                has_page,
+                suspend_asked: self.webui.suspend_asked.get(),
+                hand_off: self.webui.quick_switch.borrow().is_some(),
+                modal: self.webui_modal_open(),
+                busy: self.webui.content.borrow().is_some(),
+            };
+            match crate::webui::idle_action(idle, crate::webui::release_after()) {
+                crate::webui::IdleAction::Keep => {}
+                crate::webui::IdleAction::Suspend => {
+                    self.webui.suspend_asked.set(true);
+                    let asked = self.webui.host.borrow().as_ref().is_some_and(|host| {
+                        host.suspend(|suspended| {
+                            log(if suspended { "webui: suspended (hidden)" } else { "webui: not suspended (WebView2 declined)" });
+                        })
+                    });
+                    if !asked {
+                        log("webui: this WebView2 can't suspend a hidden page");
+                    }
+                }
+                crate::webui::IdleAction::Release => self.webui_release(),
+            }
+        }
+
+        /// Closes the hidden window's WebView2 so that its processes exit
+        /// (from the timer, never inside a handler of the page). Not a
+        /// failure: nothing counts towards the classic window, and the next
+        /// show creates the page again, with the search it had.
+        fn webui_release(&self) {
+            self.webui_stop_content();
+            let search = self.webui.page_search.borrow().clone();
+            self.webui.restore.replace(search);
+            self.webui.released.set(true);
+            self.webui.ready.set(false);
+            self.webui.loading_since.set(None);
+            self.webui.ready_since.set(None);
+            self.webui.failed.set(None);
+            self.webui.host.replace(None);
+            // What only that page used.
+            self.webui.lists.borrow_mut().reset();
+            self.webui.thumbs.shed();
+            self.webui.parts.opening.set_visible(true);
+            log(&format!("webui: released after {} hidden", crate::webui::log_duration(crate::webui::release_after())));
         }
 
         /// Ctrl+Alt+G's move: the new main window, if it is the one in use,
@@ -976,13 +1114,25 @@ mod imp {
             self.webui_send(&msg);
         }
 
+        /// Something the Settings view shows changed outside the page (a
+        /// check for updates started or ended, search from phone started or
+        /// stopped): sent now when the page is there, else on the first
+        /// tick it is.
+        pub(in super::super) fn webui_settings_changed(&self) {
+            if self.webui.active.get() && self.webui.ready.get() {
+                self.webui_send_settings();
+            } else {
+                self.webui.settings_stale.set(true);
+            }
+        }
+
         fn webui_send_settings(&self) {
-            let current = i18n::current();
+            let current = i18n::locale();
             let msg = {
                 let s = &self.state.borrow().settings;
                 Outbound::Settings(SettingsOut {
-                    lang: current.code(),
-                    next_lang: self.webui.next_lang.get().unwrap_or(current).code(),
+                    lang: current.code,
+                    next_lang: self.webui.next_lang.get().unwrap_or(current).code,
                     digits: s.arabic_digits,
                     autostart: autostart::is_enabled(),
                     content_index: s.content_index,
@@ -994,6 +1144,11 @@ mod imp {
                     tray_icon: s.tray_icon,
                     version: env!("CARGO_PKG_VERSION"),
                     store: crate::store::is_packaged(),
+                    checking_updates: self.update_check_asked(),
+                    hotkey: s.hotkey.code(),
+                    hotkey_taken: super::super::keys::hotkey_taken(),
+                    hotkeys: bridge::hotkeys(),
+                    phone: self.phone_settings(),
                 })
             };
             self.webui_send(&msg);
@@ -1039,6 +1194,9 @@ mod imp {
                     self.webui.parts.opening.set_visible(false);
                     self.webui.loading_since.set(None);
                     self.webui.ready_since.set(Some(Instant::now()));
+                    if let Some(t) = self.webui.recreate_since.take() {
+                        log(&format!("webui: recreated on show in {} ms", t.elapsed().as_millis()));
+                    }
                     // The page works: this start did not crash on the way.
                     let trying = std::mem::take(&mut self.state.borrow_mut().settings.new_ui_trying);
                     if trying != 0 {
@@ -1074,9 +1232,17 @@ mod imp {
                     // A page loaded again gets back what it searched (not an
                     // older text of the classic box); a first page gets the
                     // classic box's text (the quick popup's search).
+                    // A page created again after a release gets its search
+                    // back with its filters (or nothing, if it had none).
                     let again = self.webui.page_query.borrow().clone();
+                    let restore = self.webui.restore.take();
                     if self.webui.handover.borrow().is_some() {
                         self.webui_hand_over_query();
+                    } else if let Some(restore) = restore {
+                        self.webui.handed.replace(self.query.text());
+                        if !restore.q.trim().is_empty() {
+                            self.webui_send(&Outbound::Restore(restore));
+                        }
                     } else if again.trim().is_empty() {
                         self.webui.handed.replace(String::new());
                         self.webui_hand_over_query();
@@ -1089,6 +1255,7 @@ mod imp {
                     // (The rating question waits while the user types.)
                     self.note_typing();
                     self.webui.page_query.replace(q.clone());
+                    self.webui.page_search.replace(Some(bridge::Restore { q: q.clone(), kind, size, date, content }));
                     {
                         let s = &mut self.state.borrow_mut().settings;
                         s.kind = kind;
@@ -1257,10 +1424,9 @@ mod imp {
                 Request::ClearSaved {} => self.webui_clear_history(false),
                 Request::Set { key, on } => self.webui_set(key, on),
                 Request::Lang { lang: chosen } => {
-                    let chosen = chosen.lang();
-                    if i18n::save(chosen) {
-                        self.menu_lang_ar.set_checked(chosen == Lang::Ar);
-                        self.menu_lang_en.set_checked(chosen == Lang::En);
+                    let chosen = chosen.0;
+                    if i18n::save_locale(chosen) {
+                        self.check_lang_item(chosen);
                         self.webui.next_lang.set(Some(chosen));
                     } else {
                         self.webui_warn(tr!("تعذر حفظ اللغة.", "Could not save the language."));
@@ -1317,6 +1483,22 @@ mod imp {
                     if let Some(app) = self.webui.me.borrow().upgrade() {
                         app.show_report();
                     }
+                }
+                Request::PhoneAllow {} => self.web_allow_now(),
+                Request::PhoneWindow {} => {
+                    if let Some(app) = self.webui.me.borrow().upgrade() {
+                        app.open_web_window();
+                    }
+                }
+                Request::Hotkey { key } => {
+                    if !self.change_hotkey(key) {
+                        self.webui_warn(trf!(
+                            "الاختصار {} يستخدمه برنامج آخر أيضاً. اختر غيره.",
+                            "Another program has {} too. Pick another one.",
+                            key.label()
+                        ));
+                    }
+                    self.webui_send_settings();
                 }
                 // The Save dialog runs inside this handler: the timer leaves the page alone meanwhile.
                 Request::Export {} => {
@@ -1703,6 +1885,7 @@ mod imp {
                 Setting::HotkeyQuick => self.set_hotkey_quick(on),
                 Setting::Floating => self.set_floating_mode(if on { FloatingMode::Fade } else { FloatingMode::Off }),
                 Setting::TrayIcon => self.set_tray_icon(on),
+                Setting::Phone => self.set_web_on(on),
             }
             self.save_settings();
             self.webui_send_settings();
@@ -1919,6 +2102,9 @@ mod imp {
                 // As the Options menu's item: the Store version is told where
                 // its updates come from and offered its Store page.
                 self.check_for_update(true);
+                // The page said "Checking…" at the click; now it hears
+                // whether a check really runs (none for a managed copy).
+                self.webui_settings_changed();
             }
             if self.webui.active.get() && !self.webui.switching.get() {
                 if let Some(browser_gone) = self.webui.failed.take() {
@@ -1928,6 +2114,9 @@ mod imp {
                 } else {
                     self.webui_forgive();
                 }
+            }
+            if self.webui.active.get() && !self.webui.switching.get() {
+                self.webui_idle();
             }
             if !self.webui.active.get() || !self.webui.ready.get() {
                 return;
@@ -2081,6 +2270,10 @@ mod imp {
             false
         }
 
+        pub(in super::super) fn webui_ready(&self) -> bool {
+            false
+        }
+
         pub(in super::super) fn webui_in_use(&self) -> bool {
             false
         }
@@ -2090,6 +2283,8 @@ mod imp {
         }
 
         pub(in super::super) fn webui_tell_switch(&self) {}
+
+        pub(in super::super) fn webui_settings_changed(&self) {}
 
         pub(in super::super) fn webui_shed_thumbs(&self) {}
 
