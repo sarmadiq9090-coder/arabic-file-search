@@ -360,6 +360,13 @@ function Shot([string]$Name) {
     Write-Host "shot $Name"
 }
 
+# The scenes drive the classic window (its search box, result list and
+# Options button). The new look (WebView2) is the default since 0.10.1, so
+# settings.txt says "classic, chosen" as ci/ui-test.ps1 does, and that the
+# one-time questions (the box above the clock, rating) were already asked.
+New-Item -ItemType Directory -Force $data | Out-Null
+[IO.File]::WriteAllText((Join-Path $data 'settings.txt'), "new_ui=0`nnew_ui_default=1`nfloating_asked=1`nmove_asked=1`nrating_asked=1`n", (New-Object Text.ASCIIEncoding))
+
 # First start: index the drive (the demo folder with it), as ci/demo.ps1.
 Write-Host 'Indexing…'
 $p = Start-App 'en'

@@ -9,7 +9,8 @@ run-name: store ${{ inputs.tag || github.event.release.tag_name || github.head_r
 # - With a tag (Run workflow -> tag, or a published release), it packages
 #   that release's exact bahth.exe / bahth-x86.exe / bahth-arm64.exe.
 # - Without one (Run workflow with no tag, or a pull request touching the
-#   packaging), it builds the exes from this commit as build.yml does.
+#   packaging), it builds the exes from this commit as build.yml does
+#   (MSVC, static C runtime, no build cache).
 # The identity comes from packaging/msix/identity.json. While it still has a
 # TODO, the TEST identity is used and the run says so: the Store would
 # refuse that package.
@@ -25,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to package, v0.9.2 or later (empty: test build from the chosen branch)"
+        description: "Release tag to package, v1.0.0 or later (empty: test build from the chosen branch)"
         required: false
         default: ""
   release:
@@ -39,6 +40,7 @@ on:
       - "packaging/make_notices.py"
       - "THIRD-PARTY-NOTICES.txt"
       - "Cargo.lock"
+      - "src/webui/assets/fonts/**"
 
 permissions:
   contents: read
@@ -89,10 +91,12 @@ jobs:
           path: exes/
           retention-days: 3
 
-  # Otherwise the x64 and x86 exes cross-built with mingw, as build.yml does.
-  build-gnu:
+  # Otherwise the x64 and x86 exes built from this commit exactly as
+  # build.yml's `exe` job builds the published ones: MSVC with a static C
+  # runtime (.cargo/config.toml), on Windows, without a build cache.
+  build-msvc:
     if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.tag == '') }}
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -100,19 +104,20 @@ jobs:
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: stable
-          targets: x86_64-pc-windows-gnu, i686-pc-windows-gnu
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+          targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
       - name: Build bahth.exe and bahth-x86.exe
+        shell: bash
         run: |
-          sudo apt-get update -q && sudo apt-get install -y -q mingw-w64
-          cargo build --release --target x86_64-pc-windows-gnu
-          cargo build --release --target i686-pc-windows-gnu
+          cargo build --release --target x86_64-pc-windows-msvc
+          cargo build --release --target i686-pc-windows-msvc
           mkdir -p exes
-          cp target/x86_64-pc-windows-gnu/release/bahth.exe exes/bahth.exe
-          cp target/i686-pc-windows-gnu/release/bahth.exe exes/bahth-x86.exe
+          cp target/x86_64-pc-windows-msvc/release/bahth.exe exes/bahth.exe
+          cp target/i686-pc-windows-msvc/release/bahth.exe exes/bahth-x86.exe
+      - name: Check the imported DLLs
+        run: python ci/check_imports.py exes/bahth.exe exes/bahth-x86.exe
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: store-exes-gnu
+          name: store-exes-msvc
           path: exes/
           retention-days: 3
 
@@ -128,13 +133,14 @@ jobs:
         with:
           toolchain: stable
           targets: aarch64-pc-windows-msvc
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Build bahth-arm64.exe
         shell: pwsh
         run: |
           cargo build --release --target aarch64-pc-windows-msvc
           New-Item -ItemType Directory -Force exes | Out-Null
           Copy-Item target/aarch64-pc-windows-msvc/release/bahth.exe exes/bahth-arm64.exe
+      - name: Check the imported DLLs
+        run: python ci/check_imports.py exes/bahth-arm64.exe
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: store-exes-arm64
@@ -142,7 +148,7 @@ jobs:
           retention-days: 3
 
   package:
-    needs: [release-exes, build-gnu, build-arm64]
+    needs: [release-exes, build-msvc, build-arm64]
     # Runs after whichever exes job ran (the others are skipped).
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: windows-latest
@@ -172,7 +178,7 @@ jobs:
         shell: powershell
         run: |
           $bundle = Get-ChildItem store-package -Filter *.msixbundle | Select-Object -First 1
-          ./packaging/msix/test-install.ps1 -Bundle $bundle.FullName -Name $env:STORE_name -Publisher $env:STORE_publisher
+          ./packaging/msix/test-install.ps1 -Bundle $bundle.FullName -Name $env:STORE_name -Publisher $env:STORE_publisher -NewLookRequired
       # The single-CPU packages inside the bundle, for install-test below.
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -235,18 +241,20 @@ jobs:
           path: store-package
       - name: Install a test-signed ${{ matrix.arch }} package and check Store mode
         shell: powershell
+        env:
+          ARCH: ${{ matrix.arch }}
         run: |
           $info = @{}
           Get-Content store-package/identity.txt | ForEach-Object { $k, $v = $_ -split '=', 2; $info[$k] = $v }
-          $msix = Get-ChildItem parts -Filter "*_${{ matrix.arch }}.msix" | Select-Object -First 1
-          if (-not $msix) { throw "no ${{ matrix.arch }} package in store-parts" }
+          $msix = Get-ChildItem parts -Filter "*_$env:ARCH.msix" | Select-Object -First 1
+          if (-not $msix) { throw "no $env:ARCH package in store-parts" }
           Write-Host "OS $([Runtime.InteropServices.RuntimeInformation]::OSArchitecture), package $($msix.Name)"
           ./packaging/msix/test-install.ps1 -Bundle $msix.FullName -Name $info['name'] -Publisher $info['publisher']
 
   # Store listing screenshots (1920x1080 when the runner allows it), in
   # Arabic and English, from the same x64 exe that was packaged.
   screenshots:
-    needs: [release-exes, build-gnu]
+    needs: [release-exes, build-msvc]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: windows-latest
     # The first index of the runner's drive can take a long while.

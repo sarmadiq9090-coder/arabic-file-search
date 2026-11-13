@@ -4,12 +4,16 @@
 # like the Start menu does, then checks the log the packaged program writes:
 # package identity found, data under the package's
 # private AppData folder, startup task present but off (the user has not
-# turned it on). Removes the package and the certificate afterwards.
+# turned it on), and the new look (WebView2, the default since 0.10.1)
+# loading its page inside the package. Removes the package and the
+# certificate afterwards. -NewLookRequired makes a new look that does not
+# load an error (store.yml: the x64 run); otherwise it is a warning.
 # Run with Windows PowerShell 5.1 (the Appx module is unreliable in pwsh 7).
 param(
     [Parameter(Mandatory)][string]$Bundle,
     [Parameter(Mandatory)][string]$Name,
-    [Parameter(Mandatory)][string]$Publisher
+    [Parameter(Mandatory)][string]$Publisher,
+    [switch]$NewLookRequired
 )
 $ErrorActionPreference = 'Stop'
 $failed = $false
@@ -124,6 +128,23 @@ try {
         # Off until the user turns it on (store::ENABLE_STARTUP_ON_FIRST_RUN,
         # Store policy 10.2.8): the first run must not enable it.
         if ($line -notmatch 'startup task Some\(Disabled\)') { Fail "the startup task is not plainly off after the first run (the user did not consent): $line" }
+    }
+    # The new look: its WebView2 data folder is in the virtualised data
+    # folder too, and its processes run inside the package.
+    if ($line) {
+        $hello = $null
+        for ($i = 0; $i -lt 60 -and -not $hello; $i++) {
+            Start-Sleep -Seconds 1
+            if (Test-Path $log) { $hello = Get-Content $log | Where-Object { $_ -match 'webui: page said hello' } | Select-Object -Last 1 }
+        }
+        $webui = if (Test-Path $log) { @(Get-Content $log | Where-Object { $_ -match 'webui' }) } else { @() }
+        $webui | Select-Object -Last 8 | ForEach-Object { Write-Host "log: $_" }
+        $fallback = $webui | Where-Object { $_ -match 'did not load|process failed|using the classic window|back to the classic look' }
+        if ($hello -and -not $fallback) { Write-Host "new look: $hello" }
+        else {
+            $msg = "the new look did not load its page inside the package$(if ($fallback) { ": $($fallback | Select-Object -First 1)" })"
+            if ($NewLookRequired) { Fail $msg } else { Write-Host "::warning::$msg" }
+        }
     }
     Start-Sleep -Seconds 5
     $proc = Get-Process bahth -ErrorAction SilentlyContinue
