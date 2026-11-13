@@ -183,6 +183,8 @@ impl App {
         let on = !self.menu_read_cloud.checked();
         self.menu_read_cloud.set_checked(on);
         self.state.borrow_mut().settings.read_cloud_files = on;
+        // Saved now: a crash or a forced end would otherwise lose the choice.
+        self.save_settings();
         crate::cloud::set_read_cloud(on);
         log(&format!("cloud-only files: {}", if on { "read (downloaded)" } else { "not read" }));
         if on {
@@ -196,6 +198,7 @@ impl App {
         let on = !self.menu_content_index.checked();
         self.menu_content_index.set_checked(on);
         self.state.borrow_mut().settings.content_index = on;
+        self.save_settings();
         if on {
             self.start_warm();
         } else {
