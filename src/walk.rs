@@ -1214,8 +1214,12 @@ mod tests {
     }
 
     /// (path, size, mtime, is_dir) of a walk, sorted.
+    /// Folder times are left out: Windows updates a new folder's last-write
+    /// time a moment after its last child is created, so two walks of the same
+    /// tree can see it a second apart (seen on the ARM64 runner). Files'
+    /// times are compared.
     fn listing(entries: Vec<Entry>) -> Vec<(String, u64, i64, bool)> {
-        let mut v: Vec<_> = entries.into_iter().map(|e| (e.path.into(), e.size, e.mtime, e.is_dir)).collect();
+        let mut v: Vec<_> = entries.into_iter().map(|e| (e.path.into(), e.size, if e.is_dir { 0 } else { e.mtime }, e.is_dir)).collect();
         v.sort();
         v
     }
