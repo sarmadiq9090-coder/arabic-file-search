@@ -42,7 +42,7 @@ mod imp {
     use super::super::{App, WS_EX_LAYOUTRTL, autostart, content_index, shell, surface, title};
     use crate::history::SavedSearch;
     use crate::i18n::{self, Lang};
-    use crate::search::{self, ContentHit, ContentProgress, KINDS};
+    use crate::search::{self, ContentHit, ContentProgress};
     use crate::settings::{FloatingMode, HotkeyOpens};
     use crate::webui::bridge::{self, ContentState, List, Lists, Miss, Outbound, Params, Request, Setting, SettingsOut, Shown, Sort};
     use crate::webui::host::{self, Host};
@@ -933,7 +933,7 @@ mod imp {
                             kinds: bridge::kinds(lang),
                             sizes: bridge::labels(bridge::SIZES, lang),
                             dates: bridge::labels(bridge::DATES, lang),
-                            kind: s.kind.min(KINDS.len() - 1),
+                            kind: search::kind_or_all(s.kind),
                             sort: Sort::from_column(s.sort_col),
                             desc: s.sort_desc,
                             digits: s.arabic_digits,
@@ -1106,7 +1106,7 @@ mod imp {
                         return;
                     };
                     self.webui_set_scope(s.scope, false);
-                    self.webui_send(&Outbound::Apply { q: s.query, kind: s.kind.min(KINDS.len() - 1), content: s.content });
+                    self.webui_send(&Outbound::Apply { q: s.query, kind: search::kind_or_all(s.kind), content: s.content });
                 }
                 Request::SaveSearch { q, kind, content } => {
                     let text = q.trim().to_string();

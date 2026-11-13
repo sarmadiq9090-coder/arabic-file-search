@@ -418,6 +418,13 @@ pub const KINDS: &[(&str, &[&str])] = &[
 /// Index of the "folders only" entry in [`KINDS`].
 pub const KIND_FOLDERS: usize = 7;
 
+/// `kind` when it is an entry of [`KINDS`], else 0 (all types): a type the
+/// list does not have (a damaged file) must not become its last entry,
+/// folders only, which would hide every file.
+pub fn kind_or_all(kind: usize) -> usize {
+    if kind < KINDS.len() { kind } else { 0 }
+}
+
 /// An extension no file has, used when filters leave no allowed type.
 const NO_EXT: &str = "\0";
 

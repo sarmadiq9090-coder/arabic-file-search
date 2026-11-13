@@ -142,7 +142,7 @@ impl App {
 
     pub(super) fn apply_saved(&self, s: &SavedSearch) {
         // A kind out of range (a damaged history.json) means all types, not the last kind.
-        self.kind_combo.set_selection(Some(if s.kind < search::KINDS.len() { s.kind } else { 0 }));
+        self.kind_combo.set_selection(Some(search::kind_or_all(s.kind)));
         self.state.borrow_mut().settings.kind = self.kind();
         self.content_chk.set_check_state(if s.content {
             nwg::CheckBoxState::Checked

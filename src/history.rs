@@ -154,6 +154,10 @@ impl History {
         if h.saved.len() > MAX_SAVED {
             h.saved.drain(..h.saved.len() - MAX_SAVED);
         }
+        // A type the list does not have is "all types", for every caller.
+        for s in &mut h.saved {
+            s.kind = crate::search::kind_or_all(s.kind);
+        }
         if h.opens.len() > MAX_OPENS {
             let now = h.opens.values().map(|v| v.1).max().unwrap_or(0);
             let mut v: Vec<(String, (u32, i64))> = h.opens.drain().collect();
@@ -697,6 +701,8 @@ mod tests {
         assert_eq!(h.recent[0], "q0");
         assert_eq!(h.saved.len(), MAX_SAVED);
         assert_eq!(h.saved.last().unwrap().name, "s99");
+        // A type the list does not have is "all types", not folders only.
+        assert!(h.saved.iter().all(|s| s.kind == 0));
         assert_eq!(h.opens.len(), MAX_OPENS);
         assert!(h.opens.contains_key("new"));
         assert!(score(u32::MAX, i64::MIN, i64::MAX).is_finite());
@@ -710,5 +716,20 @@ mod tests {
         fs::write(&file, vec![b' '; (MAX_FILE_BYTES + 1) as usize]).unwrap();
         assert!(History::load_from(&file).recent.is_empty());
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn saved_search_kinds_out_of_range_mean_all_types() {
+        let dir = std::env::temp_dir().join(format!("bahth_hist_kind_{}", std::process::id()));
+        let file = dir.join("history.json");
+        fs::create_dir_all(&dir).unwrap();
+        let folders = crate::search::KIND_FOLDERS;
+        let json = format!(r#"{{"saved":[{{"name":"a","kind":99}},{{"name":"b","kind":{folders}}},{{"name":"c","kind":2}},{{"name":"d","kind":{}}}]}}"#, crate::search::KINDS.len());
+        fs::write(&file, json).unwrap();
+        let kinds: Vec<usize> = History::load_from(&file).saved.iter().map(|s| s.kind).collect();
+        assert_eq!(kinds, [0, folders, 2, 0]);
+        fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(crate::search::kind_or_all(folders), folders);
+        assert_eq!(crate::search::kind_or_all(usize::MAX), 0);
     }
 }
