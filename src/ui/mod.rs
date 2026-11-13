@@ -95,7 +95,7 @@ use crate::leave::Leaving;
 use files::SAVES;
 use format::ARABIC_DIGITS;
 use history_menu::HistoryMenu;
-use keys::{HOTKEY_ID, HOTKEY_TEXT};
+use keys::{HOTKEY_ID, hotkey_text};
 use search_jobs::NameResult;
 use startup::{LOOP_STARTED, activate_running_copy, phase, ui_font_family};
 use updates::UpdateEvent;
@@ -589,7 +589,7 @@ impl App {
         if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
             // The hotkey, unless another program has it (its menu item is
             // greyed then).
-            let hotkey = self.menu_hotkey.enabled().then_some(HOTKEY_TEXT);
+            let hotkey = self.menu_hotkey.enabled().then_some(hotkey_text());
             self.tray.show(
                 &crate::quick::hidden_hint(crate::i18n::current(), hotkey),
                 Some(title()),

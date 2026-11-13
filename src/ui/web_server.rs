@@ -10,7 +10,9 @@
 //! Windows marks it private) or of a network the user allowed in this run.
 //! It stops when the PC leaves that network and moves with a new address.
 //! While it runs, the tray icon's tip and a check mark on the Options item
-//! say so.
+//! say so. After two hours with no request from any phone ([`web::IDLE_OFF`])
+//! it turns itself off, as if the user had (logged, and said in the window
+//! and the new look's Settings).
 
 use native_windows_gui as nwg;
 use std::cell::{Cell, RefCell};
@@ -29,7 +31,7 @@ use winapi::um::winuser::{GWL_EXSTYLE, GetWindowLongW, SWP_FRAMECHANGED, SWP_NOM
 use super::lazy::Lazy;
 use super::shell::wide;
 use super::startup::log;
-use super::keys::HOTKEY_TEXT;
+use super::keys::hotkey_text;
 use super::{App, WS_EX_LAYOUTRTL, autostart, title};
 use crate::web;
 use crate::web::net::{self, Refusal};
@@ -70,6 +72,9 @@ pub struct WebUi {
     refusal: Cell<Option<Refusal>>,
     /// The network seen last, for the window.
     seen: RefCell<Vec<net::Candidate>>,
+    /// It turned itself off after [`web::IDLE_OFF`] with no request (until
+    /// it is turned on again).
+    idle_off: Cell<bool>,
 }
 
 impl std::ops::Deref for WebUi {
@@ -282,6 +287,7 @@ impl App {
             match evt {
                 nwg::Event::OnMenuItemSelected if handle == app.web.menu_item && app.ensure_web_window() => app.show_web_window(),
                 nwg::Event::OnTimerTick if handle == app.timer => {
+                    app.check_web_idle();
                     app.poll_web_network();
                     app.sync_web_index();
                 }
@@ -376,6 +382,8 @@ impl App {
         };
         shared.set_index(self.state.borrow().index.clone());
         self.set_web_show_system(&shared);
+        // The idle time counts from the start.
+        shared.note_request(std::time::Instant::now());
         let mut all = ips.to_vec();
         all.push(Ipv4Addr::LOCALHOST);
         match web::Server::start_on(&all, port, shared) {
@@ -484,6 +492,9 @@ impl App {
         if changed && self.web.ui.is_built() && self.web.window.visible() {
             self.refresh_web_window();
         }
+        if changed {
+            self.webui_settings_changed();
+        }
     }
 
     /// The user turned it on or pressed "Allow this network": this network
@@ -503,19 +514,29 @@ impl App {
 
     /// The tray icon's tip and the Options item's check mark say whether
     /// the server runs.
-    fn update_web_indicator(&self) {
+    pub(super) fn update_web_indicator(&self) {
         let on = self.web.server.borrow().is_some();
         // Not built in the Microsoft Store version (`build_web_ui`).
         if !self.web.menu_item.handle.blank() {
             self.web.menu_item.set_checked(on);
         }
-        let base = format!("{} ({HOTKEY_TEXT})", title());
+        let base = format!("{} ({})", title(), hotkey_text());
         let tip = if on { format!("{base} — {}", tr!("البحث من الهاتف يعمل", "Phone search is on")) } else { base };
         self.tray.set_tip(&tip);
+        self.webui_settings_changed();
     }
 
     fn on_web_switch(&self) {
-        let on = self.web.on_chk.check_state() == nwg::CheckBoxState::Checked;
+        self.set_web_on(self.web.on_chk.check_state() == nwg::CheckBoxState::Checked);
+    }
+
+    /// Turns search from phone on or off (the window's box, or the new
+    /// look's Settings switch). Never in the Microsoft Store version.
+    pub(super) fn set_web_on(&self, on: bool) {
+        if crate::store::is_packaged() {
+            return; // see build_web_ui
+        }
+        self.web.idle_off.set(false);
         if on {
             self.web.wanted.set(true);
             set_dword(REG_ON, 1);
@@ -536,6 +557,79 @@ impl App {
             *self.web.error.borrow_mut() = None;
         }
         self.refresh_web_window();
+        self.webui_settings_changed();
+    }
+
+    /// Off after two hours with no request from a phone: an open door
+    /// nobody uses is closed (the user turns it on again when needed).
+    fn check_web_idle(&self) {
+        if self.web.server.borrow().is_none() {
+            return;
+        }
+        let expired = self.web.shared.borrow().as_ref().is_some_and(|s| s.idle_expired(std::time::Instant::now()));
+        if expired {
+            log(&format!("web: no request for {} minutes; turning phone search off", web::IDLE_OFF.as_secs() / 60));
+            self.set_web_on(false);
+            self.web.idle_off.set(true);
+            self.refresh_web_window();
+        }
+    }
+
+    /// The new look's «السماح بهذه الشبكة» / "Allow this network".
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))] // only the new look (MSVC) shows it
+    pub(super) fn web_allow_now(&self) {
+        if !self.web.wanted.get() {
+            return;
+        }
+        self.allow_web_network();
+        self.refresh_web_window();
+        self.webui_settings_changed();
+    }
+
+    /// The new look's "More phone settings…": the window with the port,
+    /// downloads and a new PIN.
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))] // only the new look (MSVC) shows it
+    pub(super) fn open_web_window(self: &Rc<Self>) {
+        if !crate::store::is_packaged() && self.ensure_web_window() {
+            self.show_web_window();
+        }
+    }
+
+    /// Search from phone as the new look's Settings shows it; `None` in the
+    /// Microsoft Store version, which has none.
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))] // only the new look (MSVC) shows it
+    pub(super) fn phone_settings(&self) -> Option<crate::webui::bridge::PhoneOut> {
+        if crate::store::is_packaged() {
+            return None;
+        }
+        let w = &self.web;
+        let server = w.server.borrow();
+        let wanted = w.wanted.get();
+        let mut out = crate::webui::bridge::PhoneOut { on: wanted, running: server.is_some(), idle_off: w.idle_off.get(), ..Default::default() };
+        // What the server checks (see refresh_web_window).
+        let secrets = if server.is_some() { w.shared.borrow().as_ref().map(|s| s.current_secrets()) } else { None };
+        if let (Some(s), Some((token, pin))) = (server.as_ref(), secrets) {
+            let lan = s.lan_addrs().next();
+            if let Some(a) = lan.or(s.addrs.first()) {
+                out.url = format!("http://{a}/");
+                out.link = format!("http://{a}/?t={token}");
+            }
+            out.pin = web::pin_display(&pin);
+            if lan.is_none() {
+                out.note = tr!(
+                    "لم يُعثر على اتصال بشبكة منزلية، يعمل على هذا الحاسوب فقط.",
+                    "No home network connection found; it works on this PC only."
+                )
+                .into();
+            }
+        } else if wanted {
+            let refusal = w.refusal.get();
+            let mut note = w.error.borrow().clone().map(|e| e + "\n").unwrap_or_default();
+            note.push_str(&off_reason(refusal, &w.seen.borrow(), w.error.borrow().is_some()).replace("\r\n", "\n"));
+            out.note = note.trim().to_string();
+            out.allow = matches!(refusal, Some(Refusal::NotHome | Refusal::NotPrivate | Refusal::Unknown));
+        }
+        Some(out)
     }
 
     fn on_web_download_switch(&self) {
@@ -564,6 +658,7 @@ impl App {
             *self.web.error.borrow_mut() = Some(tr!("تعذر إنشاء رمز سري آمن.", "Could not create a secure PIN.").into());
         }
         self.refresh_web_window();
+        self.webui_settings_changed();
     }
 
     /// Keeps the server on the index the window shows (it is replaced, not
@@ -579,6 +674,9 @@ impl App {
     }
 
     fn refresh_web_window(&self) {
+        if !self.web.ui.is_built() {
+            return; // (the new look's Settings switch, before the window was ever opened)
+        }
         let w = &self.web;
         let server = w.server.borrow();
         let running = server.is_some();
@@ -632,10 +730,20 @@ impl App {
                 }
             }
             _ if wanted => text.push_str(&off_reason(refusal, &w.seen.borrow(), w.error.borrow().is_some())),
+            _ if w.idle_off.get() => text.push_str(idle_off_text()),
             _ => text.push_str(tr!("متوقف. فعّل الخيار أعلاه للبدء.", "Off. Tick the box above to start.")),
         }
         w.details.set_text(&text);
     }
+}
+
+/// It turned itself off after two hours unused (the window; the page has
+/// its own words).
+fn idle_off_text() -> &'static str {
+    tr!(
+        "توقّف البحث من الهاتف وحده بعد ساعتين دون أي طلب من الهاتف، للأمان. فعّل الخيار أعلاه لتشغيله من جديد.",
+        "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again."
+    )
 }
 
 /// Why the switch is on but the server is not running, for the window.

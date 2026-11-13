@@ -1,15 +1,53 @@
 //! Keyboard handling in the window, and the global hotkey.
 
 use native_windows_gui as nwg;
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use winapi::shared::minwindef::UINT;
 use winapi::um::winuser::{EM_SETSEL, GetKeyState, SendMessageW, VK_CONTROL, VK_DOWN, VK_F3, VK_UP};
 
 use super::App;
 use super::startup::log;
+use crate::settings::Hotkey;
 
-/// Id of the global "show the program" hotkey, Ctrl+Alt+F.
+/// Id of the global "show the program" hotkey (Ctrl+Alt+F unless the user
+/// chose another in Settings: `Settings::hotkey`).
 pub(super) const HOTKEY_ID: i32 = 1;
-pub(super) const HOTKEY_TEXT: &str = "Ctrl+Alt+F";
+
+/// The chosen hotkey (its place in `Hotkey::ALL`), for the labels that name it.
+static CURRENT: AtomicU8 = AtomicU8::new(0);
+/// Another program held the chosen hotkey when it was registered.
+static TAKEN: AtomicBool = AtomicBool::new(false);
+
+/// The keys of the global hotkey, as the menus, tips and hints name them.
+pub(super) fn hotkey_text() -> &'static str {
+    current_hotkey().label()
+}
+
+pub(super) fn current_hotkey() -> Hotkey {
+    Hotkey::ALL.get(CURRENT.load(Ordering::Relaxed) as usize).copied().unwrap_or_default()
+}
+
+/// Called with the settings before any label is built.
+pub(super) fn set_current_hotkey(h: Hotkey) {
+    CURRENT.store(Hotkey::ALL.iter().position(|&x| x == h).unwrap_or(0) as u8, Ordering::Relaxed);
+}
+
+/// Whether another program has the chosen hotkey (Settings says so).
+pub(super) fn hotkey_taken() -> bool {
+    TAKEN.load(Ordering::Relaxed)
+}
+
+/// `RegisterHotKey`'s modifiers and key for `h`.
+fn mods_and_key(h: Hotkey) -> (u32, u32) {
+    use winapi::um::winuser::{MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT, MOD_WIN, VK_SPACE};
+    let (mods, key) = match h {
+        Hotkey::CtrlAltF => (MOD_CONTROL | MOD_ALT, 'F' as u32),
+        Hotkey::CtrlAltSpace => (MOD_CONTROL | MOD_ALT, VK_SPACE as u32),
+        Hotkey::CtrlShiftF => (MOD_CONTROL | MOD_SHIFT, 'F' as u32),
+        Hotkey::WinAltF => (MOD_WIN | MOD_ALT, 'F' as u32),
+    };
+    ((mods | MOD_NOREPEAT) as u32, key)
+}
 /// Id of the optional Alt+Space hotkey (quick search), off by default.
 /// Not 2: that is Ctrl+Alt+G (`quickswitch::HOTKEY_ID`) on the same window.
 pub(super) const ALT_SPACE_ID: i32 = 3;
@@ -18,14 +56,55 @@ const _: () = assert!(ALT_SPACE_ID != HOTKEY_ID && ALT_SPACE_ID != super::quicks
 impl App {
     // ---------------------------------------------------------------- hotkey
 
+    /// Registers the chosen hotkey. When another program has it, the
+    /// Options item is greyed and Settings says so, offering the others.
     pub(super) fn register_hotkey(&self) {
-        use winapi::um::winuser::{MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, RegisterHotKey};
-        let Some(h) = self.window.handle.hwnd() else { return };
-        let ok = unsafe { RegisterHotKey(h, HOTKEY_ID, (MOD_CONTROL | MOD_ALT | MOD_NOREPEAT) as u32, 'F' as u32) } != 0;
+        let chosen = self.state.borrow().settings.hotkey;
+        set_current_hotkey(chosen);
+        let ok = self.try_hotkey(chosen);
+        TAKEN.store(!ok, Ordering::Relaxed);
+        self.menu_hotkey.set_enabled(ok);
         if !ok {
-            self.menu_hotkey.set_enabled(false);
-            log("hotkey Ctrl+Alt+F is taken by another program");
+            log(&format!("hotkey {} is taken by another program", chosen.label()));
         }
+    }
+
+    fn try_hotkey(&self, h: Hotkey) -> bool {
+        let Some(hwnd) = self.window.handle.hwnd() else { return false };
+        let (mods, key) = mods_and_key(h);
+        unsafe { winapi::um::winuser::RegisterHotKey(hwnd, HOTKEY_ID, mods, key) != 0 }
+    }
+
+    /// Settings ▸ the hotkey: uses `h` from now on (saved) if Windows gives
+    /// it; false when another program has it too (the old one is kept).
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))] // only the new window (MSVC) offers the choice
+    pub(super) fn change_hotkey(&self, h: Hotkey) -> bool {
+        let old = current_hotkey();
+        if h == old && !hotkey_taken() {
+            return true;
+        }
+        if let Some(hwnd) = self.window.handle.hwnd() {
+            unsafe { winapi::um::winuser::UnregisterHotKey(hwnd, HOTKEY_ID) };
+        }
+        if !self.try_hotkey(h) {
+            log(&format!("hotkey {} is taken by another program too; keeping {}", h.label(), old.label()));
+            if !hotkey_taken() && !self.try_hotkey(old) {
+                TAKEN.store(true, Ordering::Relaxed);
+                self.menu_hotkey.set_enabled(false);
+            }
+            return false;
+        }
+        log(&format!("hotkey changed from {} to {}", old.label(), h.label()));
+        set_current_hotkey(h);
+        TAKEN.store(false, Ordering::Relaxed);
+        self.menu_hotkey.set_enabled(true);
+        self.state.borrow_mut().settings.hotkey = h;
+        self.save_settings();
+        let label = trf!("إظهار البرنامج من أي مكان\t{}", "Show the program from anywhere\t{}", h.label());
+        set_menu_text(&self.menu_hotkey, &label);
+        set_menu_text(&self.tray_quick, &trf!("فتح نافذة البحث\t{}", "Open quick search\t{}", h.label()));
+        self.hotkey_labels_changed();
+        true
     }
 
     /// Alt+Space for the quick search; false when another program has it.
@@ -139,4 +218,16 @@ impl App {
             unsafe { SendMessageW(h, EM_SETSEL as UINT, 0, -1) };
         }
     }
+}
+
+/// A menu item's text, changed after it was built.
+pub(super) fn set_menu_text(item: &nwg::MenuItem, text: &str) {
+    use winapi::um::winuser::{MENUITEMINFOW, MIIM_STRING, SetMenuItemInfoW};
+    let Some((menu, id)) = item.handle.hmenu_item() else { return };
+    let text = super::shell::wide(text);
+    let mut info: MENUITEMINFOW = unsafe { std::mem::zeroed() };
+    info.cbSize = std::mem::size_of::<MENUITEMINFOW>() as UINT;
+    info.fMask = MIIM_STRING;
+    info.dwTypeData = text.as_ptr() as *mut u16;
+    unsafe { SetMenuItemInfoW(menu, id, 0, &info) };
 }
