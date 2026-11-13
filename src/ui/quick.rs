@@ -187,7 +187,7 @@ impl Drop for Popup {
 }
 
 fn rtl() -> bool {
-    !crate::i18n::is_en()
+    crate::i18n::is_rtl()
 }
 
 /// `GET_X_LPARAM` / `GET_Y_LPARAM`.

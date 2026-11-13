@@ -53,7 +53,7 @@ mod imp {
     use super::super::startup::log;
     use super::super::{App, WS_EX_LAYOUTRTL, autostart, content_index, shell, surface, title};
     use crate::history::SavedSearch;
-    use crate::i18n::{self, Lang};
+    use crate::i18n;
     use crate::search::{self, ContentHit, ContentProgress};
     use crate::settings::{FloatingMode, HotkeyOpens};
     use crate::webui::bridge::{self, ContentState, List, Lists, Miss, Outbound, Params, Request, Setting, SettingsOut, Shown, Sort};
@@ -132,7 +132,7 @@ mod imp {
         /// The folder searched, "" for all drives (the page never sets it).
         scope: RefCell<String>,
         /// The language chosen for the next start, when it was changed.
-        next_lang: Cell<Option<Lang>>,
+        next_lang: Cell<Option<&'static crate::i18n::Locale>>,
         last_status: RefCell<String>,
         /// The classic search box's text last handed to the page (the quick
         /// popup's "open in the full window" puts its search there).
@@ -1090,12 +1090,12 @@ mod imp {
         }
 
         fn webui_send_settings(&self) {
-            let current = i18n::current();
+            let current = i18n::locale();
             let msg = {
                 let s = &self.state.borrow().settings;
                 Outbound::Settings(SettingsOut {
-                    lang: current.code(),
-                    next_lang: self.webui.next_lang.get().unwrap_or(current).code(),
+                    lang: current.code,
+                    next_lang: self.webui.next_lang.get().unwrap_or(current).code,
                     digits: s.arabic_digits,
                     autostart: autostart::is_enabled(),
                     content_index: s.content_index,
@@ -1382,10 +1382,9 @@ mod imp {
                 Request::ClearSaved {} => self.webui_clear_history(false),
                 Request::Set { key, on } => self.webui_set(key, on),
                 Request::Lang { lang: chosen } => {
-                    let chosen = chosen.lang();
-                    if i18n::save(chosen) {
-                        self.menu_lang_ar.set_checked(chosen == Lang::Ar);
-                        self.menu_lang_en.set_checked(chosen == Lang::En);
+                    let chosen = chosen.0;
+                    if i18n::save_locale(chosen) {
+                        self.check_lang_item(chosen);
                         self.webui.next_lang.set(Some(chosen));
                     } else {
                         self.webui_warn(tr!("تعذر حفظ اللغة.", "Could not save the language."));

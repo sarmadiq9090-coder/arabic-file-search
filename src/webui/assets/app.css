@@ -58,6 +58,29 @@
   --shadow: 0 2px 8px rgb(0 0 0 / .35), 0 24px 48px -16px rgb(0 0 0 / .6);
 }
 
+/* Fonts that Windows 10/11 have for each script, by language (the page
+   and each name in the language list); Arabic-script languages keep the
+   default (IBM Plex Sans Arabic). Latin with letters beyond Latin-1 starts
+   with Segoe UI so a word is not set in two fonts. */
+.lname { --font: "IF Sans", "Segoe UI Variable Text", "Segoe UI", Tahoma, sans-serif; }
+:lang(syr) { --font: "Estrangelo Edessa", "Segoe UI Historic", "Segoe UI", Tahoma, sans-serif; }
+:lang(zgh) { --font: "Ebrima", "Segoe UI Historic", "Segoe UI", sans-serif; }
+:lang(ur) { --font: "Urdu Typesetting", "IF Sans", "Segoe UI", Tahoma, sans-serif; }
+:lang(zh-Hans) { --font: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif; }
+:lang(zh-Hant) { --font: "Microsoft JhengHei UI", "Microsoft JhengHei", "Segoe UI", sans-serif; }
+:lang(ja) { --font: "Yu Gothic UI", "Meiryo UI", "Segoe UI", sans-serif; }
+:lang(ko) { --font: "Malgun Gothic", "Segoe UI", sans-serif; }
+:lang(hi), :lang(mr), :lang(bn), :lang(pa), :lang(gu), :lang(or), :lang(ta), :lang(te), :lang(kn), :lang(ml) { --font: "Nirmala UI", "Segoe UI", sans-serif; }
+:lang(th) { --font: "Leelawadee UI", "Segoe UI", sans-serif; }
+:lang(tr), :lang(az), :lang(uz), :lang(kmr), :lang(vi), :lang(ru), :lang(uk), :lang(ha) { --font: "Segoe UI Variable Text", "Segoe UI", Tahoma, sans-serif; }
+/* Line breaking: Chinese and Japanese break between characters but not
+   before closing punctuation or small kana; Korean keeps its words whole;
+   long German, Russian… words may hyphenate instead of overflowing. */
+:lang(zh-Hans), :lang(zh-Hant), :lang(ja) { line-break: strict; word-break: normal; }
+:lang(ko) { word-break: keep-all; }
+:lang(de), :lang(ru), :lang(uk), :lang(fr), :lang(es), :lang(pt), :lang(tr) { hyphens: auto; }
+:lang(syr) body, body:lang(syr), :lang(zgh) body, body:lang(zgh), :lang(ur) body, body:lang(ur) { line-height: 1.7; }
+
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body { background: var(--bg); color: var(--text); font: 400 14px/1.5 var(--font); -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; }
@@ -343,7 +366,7 @@ ol.lines .lt { text-align: start; overflow-wrap: anywhere; }
 .sbox p { margin: 0; }
 .sbox .muted { color: var(--muted); font-size: 12.5px; }
 .srow { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 40px; }
-.srow label { display: flex; flex-direction: column; cursor: pointer; }
+.srow label { display: flex; flex-direction: column; cursor: pointer; min-width: 0; overflow-wrap: break-word; }
 .srow small { color: var(--muted); font-size: 12px; }
 .sw { flex: none; width: 42px; height: 24px; border-radius: 99px; border: 1.5px solid var(--muted); background: var(--surface-3); position: relative; cursor: pointer; padding: 0; }
 /* An off switch reads as off (its knob in the text's grey, not white on grey). */
@@ -351,6 +374,13 @@ ol.lines .lt { text-align: start; overflow-wrap: anywhere; }
 .sw[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
 .sw[aria-checked="true"] .knob { inset-inline-start: 20px; background: var(--accent-text); }
 .segs { display: inline-flex; gap: 6px; }
+/* The language list: every language by its own name, scrolling when long. */
+.langs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; max-height: 264px; overflow-y: auto; padding: 2px; margin: 0 -2px; }
+.lopt { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-height: 40px; padding: 4px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; text-align: start; }
+.lopt .lname { font-weight: 500; font-family: var(--font); line-height: 1.35; unicode-bidi: isolate; }
+.lopt small { color: var(--muted); font-size: 11px; line-height: 1.3; }
+.lopt.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.lopt.on small { color: inherit; opacity: .85; }
 .seg { height: 34px; padding-inline: 16px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; font-weight: 500; }
 .seg.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .snote { margin-top: 10px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 12.5px; }

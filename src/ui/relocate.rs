@@ -140,10 +140,10 @@ impl App {
         }
     }
 
-    /// A message box over the main window, right to left in Arabic; true
+    /// A message box over the main window, right to left in a right-to-left language; true
     /// when "Yes" was chosen.
     fn move_message(&self, text: &str, flags: u32) -> bool {
-        let flags = flags | if crate::i18n::is_en() { 0 } else { MB_RTLREADING | MB_RIGHT };
+        let flags = flags | if crate::i18n::is_rtl() { MB_RTLREADING | MB_RIGHT } else { 0 };
         let caption = tr!("نقل البرنامج إلى مكان دائم", "Move the program to a permanent place");
         let (t, c) = (shell::wide(text), shell::wide(caption));
         // Over the new main window when it is the one on screen.

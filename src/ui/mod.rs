@@ -308,8 +308,8 @@ pub struct App {
     menu_update: nwg::MenuItem,
     menu_autostart: nwg::MenuItem,
     lang_menu: nwg::Menu,
-    menu_lang_ar: nwg::MenuItem,
-    menu_lang_en: nwg::MenuItem,
+    /// One item per interface language (`lang_menu.rs`).
+    menu_langs: Vec<(nwg::MenuItem, &'static crate::i18n::Locale)>,
     /// Options ▸ "Send feedback": report a problem, suggest an idea, discuss.
     feedback_menu: nwg::Menu,
     menu_feedback_bug: nwg::MenuItem,

@@ -28,6 +28,8 @@ lopdf = { version = "0.42", default-features = false }
 flate2 = "1.1.10"
 tar = { version = "0.4.46", default-features = false }
 sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["bzip2", "deflate", "ppmd"] }
+# trf! in a translated interface language (src/i18n.rs): no dependencies.
+bahth-i18n-macros = { path = "i18n-macros" }
 
 [dev-dependencies]
 # The encoder, only to build .7z archives in the tests.

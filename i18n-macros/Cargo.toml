@@ -1,0 +1,11 @@
+[package]
+name = "bahth-i18n-macros"
+version = "0.1.0"
+edition = "2024"
+description = "trf!: format! with a translated template (src/i18n.rs)"
+license-file = "../LICENSE"
+publish = false
+
+[lib]
+proc-macro = true
+path = "src/lib.rs"

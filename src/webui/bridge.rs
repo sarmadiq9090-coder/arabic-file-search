@@ -21,7 +21,7 @@ use std::time::Instant;
 
 use crate::fuzzy::{self, Fallback};
 use crate::history::History;
-use crate::i18n::{KIND_LABELS_EN, Lang};
+use crate::i18n::{KIND_LABELS_EN, Lang, Locale};
 use crate::index::{Entry, Index};
 use crate::indexing_status::{self, Indexing};
 use crate::search::{self, ContentHit, KINDS, Query, SortKey};
@@ -141,20 +141,15 @@ pub enum Setting {
     TrayIcon,
 }
 
-/// The interface language the page can choose.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum LangCode {
-    Ar,
-    En,
-}
+/// The interface language the page can choose: the code of a language
+/// this build offers ([`crate::i18n::Locale::find`]); any other is refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LangCode(pub &'static Locale);
 
-impl LangCode {
-    pub fn lang(self) -> Lang {
-        match self {
-            LangCode::Ar => Lang::Ar,
-            LangCode::En => Lang::En,
-        }
+impl<'de> Deserialize<'de> for LangCode {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let code = String::deserialize(d)?;
+        Locale::find(&code).map(LangCode).ok_or_else(|| serde::de::Error::custom("not a language of the interface"))
     }
 }
 
@@ -1486,8 +1481,11 @@ mod tests {
         assert_eq!(req(r#""op":"set","key":"read_cloud_files","on":true"#), Ok(Request::Set { key: Setting::ReadCloudFiles, on: true }));
         assert_eq!(req(r#""op":"set","key":"run_command","on":true"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"set","key":"digits""#), Err(Rejected::Malformed));
-        assert_eq!(req(r#""op":"lang","lang":"en""#), Ok(Request::Lang { lang: LangCode::En }));
-        assert_eq!(req(r#""op":"lang","lang":"fr""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"lang","lang":"en""#), Ok(Request::Lang { lang: LangCode(Locale::of(Lang::En)) }));
+        assert_eq!(req(r#""op":"lang","lang":"ar""#), Ok(Request::Lang { lang: LangCode(Locale::of(Lang::Ar)) }));
+        assert_eq!(req(r#""op":"lang","lang":"xx""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"lang","lang":"he""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"lang","lang":7"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"restart""#), Ok(Request::Restart {}));
         // There is no way back to the classic look since 1.0.
         assert_eq!(req(r#""op":"classic_look""#), Err(Rejected::Malformed));

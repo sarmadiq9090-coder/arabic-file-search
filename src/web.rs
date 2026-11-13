@@ -609,8 +609,8 @@ li{background:#fff;border-radius:8px;padding:10px 12px;margin-bottom:8px;box-sha
 .f,.i{color:#aab}.m{color:#99a}input{background:#22262b;color:#e6e8eb;border-color:#444}.n a{color:#8ab4f8}}";
 
 fn page(title: &str, body: &str) -> String {
-    let lang = crate::i18n::current();
-    let (code, dir) = (lang.code(), lang.pick("rtl", "ltr"));
+    let lang = crate::i18n::locale();
+    let (code, dir) = (lang.code, if lang.rtl { "rtl" } else { "ltr" });
     format!(
         "<!doctype html><html lang=\"{code}\" dir=\"{dir}\"><head><meta charset=\"utf-8\">\
 <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\

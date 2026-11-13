@@ -330,7 +330,7 @@ impl NativeUi<AppUi> for App {
             .parent(&app.options_menu)
             .build(&mut app.menu_digits)?;
         app.build_thumbs()?;
-        super::lang_menu::build(&app.options_menu, &mut app.lang_menu, &mut app.menu_lang_ar, &mut app.menu_lang_en)?;
+        super::lang_menu::build(&app.options_menu, &mut app.lang_menu, &mut app.menu_langs)?;
         nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[0])?;
 
         nwg::MenuItem::builder()

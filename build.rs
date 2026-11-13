@@ -62,8 +62,39 @@ fn main() {
         std::fs::write(&rc, resource_script(&dir, &version)).expect("unable to write the resource script");
         embed_resource::compile(&rc, embed_resource::NONE).manifest_required().expect("unable to embed the resources");
     }
+    embed_languages();
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets/bahth.ico");
+}
+
+/// `OUT_DIR/i18n_files.rs`: every language file `i18n/<code>.json`
+/// (`source.json`, the list of English texts, is not one) as
+/// `("<code>", include_str!("…"))`, for `src/i18n.rs`. A language is
+/// offered only when its file is here.
+fn embed_languages() {
+    let dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR")).join("i18n");
+    println!("cargo:rerun-if-changed={}", dir.display());
+    let mut files: Vec<(String, std::path::PathBuf)> = std::fs::read_dir(&dir)
+        .map(|rd| {
+            rd.filter_map(Result::ok)
+                .filter_map(|e| {
+                    let path = e.path();
+                    let code = path.file_name()?.to_str()?.strip_suffix(".json")?.to_string();
+                    let ok = code != "source" && !code.is_empty() && code.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-');
+                    ok.then_some((code, path))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    files.sort();
+    let mut rs = String::from("&[\n");
+    for (code, path) in &files {
+        println!("cargo:rerun-if-changed={}", path.display());
+        rs.push_str(&format!("    ({code:?}, include_str!({:?})),\n", path.display().to_string()));
+    }
+    rs.push(']');
+    let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR"));
+    std::fs::write(out.join("i18n_files.rs"), rs).expect("unable to write i18n_files.rs");
 }
 
 /// The resource script: the icon (id 1) and a version resource for

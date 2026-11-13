@@ -67,7 +67,7 @@ pub struct Floating {
 }
 
 fn rtl() -> bool {
-    !crate::i18n::is_en()
+    crate::i18n::is_rtl()
 }
 
 impl App {

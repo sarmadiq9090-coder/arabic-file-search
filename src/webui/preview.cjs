@@ -48,10 +48,21 @@ const TEST_PNG = (() => {
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
 })();
 const MIME = { ".js": "text/javascript", ".css": "text/css", ".woff2": "font/woff2" };
+// The language files (i18n/<code>.json), as src/i18n.rs embeds them: the
+// page gets the language's "js" texts and the list of languages to offer.
+const I18N_DIR = path.join(__dirname, "..", "..", "i18n");
+const LANG_FILES = Object.fromEntries(fs.readdirSync(I18N_DIR).filter((f) => f.endsWith(".json") && f !== "source.json")
+  .map((f) => [f.slice(0, -5), JSON.parse(fs.readFileSync(path.join(I18N_DIR, f), "utf8"))]));
+const LANGS = [{ code: "ar", native: "العربية", english: "Arabic", rtl: true, machine: false }, { code: "en", native: "English", english: "English", rtl: false, machine: false },
+  ...Object.entries(LANG_FILES).map(([code, f]) => ({ code, native: f.meta.name_native, english: f.meta.name_en, rtl: !!f.meta.rtl, machine: true })).sort((a, b) => a.native.toLowerCase() < b.native.toLowerCase() ? -1 : 1)];
+const dirOf = (lang) => (LANGS.find((l) => l.code === lang) || {}).rtl ? "rtl" : "ltr";
 function page(lang) {
+  if (lang !== "ar" && lang !== "en" && !LANG_FILES[lang]) throw new Error(`no i18n/${lang}.json`);
+  const data = { code: lang, rtl: dirOf(lang) === "rtl", js: (LANG_FILES[lang] || {}).js || {}, langs: LANGS };
   return fs.readFileSync(path.join(ASSETS, "index.html"), "utf8")
-    .replace("{{LANG}}", lang).replace("{{DIR}}", lang === "ar" ? "rtl" : "ltr")
-    .replace("{{CSP}}", CSP.replace("; frame-ancestors 'none'", "")).replace("{{TOKEN}}", "00112233445566778899aabbccddeeff");
+    .replace("{{LANG}}", lang).replace("{{DIR}}", dirOf(lang))
+    .replace("{{CSP}}", CSP.replace("; frame-ancestors 'none'", "")).replace("{{TOKEN}}", "00112233445566778899aabbccddeeff")
+    .replace("{{I18N}}", () => JSON.stringify(data).replace(/</g, "\\u003c"));
 }
 
 // The fake program: runs inside the page, answers like src/webui/bridge.rs.
@@ -339,7 +350,7 @@ const SHOTS = [
   ["history-ar-light", "ar", "light", [["click", "#hist-btn"]], { expect: { menu: true } }],
   ["history-en-dark", "en", "dark", [["key", "ArrowDown"]], { expect: { menu: true } }],
   ["saved-ar-light", "ar", "light", [["click", "#hist-btn"], ["click", "#hist [role=menuitem]"], ["wait", 300]], { expect: { content: true } }],
-  ["settings-ar-light", "ar", "light", [["click", "#set-btn"], ["click", "#settings .seg[lang=en]"], ["click", "#set-floating"]], { expect: { settings: true } }],
+  ["settings-ar-light", "ar", "light", [["click", "#set-btn"], ["click", "#settings [data-lang=en]"], ["click", "#set-floating"]], { expect: { settings: true } }],
   ["settings-en-dark", "en", "dark", [["key", "Control+,"]], { expect: { settings: true } }],
   // Dragging a row out asks the program to drag that file (once), naming its list version.
   ["drag-en-light", "en", "light", [["type", "report"], ["drag", "#r1"]], { expect: { drags: 1, dialog: false } }],
@@ -399,6 +410,14 @@ const SHOTS = [
   ["pv-name-ar-light", "ar", "light", [["type", "123-45"]], { expect: { pvNameSide: "right" } }],
   ["pv-name-en-ui-ar-name-en-light", "en", "light", [["type", "فاتورة"]], { expect: { pvNameSide: "right" } }],
   ["pv-name-en-dark", "en", "dark", [["type", "report"]], { expect: { pvNameSide: "left" } }],
+  // Translated languages (i18n/*.json): direction, fonts, the language list
+  // (scrolling, each name in its own script, machine translations marked)
+  // and long or CJK texts without overflow.
+  ...["ckb", "syr", "zgh", "fr", "de", "ru", "ja", "ur"].filter((l) => LANG_FILES[l]).flatMap((l) => [
+    [`main-${l}-light`, l, "light", [["type", "report"], ["key", "ArrowDown"]]],
+    [`settings-${l}-dark`, l, "dark", [["key", "Control+,"]], { langs: LANGS.length, expect: { settings: true } }],
+    [`nores-${l}-light`, l, "light", [["type", "zzqq 2024"]]],
+  ]),
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
@@ -406,7 +425,7 @@ const SHOTS = [
   const browser = await chromium.launch(exe ? { executablePath: exe } : {});
   const errors = [];
   for (const [name, lang, theme, steps, opts = {}] of SHOTS) {
-    const ctx = await browser.newContext({ viewport: { width: opts.width || 1280, height: opts.height || 800 }, deviceScaleFactor: 2, colorScheme: theme, locale: lang === "ar" ? "ar" : "en-US" });
+    const ctx = await browser.newContext({ viewport: { width: opts.width || 1280, height: opts.height || 800 }, deviceScaleFactor: 2, colorScheme: theme, locale: lang === "en" ? "en-US" : lang });
     const pg = await ctx.newPage();
     const thumbAsks = [];
     pg.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
@@ -452,13 +471,14 @@ const SHOTS = [
     }
     await pg.evaluate(() => document.fonts.ready);
     await pg.waitForTimeout(100);
-    const check = await pg.evaluate((lang) => {
+    const check = await pg.evaluate(([lang, wantDir, expectLangs]) => {
       const bad = [...window.__fakeErrors];
       const visible = (el) => el && !el.closest("[hidden]") && el.getClientRects().length > 0;
       if (document.documentElement.scrollWidth > innerWidth) bad.push("horizontal overflow");
-      if ([...document.fonts].filter((f) => f.status === "loaded").length < 2) bad.push("fonts not loaded");
-      if (document.documentElement.dir !== (lang === "ar" ? "rtl" : "ltr")) bad.push("page direction");
-      if (getComputedStyle(document.body).direction !== (lang === "ar" ? "rtl" : "ltr")) bad.push("body direction");
+      // (A language whose script IBM Plex lacks starts with a Windows font instead.)
+      if (getComputedStyle(document.body).fontFamily.startsWith('"IF Sans"') && [...document.fonts].filter((f) => f.status === "loaded").length < 2) bad.push("fonts not loaded");
+      if (document.documentElement.dir !== wantDir) bad.push("page direction");
+      if (getComputedStyle(document.body).direction !== wantDir) bad.push("body direction");
       // Every path: left to right, its folder names placed left to right in order.
       for (const p of document.querySelectorAll(".path")) {
         if (getComputedStyle(p).direction !== "ltr") bad.push("path not LTR: " + p.textContent);
@@ -467,7 +487,25 @@ const SHOTS = [
       }
       // The empty search box's hint reads in the page's direction («ابحث باسم الملف…», its ellipsis at the end).
       const box = document.querySelector("#q");
-      if (!box.value && getComputedStyle(box).direction !== (lang === "ar" ? "rtl" : "ltr")) bad.push("search hint not in the page's direction");
+      if (!box.value && getComputedStyle(box).direction !== wantDir) bad.push("search hint not in the page's direction");
+      // The language list: every language, each name in its own language, translations marked.
+      if (expectLangs) {
+        const opts = [...document.querySelectorAll("#settings .lopt")];
+        if (opts.length !== expectLangs) bad.push(`languages listed: ${opts.length} of ${expectLangs}`);
+        const list = document.querySelector("#settings .langs");
+        if (list && list.scrollHeight > list.clientHeight && getComputedStyle(list).overflowY !== "auto") bad.push("language list does not scroll");
+        for (const o of opts) {
+          const n = o.querySelector(".lname");
+          if (!n || !n.lang) bad.push("language name without lang");
+          if (o.dataset.lang !== "ar" && o.dataset.lang !== "en" && !o.querySelector("small")) bad.push(`${o.dataset.lang}: not marked as a machine translation`);
+          if (o.scrollWidth > o.clientWidth + 1) bad.push(`${o.dataset.lang}: name overflows`);
+        }
+        if (lang !== "ar" && lang !== "en" && !document.querySelector("#lang-help")) bad.push("no help-improve-the-translation link");
+      }
+      // Nothing cut off sideways: buttons and labels fit (long German/Russian words, CJK).
+      if (lang !== "ar" && lang !== "en") for (const el of document.querySelectorAll("button, .srow label, .chip, h2, h3")) {
+        if (visible(el) && el.scrollWidth > el.clientWidth + 2 && getComputedStyle(el).overflow !== "hidden" && getComputedStyle(el).textOverflow !== "ellipsis") bad.push(`overflows: ${el.id || el.className} «${el.textContent.trim().slice(0, 40)}»`);
+      }
       // Names, snippets and matching lines pick their own direction.
       for (const el of document.querySelectorAll(".pv-name .t, .row .n3 .sn, .lines .lt, .field input")) if (visible(el) && getComputedStyle(el).unicodeBidi !== "plaintext" && el.tagName !== "BDI" && !(el.classList.contains("fname") && el.dir) && !el.matches(":placeholder-shown")) bad.push("text without its own direction: " + el.className);
       // Phone numbers, dates and versions (app.js DIGIT_RUN) read as typed:
@@ -580,7 +618,7 @@ const SHOTS = [
         lastSearch: (() => { const m = window.__sent.filter((x) => x.op === "search").pop(); return m ? [m.q, m.kind, m.size, m.date, m.content].join("|") : null; })(),
         ctxFirst: (() => { const it = document.querySelector("#ctx:not([hidden]) [role=menuitem] span"); return it ? it.textContent : null; })(),
       };
-    }, lang);
+    }, [lang, dirOf(lang), opts.langs]);
     for (const b of check.bad) errors.push(`${name}: ${b}`);
     // Chromium's own accessibility tree (what WebView2 hands to UI Automation)
     // has each result row as an option of the "Results" listbox, with its name.

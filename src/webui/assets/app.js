@@ -9,11 +9,158 @@
 "use strict";
 (() => {
   const TOKEN = document.querySelector('meta[name="instafind-token"]').content;
-  const LANG = document.documentElement.lang === "en" ? "en" : "ar";
+  // The interface language (src/i18n.rs page_data): its code, direction,
+  // the translations of this file's texts and the languages to offer.
+  // Arabic and English are the originals below; every other language
+  // starts from English (LANG) and replaces what its file translates.
+  const I18N = (() => {
+    try { return JSON.parse(document.getElementById("i18n").textContent) || {}; } catch (e) { return {}; }
+  })();
+  const CODE = document.documentElement.lang || "ar";
+  const LANG = CODE === "ar" ? "ar" : "en";
   const FIRST_PAGE_GUARD = 300; // px from the bottom that asks for more rows
 
   // ---------- strings ----------
-  const T = {
+  // T: the texts of the interface language. A translated language is
+  // T.en with every text its file translates (src/i18n.rs; nested objects
+  // and lists key by key). A function's translation is not code to run:
+  // it is read by compile() below, a small expression language
+  // (parameters, texts, `${…}` templates, ?:, comparisons, + - * / %,
+  // num(), T.key),
+  // and a translation it can't read, or one that fails, gives English.
+  function localize(tables) {
+    const base = tables[LANG];
+    if (LANG !== "en" || CODE === "en" || !I18N.js || typeof I18N.js !== "object") return base;
+    const merge = (en, tr) => {
+      if (tr === undefined || tr === null) return en;
+      if (typeof en === "function") return compile(en, tr);
+      if (Array.isArray(en)) return en.map((x, i) => merge(x, Array.isArray(tr) ? tr[i] : tr && tr[i]));
+      if (en && typeof en === "object") {
+        const o = {};
+        for (const k of Object.keys(en)) o[k] = merge(en[k], Object.prototype.hasOwnProperty.call(tr, k) ? tr[k] : undefined);
+        return o;
+      }
+      return typeof tr === "string" && tr.trim() ? tr : en;
+    };
+    return merge(base, I18N.js);
+  }
+
+  // The translation `src` of English function `en`: "FN:(a, b) => expr"
+  // or a template text with ${a} places. Returns a function with en's
+  // parameters, falling back to en on any problem.
+  function compile(en, src) {
+    if (typeof src !== "string" || !src.trim()) return en;
+    const params = (s) => { const m = /^\s*(?:\(([^)]*)\)|([A-Za-z_$][\w$]*))\s*=>/.exec(s); return m ? (m[1] !== undefined ? m[1] : m[2]).split(",").map((p) => p.trim()).filter(Boolean) : null; };
+    const want = params(String(en));
+    if (!want) return en;
+    let body = src, isTemplate = true;
+    if (src.startsWith("FN:")) {
+      const p = params(src.slice(3));
+      if (!p || p.join() !== want.join()) return en;
+      body = src.slice(src.indexOf("=>") + 2);
+      isTemplate = false;
+    }
+    let i = 0;
+    const fail = () => { throw new Error("i18n"); };
+    const ws = () => { while (i < body.length && /\s/.test(body[i])) i++; };
+    const eat = (t) => { ws(); if (body.startsWith(t, i)) { i += t.length; return true; } return false; };
+    // Each parse function returns an evaluator: (args) => value.
+    function expr() {
+      const c = or();
+      if (eat("?")) { const a = expr(); if (!eat(":")) fail(); const b = expr(); return (v) => (c(v) ? a(v) : b(v)); }
+      return c;
+    }
+    function or() { let l = and(); while (eat("||")) { const a = l, b = and(); l = (v) => a(v) || b(v); } return l; }
+    function and() { let l = cmp(); while (eat("&&")) { const a = l, b = cmp(); l = (v) => a(v) && b(v); } return l; }
+    function cmp() {
+      const l = add();
+      const ops = { "===": (a, b) => a === b, "!==": (a, b) => a !== b, "==": (a, b) => a == b, "!=": (a, b) => a != b, "<=": (a, b) => a <= b, ">=": (a, b) => a >= b, "<": (a, b) => a < b, ">": (a, b) => a > b };
+      for (const op of Object.keys(ops)) if (eat(op)) { const r = add(), f = ops[op]; return (v) => f(l(v), r(v)); }
+      return l;
+    }
+    function add() {
+      let l = mul();
+      for (;;) {
+        if (eat("+")) { const a = l, b = mul(); l = (v) => a(v) + b(v); } else if (eat("-")) { const a = l, b = mul(); l = (v) => a(v) - b(v); } else return l;
+      }
+    }
+    // % for plural rules (n % 10 === 1), * and /.
+    function mul() {
+      let l = unary();
+      for (;;) {
+        if (eat("%")) { const a = l, b = unary(); l = (v) => a(v) % b(v); } else if (eat("*")) { const a = l, b = unary(); l = (v) => a(v) * b(v); } else if (eat("/")) { const a = l, b = unary(); l = (v) => a(v) / b(v); } else return l;
+      }
+    }
+    function unary() { if (eat("!")) { const a = unary(); return (v) => !a(v); } return primary(); }
+    function template(end) {
+      const parts = [];
+      let text = "";
+      while (i < body.length) {
+        const ch = body[i];
+        if (ch === "\\") { text += body[i + 1] === "n" ? "\n" : body[i + 1] || ""; i += 2; continue; }
+        if (ch === "$" && body[i + 1] === "{") {
+          i += 2;
+          if (text) { const t = text; parts.push(() => t); text = ""; }
+          const e = expr();
+          if (!eat("}")) fail();
+          parts.push((v) => { const x = e(v); return typeof x === "number" ? num(x) : String(x); });
+          continue;
+        }
+        if (end && ch === end) { i++; if (text) { const t = text; parts.push(() => t); } return (v) => parts.map((p) => p(v)).join(""); }
+        text += ch; i++;
+      }
+      if (end) fail();
+      if (text) { const t = text; parts.push(() => t); }
+      return (v) => parts.map((p) => p(v)).join("");
+    }
+    function primary() {
+      ws();
+      const ch = body[i];
+      if (ch === "(") { i++; const e = expr(); if (!eat(")")) fail(); return e; }
+      if (ch === '"' || ch === "'") {
+        let s = ""; i++;
+        while (i < body.length && body[i] !== ch) { if (body[i] === "\\") i++; s += body[i] === undefined ? "" : body[i]; i++; }
+        if (body[i] !== ch) fail();
+        i++;
+        return () => s;
+      }
+      if (ch === "`") { i++; return template("`"); }
+      const n = /^\d+(\.\d+)?/.exec(body.slice(i));
+      if (n) { i += n[0].length; const x = Number(n[0]); return () => x; }
+      const id = /^[A-Za-z_][\w]*/.exec(body.slice(i));
+      if (!id) fail();
+      i += id[0].length;
+      let get;
+      if (id[0] === "T") {
+        if (!eat(".")) fail();
+        ws();
+        const k = /^[A-Za-z_][\w]*/.exec(body.slice(i));
+        if (!k) fail();
+        i += k[0].length;
+        get = () => T[k[0]];
+      } else if (id[0] === "num") {
+        get = () => num;
+      } else {
+        const at = want.indexOf(id[0]);
+        if (at < 0) fail();
+        get = (v) => v[at];
+      }
+      if (eat("(")) {
+        const args = [];
+        if (!eat(")")) { do args.push(expr()); while (eat(",")); if (!eat(")")) fail(); }
+        return (v) => { const f = get(v); if (typeof f !== "function") fail(); return f(...args.map((a) => a(v))); };
+      }
+      return get;
+    }
+    let run;
+    try {
+      if (isTemplate) run = template(null);
+      else { run = expr(); ws(); if (i !== body.length) fail(); }
+    } catch (e) { return en; }
+    return (...v) => { try { const r = run(v); return r === undefined || r === null ? en(...v) : r; } catch (e) { return en(...v); } };
+  }
+
+  const T = localize({
     ar: {
       ph: "ابحث باسم الملف…", phContent: "ابحث داخل المستندات ثم اضغط Enter…", type: "النوع", size: "الحجم", date: "التاريخ",
       filters: "عوامل التصفية", lookIn: "البحث في", allDrives: "كل الأقراص", chooseFolder: "اختيار مجلد…", clearFilter: "إزالة",
@@ -68,6 +215,7 @@
       // settings
       settings: "الإعدادات", settingsKey: "الإعدادات (Ctrl+,)", back: "رجوع إلى البحث",
       sLang: "اللغة", sLangNote: "ستظهر الواجهة باللغة المختارة بعد إعادة تشغيل البرنامج.", restart: "إعادة التشغيل الآن",
+      sLangMachine: "(ترجمة آلية)", sLangHelp: "ساعد في تحسين هذه الترجمة",
       sDisplay: "العرض", sDigits: "عرض الأرقام بالعربية (٠١٢٣)",
       app: "تطبيق", appsLabel: "برامج بهذا الاسم",
       grid: "عرض المصغرات (Ctrl+T)",
@@ -134,6 +282,7 @@
       savedInside: "inside documents", savedScoped: "in a folder",
       settings: "Settings", settingsKey: "Settings (Ctrl+,)", back: "Back to search",
       sLang: "Language", sLangNote: "The interface changes language after the program restarts.", restart: "Restart now",
+      sLangMachine: "(machine translation)", sLangHelp: "Help improve this translation",
       sDisplay: "Display", sDigits: "Show Arabic-Indic digits (٠١٢٣)",
       app: "App", appsLabel: "Programs by this name",
       grid: "Thumbnail view (Ctrl+T)",
@@ -151,7 +300,7 @@
       sStartup: "Startup", sAutostart: "Start with Windows (in the background)",
       sAbout: "About", version: (v) => `InstaFind — version ${v}`,
     },
-  }[LANG];
+  });
   const SORTS = ["best", "name", "path", "size", "date"];
   // The privacy line: the Store version's updates come from the Store, not GitHub.
   function trustText() { return S.store ? T.trustStore : T.trust; }
@@ -172,8 +321,12 @@
   const q = $("q"), list = $("list");
 
   // ---------- numbers, sizes, dates ----------
-  const AR_DIGITS = "٠١٢٣٤٥٦٧٨٩";
-  function digits(s) { return S.digits && LANG === "ar" ? String(s).replace(/[0-9]/g, (d) => AR_DIGITS[d]) : String(s); }
+  // The "Arabic-Indic digits" option: ٠١٢٣ in Arabic and Kurdish, the
+  // Persian forms ۰۱۲۳ in Persian, Urdu and Pashto; Western digits in
+  // every other language.
+  const AR_DIGITS = "٠١٢٣٤٥٦٧٨٩", FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
+  const NATIVE_DIGITS = { ar: AR_DIGITS, ckb: AR_DIGITS, fa: FA_DIGITS, ur: FA_DIGITS, ps: FA_DIGITS }[CODE];
+  function digits(s) { return S.digits && NATIVE_DIGITS ? String(s).replace(/[0-9]/g, (d) => NATIVE_DIGITS[d]) : String(s); }
   function num(n) { return digits(Number(n).toLocaleString("en-US")); }
   function size(bytes) {
     let v = Number(bytes), u = 0;
@@ -181,7 +334,11 @@
     const s = u === 0 ? String(v) : v >= 10 ? v.toFixed(0) : v.toFixed(1).replace(/\.0$/, "");
     return `${digits(s)} ${T.units[u]}`;
   }
-  const LOCALE = LANG === "ar" ? "ar-u-nu-latn" : "en-US";
+  // Dates in the interface language when the browser knows it (Western
+  // digits; digits() converts them), else in English.
+  const LOCALE = CODE === "en" ? "en-US" : (() => {
+    try { return Intl.DateTimeFormat.supportedLocalesOf([CODE]).length ? `${CODE}-u-nu-latn` : "en-US"; } catch (e) { return "en-US"; }
+  })();
   const fmtDay = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "long" });
   const fmtDayYear = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "long", year: "numeric" });
   const fmtTime = new Intl.DateTimeFormat(LOCALE, { hour: "numeric", minute: "2-digit" });
@@ -986,7 +1143,7 @@
       if (S.content && contentStale()) text = T.pressEnter + " · " + text;
       else if (S.isContent && S.progress) text = digits(S.progress);
       else text = (S.note ? S.note + " · " : "") + T.count(S.total, S.ms) + " · " + text;
-      if (S.warnings.length) text += ` — ${T.note}: ${S.warnings.join(LANG === "ar" ? "، " : "; ")}`;
+      if (S.warnings.length) text += ` — ${T.note}: ${S.warnings.join(["ar", "fa", "ur", "ps", "ckb", "ug"].includes(CODE) ? "، " : "; ")}`;
     } else if (!S.notice && S.content && contentStale() && S.q.trim()) text = T.pressEnter;
     $("status-text").replaceChildren();
     fill($("status-text"), [[text, false]]);
@@ -1253,13 +1410,21 @@
       return h("div", { class: "srow" }, h("label", { for: "set-" + key }, h("span", null, label), sub ? h("small", null, sub) : null), b);
     };
     const section = (title, ...rows) => h("section", { class: "sbox" }, h("h3", null, title), ...rows);
-    const langBtn = (code, label) => {
-      const on = st.next_lang === code;
-      const b = h("button", { class: "seg" + (on ? " on" : ""), type: "button", role: "radio", "aria-checked": String(on), lang: code, dir: code === "ar" ? "rtl" : "ltr" }, label);
-      b.addEventListener("click", () => send({ op: "lang", lang: code }));
+    // Every language by its own name, in its own script and font (app.css
+    // :lang), a translation marked as a machine translation.
+    const langs = Array.isArray(I18N.langs) && I18N.langs.length ? I18N.langs : [{ code: "ar", native: "العربية", rtl: true }, { code: "en", native: "English", rtl: false }];
+    const langBtn = (l) => {
+      const on = st.next_lang === l.code;
+      const b = h("button", { class: "lopt" + (on ? " on" : ""), type: "button", role: "radio", "aria-checked": String(on), "data-lang": l.code, "aria-label": l.machine ? `${l.native} ${T.sLangMachine}` : l.native },
+        h("span", { class: "lname", lang: l.code, dir: l.rtl ? "rtl" : "ltr" }, l.native),
+        l.machine ? h("small", null, T.sLangMachine) : null);
+      b.addEventListener("click", () => send({ op: "lang", lang: l.code }));
       return b;
     };
-    const lang = section(T.sLang, h("div", { class: "segs", role: "radiogroup", "aria-label": T.sLang }, langBtn("ar", "العربية"), langBtn("en", "English")));
+    const lang = section(T.sLang, h("div", { class: "langs", role: "radiogroup", "aria-label": T.sLang }, ...langs.map(langBtn)));
+    if (langs.find((l) => l.code === CODE && l.machine)) {
+      lang.append(h("div", { class: "srow" }, h("label", { for: "lang-help" }, h("span", null, T.sLangHelp)), btn("", I.flag, T.reportBtn, () => send({ op: "report_problem" }), { id: "lang-help" })));
+    }
     if (st.next_lang !== st.lang) lang.append(h("div", { class: "snote" }, h("span", null, T.sLangNote), btn("primary", I.open, T.restart, () => send({ op: "restart" }))));
     const reindex = btn("", I.search, T.reindex, () => send({ op: "reindex" }));
     const back = btn("", I.back, T.back, closeSettings, { class: "btn back" });

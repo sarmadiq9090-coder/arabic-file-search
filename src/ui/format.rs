@@ -12,7 +12,7 @@ pub(super) static ARABIC_DIGITS: AtomicBool = AtomicBool::new(false);
 /// ([`crate::bidi_layout::ltr_path`]). Display only: never pass the result
 /// to the shell or the clipboard.
 pub(super) fn ltr_path(path: &str) -> String {
-    crate::bidi_layout::ltr_path(path, crate::i18n::is_en())
+    crate::bidi_layout::ltr_path(path, !crate::i18n::is_rtl())
 }
 
 /// A file name, folder name or document text as shown in the interface:
@@ -22,9 +22,9 @@ pub(super) fn shown_digits(text: &str) -> String {
     crate::bidi_layout::ordered_digits(text, ui_rtl())
 }
 
-/// The interface reads right to left (Arabic).
+/// The interface reads right to left (Arabic, Persian, Urdu…).
 pub(super) fn ui_rtl() -> bool {
-    !crate::i18n::is_en()
+    crate::i18n::is_rtl()
 }
 
 /// Reads a NUL-terminated UTF-16 string.
@@ -44,8 +44,10 @@ pub(super) fn digits(s: String) -> String {
     if !ARABIC_DIGITS.load(Ordering::Relaxed) {
         return s;
     }
+    // Persian, Urdu and Pashto write the Extended Arabic-Indic forms (۰۱۲۳).
+    let zero = if matches!(crate::i18n::locale().code, "fa" | "ur" | "ps") { 0x06F0 } else { 0x0660 };
     s.chars()
-        .map(|c| if c.is_ascii_digit() { char::from_u32(c as u32 - '0' as u32 + 0x0660).unwrap_or(c) } else { c })
+        .map(|c| if c.is_ascii_digit() { char::from_u32(c as u32 - '0' as u32 + zero).unwrap_or(c) } else { c })
         .collect()
 }
 
