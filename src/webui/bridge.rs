@@ -267,6 +267,11 @@ pub enum Request {
     /// Open the "Report a problem" window: it shows what would be shared
     /// before anything happens (nothing is sent by the program).
     ReportProblem {},
+    /// Move the Save/Open dialog waiting since Ctrl+Alt+G
+    /// ([`Outbound::QuickSwitch`]) to the folder of row `id`.
+    SwitchTo { list: List, seq: u64, ver: u64, id: u32 },
+    /// Forget the Save/Open dialog waiting since Ctrl+Alt+G (Esc).
+    SwitchCancel {},
 }
 
 /// Why a message was refused.
@@ -541,6 +546,14 @@ pub enum Outbound {
     Apps {
         seq: u64,
         apps: Vec<String>,
+    },
+    /// Ctrl+Alt+G was pressed in a Save/Open dialog (`on`, with the hint to
+    /// show while it waits), or that dialog was moved, closed or forgotten:
+    /// while on, Enter on a result asks for [`Request::SwitchTo`], Esc for
+    /// [`Request::SwitchCancel`], and the result menu offers the move.
+    QuickSwitch {
+        on: bool,
+        text: String,
     },
 }
 
@@ -1459,6 +1472,11 @@ mod tests {
         assert_eq!(req(r#""op":"hide","forever":true"#), Err(Rejected::Malformed));
         assert_eq!(parse(r#"{"op":"hide"}"#, SRC, TOKEN), Err(Rejected::Token));
         assert_eq!(parse(&format!(r#"{{"t":"{TOKEN}","op":"hide"}}"#), "https://evil.example/", TOKEN), Err(Rejected::Origin));
+        assert_eq!(req(r#""op":"switch_to","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::SwitchTo { list: List::Results, seq: 2, ver: 3, id: 1 }));
+        assert_eq!(req(r#""op":"switch_to","list":"recent","seq":0,"ver":4,"id":0"#), Ok(Request::SwitchTo { list: List::Recent, seq: 0, ver: 4, id: 0 }));
+        // A folder, never a path, from the page.
+        assert_eq!(req(r#""op":"switch_to","path":"C:\\Windows""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"switch_cancel""#), Ok(Request::SwitchCancel {}));
         assert_eq!(req(r#""op":"reindex""#), Ok(Request::Reindex {}));
         assert_eq!(req(r#""op":"stop","seq":9"#), Ok(Request::Stop { seq: 9 }));
     }

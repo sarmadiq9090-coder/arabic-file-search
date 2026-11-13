@@ -176,6 +176,9 @@ mod imp {
         /// The program is restarting from the page's own message handler:
         /// the page is left to the process exit, not dropped inside it.
         exiting: Cell<bool>,
+        /// A Save/Open dialog waits since Ctrl+Alt+G (`super::super::quickswitch`):
+        /// the hint the page shows meanwhile.
+        quick_switch: RefCell<Option<String>>,
     }
 
     impl App {
@@ -741,11 +744,45 @@ mod imp {
             true
         }
 
-        fn webui_hide(&self) {
+        /// The window out of the way (to the tray), its page in its
+        /// low-memory mode.
+        fn webui_put_away(&self) {
             self.webui.parts.window.set_visible(false);
             if let Some(host) = &*self.webui.host.borrow() {
                 host.set_idle(true);
             }
+        }
+
+        /// Ctrl+Alt+G's move: the new main window, if it is the one in use,
+        /// gets out of the way of the Save/Open dialog (no balloon). False
+        /// when the new look is not in use.
+        pub(in super::super) fn webui_step_aside(&self) -> bool {
+            if !self.webui.active.get() {
+                return false;
+            }
+            self.webui_put_away();
+            true
+        }
+
+        /// A Save/Open dialog started waiting for a result (`Some`, with the
+        /// hint), or stopped waiting: the page says so and Enter, Esc and its
+        /// result menu follow (`Outbound::QuickSwitch`).
+        pub(in super::super) fn webui_quick_switch(&self, hint: Option<&str>) {
+            let hint = hint.map(str::to_string);
+            if *self.webui.quick_switch.borrow() == hint {
+                return;
+            }
+            self.webui.quick_switch.replace(hint);
+            self.webui_send_quick_switch();
+        }
+
+        fn webui_send_quick_switch(&self) {
+            let text = self.webui.quick_switch.borrow().clone();
+            self.webui_send(&Outbound::QuickSwitch { on: text.is_some(), text: text.unwrap_or_default() });
+        }
+
+        fn webui_hide(&self) {
+            self.webui_put_away();
             if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
                 self.tray.show(
                     tr!("البرنامج ما زال يعمل هنا. انقر الأيقونة أو شغّل البرنامج مرة أخرى لإظهاره فوراً.", "The program is still running here. Click the icon or start the program again to show it at once."),
@@ -910,6 +947,9 @@ mod imp {
                     self.webui_status(true);
                     self.webui_send_recent();
                     self.webui_send_history();
+                    if self.webui.quick_switch.borrow().is_some() {
+                        self.webui_send_quick_switch();
+                    }
                     // A page loaded again gets back what it searched (not an
                     // older text of the classic box); a first page gets the
                     // classic box's text (the quick popup's search).
@@ -1047,10 +1087,7 @@ mod imp {
                 Request::Recycle { list, seq, ver, id } => self.webui_recycle(list, seq, ver, id),
                 Request::Scope { list, seq, ver, id } => {
                     let Some(path) = self.webui_path(list, seq, ver, id) else { return };
-                    let is_dir = match list {
-                        List::Results => self.webui.lists.borrow().shown_at(seq, ver).is_ok_and(|s| s.is_dir(id)),
-                        List::Recent => std::path::Path::new(&path).is_dir(),
-                    };
+                    let is_dir = self.webui_is_dir(list, seq, ver, id, &path);
                     let scope = bridge::scope_for(&path, is_dir);
                     if !scope.is_empty() {
                         self.webui_set_scope(scope, true);
@@ -1177,6 +1214,21 @@ mod imp {
                     }
                     self.webui_send_history();
                 }
+                Request::SwitchTo { list, seq, ver, id } => {
+                    let Some(path) = self.webui_path(list, seq, ver, id) else { return };
+                    let is_dir = self.webui_is_dir(list, seq, ver, id, &path);
+                    if self.quick_switch_waiting() {
+                        self.webui_note_use(list, &path);
+                    }
+                    self.quick_switch_to(&path, is_dir);
+                }
+                Request::SwitchCancel {} => {
+                    // (Already forgotten: the page is told it is over.)
+                    if !self.quick_switch_cancel() {
+                        self.webui.quick_switch.replace(None);
+                        self.webui_send_quick_switch();
+                    }
+                }
                 Request::Drag { list, seq, ver, id } => {
                     // Started right after this handler returns (the drag
                     // runs its own message loop, not inside WebView2's).
@@ -1194,6 +1246,14 @@ mod imp {
         fn webui_path(&self, list: List, seq: u64, ver: u64, id: u32) -> Option<String> {
             let found = self.webui.lists.borrow().path(list, seq, ver, id).map(str::to_string);
             found.map_err(|miss| self.webui_missed(miss)).ok()
+        }
+
+        /// Whether row `id` (whose file is `path`) is a folder.
+        fn webui_is_dir(&self, list: List, seq: u64, ver: u64, id: u32, path: &str) -> bool {
+            match list {
+                List::Results => self.webui.lists.borrow().shown_at(seq, ver).is_ok_and(|s| s.is_dir(id)),
+                List::Recent => std::path::Path::new(path).is_dir(),
+            }
         }
 
         fn webui_missed(&self, miss: Miss) {
@@ -1708,6 +1768,10 @@ mod imp {
                 return;
             }
             self.webui_status(false);
+            // A dialog closed while it waited: the page leaves the mode.
+            if self.webui.quick_switch.borrow().is_some() {
+                self.quick_switch_waiting();
+            }
             if self.webui.running.get() || !self.webui.parts.window.visible() {
                 return;
             }
@@ -1876,6 +1940,12 @@ mod imp {
         pub(in super::super) fn webui_hide_main(&self) -> bool {
             false
         }
+
+        pub(in super::super) fn webui_step_aside(&self) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_quick_switch(&self, _hint: Option<&str>) {}
 
         pub(in super::super) fn webui_status_text(&self, _text: &str) {}
 

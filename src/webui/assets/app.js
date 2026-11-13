@@ -50,6 +50,7 @@
       mOpen: "فتح الملف", mReveal: "فتح المجلد الذي يحتويه", mCopyFile: "نسخ الملف", mCopyPath: "نسخ المسار", mCopyAll: "نسخ مسارات كل النتائج",
       mSizes: "أحجام المجلدات هنا…", mReplace: "استبدال نص في الملفات…", exportBtn: "تصدير النتائج", reindexBtn: "تحديث الفهرس",
       mScope: "البحث في هذا المجلد", mRename: "تغيير الاسم", mRecycle: "نقل إلى سلة المحذوفات", mMatches: "عرض كل التطابقات داخل الملف",
+      mSwitch: "فتح مجلدها في نافذة الحفظ/الفتح", qsCancel: "إلغاء النقل",
       // dialogs
       renameH: "تغيير الاسم", renameLabel: "الاسم الجديد", renameOk: "تغيير الاسم", cancel: "إلغاء", close: "إغلاق",
       recycleH: "نقل إلى سلة المحذوفات", recycleQ: ["هل تريد نقل «", "» إلى سلة المحذوفات؟"], recycleQDir: ["هل تريد نقل المجلد «", "» وكل ما فيه إلى سلة المحذوفات؟"],
@@ -113,6 +114,7 @@
       mOpen: "Open file", mReveal: "Open containing folder", mCopyFile: "Copy file", mCopyPath: "Copy path", mCopyAll: "Copy paths of all results",
       mSizes: "Folder sizes here…", mReplace: "Replace text in files…", exportBtn: "Export results", reindexBtn: "Update index",
       mScope: "Search in this folder", mRename: "Rename", mRecycle: "Move to Recycle Bin", mMatches: "Show all matches in the file",
+      mSwitch: "Open its folder in the Save/Open dialog", qsCancel: "Cancel the move",
       renameH: "Rename", renameLabel: "New name", renameOk: "Rename", cancel: "Cancel", close: "Close",
       recycleH: "Move to the Recycle Bin", recycleQ: ["Move “", "” to the Recycle Bin?"], recycleQDir: ["Move the folder “", "” and everything in it to the Recycle Bin?"],
       recycleSub: "You can restore it from the Recycle Bin.", recycleOk: "Move to Recycle Bin",
@@ -149,6 +151,8 @@
     progress: "", warnings: [], files: 0, state: "ready", stateText: "",
     recent: [], sugg: [], ssel: 0, view: "empty", note: "", notice: "", resultsScope: "",
     matches: null, history: { recent: [], saved: [] }, settings: null, apps: { seq: -1, apps: [] },
+    // Ctrl+Alt+G: a Save/Open dialog waits for a result's folder (its hint), "" when none.
+    qswitch: "",
   };
 
   const $ = (id) => document.getElementById(id);
@@ -472,6 +476,11 @@
       }
     },
     apps(m) { S.apps = { seq: m.seq, apps: m.apps || [] }; renderApps(); },
+    quick_switch(m) {
+      S.qswitch = m.on ? m.text || "" : "";
+      renderQswitch();
+      if (m.on) { closeSettings(); $("live").textContent = m.text || ""; }
+    },
     notice(m) {
       S.notice = m.text; S.noticeWarn = !!m.warn; renderStatus();
       clearTimeout(handlers.noticeTimer);
@@ -558,6 +567,28 @@
     const x = btn("icon", I.x, null, () => { bar.hidden = true; q.focus(); }, { "aria-label": T.dismiss, title: T.dismiss, id: "switched-x" });
     bar.replaceChildren(h("span", null, T.switchedText), x);
     bar.hidden = false;
+  }
+  // Ctrl+Alt+G in a Save/Open dialog: what Enter and Esc do now, until the
+  // dialog was moved or the move cancelled (the program says when).
+  function renderQswitch() {
+    const bar = $("qswitch");
+    bar.hidden = !S.qswitch;
+    if (!S.qswitch) { bar.replaceChildren(); return; }
+    const x = btn("small", I.x, T.qsCancel, () => { send({ op: "switch_cancel" }); q.focus(); }, { id: "qswitch-x" });
+    // "Enter: … · Esc: …": each key as a key cap (a bare "Enter:" in an
+    // Arabic line would show its colon on the wrong side).
+    const say = h("span", null);
+    S.qswitch.split(" · ").forEach((part, i) => {
+      const m = part.match(/^([A-Za-z][A-Za-z0-9+]*):\s*(.*)$/);
+      if (i) say.append(" · ");
+      if (m) say.append(h("kbd", null, m[1]), " ", m[2]); else say.append(part);
+    });
+    bar.replaceChildren(say, x);
+  }
+  // The selected result (the top one from the box) for the waiting dialog.
+  function switchTo(row, listName = "results", at = listAt(listName)) {
+    if (!row || row.gone) return;
+    send({ op: "switch_to", list: at.list, seq: at.seq, ver: at.ver, id: row.id });
   }
   // ---------- how the results are laid out (kept in this page's storage) ----------
   // Compact rows (one line each) unless chosen otherwise: on by itself in a
@@ -964,7 +995,9 @@
       it.addEventListener("click", () => { closeMenus(); runCtx(op); });
       return it;
     };
-    const items = [item(T.mOpen, "Enter", "open", I.open), item(T.mReveal, "Ctrl+Enter", "reveal", I.folder), item(T.mCopyFile, "Ctrl+C", "copy_file", I.copy), item(T.mCopyPath, "Ctrl+Shift+C", "copy", I.copy)];
+    // While a Save/Open dialog waits (Ctrl+Alt+G), its move comes first and takes Enter.
+    const items = S.qswitch ? [item(T.mSwitch, "Enter", "switch_to", I.folder), item(T.mOpen, null, "open", I.open)] : [item(T.mOpen, "Enter", "open", I.open)];
+    items.push(item(T.mReveal, "Ctrl+Enter", "reveal", I.folder), item(T.mCopyFile, "Ctrl+C", "copy_file", I.copy), item(T.mCopyPath, "Ctrl+Shift+C", "copy", I.copy));
     if (listName === "results") items.push(item(T.mCopyAll, null, "copy_all", I.copy));
     items.push(item(T.mScope, null, "scope", I.search), item(T.mSizes, null, "folder_sizes", I.scale));
     if (listName === "results") items.push(item(T.mReplace, null, "replace_text", I.pen));
@@ -1205,6 +1238,7 @@
     if (ctrl && (e.key === "+" || e.key === "=" || e.key === "-" || e.key === "0")) { zoomBy(e.key === "0" ? 0 : e.key === "-" ? -1 : 1); e.preventDefault(); return; }
     if (e.key === "Escape") {
       if (openMenus().length) closeMenus();
+      else if (S.qswitch) send({ op: "switch_cancel" });
       else if (S.view === "settings") closeSettings();
       else if (S.running) stop();
       else if (q.value) { q.value = ""; onInput(); q.focus(); }
@@ -1242,6 +1276,9 @@
     }
     if (e.key in moves && (inBox || inList)) { select(Math.max(0, Math.min(S.rows.length - 1, S.sel + moves[e.key]))); e.preventDefault(); return; }
     if (ctrl && (e.key === "Home" || e.key === "End")) { select(e.key === "Home" ? 0 : S.rows.length - 1); e.preventDefault(); return; }
+    // A Save/Open dialog waits (Ctrl+Alt+G): Enter moves it to the folder of
+    // the selected result (the top one from the box), as in the classic window.
+    if (e.key === "Enter" && S.qswitch && !ctrl && (inBox || inList)) { switchTo(row); e.preventDefault(); return; }
     // Enter in the box moves to the list (as the classic window, where it
     // searched); there Enter opens. Ctrl+Enter opens the folder from both.
     if (e.key === "Enter" && inBox && !ctrl) { focusList(); select(S.sel); e.preventDefault(); return; }

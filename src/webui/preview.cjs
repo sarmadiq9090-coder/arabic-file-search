@@ -109,10 +109,11 @@ function fakeProgram(cfg) {
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id", "name"],
     save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], options_menu: [], report_problem: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], thumbs: ["seq", "ver", "ids"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
+    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
-  const ROW_OPS = ["thumbs", "more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope", "drag", "folder_sizes"];
+  const ROW_OPS = ["thumbs", "more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope", "drag", "folder_sizes", "switch_to"];
   let lastVer = 0, recentVer = 0;
   const nextVer = () => ++lastVer;
   const send = (m) => setTimeout(() => window.__instafind.recv(m), 0);
@@ -231,6 +232,10 @@ function fakeProgram(cfg) {
       settings[m.key] = m.on; send({ ...settings });
     } else if (m.op === "lang") {
       settings.next_lang = m.lang; send({ ...settings });
+    } else if (m.op === "switch_to" || m.op === "switch_cancel") {
+      // The dialog was moved (or forgotten): the mode is over.
+      send({ type: "quick_switch", on: false, text: "" });
+      if (m.op === "switch_cancel") send({ type: "notice", text: ar ? "أُلغي نقل نافذة الحفظ/الفتح." : "Save/Open dialog switch cancelled.", warn: false });
     } else if (m.op === "save_search" || m.op === "clear_recent" || m.op === "clear_saved") {
       if (m.op === "clear_recent") history.recent = [];
       send({ ...history });
@@ -240,6 +245,11 @@ function fakeProgram(cfg) {
   window.__rerun = () => { shown.list = [...shown.list].reverse(); shown.ver = nextVer(); send(results({ seq: shown.seq, kind: 0 }, {})); };
 }
 
+// The program's word that a Save/Open dialog waits (Ctrl+Alt+G).
+const QS_ON = {
+  ar: "window.__instafind.recv({ type: 'quick_switch', on: true, text: 'Enter: نقل النافذة إلى مجلد النتيجة · Esc: إلغاء' })",
+  en: "window.__instafind.recv({ type: 'quick_switch', on: true, text: 'Enter: move the dialog to the result\\'s folder · Esc: cancel' })",
+};
 // name, lang, theme, steps (run in the page with Playwright), fake program options
 const SHOTS = [
   ["main-ar-light", "ar", "light", [["type", "تقرير"], ["key", "ArrowDown"]]],
@@ -334,6 +344,13 @@ const SHOTS = [
   // as typed, in the list, its folder, the preview and the status bar's
   // file count, a match inside the phone marked.
   ["digit-runs-ar-light", "ar", "light", [["type", "123-45"]], { expect: { rows: 1, marks: 1, runs: 7 } }],
+  // Ctrl+Alt+G in a Save/Open dialog: a line says what Enter does; Enter moves the dialog to the
+  // selected result's folder (not open it), Esc cancels; the result menu has the move first.
+  ["qswitch-ar-light", "ar", "light", [["eval", QS_ON.ar], ["type", "تقرير"], ["key", "ArrowDown"]], { expect: { qswitch: true } }],
+  ["qswitch-enter-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["key", "Enter"], ["wait", 50]], { expect: { lastSent: "switch_to", opens: 0, qswitch: false } }],
+  ["qswitch-esc-en-dark", "en", "dark", [["eval", QS_ON.en], ["type", "report"], ["key", "Escape"], ["wait", 50]], { expect: { lastSent: "switch_cancel", qswitch: false, q: "report" } }],
+  ["qswitch-ctx-ar-dark", "ar", "dark", [["eval", QS_ON.ar], ["type", "تقرير"], ["rclick", "#r1"]], { expect: { menu: true, ctxFirst: "فتح مجلدها في نافذة الحفظ/الفتح" } }],
+  ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
 (async () => {
@@ -479,6 +496,8 @@ const SHOTS = [
         preview: visible(document.getElementById("preview")),
         bannerSlim: document.getElementById("banner").classList.contains("slim") && document.getElementById("banner").getBoundingClientRect().height <= 48,
         dlgName: !!document.querySelector("#dlg-h .fname"),
+        qswitch: visible(document.getElementById("qswitch")),
+        ctxFirst: (() => { const it = document.querySelector("#ctx:not([hidden]) [role=menuitem] span"); return it ? it.textContent : null; })(),
       };
     }, lang);
     for (const b of check.bad) errors.push(`${name}: ${b}`);
