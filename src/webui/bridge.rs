@@ -267,6 +267,21 @@ pub enum Request {
     /// Open the "Report a problem" window: it shows what would be shared
     /// before anything happens (nothing is sent by the program).
     ReportProblem {},
+    /// Move the Save/Open dialog waiting since Ctrl+Alt+G
+    /// ([`Outbound::QuickSwitch`]) to the folder of row `id`.
+    SwitchTo { list: List, seq: u64, ver: u64, id: u32 },
+    /// Forget the Save/Open dialog waiting since Ctrl+Alt+G (Esc).
+    SwitchCancel {},
+    /// Windows' "Open with" choice for the file of row `id`.
+    OpenWith { list: List, seq: u64, ver: u64, id: u32 },
+    /// Windows' Properties window for the file of row `id`.
+    Properties { list: List, seq: u64, ver: u64, id: u32 },
+    /// Check for updates now (the Store version: where its updates come
+    /// from, and its Store page), as the Options menu's item.
+    CheckUpdates {},
+    /// The answer to the Store rating row ([`Outbound::Rating`]): rate now
+    /// (`rate`, opens the Store's review page) or not now.
+    Rating { rate: bool },
 }
 
 /// Why a message was refused.
@@ -406,6 +421,8 @@ pub struct SettingsOut {
     pub floating: bool,
     pub tray_icon: bool,
     pub version: &'static str,
+    /// The Microsoft Store version: its updates come from the Store.
+    pub store: bool,
 }
 
 /// A message to the page.
@@ -428,6 +445,9 @@ pub enum Outbound {
         /// This start moved someone who used the classic window to the new
         /// look (the only one since 1.0): say so once.
         switched: bool,
+        /// The Microsoft Store version: its updates come from the Store,
+        /// not GitHub (the privacy line says so).
+        store: bool,
     },
     Results {
         seq: u64,
@@ -481,6 +501,10 @@ pub enum Outbound {
     History {
         recent: Vec<String>,
         saved: Vec<SavedOut>,
+        /// "Clear history and recent files" has something to clear: recent
+        /// searches, opened files, quick-search launches or web searches
+        /// (`History::clear_activity`).
+        clearable: bool,
     },
     /// The folder searched now, "" for all drives; `search`: run the
     /// current search again in it.
@@ -517,9 +541,13 @@ pub enum Outbound {
         /// The progress in words, while indexing runs.
         text: Option<String>,
     },
-    /// Put this text in the box and search (from the quick popup).
+    /// Put this text in the box and search (from the quick popup); with
+    /// `content` inside documents, with `all_kinds` in every file type
+    /// (its suggestions for a search that found nothing).
     Query {
         q: String,
+        content: bool,
+        all_kinds: bool,
     },
     /// Put the caret in the search box.
     Focus,
@@ -542,6 +570,18 @@ pub enum Outbound {
         seq: u64,
         apps: Vec<String>,
     },
+    /// Ctrl+Alt+G was pressed in a Save/Open dialog (`on`, with the hint to
+    /// show while it waits), or that dialog was moved, closed or forgotten:
+    /// while on, Enter on a result asks for [`Request::SwitchTo`], Esc for
+    /// [`Request::SwitchCancel`], and the result menu offers the move.
+    QuickSwitch {
+        on: bool,
+        text: String,
+    },
+    /// The Microsoft Store build's one-time rating question is due
+    /// (`crate::rating`): a calm row under the results, never a dialog,
+    /// never taking the focus; the answer is [`Request::Rating`].
+    Rating,
 }
 
 /// The script that hands `msg` to the page.
@@ -591,6 +631,7 @@ pub fn history(h: &History) -> Outbound {
             .enumerate()
             .map(|(i, s)| SavedOut { id: i as u32, name: s.name.clone(), content: s.content, scoped: !s.scope.is_empty() })
             .collect(),
+        clearable: !h.activity_is_empty(),
     }
 }
 
@@ -1301,7 +1342,7 @@ pub fn content_text(s: &ContentState, lang: Lang) -> String {
             (c, Lang::En) => format!(" ({} from the index)", n(c)),
         };
         let mut t = match lang {
-            Lang::Ar => format!("انتهى البحث داخل {} مستند: وجدت {} ملف.{cached}", n(s.total), n(s.found)),
+            Lang::Ar => format!("انتهى البحث. المستندات المفحوصة: {}، عدد النتائج: {}.{cached}", n(s.total), n(s.found)),
             Lang::En => format!("Searched {} documents: found {} files.{cached}", n(s.total), n(s.found)),
         };
         // Documents not in the index yet were not searched.
@@ -1320,7 +1361,7 @@ pub fn content_text(s: &ContentState, lang: Lang) -> String {
     }
     let (checked, total, found) = (n(s.checked.min(s.total)), n(s.total), n(s.found));
     match lang {
-        Lang::Ar => format!("جارٍ البحث داخل المستندات… تم فحص {checked} من {total} — وجدت {found}"),
+        Lang::Ar => format!("جارٍ البحث داخل المستندات… تم فحص {checked} من {total} — عدد النتائج: {found}"),
         Lang::En => format!("Searching inside documents… checked {checked} of {total} — found {found}"),
     }
 }
@@ -1459,6 +1500,20 @@ mod tests {
         assert_eq!(req(r#""op":"hide","forever":true"#), Err(Rejected::Malformed));
         assert_eq!(parse(r#"{"op":"hide"}"#, SRC, TOKEN), Err(Rejected::Token));
         assert_eq!(parse(&format!(r#"{{"t":"{TOKEN}","op":"hide"}}"#), "https://evil.example/", TOKEN), Err(Rejected::Origin));
+        assert_eq!(req(r#""op":"switch_to","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::SwitchTo { list: List::Results, seq: 2, ver: 3, id: 1 }));
+        assert_eq!(req(r#""op":"switch_to","list":"recent","seq":0,"ver":4,"id":0"#), Ok(Request::SwitchTo { list: List::Recent, seq: 0, ver: 4, id: 0 }));
+        // A folder, never a path, from the page.
+        assert_eq!(req(r#""op":"switch_to","path":"C:\\Windows""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"switch_cancel""#), Ok(Request::SwitchCancel {}));
+        assert_eq!(req(r#""op":"rating","rate":true"#), Ok(Request::Rating { rate: true }));
+        assert_eq!(req(r#""op":"check_updates""#), Ok(Request::CheckUpdates {}));
+        assert_eq!(req(r#""op":"check_updates","url":"https://x""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"rating""#), Err(Rejected::Malformed));
+        assert_eq!(serde_json::to_string(&Outbound::Rating).unwrap(), r#"{"type":"rating"}"#);
+        assert_eq!(req(r#""op":"open_with","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::OpenWith { list: List::Results, seq: 2, ver: 3, id: 1 }));
+        assert_eq!(req(r#""op":"properties","list":"recent","seq":0,"ver":3,"id":1"#), Ok(Request::Properties { list: List::Recent, seq: 0, ver: 3, id: 1 }));
+        // Only Windows' own two verbs, never one the page names.
+        assert_eq!(req(r#""op":"properties","list":"results","seq":2,"ver":3,"id":1,"verb":"runas""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"reindex""#), Ok(Request::Reindex {}));
         assert_eq!(req(r#""op":"stop","seq":9"#), Ok(Request::Stop { seq: 9 }));
     }
@@ -1792,12 +1847,20 @@ mod tests {
             h.add_recent(&format!("بحث {i}"));
         }
         h.add_saved(crate::history::SavedSearch { name: "عقود".into(), query: "عقد".into(), kind: 1, scope: "D:\\".into(), content: true });
-        let Outbound::History { recent, saved } = history(&h) else { panic!() };
+        let Outbound::History { recent, saved, clearable } = history(&h) else { panic!() };
         assert_eq!(recent.len(), RECENT_SEARCHES);
+        assert!(clearable);
         assert_eq!(saved, [SavedOut { id: 0, name: "عقود".into(), content: true, scoped: true }]);
         // The saved search's folder is not sent to the page.
         let json = serde_json::to_string(&history(&h)).unwrap();
         assert!(!json.contains("D:\\\\"), "{json}");
+        // Only opened files, no searches: still something to clear.
+        let mut opened = History::default();
+        assert!(matches!(history(&opened), Outbound::History { clearable: false, .. }));
+        opened.record_open("C:\\ملف.txt", 1_700_000_000);
+        assert!(matches!(history(&opened), Outbound::History { clearable: true, .. }));
+        opened.clear_activity();
+        assert!(matches!(history(&opened), Outbound::History { clearable: false, .. }));
     }
 
     #[test]
@@ -1805,7 +1868,7 @@ mod tests {
         let s = |found, done, indexing| ContentState { checked: 1200, total: 4000, found, cached: 0, done, indexing, ocr_arabic_missing: false };
         assert_eq!(content_text(&s(3, false, Indexing::Idle), Lang::En), "Searching inside documents… checked 1,200 of 4,000 — found 3");
         assert!(content_text(&s(0, false, Indexing::Names { found: 9 }), Lang::Ar).contains("قد تكون النتائج ناقصة"));
-        assert_eq!(content_text(&s(2, true, Indexing::Idle), Lang::Ar), "انتهى البحث داخل 4,000 مستند: وجدت 2 ملف.");
+        assert_eq!(content_text(&s(2, true, Indexing::Idle), Lang::Ar), "انتهى البحث. المستندات المفحوصة: 4,000، عدد النتائج: 2.");
         let done = ContentState { cached: 50, ocr_arabic_missing: true, ..s(0, true, Indexing::Names { found: 1 }) };
         let t = content_text(&done, Lang::En);
         assert!(t.starts_with("Searched 4,000 documents: found 0 files. (50 from the index) Results may be incomplete"), "{t}");
@@ -1814,7 +1877,7 @@ mod tests {
 
     #[test]
     fn script_and_status() {
-        let s = script(&Outbound::Query { q: "a\"b</script>\u{2028}".into() });
+        let s = script(&Outbound::Query { q: "a\"b</script>\u{2028}".into(), content: false, all_kinds: false });
         assert!(s.starts_with("window.__instafind&&window.__instafind.recv({\"type\":\"query\""), "{s}");
         assert!(s.contains(r#"a\"b</script>"#));
         assert!(matches!(status(true, Indexing::Idle, 0, Lang::Ar), Outbound::Status { state: "loading", .. }));
@@ -1835,9 +1898,11 @@ mod tests {
             floating: false,
             tray_icon: true,
             version: "1.0.0",
+            store: true,
         });
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.starts_with(r#"{"type":"settings","lang":"ar","next_lang":"en""#), "{json}");
+        assert!(json.ends_with(r#""version":"1.0.0","store":true}"#), "{json}");
         let json = serde_json::to_string(&Outbound::Renamed { list: List::Recent, seq: 0, ver: 3, id: 1, name: "a".into() }).unwrap();
         assert_eq!(json, r#"{"type":"renamed","list":"recent","seq":0,"ver":3,"id":1,"name":"a"}"#);
     }

@@ -20,20 +20,22 @@
       inside: "داخل المستندات", sortBy: "الترتيب",
       sorts: { best: "الأنسب أولاً", name: "الاسم", path: "المسار", size: "الحجم", date: "تاريخ التعديل" },
       asc: "تصاعدي", desc: "تنازلي",
-      cName: "الاسم والمسار", cSize: "الحجم", cDate: "تاريخ التعديل",
+      cName: "الاسم والمسار", cSize: "الحجم", cDate: "تاريخ التعديل", resize: (c) => `تغيير عرض عمود «${c}»`,
       results: "النتائج", preview: "المعاينة",
       recent: "ملفات فتحتها مؤخراً", recentNone: "الملفات التي تفتحها تظهر هنا.", tryThese: "جرّب هذه",
       trust: "ملفاتك وفهرسها يبقيان على جهازك ولا نجمع بيانات استخدام. يتصل البرنامج بالإنترنت فقط ليتحقق من التحديثات (GitHub) ولأسعار العملات؛ والبحث من الهاتف يعمل داخل شبكة بيتك فقط.",
+      trustStore: "ملفاتك وفهرسها يبقيان على جهازك ولا نجمع بيانات استخدام. يتصل البرنامج بالإنترنت فقط لأسعار العملات، وتصله التحديثات من Microsoft Store؛ والبحث من الهاتف يعمل داخل شبكة بيتك فقط.",
       tips: [["تقرير .pdf", "ملفات PDF فقط"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"], ['"عقد إيجار"', "العبارة كما هي"], ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["hgjrvdv", "لوحة المفاتيح الخطأ ← «التقرير»"]],
       kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد", kMenu: "المزيد",
       open: "فتح", openFolder: "فتح المجلد", copyPath: "نسخ المسار", more: "إجراءات أخرى",
       fType: "النوع", fSize: "الحجم", fMod: "تاريخ التعديل", fMatches: "التطابقات", folder: "مجلد", file: "ملف", fileOf: (x) => `ملف ${x}`,
-      nres: (n) => (n === 0 ? "لا نتائج" : n === 1 ? "نتيجة واحدة" : n === 2 ? "نتيجتان" : n <= 10 ? `${num(n)} نتائج` : `${num(n)} نتيجة`),
-      nMatches: (n) => (n === 1 ? "تطابق واحد" : n === 2 ? "تطابقان" : n <= 10 ? `${num(n)} تطابقات` : `${num(n)} تطابقاً`),
-      count: (n, ms) => (n ? `وجدت ${T.nres(n)} في ${num(ms)} ملّي ثانية` : T.nres(0)),
-      files: (n) => `الفهرس محدَّث · ${num(n)} ملف`,
+      // Counts read «label: n» (no noun that must agree with the number), as the classic window.
+      nres: (n) => (n === 0 ? "لا نتائج" : `عدد النتائج: ${num(n)}`),
+      nMatches: (n) => `عدد التطابقات: ${num(n)}`,
+      count: (n, ms) => (n ? `${T.nres(n)} في ${num(ms)} ملّي ثانية` : T.nres(0)),
+      files: (n) => `الفهرس محدَّث · عدد الملفات: ${num(n)}`,
       noresH: (q) => `لا توجد نتائج لـ «${q}»`,
-      noresSub: (n, kind, scope) => `بحثنا في أسماء ${num(n)} ملف ${scope ? `داخل ${scope}` : "في كل الأقراص"}${kind ? `، ضمن «${kind}» فقط` : ""}.`,
+      noresSub: (n, kind, scope) => `بحثنا في أسماء الملفات ${scope ? `داخل ${scope}` : "في كل الأقراص"}${kind ? `، ضمن «${kind}» فقط` : ""} (عددها: ${num(n)}).`,
       noresSubContent: (scope) => `بحثنا داخل المستندات ${scope ? `في ${scope}` : "في كل الأقراص"}.`,
       noresIx: "الفهرسة ما زالت جارية، وقد يظهر الملف حين تنتهي.",
       stillIx: "ما زلنا نفهرس ملفاتك…", stillIxSub: "ستظهر النتائج هنا تلقائياً.",
@@ -50,16 +52,18 @@
       mOpen: "فتح الملف", mReveal: "فتح المجلد الذي يحتويه", mCopyFile: "نسخ الملف", mCopyPath: "نسخ المسار", mCopyAll: "نسخ مسارات كل النتائج",
       mSizes: "أحجام المجلدات هنا…", mReplace: "استبدال نص في الملفات…", exportBtn: "تصدير النتائج", reindexBtn: "تحديث الفهرس",
       mScope: "البحث في هذا المجلد", mRename: "تغيير الاسم", mRecycle: "نقل إلى سلة المحذوفات", mMatches: "عرض كل التطابقات داخل الملف",
+      rateText: "هل يفيدك InstaFind؟ تقييمك في المتجر يساعد غيرك على إيجاده.", rateOk: "قيّم InstaFind في المتجر", rateLater: "ليس الآن", rateRegion: "التقييم في المتجر",
+      mSwitch: "فتح مجلدها في نافذة الحفظ/الفتح", qsCancel: "إلغاء النقل", mOpenWith: "فتح باستخدام…", mProps: "خصائص",
       // dialogs
       renameH: "تغيير الاسم", renameLabel: "الاسم الجديد", renameOk: "تغيير الاسم", cancel: "إلغاء", close: "إغلاق",
       recycleH: "نقل إلى سلة المحذوفات", recycleQ: ["هل تريد نقل «", "» إلى سلة المحذوفات؟"], recycleQDir: ["هل تريد نقل المجلد «", "» وكل ما فيه إلى سلة المحذوفات؟"],
       recycleSub: "يمكنك استعادته من سلة المحذوفات.", recycleOk: "نقل إلى سلة المحذوفات",
-      matchesH: (name) => `كل التطابقات — ${name}`, line: (n) => `سطر ${num(n)}`, firstLines: (n) => `(أول ${num(n)} سطر)`,
+      matchesH: (name) => `كل التطابقات — ${name}`, line: (n) => `سطر ${num(n)}`, firstLines: (n) => `(أول الأسطر فقط، عددها: ${num(n)})`,
       matchesNone: "يُعرض هنا كل سطر يطابق البحث.",
       gone: "نُقل إلى سلة المحذوفات",
       // history
       history: "السجل", historyKey: "السجل (Ctrl+H)", savedH: "البحوث المحفوظة", recentH: "عمليات البحث الأخيرة", recentEmpty: "لا توجد عمليات بحث سابقة بعد",
-      saveCurrent: "حفظ البحث الحالي", clearRecent: "مسح عمليات البحث الأخيرة", clearSaved: "حذف كل البحوث المحفوظة",
+      saveCurrent: "حفظ البحث الحالي", clearRecent: "مسح السجل والملفات الأخيرة", clearSaved: "حذف كل البحوث المحفوظة",
       savedInside: "داخل المستندات", savedScoped: "في مجلد",
       // settings
       settings: "الإعدادات", settingsKey: "الإعدادات (Ctrl+,)", back: "رجوع إلى البحث",
@@ -68,7 +72,10 @@
       app: "تطبيق", appsLabel: "برامج بهذا الاسم",
       grid: "عرض المصغرات (Ctrl+T)",
       compact: "عرض مضغوط", compactSub: "سطر واحد لكل نتيجة، فتظهر نتائج أكثر", showPreview: "إظهار المعاينة", hidePreview: "إخفاء المعاينة",
-      sMore: "المزيد", sMoreRow: "خيارات أخرى", sMoreSub: "التحقق من التحديثات، الدعم والملاحظات، أدوات مثل الملفات المكررة وأحجام المجلدات، وإعدادات البحث من أي مكان", moreBtn: "فتح قائمة الخيارات…", sReportRow: "الإبلاغ عن مشكلة", sReportSub: "تعرض ما سيُشارَك قبل أي شيء: لن يُرسل شيء إلا إذا ضغطت أنت، وأسماء الملفات والمسارات تُحذف.", reportBtn: "الإبلاغ عن مشكلة…",
+      sMore: "المزيد", sMoreRow: "خيارات أخرى", sMoreSub: "التحقق من التحديثات، الدعم والملاحظات، أدوات مثل الملفات المكررة وأحجام المجلدات، وإعدادات البحث من أي مكان", moreBtn: "فتح قائمة الخيارات…",
+      sHelp: "التحديثات والمساعدة", sUpdRow: "التحديثات", sUpdSub: (v) => `الإصدار المثبّت ${v}. يتحقق البرنامج من وجود إصدار أحدث ويعرض عليك تثبيته.`, updBtn: "التحقق من التحديثات…",
+      sUpdSubStore: (v) => `الإصدار المثبّت ${v}. تصل التحديثات من Microsoft Store.`, updBtnStore: "التحديثات من Microsoft Store…",
+      sReportRow: "الإبلاغ عن مشكلة", sReportSub: "تعرض ما سيُشارَك قبل أي شيء: لن يُرسل شيء إلا إذا ضغطت أنت، وأسماء الملفات والمسارات تُحذف.", reportBtn: "الإبلاغ عن مشكلة…",
       sSearch: "البحث والفهرسة", sHideSystem: "إخفاء ملفات النظام", sHideSystemSub: "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
       sContentIndex: "فهرسة محتوى المستندات في الخلفية", sContentIndexSub: "بحث أسرع داخل الملفات، ويشمل النص في الصور والملفات الممسوحة",
       sReadCloud: "قراءة محتوى الملفات الموجودة على السحابة فقط (يُنزّلها من الإنترنت)",
@@ -84,10 +91,11 @@
       inside: "Inside documents", sortBy: "Sort",
       sorts: { best: "Best match first", name: "Name", path: "Path", size: "Size", date: "Modified" },
       asc: "ascending", desc: "descending",
-      cName: "Name and path", cSize: "Size", cDate: "Modified",
+      cName: "Name and path", cSize: "Size", cDate: "Modified", resize: (c) => `Resize the “${c}” column`,
       results: "Results", preview: "Preview",
       recent: "Recently opened files", recentNone: "Files you open show up here.", tryThese: "Try these",
       trust: "Your files and their index stay on your PC; no usage data is collected. InstaFind goes online only to check for updates (GitHub) and fetch exchange rates; phone search works only on your home network.",
+      trustStore: "Your files and their index stay on your PC; no usage data is collected. InstaFind goes online only to fetch exchange rates, and its updates come from the Microsoft Store; phone search works only on your home network.",
       tips: [["report .pdf", "PDF files only"], ["size:>10mb", "Bigger than 10 MB"], ["dm:thisweek", "Changed this week"], ['"lease agreement"', "Exact phrase"], ["root: كتاب", "Arabic root: مكتبة، الكاتب"], ["احمد", "Also finds «أحمد»"]],
       kNav: "Move", kOpen: "Open", kFolder: "Folder", kMenu: "More",
       open: "Open", openFolder: "Open folder", copyPath: "Copy path", more: "More actions",
@@ -113,6 +121,8 @@
       mOpen: "Open file", mReveal: "Open containing folder", mCopyFile: "Copy file", mCopyPath: "Copy path", mCopyAll: "Copy paths of all results",
       mSizes: "Folder sizes here…", mReplace: "Replace text in files…", exportBtn: "Export results", reindexBtn: "Update index",
       mScope: "Search in this folder", mRename: "Rename", mRecycle: "Move to Recycle Bin", mMatches: "Show all matches in the file",
+      rateText: "Is InstaFind useful to you? A rating in the Store helps others find it.", rateOk: "Rate InstaFind in the Store", rateLater: "Not now", rateRegion: "Rate in the Store",
+      mSwitch: "Open its folder in the Save/Open dialog", qsCancel: "Cancel the move", mOpenWith: "Open with…", mProps: "Properties",
       renameH: "Rename", renameLabel: "New name", renameOk: "Rename", cancel: "Cancel", close: "Close",
       recycleH: "Move to the Recycle Bin", recycleQ: ["Move “", "” to the Recycle Bin?"], recycleQDir: ["Move the folder “", "” and everything in it to the Recycle Bin?"],
       recycleSub: "You can restore it from the Recycle Bin.", recycleOk: "Move to Recycle Bin",
@@ -120,7 +130,7 @@
       matchesNone: "Every line that matches the search shows here.",
       gone: "Moved to the Recycle Bin",
       history: "History", historyKey: "History (Ctrl+H)", savedH: "Saved searches", recentH: "Recent searches", recentEmpty: "No recent searches yet",
-      saveCurrent: "Save the current search", clearRecent: "Clear recent searches", clearSaved: "Delete all saved searches",
+      saveCurrent: "Save the current search", clearRecent: "Clear history and recent files", clearSaved: "Delete all saved searches",
       savedInside: "inside documents", savedScoped: "in a folder",
       settings: "Settings", settingsKey: "Settings (Ctrl+,)", back: "Back to search",
       sLang: "Language", sLangNote: "The interface changes language after the program restarts.", restart: "Restart now",
@@ -128,7 +138,10 @@
       app: "App", appsLabel: "Programs by this name",
       grid: "Thumbnail view (Ctrl+T)",
       compact: "Compact rows", compactSub: "One line per result, so more of them fit", showPreview: "Show the preview", hidePreview: "Hide the preview",
-      sMore: "More", sMoreRow: "More options", sMoreSub: "Check for updates, support and feedback, tools such as duplicate files and folder sizes, and search-from-anywhere settings", moreBtn: "Open the Options menu…", sReportRow: "Report a problem", sReportSub: "Shows what would be shared first: nothing is sent unless you press a button, and file names and paths are removed.", reportBtn: "Report a problem…",
+      sMore: "More", sMoreRow: "More options", sMoreSub: "Check for updates, support and feedback, tools such as duplicate files and folder sizes, and search-from-anywhere settings", moreBtn: "Open the Options menu…",
+      sHelp: "Updates and help", sUpdRow: "Updates", sUpdSub: (v) => `Installed version ${v}. Looks for a newer version and offers to install it.`, updBtn: "Check for updates…",
+      sUpdSubStore: (v) => `Installed version ${v}. Updates come from the Microsoft Store.`, updBtnStore: "Updates from Microsoft Store…",
+      sReportRow: "Report a problem", sReportSub: "Shows what would be shared first: nothing is sent unless you press a button, and file names and paths are removed.", reportBtn: "Report a problem…",
       sSearch: "Search and indexing", sHideSystem: "Hide system files", sHideSystemSub: "The Windows folder, temporary and cache files",
       sContentIndex: "Index document contents in the background", sContentIndexSub: "Faster search inside files, text in pictures and scans included",
       sReadCloud: "Read contents of cloud-only files (downloads them)",
@@ -140,6 +153,8 @@
     },
   }[LANG];
   const SORTS = ["best", "name", "path", "size", "date"];
+  // The privacy line: the Store version's updates come from the Store, not GitHub.
+  function trustText() { return S.store ? T.trustStore : T.trust; }
 
   // ---------- state ----------
   const S = {
@@ -148,7 +163,9 @@
     rows: [], total: 0, ms: 0, done: true, sel: 0, asked: 0, running: false, isContent: false, contentFor: null,
     progress: "", warnings: [], files: 0, state: "ready", stateText: "",
     recent: [], sugg: [], ssel: 0, view: "empty", note: "", notice: "", resultsScope: "",
-    matches: null, history: { recent: [], saved: [] }, settings: null, apps: { seq: -1, apps: [] },
+    matches: null, history: { recent: [], saved: [] }, settings: null, apps: { seq: -1, apps: [] }, rsel: 0,
+    // Ctrl+Alt+G: a Save/Open dialog waits for a result's folder (its hint), "" when none.
+    qswitch: "",
   };
 
   const $ = (id) => document.getElementById(id);
@@ -235,6 +252,7 @@
     refresh: [["path", { d: "M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" }]],
     pane: [["rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }], ["path", { d: "M14 5v14" }]],
     flag: [["path", { d: "M5 21V4M5 4h11l-2 4 2 4H5" }]],
+    info: [["circle", { cx: "12", cy: "12", r: "9" }], ["path", { d: "M12 11v6M12 7.5v.5" }]],
   };
 
   // File-type badge: colour by family, the extension as its label.
@@ -373,7 +391,8 @@
       S.kinds = m.kinds || []; S.sizes = m.sizes || []; S.dates = m.dates || [];
       S.kind = m.kind < S.kinds.length ? m.kind : 0;
       S.sort = SORTS.includes(m.sort) ? m.sort : "best"; S.desc = !!m.desc;
-      S.digits = !!m.digits; S.version = m.version || "";
+      S.digits = !!m.digits; S.version = m.version || ""; S.store = !!m.store;
+      for (const el of document.querySelectorAll('[data-i18n="trust"]')) el.textContent = trustText();
       renderChips(); renderStatus();
       if (m.switched) showSwitched();
     },
@@ -406,6 +425,7 @@
       if (m.seq !== S.seq) return;
       S.total = Math.max(S.total, m.total); S.running = !m.done; S.progress = m.text || "";
       S.done = S.rows.length >= S.total;
+      list.setAttribute("aria-busy", String(S.running));
       if (!S.done) wantMore();
       if (S.view === "results" && !S.rows.length) renderRows(false);
       renderStatus(); renderStop();
@@ -419,7 +439,7 @@
       if (dlgFor === "matches:" + m.id) showMatches(m.id);
     },
     recent(m) { S.recent = m.rows || []; S.recentVer = m.ver || 0; renderRecent(); },
-    history(m) { S.history = { recent: m.recent || [], saved: m.saved || [] }; if (!$("hist").hidden) renderHistory(); },
+    history(m) { S.history = { recent: m.recent || [], saved: m.saved || [], clearable: !!m.clearable }; if (!$("hist").hidden) renderHistory(); },
     scope(m) {
       S.scope = m.path || "";
       renderChips();
@@ -461,7 +481,15 @@
       renderBanner(); renderStatus();
       if (S.view === "nores") renderNoResults();
     },
-    query(m) { closeSettings(); q.value = m.q; onInput(); },
+    // A search from the quick popup; its suggestions say how to run it
+    // (inside documents, every file type; "all drives" came as a scope).
+    query(m) {
+      closeSettings(); q.value = m.q;
+      if (m.all_kinds) S.kind = 0;
+      if (m.content) S.content = true;
+      if (m.all_kinds || m.content) renderChips();
+      if (m.content) { S.q = q.value; runSearch(); } else onInput();
+    },
     focus() { q.focus(); },
     thumbs(m) {
       if (m.seq !== S.shown || m.ver !== S.ver) return;
@@ -472,12 +500,28 @@
       }
     },
     apps(m) { S.apps = { seq: m.seq, apps: m.apps || [] }; renderApps(); },
+    // The Store build's one-time rating question (the program decides when):
+    // a row above the status line, never a dialog, never taking the focus.
+    rating() {
+      const bar = $("rating");
+      const answer = (rate) => { bar.hidden = true; bar.replaceChildren(); send({ op: "rating", rate }); };
+      bar.replaceChildren(h("span", null, T.rateText),
+        btn("primary small", I.star, T.rateOk, () => answer(true), { id: "rate-ok" }),
+        btn("small", I.x, T.rateLater, () => answer(false), { id: "rate-later" }));
+      bar.hidden = false;
+    },
+    quick_switch(m) {
+      S.qswitch = m.on ? m.text || "" : "";
+      renderQswitch();
+      if (m.on) { closeSettings(); $("live").textContent = m.text || ""; }
+    },
     notice(m) {
       S.notice = m.text; S.noticeWarn = !!m.warn; renderStatus();
       clearTimeout(handlers.noticeTimer);
-      // A problem stays until the next key or click, and is read out.
-      if (m.warn) $("live").textContent = m.text;
-      else handlers.noticeTimer = setTimeout(() => { S.notice = ""; renderStatus(); }, 3500);
+      // Read out ("Path copied.", "Could not…"); a problem stays until the
+      // next key or click.
+      $("live").textContent = m.text;
+      if (!m.warn) handlers.noticeTimer = setTimeout(() => { S.notice = ""; renderStatus(); }, 3500);
     },
   };
   Object.defineProperty(window, "__instafind", { value: Object.freeze({ recv: (m) => { const f = handlers[m && m.type]; if (f) f(m); } }) });
@@ -559,6 +603,28 @@
     bar.replaceChildren(h("span", null, T.switchedText), x);
     bar.hidden = false;
   }
+  // Ctrl+Alt+G in a Save/Open dialog: what Enter and Esc do now, until the
+  // dialog was moved or the move cancelled (the program says when).
+  function renderQswitch() {
+    const bar = $("qswitch");
+    bar.hidden = !S.qswitch;
+    if (!S.qswitch) { bar.replaceChildren(); return; }
+    const x = btn("small", I.x, T.qsCancel, () => { send({ op: "switch_cancel" }); q.focus(); }, { id: "qswitch-x" });
+    // "Enter: … · Esc: …": each key as a key cap (a bare "Enter:" in an
+    // Arabic line would show its colon on the wrong side).
+    const say = h("span", null);
+    S.qswitch.split(" · ").forEach((part, i) => {
+      const m = part.match(/^([A-Za-z][A-Za-z0-9+]*):\s*(.*)$/);
+      if (i) say.append(" · ");
+      if (m) say.append(h("kbd", null, m[1]), " ", m[2]); else say.append(part);
+    });
+    bar.replaceChildren(say, x);
+  }
+  // The selected result (the top one from the box) for the waiting dialog.
+  function switchTo(row, listName = "results", at = listAt(listName)) {
+    if (!row || row.gone) return;
+    send({ op: "switch_to", list: at.list, seq: at.seq, ver: at.ver, id: row.id });
+  }
   // ---------- how the results are laid out (kept in this page's storage) ----------
   // Compact rows (one line each) unless chosen otherwise: on by itself in a
   // window under 800 px high. The preview pane can be hidden.
@@ -581,16 +647,25 @@
     savePref(); applyZoom();
   }
   document.addEventListener("wheel", (e) => { if (e.ctrlKey) { zoomBy(e.deltaY < 0 ? 1 : -1); e.preventDefault(); } }, { passive: false });
-  const COLW = { size: 96, date: 128 };
+  // Every column can be sized (kept in this page's storage, as the classic
+  // list keeps its columns): the name and path column takes what is left
+  // until it is given a width of its own (null).
+  const COLW = { name: null, size: 96, date: 128 };
+  const COL_MIN = { name: 160, size: 64, date: 64 }, COL_MAX = { name: 4000, size: 320, date: 320 };
   function colWidth(key) { const w = PREF.cols && PREF.cols[key]; return typeof w === "number" ? w : COLW[key]; }
   function setColWidth(key, w, save = true) {
-    PREF.cols = Object.assign({}, PREF.cols, { [key]: Math.round(Math.max(64, Math.min(320, w))) });
+    PREF.cols = Object.assign({}, PREF.cols, { [key]: w === null ? null : Math.round(Math.max(COL_MIN[key], Math.min(COL_MAX[key], w))) });
     applyCols();
     if (save) savePref();
   }
   function applyCols() {
     document.body.style.setProperty("--w-size", colWidth("size") + "px");
     document.body.style.setProperty("--w-date", colWidth("date") + "px");
+    // (Never wider than the list: it gives way when the window narrows.)
+    const name = colWidth("name");
+    if (name === null) document.body.style.removeProperty("--c-name");
+    else document.body.style.setProperty("--c-name", `minmax(0, ${name}px)`);
+    for (const g of document.querySelectorAll(".grip")) g.setAttribute("aria-valuenow", String(Math.round(g.parentElement.getBoundingClientRect().width)));
   }
   function setPref(key, on) { PREF[key] = on; savePref(); applyView(); renderChips(); if (S.view === "settings") renderSettings(); }
   function viewButtons() {
@@ -643,8 +718,7 @@
     img.src = "/thumb/" + key;
   }
   function tileEl(r, i) {
-    const name = plainName(r);
-    const el = h("div", { class: "row tile" + (r.gone ? " gone" : ""), role: "option", id: "r" + i, "aria-selected": String(i === S.sel), "aria-label": `${name}, ${r.dir}${r.folder ? "" : ", " + size(r.size)}, ${when(r.mtime)}${r.gone ? ", " + T.gone : ""}` });
+    const el = h("div", Object.assign({ class: "row tile" + (r.gone ? " gone" : "") }, rowAria(r, i, "results")));
     el.dataset.i = i;
     el.append(h("span", { class: "tpic" }, badge(r, "ft big"), h("img", { alt: "", draggable: "false" })), h("span", { class: "tname" }, nameEl(r)));
     const key = thumbKeys.get(`${S.shown}:${S.ver}:${i}`);
@@ -657,10 +731,22 @@
     if (S.view === "results") { renderCols(); renderRows(true); }
   }
 
+  // What Narrator, NVDA and UI Automation get for a row: an option of its
+  // listbox ("Results" / the recent files), selected or not, named by the
+  // file, its folder, size, date and matches, with its place in the list
+  // (the whole count, or -1 while a document search still finds more).
+  function rowAria(r, i, listName) {
+    const name = plainName(r), results = listName === "results";
+    const label = [name, r.dir, r.folder ? T.folder : size(r.size), when(r.mtime), r.matches ? T.nMatches(r.matches) : "", r.gone ? T.gone : ""].filter(Boolean).join(", ");
+    return {
+      role: "option", id: (results ? "r" : "rr") + i, "aria-label": label,
+      "aria-selected": String(results ? i === S.sel : i === S.rsel),
+      "aria-posinset": String(i + 1), "aria-setsize": String(results ? (S.running ? -1 : Math.max(S.total, S.rows.length)) : S.recent.length),
+    };
+  }
   function rowEl(r, i, listName) {
     if (listName === "results" && gridOn()) return tileEl(r, i);
-    const name = plainName(r);
-    const el = h("div", { class: "row" + (r.gone ? " gone" : "") + (r.snippet ? " doc" : ""), role: "option", id: (listName === "recent" ? "rr" : "r") + i, "aria-selected": String(listName === "results" && i === S.sel), "aria-label": `${name}, ${r.dir}${r.folder ? "" : ", " + size(r.size)}, ${when(r.mtime)}${r.gone ? ", " + T.gone : ""}` });
+    const el = h("div", Object.assign({ class: "row" + (r.gone ? " gone" : "") + (r.snippet ? " doc" : "") }, rowAria(r, i, listName)));
     el.dataset.i = i;
     const nm = h("span", { class: "nm" }, h("span", { class: "n1" }, nameEl(r), r.matches > 1 ? h("span", { class: "cnt num" }, T.nMatches(r.matches)) : null), h("span", { class: "n2" }, pathEl(r.dir)));
     if (r.snippet) nm.append(h("span", { class: "n3" }, marked(r.snippet, "sn")));
@@ -677,32 +763,52 @@
   function renderCols() {
     const col = (key, label, cls) => {
       const on = S.sort === key;
-      const b = h("button", { class: "colbtn" + (on ? " sorted" : "") + (cls ? " " + cls : ""), type: "button", "aria-pressed": String(on) }, h("span", null, label));
+      // Its name says what a press does and how the list is ordered now.
+      const name = `${T.sortBy}: ${label}${on ? ` (${S.desc ? T.desc : T.asc})` : ""}`;
+      const b = h("button", { class: "colbtn" + (on ? " sorted" : "") + (cls ? " " + cls : ""), type: "button", "aria-pressed": String(on), "aria-label": name }, h("span", null, label));
       if (on) b.append(icon(S.desc ? I.down : I.up, "i caret"));
       b.dataset.sort = key;
       return b;
     };
-    // The Size and Date columns can be made wider or narrower by dragging
-    // the edge before their header (kept for next time).
+    // Every column is made wider or narrower by dragging the edge at the
+    // end of its header, as in the classic list (kept for next time), or
+    // with the arrow keys on that edge; a double click gives the column its
+    // usual width back (the name column: what is left).
+    const label = { name: T.cName, size: T.cSize, date: T.cDate };
     const grip = (key) => {
-      const g = h("span", { class: "grip", role: "separator", "aria-orientation": "vertical", "aria-label": key === "size" ? T.cSize : T.cDate });
+      const g = h("span", { class: "grip", role: "separator", tabindex: "0", "aria-orientation": "vertical", "aria-label": T.resize(label[key]), "aria-valuemin": String(COL_MIN[key]), "aria-valuemax": String(COL_MAX[key]) });
+      g.dataset.col = key;
+      const rtl = () => document.documentElement.dir === "rtl";
+      // The width now (the name column has none of its own until sized).
+      const now = () => colWidth(key) ?? Math.round(g.parentElement.getBoundingClientRect().width);
       g.addEventListener("pointerdown", (e) => {
         e.preventDefault(); e.stopPropagation();
-        const start = e.clientX, w0 = colWidth(key), rtl = document.documentElement.dir === "rtl";
+        const start = e.clientX, w0 = now();
         g.setPointerCapture(e.pointerId); g.classList.add("on");
-        const move = (ev) => setColWidth(key, w0 + (rtl ? ev.clientX - start : start - ev.clientX), false);
-        const up = () => { g.classList.remove("on"); g.removeEventListener("pointermove", move); savePref(); };
+        // The end edge follows the pointer: to the right grows a column in a
+        // left-to-right page, to the left in a right-to-left one.
+        const move = (ev) => setColWidth(key, w0 + (rtl() ? start - ev.clientX : ev.clientX - start), false);
+        const up = () => { g.classList.remove("on"); g.removeEventListener("pointermove", move); savePref(); applyCols(); };
         g.addEventListener("pointermove", move);
         g.addEventListener("pointerup", up, { once: true });
       });
+      g.addEventListener("keydown", (e) => {
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+        const grow = (e.key === "ArrowRight") !== rtl();
+        setColWidth(key, now() + (grow ? 16 : -16));
+        e.preventDefault(); e.stopPropagation();
+      });
+      g.addEventListener("dblclick", (e) => { setColWidth(key, COLW[key]); e.stopPropagation(); });
       g.addEventListener("click", (e) => e.stopPropagation());
       return g;
     };
     const size = col("size", T.cSize, "end"), date = col("date", T.cDate, "end");
-    $("cols").replaceChildren(h("span"), col("name", T.cName), h("span", { class: "cwrap end" }, grip("size"), size), h("span", { class: "cwrap end" }, grip("date"), date));
+    $("cols").replaceChildren(h("span"), h("span", { class: "cwrap start" }, col("name", T.cName), grip("name")), h("span", { class: "cwrap end" }, size, grip("size")), h("span", { class: "cwrap end" }, date, grip("date")));
+    applyCols();
   }
   function renderRows(refresh) {
     const top = list.scrollTop;
+    list.setAttribute("aria-busy", String(!!S.running));
     thumbSeen.disconnect();
     list.replaceChildren(...S.rows.map((r, i) => rowEl(r, i, "results")));
     if (!S.done || (S.running && !S.rows.length)) list.append(h("div", { class: "more", "aria-hidden": "true" }, S.running && !S.rows.length ? T.searching : T.moreRows));
@@ -771,7 +877,7 @@
     open.append(h("kbd", null, "Enter"));
     const parts = [
       h("div", { class: "thumb" }, badge(r)),
-      h("div", null, h("div", { class: "pv-name" }, nameEl(r)), h("div", { class: "pv-path" }, pathEl(r.dir, 999))),
+      h("div", null, h("div", { class: "pv-name", dir: firstStrongDir(plainName(r)) }, nameEl(r)), h("div", { class: "pv-path" }, pathEl(r.dir, 999))),
     ];
     if (r.gone) parts.push(h("p", { class: "gone-note" }, T.gone));
     else parts.push(h("div", { class: "actions" }, open, btn("", I.folder, T.openFolder, () => act("reveal", S.rows[S.sel])),
@@ -790,6 +896,21 @@
     const el = $("recent");
     el.replaceChildren(...S.recent.map((r, i) => rowEl(r, i, "recent")));
     $("recent-none").hidden = S.recent.length > 0;
+    // (Not a tab stop while it lists nothing.)
+    el.tabIndex = S.recent.length ? 0 : -1;
+    selectRecent(Math.min(S.rsel || 0, Math.max(0, S.recent.length - 1)));
+  }
+  // The recent files from the keyboard too (Tab to them, then the arrows):
+  // the selected one is what Enter, Ctrl+Enter, F2, Delete and the menu act on.
+  function selectRecent(i, scroll = false) {
+    const el = $("recent");
+    S.rsel = i;
+    for (const r of el.querySelectorAll('.row[aria-selected="true"]')) r.setAttribute("aria-selected", "false");
+    const row = $("rr" + i);
+    if (!row) { el.removeAttribute("aria-activedescendant"); return; }
+    row.setAttribute("aria-selected", "true");
+    el.setAttribute("aria-activedescendant", row.id);
+    if (scroll) row.scrollIntoView({ block: "nearest" });
   }
   const SUGG_ICON = { query: I.bulb, all_kinds: I.filter, all_drives: I.folder, contents: I.text, web: I.globe };
   function renderNoResults() {
@@ -892,7 +1013,7 @@
       }
       const wrap = h("span", { class: "chipwrap" + (d.end ? " end" : "") }, chip);
       if (d.items) {
-        const menu = h("div", { class: "menu", role: "menu", id: "menu-" + d.id, hidden: true });
+        const menu = h("div", { class: "menu", role: "menu", id: "menu-" + d.id, "aria-label": d.label, hidden: true });
         d.items.forEach((label, i) => { const it = h("div", { role: "menuitemradio", tabindex: "-1", "aria-checked": String(i === d.cur) }, label); it.dataset.k = i; menu.append(it); });
         wrap.append(menu);
       }
@@ -907,7 +1028,8 @@
     $("chips").replaceChildren(...wraps, viewButtons());
     updatePlaceholder();
   }
-  function updatePlaceholder() { q.placeholder = S.content ? T.phContent : T.ph; }
+  // (The box's accessible name follows its hint: names or inside documents.)
+  function updatePlaceholder() { q.placeholder = S.content ? T.phContent : T.ph; q.setAttribute("aria-label", q.placeholder); }
   function setFilter(key, i) {
     S[key] = i;
     if (key === "kind") S.kindLabel = S.kinds[i] || "";
@@ -960,16 +1082,23 @@
     ctxRow = { r, at: listAt(listName) };
     ctxBack = document.activeElement;
     const item = (label, key, op, ic) => {
-      const it = h("div", { role: "menuitem", tabindex: "-1" }, icon(ic), h("span", null, label), key ? h("kbd", null, key) : null);
+      const it = h("div", { role: "menuitem", tabindex: "-1", "data-op": op }, icon(ic), h("span", null, label), key ? h("kbd", null, key) : null);
       it.addEventListener("click", () => { closeMenus(); runCtx(op); });
       return it;
     };
-    const items = [item(T.mOpen, "Enter", "open", I.open), item(T.mReveal, "Ctrl+Enter", "reveal", I.folder), item(T.mCopyFile, "Ctrl+C", "copy_file", I.copy), item(T.mCopyPath, "Ctrl+Shift+C", "copy", I.copy)];
+    // While a Save/Open dialog waits (Ctrl+Alt+G), its move comes first and takes Enter.
+    const items = S.qswitch ? [item(T.mSwitch, "Enter", "switch_to", I.folder), item(T.mOpen, null, "open", I.open)] : [item(T.mOpen, "Enter", "open", I.open)];
+    items.push(item(T.mReveal, "Ctrl+Enter", "reveal", I.folder));
+    // Windows' own "Open with" choice (files only), as the classic menu.
+    if (!r.folder) items.push(item(T.mOpenWith, null, "open_with", I.open));
+    items.push(item(T.mCopyFile, "Ctrl+C", "copy_file", I.copy), item(T.mCopyPath, "Ctrl+Shift+C", "copy", I.copy));
     if (listName === "results") items.push(item(T.mCopyAll, null, "copy_all", I.copy));
     items.push(item(T.mScope, null, "scope", I.search), item(T.mSizes, null, "folder_sizes", I.scale));
     if (listName === "results") items.push(item(T.mReplace, null, "replace_text", I.pen));
     if (r.snippet) items.push(item(T.mMatches, "F4", "matches", I.text));
     items.push(h("div", { class: "sep", role: "separator" }), item(T.mRename, "F2", "rename", I.pen), item(T.mRecycle, "Delete", "recycle", I.trash));
+    // Last, as in Explorer: Windows' Properties window.
+    items.push(h("div", { class: "sep", role: "separator" }), item(T.mProps, "Alt+Enter", "properties", I.info));
     const menu = $("ctx");
     menu.replaceChildren(...items);
     closeMenus();
@@ -1063,8 +1192,8 @@
   // ---------- history ----------
   function renderHistory() {
     const menu = $("hist");
-    const item = (cls, ic, label, sub, onClick, disabled) => {
-      const it = h("div", { role: "menuitem", tabindex: "-1", class: cls, "aria-disabled": disabled ? "true" : null }, icon(ic), h("bdi", { class: "lbl" }, label), sub ? h("span", { class: "sub" }, sub) : null);
+    const item = (cls, ic, label, sub, onClick, disabled, id) => {
+      const it = h("div", { role: "menuitem", tabindex: "-1", class: cls, id, "aria-disabled": disabled ? "true" : null }, icon(ic), h("bdi", { class: "lbl" }, label), sub ? h("span", { class: "sub" }, sub) : null);
       if (!disabled) it.addEventListener("click", () => { closeMenus(); onClick(); });
       return it;
     };
@@ -1078,7 +1207,8 @@
     for (const r of S.history.recent) kids.push(item("", I.clock, r, null, () => { closeSettings(); q.value = r; runSearch(); q.focus(); }));
     kids.push(h("div", { class: "sep", role: "separator" }));
     kids.push(item("act", I.star, T.saveCurrent, null, () => send({ op: "save_search", q: S.q, kind: S.kind, content: S.content }), !S.q.trim()));
-    kids.push(item("act", I.x, T.clearRecent, null, () => send({ op: "clear_recent" }), !S.history.recent.length));
+    // Also the opened files and the quick search's launches, as the classic menu.
+    kids.push(item("act", I.x, T.clearRecent, null, () => send({ op: "clear_recent" }), !S.history.clearable, "hist-clear"));
     kids.push(item("act", I.trash, T.clearSaved, null, () => send({ op: "clear_saved" }), !S.history.saved.length));
     menu.replaceChildren(...kids);
   }
@@ -1133,9 +1263,14 @@
       section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("read_cloud_files", T.sReadCloud), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
       section(T.sAnywhere, sw("hotkey_quick", T.sHotkey), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
       section(T.sStartup, sw("autostart", T.sAutostart)),
-      section(T.sMore, h("div", { class: "srow" }, h("label", { for: "options-menu" }, h("span", null, T.sMoreRow), h("small", null, T.sMoreSub)), btn("", I.dots, T.moreBtn, () => send({ op: "options_menu" }), { id: "options-menu" })),
+      // "Check for updates" and "Report a problem", each with its own button
+      // in view (the release standard), before the Options menu's rest.
+      section(T.sHelp,
+        h("div", { class: "srow" }, h("label", { for: "check-updates" }, h("span", null, T.sUpdRow), h("small", { class: "num" }, digits((st.store ? T.sUpdSubStore : T.sUpdSub)(st.version)))),
+          btn("", I.refresh, st.store ? T.updBtnStore : T.updBtn, () => send({ op: "check_updates" }), { id: "check-updates" })),
         h("div", { class: "srow" }, h("label", { for: "report-problem" }, h("span", null, T.sReportRow), h("small", null, T.sReportSub)), btn("", I.flag, T.reportBtn, () => send({ op: "report_problem" }), { id: "report-problem" }))),
-      section(T.sAbout, h("p", { class: "num" }, digits(T.version(st.version))), h("p", { class: "muted" }, T.trust)),
+      section(T.sMore, h("div", { class: "srow" }, h("label", { for: "options-menu" }, h("span", null, T.sMoreRow), h("small", null, T.sMoreSub)), btn("", I.dots, T.moreBtn, () => send({ op: "options_menu" }), { id: "options-menu" }))),
+      section(T.sAbout, h("p", { class: "num" }, digits(T.version(st.version))), h("p", { class: "muted" }, trustText())),
     );
   }
   $("set-btn").addEventListener("click", () => (S.view === "settings" ? closeSettings() : openSettings()));
@@ -1153,6 +1288,22 @@
   list.addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) { focusList(); select(+r.dataset.i, false); openCtx(+r.dataset.i, null, "results", { left: e.clientX, top: e.clientY }); } });
   list.addEventListener("scroll", () => { if (list.scrollTop + list.clientHeight > list.scrollHeight - FIRST_PAGE_GUARD) askMore(); });
   $("recent").addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) act("open", S.recent[+r.dataset.i], "recent"); });
+  $("recent").addEventListener("keydown", (e) => {
+    const r = S.recent[S.rsel], ctrl = e.ctrlKey || e.metaKey;
+    if (!r) return;
+    const moves = { ArrowDown: 1, ArrowUp: -1, Home: -1e9, End: 1e9 };
+    if (e.key in moves) selectRecent(Math.max(0, Math.min(S.recent.length - 1, S.rsel + moves[e.key])), true);
+    else if (e.key === "Enter" && e.altKey) act("properties", r, "recent");
+    else if (e.key === "Enter") act(ctrl ? "reveal" : "open", r, "recent");
+    else if (e.key === "F2") renameDialog(r, "recent");
+    else if (e.key === "Delete" && !ctrl && !e.shiftKey && !e.altKey) recycleDialog(r, "recent");
+    else if (ctrl && (e.key === "c" || e.key === "C")) act(e.shiftKey ? "copy" : "copy_file", r, "recent");
+    else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) openCtx(S.rsel, $("rr" + S.rsel), "recent");
+    // Typing goes on in the search box.
+    else if (!ctrl && !e.altKey && e.key.length === 1) { q.focus(); return; }
+    else return;
+    e.preventDefault(); e.stopPropagation();
+  });
   // Dragging a row out (to Explorer, a mail, a chat) is the program's own
   // drag of the file, as in the classic list: a press on a row that moves a
   // few pixels with the button down asks for it (once per press). (The
@@ -1205,6 +1356,7 @@
     if (ctrl && (e.key === "+" || e.key === "=" || e.key === "-" || e.key === "0")) { zoomBy(e.key === "0" ? 0 : e.key === "-" ? -1 : 1); e.preventDefault(); return; }
     if (e.key === "Escape") {
       if (openMenus().length) closeMenus();
+      else if (S.qswitch) send({ op: "switch_cancel" });
       else if (S.view === "settings") closeSettings();
       else if (S.running) stop();
       else if (q.value) { q.value = ""; onInput(); q.focus(); }
@@ -1242,6 +1394,11 @@
     }
     if (e.key in moves && (inBox || inList)) { select(Math.max(0, Math.min(S.rows.length - 1, S.sel + moves[e.key]))); e.preventDefault(); return; }
     if (ctrl && (e.key === "Home" || e.key === "End")) { select(e.key === "Home" ? 0 : S.rows.length - 1); e.preventDefault(); return; }
+    // Alt+Enter: Windows' Properties window, as in Explorer.
+    if (e.key === "Enter" && e.altKey && (inBox || inList)) { act("properties", row); e.preventDefault(); return; }
+    // A Save/Open dialog waits (Ctrl+Alt+G): Enter moves it to the folder of
+    // the selected result (the top one from the box), as in the classic window.
+    if (e.key === "Enter" && S.qswitch && !ctrl && (inBox || inList)) { switchTo(row); e.preventDefault(); return; }
     // Enter in the box moves to the list (as the classic window, where it
     // searched); there Enter opens. Ctrl+Enter opens the folder from both.
     if (e.key === "Enter" && inBox && !ctrl) { focusList(); select(S.sel); e.preventDefault(); return; }

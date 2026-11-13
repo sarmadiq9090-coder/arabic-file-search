@@ -38,7 +38,7 @@ impl App {
         if let Some(dir) = crate::update::read_only_folder() {
             if manual {
                 log(&format!("update: skipped, cannot write to {dir}"));
-                nwg::modal_info_message(&self.window, title(), &crate::update::read_only_message(&dir));
+                self.modal_info(title(), &crate::update::read_only_message(&dir));
             }
             return;
         }
@@ -121,8 +121,7 @@ impl App {
                     Ok(()) => {
                         log(&format!("update: rolled back to {} ({failed})", env!("CARGO_PKG_VERSION")));
                         self.update_busy.set(false);
-                        nwg::modal_error_message(
-                            &self.window,
+                        self.modal_error(
                             title(),
                             &trf!("تعذر تطبيق التحديث: {failed}\nأُعيد الإصدار الحالي ({}) وهو يعمل كما هو.", "The update could not be applied: {failed}\nThe current version ({}) was put back and keeps working.", env!("CARGO_PKG_VERSION")),
                         );
@@ -196,11 +195,11 @@ impl App {
 
     /// A message box over the main window in use: the new look's when it
     /// is on screen (the classic window is hidden then), else the classic one.
-    fn modal_info(&self, title: &str, text: &str) {
+    pub(super) fn modal_info(&self, title: &str, text: &str) {
         self.with_modal_owner(|owner| nwg::modal_info_message(nwg::ControlHandle::Hwnd(owner), title, text));
     }
 
-    fn modal_error(&self, title: &str, text: &str) {
+    pub(super) fn modal_error(&self, title: &str, text: &str) {
         self.with_modal_owner(|owner| nwg::modal_error_message(nwg::ControlHandle::Hwnd(owner), title, text));
     }
 

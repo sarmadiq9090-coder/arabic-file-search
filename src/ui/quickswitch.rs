@@ -378,6 +378,17 @@ impl App {
     fn set_quick_target(&self, dialog: Option<HWND>) {
         self.quick.target.set(dialog.map_or(0, |h| h as usize));
         self.quick.menu_switch.set_enabled(dialog.is_some());
+        // The new look shows the same mode: a line with the hint, Enter
+        // moves the dialog, Esc cancels, and its result menu has the item.
+        self.webui_quick_switch(dialog.map(|_| hint()));
+    }
+
+    /// Whether a Save/Open dialog is still waiting to be moved (forgets
+    /// one that was closed meanwhile). Only the new look asks; mingw builds
+    /// have none.
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))]
+    pub(super) fn quick_switch_waiting(&self) -> bool {
+        self.quick_target().is_some()
     }
 
     /// Ctrl+Alt+G: remember the file dialog in front, if any, and show the search.
@@ -393,7 +404,8 @@ impl App {
         ));
         self.set_quick_target(dialog);
         self.show_window();
-        if dialog.is_some() {
+        // (The new look shows the hint on its own line while the mode lasts.)
+        if dialog.is_some() && !self.webui_in_use() {
             self.set_status(hint());
         }
     }
@@ -428,7 +440,7 @@ impl App {
 
     fn quick_switch_selected(&self) {
         if self.quick_target().is_none() {
-            self.set_status(&trf!("اضغط {HOTKEY_TEXT} في نافذة حفظ أو فتح أولاً.", "Press {HOTKEY_TEXT} in a Save or Open dialog first."));
+            self.set_status(&press_first());
             return;
         }
         match self.list.selected_item() {
@@ -438,24 +450,47 @@ impl App {
     }
 
     fn switch_to_row(&self, row: usize) {
-        let Some(dialog) = self.quick_target() else { return };
+        if self.quick_target().is_none() {
+            return;
+        }
         let Some((path, is_dir)) = self.state.borrow().row_entry(row).map(|e| (e.path.to_string(), e.is_dir)) else {
             return;
         };
-        let folder = result_folder(&path, is_dir);
         self.note_use(&path);
         self.remember_query();
-        // Out of the way first, so the dialog gets the focus back.
-        self.window.set_visible(false);
+        self.quick_switch_to(&path, is_dir);
+    }
+
+    /// Moves the waiting Save/Open dialog to the folder of `path` (a result
+    /// picked in either look; the folder itself when `is_dir`). The main
+    /// window in use gets out of the way first, so the dialog gets the
+    /// focus back, and comes back with a word when the move fails. True
+    /// when the dialog was moved.
+    pub(super) fn quick_switch_to(&self, path: &str, is_dir: bool) -> bool {
+        let Some(dialog) = self.quick_target() else {
+            self.set_status(&press_first());
+            return false;
+        };
+        let folder = result_folder(path, is_dir);
+        if !self.webui_step_aside() {
+            self.window.set_visible(false);
+        }
         if switch_dialog_folder(dialog, &folder) {
             self.set_quick_target(None);
             log("quick switch: moved a file dialog");
+            true
         } else {
             self.show_window();
             self.set_quick_target(None);
             self.set_status(tr!("تعذر نقل نافذة الحفظ/الفتح إلى هذا المجلد.", "Could not move the Save/Open dialog to this folder."));
+            false
         }
     }
+}
+
+/// Said when a result is picked for a dialog that is no longer waiting.
+fn press_first() -> String {
+    trf!("اضغط {HOTKEY_TEXT} في نافذة حفظ أو فتح أولاً.", "Press {HOTKEY_TEXT} in a Save or Open dialog first.")
 }
 
 #[cfg(test)]

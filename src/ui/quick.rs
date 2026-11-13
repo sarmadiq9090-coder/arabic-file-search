@@ -323,6 +323,12 @@ impl App {
             let cue = shell::wide(tr!("ابحث...", "Search..."));
             SendMessageW(edit, winapi::um::commctrl::EM_SETCUEBANNER, 1, cue.as_ptr() as LPARAM);
         }
+        // What a screen reader says for the box (its text is what is typed,
+        // and the hint above is only a cue banner, which it does not read).
+        super::accessible::set_name(
+            edit,
+            tr!("بحث سريع: اكتب اسم ملف أو برنامج أو إعداد، ثم Enter", "Quick search: type the name of a file, an app or a setting, then press Enter"),
+        );
         self.popup.hwnd.set(hwnd as usize);
         self.popup.edit.set(edit as usize);
         self.popup.post_to.store(hwnd as usize, Ordering::Relaxed);
@@ -1176,6 +1182,11 @@ impl App {
                 return;
             }
             (Target::OpenInMain(q), _) => {
+                // The new look takes the text (no search in the hidden classic window).
+                if self.webui_take_search(q, super::webui::Handover::default()) {
+                    self.hide_quick();
+                    return;
+                }
                 self.query.set_text(q);
                 self.show_window();
                 self.hide_quick();
@@ -1303,7 +1314,7 @@ impl App {
         drop(st);
         if !was && !now {
             self.popup_error(&trf!(
-                "قائمة المثبّتة ممتلئة ({} عنصراً). ألغِ تثبيت عنصر أولاً.",
+                "قائمة المثبّتة ممتلئة (الحد الأقصى: {}). ألغِ تثبيت عنصر أولاً.",
                 "The pinned list is full ({} items). Unpin one first.",
                 crate::history::MAX_PINS
             ));
@@ -1454,6 +1465,13 @@ impl App {
                 }
             }
             Suggestion::Contents | Suggestion::AllDrives | Suggestion::AllKinds => {
+                // The new look runs it as the suggestion says (inside
+                // documents, all drives, all types), not the hidden classic window.
+                let how = super::webui::Handover { content: *s == Suggestion::Contents, all_kinds: *s == Suggestion::AllKinds, all_drives: *s == Suggestion::AllDrives };
+                if self.webui_take_search(query.trim(), how) {
+                    self.hide_quick();
+                    return;
+                }
                 self.query.set_text(query.trim());
                 if *s == Suggestion::Contents {
                     self.content_chk.set_check_state(nwg::CheckBoxState::Checked);

@@ -93,16 +93,17 @@ impl App {
         self.save_settings();
     }
 
-    /// From the timer: shows the row once it is due and the moment is calm.
-    /// Classic window only: while the new look (`webui`) is the main window
-    /// this window stays hidden, so `visible` is false and nothing is asked
-    /// (the question waits, still unasked, for the classic window). Opens
-    /// from the new look are not counted yet (TODO with its rating prompt).
+    /// From the timer: shows the row once it is due and the moment is calm,
+    /// in the main window in use: the classic window's row, or the same
+    /// row in the new look's page (`webui_ask_rating`), with the same rules
+    /// (on screen, in front, no message box, not while typing, not in its
+    /// first minute). Files opened from either look count.
     pub(super) fn rating_tick(&self, tick: u32) {
         if self.rating.open.get() || !rating::is_packaged() {
             return;
         }
-        let visible = self.window.visible();
+        let main = self.webui_window().unwrap_or(&self.window);
+        let visible = main.visible();
         if visible && self.rating.shown_tick.get().is_none() {
             self.rating.shown_tick.set(Some(tick));
         }
@@ -113,21 +114,30 @@ impl App {
         if !due {
             return;
         }
-        let foreground = self.window.handle.hwnd().is_some_and(|h| unsafe { IsIconic(h) == 0 && GetForegroundWindow() == h });
+        let foreground = main.handle.hwnd().is_some_and(|h| unsafe { IsIconic(h) == 0 && GetForegroundWindow() == h });
         let moment = Moment {
             visible,
             foreground,
-            modal: !self.window.enabled(),
+            // (A message box of the program disables the window it is over.)
+            modal: !main.enabled(),
             ticks_since_typing: tick.wrapping_sub(self.rating.typed_tick.get()),
             ticks_since_shown: self.rating.shown_tick.get().map(|t| tick.wrapping_sub(t)),
         };
         if !rating::show_now(due, moment) {
             return;
         }
+        // The new look: its page shows the row (not asked while it has no page).
+        let in_page = self.webui_in_use();
+        if in_page && !self.webui_ask_rating() {
+            return;
+        }
         // Asked once: shown counts, whatever the answer (or none).
         self.state.borrow_mut().settings.rating_asked = true;
         self.save_settings();
-        log("rating: asking once for a Store rating");
+        log(&format!("rating: asking once for a Store rating{}", if in_page { " (new look)" } else { "" }));
+        if in_page {
+            return;
+        }
         let r = &self.rating;
         r.open.set(true);
         r.text.set_visible(true);
@@ -173,6 +183,16 @@ impl App {
             self.open_store_review();
         }
         true
+    }
+
+    /// An answer in the new look's row: «قيّم InstaFind في المتجر» (`rate`)
+    /// or «ليس الآن».
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))]
+    pub(super) fn rating_answer(&self, rate: bool) {
+        log(&format!("rating: answered {} (new look)", if rate { "rate" } else { "not now" }));
+        if rate {
+            self.open_store_review();
+        }
     }
 
     /// Options ▸ / tray ▸ "Rate in the Store"; false for other items.

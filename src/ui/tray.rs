@@ -365,8 +365,8 @@ impl App {
         }
         let on = !self.quick_menu.alt_space.checked();
         if on && !self.register_alt_space() {
-            nwg::modal_info_message(
-                &self.window,
+            // Over the main window in use (the new look's when on screen).
+            self.modal_info(
                 title(),
                 tr!(
                     "الاختصار Alt+Space مستخدم من برنامج آخر، فلا يمكن استخدامه هنا. يبقى Ctrl+Alt+F متاحاً.",
@@ -398,7 +398,9 @@ impl App {
             buttons: nwg::MessageButtons::YesNo,
             icons: nwg::MessageIcons::Info,
         };
-        if nwg::modal_message(&self.window, &params) == nwg::MessageChoice::Yes {
+        // Over the main window in use (the new look's when on screen), not
+        // the hidden classic window, so it comes in front and centred on it.
+        if self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) == nwg::MessageChoice::Yes {
             super::shell::open(&notices_location());
         }
     }

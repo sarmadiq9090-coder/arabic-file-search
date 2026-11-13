@@ -574,6 +574,26 @@ fn esc_runs(s: &str) -> String {
     out
 }
 
+/// A folder path for the page: left to right, each folder name in its own
+/// isolate (`<bdi>`), with [`esc_runs`] inside. In one left-to-right
+/// isolate alone, «C:\العمل\المالية» showed its Arabic folder names in
+/// reverse order: the backslash between two Arabic names takes their
+/// direction. The separators stay outside the isolates. Display only.
+fn path_html(path: &str) -> String {
+    let mut out = String::with_capacity(path.len() + 32);
+    for (i, seg) in path.split(['\\', '/']).enumerate() {
+        if i > 0 {
+            out.push('\\');
+        }
+        if !seg.is_empty() {
+            out.push_str("<bdi>");
+            out.push_str(&esc_runs(seg));
+            out.push_str("</bdi>");
+        }
+    }
+    out
+}
+
 const STYLE: &str = "body{font-family:system-ui,'Segoe UI',Tahoma,sans-serif;margin:0;background:#f6f7f9;color:#1b1f24}\
 header{background:#1e5aa8;color:#fff;padding:12px 16px;font-size:18px}\
 main{padding:12px 16px;max-width:760px;margin:auto}\
@@ -691,9 +711,9 @@ autocomplete=\"off\" autofocus><button type=\"submit\">{}</button></form>",
     let total = hits.len();
     let shown = total.min(MAX_RESULTS);
     let summary = if total > shown {
-        trf!("{total} نتيجة (تظهر أول {shown})", "{total} results (showing the first {shown})")
+        trf!("عدد النتائج: {total} (تظهر أول {shown})", "{total} results (showing the first {shown})")
     } else {
-        trf!("{total} نتيجة", "{total} results")
+        trf!("عدد النتائج: {total}", "{total} results")
     };
     let _ = write!(body, "<p class=\"i\">{}</p><ul>", esc(&summary));
     for e in hits.iter().take(shown).filter_map(|&i| index.entries.get(i as usize)) {
@@ -707,7 +727,7 @@ autocomplete=\"off\" autofocus><button type=\"submit\">{}</button></form>",
             body,
             "<li><div class=\"n\"><bdi>{name}</bdi></div><div class=\"f\"><bdi dir=\"ltr\">{}</bdi></div>\
 <div class=\"m\">{} · <bdi dir=\"ltr\">{}</bdi></div></li>",
-            esc_runs(folder_of(&e.path)),
+            path_html(folder_of(&e.path)),
             esc(&fmt_size(e)),
             esc(&fmt_date(e.mtime)),
         );
@@ -1351,8 +1371,21 @@ mod tests {
         let s = shared_with(vec![entry(r"C:\الفواتير 2026-11\فاتورة 2026-11-12.pdf", 10, false)]);
         let page = search_page("فاتورة", &s.index(), true, false);
         assert!(page.contains("فاتورة <bdi class=\"r\" dir=\"ltr\">2026-11-12</bdi>.pdf"), "{page}");
-        assert!(page.contains("الفواتير <bdi class=\"r\" dir=\"ltr\">2026-11</bdi>"), "{page}");
+        assert!(page.contains("<bdi>الفواتير <bdi class=\"r\" dir=\"ltr\">2026-11</bdi></bdi>"), "{page}");
         assert!(page.contains(&format!("/f?p={}", percent_encode(r"C:\الفواتير 2026-11\فاتورة 2026-11-12.pdf"))));
+    }
+
+    #[test]
+    fn folder_names_are_isolated_one_by_one() {
+        // Several Arabic folder names in a row keep their order (each its own isolate).
+        assert_eq!(path_html(r"C:\العمل\المالية"), "<bdi>C:</bdi>\\<bdi>العمل</bdi>\\<bdi>المالية</bdi>");
+        assert_eq!(path_html(r"C:\"), "<bdi>C:</bdi>\\");
+        assert_eq!(path_html(r"\\server\مشترك"), "\\\\<bdi>server</bdi>\\<bdi>مشترك</bdi>");
+        assert_eq!(path_html(""), "");
+        assert_eq!(path_html("<a>&"), "<bdi>&lt;a&gt;&amp;</bdi>");
+        let s = shared_with(vec![entry(r"C:\Users\سارة\العمل\المالية\تقرير.pdf", 10, false)]);
+        let page = search_page("تقرير", &s.index(), true, false);
+        assert!(page.contains("<bdi dir=\"ltr\"><bdi>C:</bdi>\\<bdi>Users</bdi>\\<bdi>سارة</bdi>\\<bdi>العمل</bdi>\\<bdi>المالية</bdi></bdi>"), "{page}");
     }
 
     #[test]
@@ -1544,7 +1577,7 @@ mod tests {
         let s = shared_with(vec![entry(r"C:\docs\تقرير.pdf", 2048, false), entry(r"C:\docs\تقارير", 0, true)]);
         let b = body(&handle(&get("/?q=%D8%AA%D9%82%D8%B1%D9%8A%D8%B1", Some(TOKEN)), LAN, &s, Instant::now()));
         assert!(b.contains("تقرير.pdf"));
-        assert!(b.contains(r"C:\docs"));
+        assert!(b.contains(r"<bdi>C:</bdi>\<bdi>docs</bdi>"));
         assert!(b.contains("2.0 ك.ب"));
         // Downloads are off: no links.
         assert!(!b.contains("/f?p="));
@@ -1861,7 +1894,7 @@ mod tests {
         ]);
         for q in ["مسئول", "مسؤول", "مسوول"] {
             let page = search_page(q, &s.index(), false, false);
-            assert!(page.contains(&trf!("{} نتيجة", "{} results", 3)), "{q}: {page}");
+            assert!(page.contains(&trf!("عدد النتائج: {}", "{} results", 3)), "{q}: {page}");
             for name in ["مسؤول المبيعات.docx", "مسئول الحسابات.xlsx", "مسوول المخزن.txt"] {
                 assert!(page.contains(name), "{q}: {name}");
             }

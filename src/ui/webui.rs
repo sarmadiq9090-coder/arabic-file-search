@@ -24,6 +24,18 @@
 
 pub(super) use imp::{WebUi, available, wanted};
 
+/// How a search handed over from the quick popup runs in the main window
+/// (its suggestions for a search that found nothing).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(super) struct Handover {
+    /// Inside documents too.
+    pub content: bool,
+    /// Every file type.
+    pub all_kinds: bool,
+    /// Every drive, not the folder chosen.
+    pub all_drives: bool,
+}
+
 #[cfg(target_env = "msvc")]
 mod imp {
     use native_windows_gui as nwg;
@@ -178,9 +190,17 @@ mod imp {
         options_pending: Cell<bool>,
         /// An Options item may have changed a setting the page shows.
         settings_stale: Cell<bool>,
+        /// The page asked to check for updates: done on the next tick.
+        updates_pending: Cell<bool>,
         /// The program is restarting from the page's own message handler:
         /// the page is left to the process exit, not dropped inside it.
         exiting: Cell<bool>,
+        /// A Save/Open dialog waits since Ctrl+Alt+G (`super::super::quickswitch`):
+        /// the hint the page shows meanwhile.
+        quick_switch: RefCell<Option<String>>,
+        /// A search the quick popup handed over (its text and how to run
+        /// it), sent once the page is there.
+        handover: RefCell<Option<(String, super::Handover)>>,
     }
 
     impl App {
@@ -327,10 +347,15 @@ mod imp {
             };
             let mut parts = Parts::default();
             let flags = if maximized { nwg::WindowFlags::MAIN_WINDOW | nwg::WindowFlags::MAXIMIZED } else { nwg::WindowFlags::MAIN_WINDOW };
+            // Centred in the work area (the monitor without the taskbar, on
+            // whichever side it is), not on the whole screen, and shrunk to
+            // fit it, as the classic window (`placement`): on 1366×768, or
+            // 1080p at 150 %, the footer was under the taskbar.
+            let (size, position) = super::super::placement::opening(w.max(0) as u32, h.max(0) as u32);
             nwg::Window::builder()
                 .title(&format!("{} (new)", title()))
-                .size((w, h))
-                .center(true)
+                .size(size)
+                .position(position)
                 .ex_flags(crate::i18n::rtl_only(WS_EX_LAYOUTRTL | WS_EX_NOINHERITLAYOUT))
                 .flags(flags)
                 .build(&mut parts.window)
@@ -351,6 +376,8 @@ mod imp {
                 .map_err(|e| e.to_string())?;
             let hwnd = parts.window.handle.hwnd().ok_or("no window handle")?;
             crate::icon::set_window_icon(hwnd);
+            // With the real frame, on the monitor it opened on.
+            super::super::placement::keep_on_screen(hwnd);
             self.webui.parts.set(parts);
 
             let weak = Rc::downgrade(self);
@@ -386,12 +413,28 @@ mod imp {
                 }),
             );
             // Shown by other means than `webui_show` (a second launch brings
-            // it to the front): the page leaves its low-memory mode.
+            // it to the front): the page leaves its low-memory mode. Every
+            // time it shows, and when it comes back from the taskbar, it is
+            // kept inside the work area of its monitor: the screen may have
+            // changed while it waited (a monitor unplugged, another
+            // resolution or scale, the taskbar moved).
             let weak = Rc::downgrade(self);
+            let minimized = Cell::new(false);
             let raw = nwg::bind_raw_event_handler(
                 &handle,
                 0x1_0041,
-                crate::crash_log::guard_raw(move |_h: HWND, msg: UINT, w: WPARAM, _l: LPARAM| {
+                crate::crash_log::guard_raw(move |h: HWND, msg: UINT, w: WPARAM, _l: LPARAM| {
+                    use winapi::um::winuser::{SIZE_MINIMIZED, SIZE_RESTORED, WM_SHOWWINDOW, WM_SIZE};
+                    if msg == WM_SHOWWINDOW && w != 0 {
+                        super::super::placement::keep_on_screen(h);
+                    }
+                    if msg == WM_SIZE {
+                        if w == SIZE_MINIMIZED {
+                            minimized.set(true);
+                        } else if w == SIZE_RESTORED && minimized.replace(false) {
+                            super::super::placement::keep_on_screen(h);
+                        }
+                    }
                     if msg == WM_ACTIVATE && (w & 0xFFFF) as u16 != WA_INACTIVE {
                         let app = weak.upgrade()?;
                         // (Not while the page is being created or closed.)
@@ -727,10 +770,13 @@ mod imp {
             let window = &self.webui.parts.window;
             if let Some(h) = window.handle.hwnd() {
                 surface::dwm_style(h, surface::apps_dark(), false, false);
+                // Inside the work area before it shows (see the raw handler).
+                super::super::placement::keep_on_screen(h);
                 window.set_visible(true);
                 unsafe {
                     if IsIconic(h) != 0 {
                         ShowWindow(h, SW_RESTORE);
+                        super::super::placement::keep_on_screen(h);
                     }
                     SetForegroundWindow(h);
                     winapi::um::winuser::UpdateWindow(h);
@@ -775,19 +821,63 @@ mod imp {
             true
         }
 
-        fn webui_hide(&self) {
+        /// The window out of the way (to the tray), its page in its
+        /// low-memory mode.
+        fn webui_put_away(&self) {
             self.webui.parts.window.set_visible(false);
             if let Some(host) = &*self.webui.host.borrow() {
                 host.set_idle(true);
             }
-            if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
-                self.tray.show(
-                    tr!("البرنامج ما زال يعمل هنا. انقر الأيقونة أو شغّل البرنامج مرة أخرى لإظهاره فوراً.", "The program is still running here. Click the icon or start the program again to show it at once."),
-                    Some(title()),
-                    None,
-                    None,
-                );
+        }
+
+        /// Ctrl+Alt+G's move: the new main window, if it is the one in use,
+        /// gets out of the way of the Save/Open dialog (no balloon). False
+        /// when the new look is not in use.
+        pub(in super::super) fn webui_step_aside(&self) -> bool {
+            if !self.webui.active.get() {
+                return false;
             }
+            self.webui_put_away();
+            true
+        }
+
+        /// The Store rating question in the page (`super::super::rating`):
+        /// false when there is no page on screen to show it.
+        pub(in super::super) fn webui_ask_rating(&self) -> bool {
+            if !self.webui.ready.get() || !self.webui_visible() {
+                return false;
+            }
+            self.webui_send(&Outbound::Rating);
+            true
+        }
+
+        /// A Save/Open dialog started waiting for a result (`Some`, with the
+        /// hint), or stopped waiting: the page says so and Enter, Esc and its
+        /// result menu follow (`Outbound::QuickSwitch`).
+        pub(in super::super) fn webui_quick_switch(&self, hint: Option<&str>) {
+            let hint = hint.map(str::to_string);
+            if *self.webui.quick_switch.borrow() == hint {
+                return;
+            }
+            self.webui.quick_switch.replace(hint);
+            self.webui_send_quick_switch();
+        }
+
+        fn webui_send_quick_switch(&self) {
+            let text = self.webui.quick_switch.borrow().clone();
+            self.webui_send(&Outbound::QuickSwitch { on: text.is_some(), text: text.unwrap_or_default() });
+        }
+
+        /// Hides the window by the clock (Esc, its close button, "Hide next
+        /// to the clock"), as the classic window: what was changed up to
+        /// here (size, sort, type, settings) is saved first, since the
+        /// program may now run for days and end with Windows itself; the
+        /// first time, the balloon says how to open it again and how to exit.
+        fn webui_hide(&self) {
+            // (Measured while still on screen.)
+            self.save_settings();
+            self.webui_put_away();
+            self.hidden_balloon();
         }
 
         /// Called when the program closes: the page goes before its window.
@@ -822,8 +912,35 @@ mod imp {
             self.webui_send(&Outbound::Notice { text: text.into(), warn: true });
         }
 
+        /// The quick popup's search continues in the new window, run as
+        /// `how` says (inside documents, all types, all drives), never in the
+        /// hidden classic window. Shows the window. False when the new look
+        /// is not in use.
+        pub(in super::super) fn webui_take_search(&self, q: &str, how: super::Handover) -> bool {
+            if !self.webui.active.get() {
+                return false;
+            }
+            // (The classic box keeps the text, as before; the plain hand-over
+            // below then has nothing more to send.)
+            self.query.set_text(q);
+            self.webui.handed.replace(q.to_string());
+            self.webui.handover.replace(Some((q.to_string(), how)));
+            self.webui_show();
+            true
+        }
+
         /// The quick popup's search, when it asked for the full window.
         fn webui_hand_over_query(&self) {
+            if !self.webui.ready.get() {
+                return;
+            }
+            if let Some((q, how)) = self.webui.handover.take() {
+                if how.all_drives {
+                    self.webui_set_scope(String::new(), false);
+                }
+                self.webui_send(&Outbound::Query { q, content: how.content, all_kinds: how.all_kinds });
+                return;
+            }
             let text = self.query.text();
             if *self.webui.handed.borrow() == text {
                 return;
@@ -831,7 +948,7 @@ mod imp {
             if self.webui.ready.get() {
                 self.webui.handed.replace(text.clone());
                 if !text.trim().is_empty() {
-                    self.webui_send(&Outbound::Query { q: text });
+                    self.webui_send(&Outbound::Query { q: text, content: false, all_kinds: false });
                 }
             }
         }
@@ -876,6 +993,7 @@ mod imp {
                     floating: s.floating_mode != FloatingMode::Off,
                     tray_icon: s.tray_icon,
                     version: env!("CARGO_PKG_VERSION"),
+                    store: crate::store::is_packaged(),
                 })
             };
             self.webui_send(&msg);
@@ -940,6 +1058,7 @@ mod imp {
                             version: env!("CARGO_PKG_VERSION"),
                             // Once: a page loaded again does not say it again.
                             switched: self.webui.tell_switch.replace(false),
+                            store: crate::store::is_packaged(),
                         }
                     };
                     self.webui_send(&hello);
@@ -949,19 +1068,26 @@ mod imp {
                     self.webui_status(true);
                     self.webui_send_recent();
                     self.webui_send_history();
+                    if self.webui.quick_switch.borrow().is_some() {
+                        self.webui_send_quick_switch();
+                    }
                     // A page loaded again gets back what it searched (not an
                     // older text of the classic box); a first page gets the
                     // classic box's text (the quick popup's search).
                     let again = self.webui.page_query.borrow().clone();
-                    if again.trim().is_empty() {
+                    if self.webui.handover.borrow().is_some() {
+                        self.webui_hand_over_query();
+                    } else if again.trim().is_empty() {
                         self.webui.handed.replace(String::new());
                         self.webui_hand_over_query();
                     } else {
                         self.webui.handed.replace(self.query.text());
-                        self.webui_send(&Outbound::Query { q: again });
+                        self.webui_send(&Outbound::Query { q: again, content: false, all_kinds: false });
                     }
                 }
                 Request::Search { seq, q, kind, size, date, content, sort, desc } => {
+                    // (The rating question waits while the user types.)
+                    self.note_typing();
                     self.webui.page_query.replace(q.clone());
                     {
                         let s = &mut self.state.borrow_mut().settings;
@@ -1039,6 +1165,10 @@ mod imp {
                         self.webui_note_use(list, &path);
                         if !shell::open(&path) {
                             self.webui_warn(trf!("تعذر فتح الملف: {}", "Could not open the file: {}", path));
+                        } else if !self.webui_is_dir(list, seq, ver, id, &path) {
+                            // A file opened: counts toward the Store rating
+                            // question, as in the classic window (folders don't).
+                            self.count_file_open();
                         }
                     }
                 }
@@ -1050,8 +1180,12 @@ mod imp {
                 }
                 Request::Copy { list, seq, ver, id } => {
                     if let Some(path) = self.webui_path(list, seq, ver, id) {
-                        nwg::Clipboard::set_data_text(&self.webui.parts.window, &path);
-                        self.webui_notice(tr!("تم نسخ المسار.", "Path copied."));
+                        // Another program may hold the clipboard: then it says so.
+                        if shell::copy_text(&self.webui.parts.window, &path) {
+                            self.webui_notice(tr!("تم نسخ المسار.", "Path copied."));
+                        } else {
+                            self.webui_warn(shell::copy_failed_text());
+                        }
                     }
                 }
                 Request::CopyFile { list, seq, ver, id } => {
@@ -1076,8 +1210,11 @@ mod imp {
                     match text {
                         // Not borrowed while the clipboard notifies its previous owner.
                         Some((n, text)) => {
-                            nwg::Clipboard::set_data_text(&self.webui.parts.window, &text);
-                            self.webui_notice(trf!("تم نسخ {} مسار.", "Copied {} paths.", crate::indexing_status::group_digits(n)));
+                            if shell::copy_text(&self.webui.parts.window, &text) {
+                                self.webui_notice(trf!("تم نسخ المسارات. عددها: {}.", "Copied {} paths.", crate::indexing_status::group_digits(n)));
+                            } else {
+                                self.webui_warn(shell::copy_failed_text());
+                            }
                         }
                         None => self.webui_notice(tr!("لا توجد نتائج لنسخها.", "There are no results to copy.")),
                     }
@@ -1086,10 +1223,7 @@ mod imp {
                 Request::Recycle { list, seq, ver, id } => self.webui_recycle(list, seq, ver, id),
                 Request::Scope { list, seq, ver, id } => {
                     let Some(path) = self.webui_path(list, seq, ver, id) else { return };
-                    let is_dir = match list {
-                        List::Results => self.webui.lists.borrow().shown_at(seq, ver).is_ok_and(|s| s.is_dir(id)),
-                        List::Recent => std::path::Path::new(&path).is_dir(),
-                    };
+                    let is_dir = self.webui_is_dir(list, seq, ver, id, &path);
                     let scope = bridge::scope_for(&path, is_dir);
                     if !scope.is_empty() {
                         self.webui_set_scope(scope, true);
@@ -1216,6 +1350,27 @@ mod imp {
                     }
                     self.webui_send_history();
                 }
+                Request::Rating { rate } => self.rating_answer(rate),
+                // On the next tick, not inside WebView2's handler (it may ask
+                // with a message box).
+                Request::CheckUpdates {} => self.webui.updates_pending.set(true),
+                Request::OpenWith { list, seq, ver, id } => self.webui_verb(list, seq, ver, id, "openas"),
+                Request::Properties { list, seq, ver, id } => self.webui_verb(list, seq, ver, id, "properties"),
+                Request::SwitchTo { list, seq, ver, id } => {
+                    let Some(path) = self.webui_path(list, seq, ver, id) else { return };
+                    let is_dir = self.webui_is_dir(list, seq, ver, id, &path);
+                    if self.quick_switch_waiting() {
+                        self.webui_note_use(list, &path);
+                    }
+                    self.quick_switch_to(&path, is_dir);
+                }
+                Request::SwitchCancel {} => {
+                    // (Already forgotten: the page is told it is over.)
+                    if !self.quick_switch_cancel() {
+                        self.webui.quick_switch.replace(None);
+                        self.webui_send_quick_switch();
+                    }
+                }
                 Request::Drag { list, seq, ver, id } => {
                     // Started right after this handler returns (the drag
                     // runs its own message loop, not inside WebView2's).
@@ -1233,6 +1388,28 @@ mod imp {
         fn webui_path(&self, list: List, seq: u64, ver: u64, id: u32) -> Option<String> {
             let found = self.webui.lists.borrow().path(list, seq, ver, id).map(str::to_string);
             found.map_err(|miss| self.webui_missed(miss)).ok()
+        }
+
+        /// Windows' "Open with" ("openas") or Properties ("properties") for
+        /// row `id`, over the new window, as the classic result menu does.
+        fn webui_verb(&self, list: List, seq: u64, ver: u64, id: u32, verb: &str) {
+            let Some(path) = self.webui_path(list, seq, ver, id) else { return };
+            // (Whatever Windows shows may run a message loop: the timer
+            // leaves the page alone meanwhile.)
+            self.webui.in_page_call.set(true);
+            let ok = shell::invoke_verb(self.webui.parts.window.handle.hwnd(), &path, verb);
+            self.webui.in_page_call.set(false);
+            if !ok {
+                self.webui_warn(trf!("تعذّر تنفيذ ذلك على: {}", "Windows could not do that for: {}", super::super::format::ltr_path(&path)));
+            }
+        }
+
+        /// Whether row `id` (whose file is `path`) is a folder.
+        fn webui_is_dir(&self, list: List, seq: u64, ver: u64, id: u32, path: &str) -> bool {
+            match list {
+                List::Results => self.webui.lists.borrow().shown_at(seq, ver).is_ok_and(|s| s.is_dir(id)),
+                List::Recent => std::path::Path::new(path).is_dir(),
+            }
         }
 
         fn webui_missed(&self, miss: Miss) {
@@ -1256,18 +1433,26 @@ mod imp {
             self.webui_send_history();
         }
 
-        /// Forgets the recent searches, or deletes the saved ones.
+        /// "Clear history and recent files" (`recent`), as the classic
+        /// History menu: the recent searches, the opened files (the page's
+        /// «ملفات فتحتها مؤخراً» and the quick search's), the quick-search
+        /// launches and the web searches they hold. Or deletes the saved
+        /// searches.
         fn webui_clear_history(&self, recent: bool) {
             {
                 let mut st = self.state.borrow_mut();
                 if recent {
-                    st.history.recent.clear();
+                    st.history.clear_activity();
                 } else {
                     st.history.saved.clear();
                 }
                 st.history.save();
             }
             self.webui_send_history();
+            if recent {
+                self.webui_send_recent();
+                self.webui_notice(tr!("مُسح السجل والملفات الأخيرة.", "History and recent files cleared."));
+            }
         }
 
         // ------------------------------------------------------------ files
@@ -1727,6 +1912,11 @@ mod imp {
             if self.webui.options_pending.replace(false) && self.webui_visible() {
                 self.webui_options_menu();
             }
+            if self.webui.updates_pending.replace(false) && self.webui.active.get() {
+                // As the Options menu's item: the Store version is told where
+                // its updates come from and offered its Store page.
+                self.check_for_update(true);
+            }
             if self.webui.active.get() && !self.webui.switching.get() {
                 if let Some(browser_gone) = self.webui.failed.take() {
                     self.webui_failed(browser_gone, "a WebView2 process failed");
@@ -1747,6 +1937,10 @@ mod imp {
                 return;
             }
             self.webui_status(false);
+            // A dialog closed while it waited: the page leaves the mode.
+            if self.webui.quick_switch.borrow().is_some() {
+                self.quick_switch_waiting();
+            }
             if self.webui.running.get() || !self.webui.parts.window.visible() {
                 return;
             }
@@ -1915,6 +2109,20 @@ mod imp {
         pub(in super::super) fn webui_hide_main(&self) -> bool {
             false
         }
+
+        pub(in super::super) fn webui_step_aside(&self) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_take_search(&self, _q: &str, _how: super::Handover) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_ask_rating(&self) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_quick_switch(&self, _hint: Option<&str>) {}
 
         pub(in super::super) fn webui_status_text(&self, _text: &str) {}
 

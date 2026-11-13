@@ -86,6 +86,8 @@ function fakeProgram(cfg) {
     [`${U}\\OneDrive\\HR\\Attendance\\2026`, "Attendance report - March.xlsx", 92 * 1024, 200 * 86400],
     [`${U}\\Music\\Recordings`, "Report voice memo.m4a", 8.7 * 1048576, 240 * 86400],
     ["D:\\Archive\\2024", "Old reports", 0, 400 * 86400, true],
+    // An Arabic name in the English interface (long: the preview wraps it).
+    [`${U}\\Documents\\الفواتير`, "فاتورة الكهرباء الشهرية لشهر تشرين الثاني مع ملاحظات المحاسب والمدير.pdf", 120 * 1024, 40 * 86400],
   ]).map(([dir, name, size, age, folder]) => ({ dir, name, size: Math.round(size), mtime: now - age, folder: !!folder, ext: folder ? "" : name.split(".").pop().toLowerCase() }));
   // Synthetic document texts for the search inside documents.
   const docs = ar ? [
@@ -109,10 +111,11 @@ function fakeProgram(cfg) {
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id", "name"],
     save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], options_menu: [], report_problem: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], thumbs: ["seq", "ver", "ids"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
+    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], rating: ["rate"], check_updates: [], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
-  const ROW_OPS = ["thumbs", "more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope", "drag", "folder_sizes"];
+  const ROW_OPS = ["thumbs", "more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope", "drag", "folder_sizes", "switch_to", "open_with", "properties"];
   let lastVer = 0, recentVer = 0;
   const nextVer = () => ++lastVer;
   const send = (m) => setTimeout(() => window.__instafind.recv(m), 0);
@@ -129,14 +132,16 @@ function fakeProgram(cfg) {
     return r;
   };
   const status = cfg.indexing
-    ? { type: "status", state: "names", files: 36000, text: ar ? "جارٍ الفهرسة… 36,000 ملف حتى الآن" : "Indexing… 36,000 files so far" }
+    ? { type: "status", state: "names", files: 36000, text: ar ? "جارٍ الفهرسة… عدد الملفات حتى الآن: 36,000" : "Indexing… 36,000 files so far" }
     : { type: "status", state: "ready", files: 1204331, text: null };
-  const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1" };
+  const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1", store: !!cfg.store };
   const history = {
     type: "history",
     recent: ar ? ["تقرير المبيعات", "عقد الإيجار", "فاتورة الكهرباء .pdf", "صور العيد"] : ["sales report", "lease agreement", "electricity bill .pdf", "holiday photos"],
     saved: [{ id: 0, name: ar ? "عقود العمل" : "Work contracts", content: true, scoped: true }, { id: 1, name: ar ? "تقارير هذا الشهر" : "Reports this month", content: false, scoped: false }],
+    clearable: true,
   };
+  if (cfg.noSearches) history.recent = [];
   let shown = { seq: 0, ver: 0, list: [], term: "" };
   const SORT = { name: (a, b) => a.name.localeCompare(b.name), path: (a, b) => (a.dir + a.name).localeCompare(b.dir + b.name), size: (a, b) => a.size - b.size, date: (a, b) => a.mtime - b.mtime };
   const order = (list, sort, desc) => { if (sort === "best") return list; const s = [...list].sort(SORT[sort]); return desc ? s.reverse() : s; };
@@ -159,7 +164,7 @@ function fakeProgram(cfg) {
       }
     }
     if (m.op === "hello") {
-      send({ type: "hello", kinds: KINDS, sizes: SIZES, dates: DATES, kind: 0, sort: "best", desc: false, digits: false, version: "0.9.1", switched: !!cfg.switched });
+      send({ type: "hello", kinds: KINDS, sizes: SIZES, dates: DATES, kind: 0, sort: "best", desc: false, digits: false, version: "0.9.1", switched: !!cfg.switched, store: !!cfg.store });
       send({ type: "scope", path: cfg.scope || "", search: false });
       send(settings); send(status); send(history);
       recentVer = nextVer();
@@ -173,12 +178,12 @@ function fakeProgram(cfg) {
       send(results(m, { content: true, running: true, total: 0, rows: [] }));
       setTimeout(() => {
         shown.list = order(found, m.sort, m.desc);
-        send({ type: "progress", seq: m.seq, total: found.length, done: false, text: ar ? "جارٍ البحث داخل المستندات… تم فحص 1,840 من 4,210 — وجدت 3" : "Searching inside documents… checked 1,840 of 4,210 — found 3" });
+        send({ type: "progress", seq: m.seq, total: found.length, done: false, text: ar ? "جارٍ البحث داخل المستندات… تم فحص 1,840 من 4,210 — عدد النتائج: 3" : "Searching inside documents… checked 1,840 of 4,210 — found 3" });
         setTimeout(() => {
           // Put in order at the end: a new version, as in the program.
           shown.ver = nextVer();
           send(results(m, { content: true, running: cfg.keepRunning, suggestions: found.length ? [] : [{ kind: "web", label: ar ? "ابحث في الويب" : "Search the web", q: "" }] }));
-          if (!cfg.keepRunning) send({ type: "progress", seq: m.seq, total: found.length, done: true, text: ar ? "انتهى البحث داخل 4,210 مستند: وجدت 3 ملف. (من الفهرس: 4,102)" : "Searched 4,210 documents: found 3 files. (4,102 from the index)" });
+          if (!cfg.keepRunning) send({ type: "progress", seq: m.seq, total: found.length, done: true, text: ar ? "انتهى البحث. المستندات المفحوصة: 4,210، عدد النتائج: 3. (من الفهرس: 4,102)" : "Searched 4,210 documents: found 3 files. (4,102 from the index)" });
         }, 40);
       }, 40);
     } else if (m.op === "search") {
@@ -231,8 +236,13 @@ function fakeProgram(cfg) {
       settings[m.key] = m.on; send({ ...settings });
     } else if (m.op === "lang") {
       settings.next_lang = m.lang; send({ ...settings });
+    } else if (m.op === "switch_to" || m.op === "switch_cancel") {
+      // The dialog was moved (or forgotten): the mode is over.
+      send({ type: "quick_switch", on: false, text: "" });
+      if (m.op === "switch_cancel") send({ type: "notice", text: ar ? "أُلغي نقل نافذة الحفظ/الفتح." : "Save/Open dialog switch cancelled.", warn: false });
     } else if (m.op === "save_search" || m.op === "clear_recent" || m.op === "clear_saved") {
-      if (m.op === "clear_recent") history.recent = [];
+      // As History::clear_activity: the opened files go too.
+      if (m.op === "clear_recent") { history.recent = []; history.clearable = false; recentVer = nextVer(); send({ type: "recent", ver: recentVer, rows: [] }); }
       send({ ...history });
     }
   } } });
@@ -240,19 +250,24 @@ function fakeProgram(cfg) {
   window.__rerun = () => { shown.list = [...shown.list].reverse(); shown.ver = nextVer(); send(results({ seq: shown.seq, kind: 0 }, {})); };
 }
 
+// The program's word that a Save/Open dialog waits (Ctrl+Alt+G).
+const QS_ON = {
+  ar: "window.__instafind.recv({ type: 'quick_switch', on: true, text: 'Enter: نقل النافذة إلى مجلد النتيجة · Esc: إلغاء' })",
+  en: "window.__instafind.recv({ type: 'quick_switch', on: true, text: 'Enter: move the dialog to the result\\'s folder · Esc: cancel' })",
+};
 // name, lang, theme, steps (run in the page with Playwright), fake program options
 const SHOTS = [
   ["main-ar-light", "ar", "light", [["type", "تقرير"], ["key", "ArrowDown"]]],
   ["main-en-dark", "en", "dark", [["type", "report"], ["key", "ArrowDown"]]],
   ["empty-ar-light", "ar", "light", []],
   ["empty-en-dark", "en", "dark", []],
-  ["nores-ar-dark", "ar", "dark", [["chip", "kind", 1], ["type", "عقد الايجار 2024"]]],
+  ["nores-ar-dark", "ar", "dark", [["chip", "kind", 1], ["type", "عقد الايجار 2024"]], { expect: { countsAr: true } }],
   ["nores-en-light", "en", "light", [["type", "lease 2024"]]],
-  ["indexing-ar-light", "ar", "light", [["type", "تقرير"]], { indexing: true }],
-  ["content-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 250], ["key", "ArrowDown"], ["key", "ArrowUp"], ["wait", 250]], { expect: { content: true, rows: 3 } }],
+  ["indexing-ar-light", "ar", "light", [["type", "تقرير"]], { indexing: true, expect: { countsAr: true } }],
+  ["content-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 250], ["key", "ArrowDown"], ["key", "ArrowUp"], ["wait", 250]], { expect: { content: true, rows: 3, countsAr: true } }],
   ["content-en-dark", "en", "dark", [["click", "#chip-content"], ["type", "lease agreement"], ["key", "Enter"], ["wait", 250], ["wait", 250]], { expect: { content: true, rows: 3 } }],
   ["content-running-ar-dark", "ar", "dark", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 250]], { keepRunning: true, expect: { stop: true } }],
-  ["matches-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 300], ["key", "F4"], ["wait", 150]], { expect: { dialog: true, dlgName: true } }],
+  ["matches-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 300], ["key", "F4"], ["wait", 150]], { expect: { dialog: true, dlgName: true, countsAr: true } }],
   // Enter in the box moves to the list (as the classic window); Enter there opens.
   ["enter-en-light", "en", "light", [["type", "report"], ["key", "Enter"]], { expect: { focus: "list", opens: 0 } }],
   ["enter-twice-en-light", "en", "light", [["type", "report"], ["key", "Enter"], ["key", "Enter"]], { expect: { opens: 1 } }],
@@ -274,20 +289,26 @@ const SHOTS = [
   // One-click actions: Export and Update index in the toolbar, labelled History/Settings, the
   // right-click menu's folder sizes and replace text, and the actions under the list in a narrow window.
   ["tools-en-light", "en", "light", [["type", "report"], ["click", "#tool-export"]], { expect: { lastSent: "export", labels: true } }],
-  ["ctx-sizes-ar-light", "ar", "light", [["type", "تقرير"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:nth-child(7)"], ["wait", 50]], { expect: { lastSent: "folder_sizes" } }],
+  ["ctx-sizes-ar-light", "ar", "light", [["type", "تقرير"], ["rclick", "#r1"], ["click", "#ctx [data-op=folder_sizes]"], ["wait", 50]], { expect: { lastSent: "folder_sizes" } }],
   ["narrow-ar-light", "ar", "light", [["type", "تقرير"], ["key", "ArrowDown"]], { width: 820, expect: { actbar: 4, labels: false } }],
   ["actbar-no-preview-en-light", "en", "light", [["type", "report"], ["click", "#view-preview"], ["click", "#actbar .btn:nth-child(3)"], ["wait", 50]], { expect: { actbar: 4, lastSent: "copy" } }],
   // The classic window's terms, and the date with its time in the preview.
-  ["terms-ar-light", "ar", "light", [["type", "تقرير"]], { expect: { termsAr: true, dateTime: true } }],
+  ["terms-ar-light", "ar", "light", [["type", "تقرير"]], { expect: { countsAr: true, termsAr: true, dateTime: true } }],
   // Zoom with Ctrl and + / 0; off switches readable; paths 13.5 px.
   ["zoom-en-light", "en", "light", [["type", "report"], ["key", "Control+="], ["key", "Control+="]], { expect: { zoom: "1.25", pathPx: true } }],
   ["zoom-reset-en-light", "en", "light", [["key", "Control+="], ["key", "Control+0"]], { expect: { zoom: "1" } }],
   // A document found by its text: its matching lines start above the fold; wide screens.
   ["content-lines-en-light", "en", "light", [["click", "#chip-content"], ["type", "lease agreement"], ["key", "Enter"], ["wait", 300]], { expect: { linesTop: true } }],
   ["wide-en-light", "en", "light", [["type", "report"]], { width: 1920, height: 1080, expect: { rows: 11 } }],
-  // Column widths: the edge before the Date header drags (kept in the page's storage).
-  ["col-width-en-light", "en", "light", [["type", "report"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "98px" } }],
-  ["col-width-ar-light", "ar", "light", [["type", "تقرير"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "158px" } }],
+  // Column widths: the edge at the end of every header drags (kept in the page's storage):
+  // to the right grows a column in English, to the left in Arabic.
+  ["col-width-en-light", "en", "light", [["type", "report"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "158px", grips: 3 } }],
+  ["col-width-ar-light", "ar", "light", [["type", "تقرير"], ["drag", ".cwrap:last-child .grip"]], { expect: { dateW: "98px", grips: 3 } }],
+  // The name and path column too: given a width, the rows keep it (the rest of the row stays empty); a double click gives it back.
+  ["col-name-en-light", "en", "light", [["type", "report"], ["drag", '.grip[data-col="name"]']], { expect: { nameSized: true, nameCellMatches: true } }],
+  ["col-name-reset-ar-light", "ar", "light", [["type", "تقرير"], ["drag", '.grip[data-col="name"]'], ["dblclick", '.grip[data-col="name"]']], { expect: { nameSized: false } }],
+  // From the keyboard: Tab to an edge, then the arrow keys.
+  ["col-keys-en-dark", "en", "dark", [["type", "report"], ["focus", '.grip[data-col="size"]'], ["key", "ArrowRight"], ["key", "ArrowRight"]], { expect: { sizeW: "128px" } }],
   // The thumbnail view (Ctrl+T): tiles, pictures by one-time key (never a path), keys in reading order.
   ["grid-ar-light", "ar", "light", [["type", "تقرير"], ["key", "Control+t"], ["wait", 500]], { expect: { grid: true, pics: true } }],
   ["grid-en-dark", "en", "dark", [["type", "report"], ["click", "#view-grid"], ["wait", 500]], { expect: { grid: true, pics: true } }],
@@ -306,7 +327,7 @@ const SHOTS = [
   ["rename-done-en-light", "en", "light", [["type", "report"], ["key", "F2"], ["fill", "#rename", "Sales report 2026 (final).xlsx"], ["key", "Enter"], ["wait", 50], ["key", "ArrowDown"], ["key", "Delete"], ["wait", 50], ["click", "#r1"], ["key", "Delete"], ["wait", 50], ["click", "#recycle-ok"], ["wait", 50]], { expect: { renamed: "Sales report 2026 (final).xlsx", gone: 1, recycles: 1, dialog: false } }],
   ["delete-in-box-en-dark", "en", "dark", [["type", "report"], ["key", "ArrowDown"], ["key", "Delete"], ["wait", 50]], { expect: { dialog: false, recycles: 0, q: "report" } }],
   ["recycle-ar-light", "ar", "light", [["type", "تقرير"], ["click", "#r1"], ["key", "Delete"], ["wait", 50]], { expect: { dialog: true, recycles: 0, focus: "recycle-ok" } }],
-  ["recycle-cancel-ar-dark", "ar", "dark", [["type", "تقرير"], ["rclick", "#r2"], ["click", "#ctx [role=menuitem]:last-child"], ["wait", 50], ["key", "Escape"], ["wait", 50]], { expect: { dialog: false, recycles: 0, gone: 0, focus: "list" } }],
+  ["recycle-cancel-ar-dark", "ar", "dark", [["type", "تقرير"], ["rclick", "#r2"], ["click", "#ctx [data-op=recycle]"], ["wait", 50], ["key", "Escape"], ["wait", 50]], { expect: { dialog: false, recycles: 0, gone: 0, focus: "list" } }],
   // Typing with the focus on the list goes on in the box.
   ["list-typing-en-light", "en", "light", [["type", "report"], ["click", "#r1"], ["key", "s"], ["wait", 200]], { expect: { q: "reports", focus: "q" } }],
   // The rename dialog names the list it was opened on: the list listed again
@@ -334,6 +355,43 @@ const SHOTS = [
   // as typed, in the list, its folder, the preview and the status bar's
   // file count, a match inside the phone marked.
   ["digit-runs-ar-light", "ar", "light", [["type", "123-45"]], { expect: { rows: 1, marks: 1, runs: 7 } }],
+  // Ctrl+Alt+G in a Save/Open dialog: a line says what Enter does; Enter moves the dialog to the
+  // selected result's folder (not open it), Esc cancels; the result menu has the move first.
+  ["qswitch-ar-light", "ar", "light", [["eval", QS_ON.ar], ["type", "تقرير"], ["key", "ArrowDown"]], { expect: { qswitch: true } }],
+  ["qswitch-enter-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["key", "Enter"], ["wait", 50]], { expect: { lastSent: "switch_to", opens: 0, qswitch: false } }],
+  ["qswitch-esc-en-dark", "en", "dark", [["eval", QS_ON.en], ["type", "report"], ["key", "Escape"], ["wait", 50]], { expect: { lastSent: "switch_cancel", qswitch: false, q: "report" } }],
+  ["qswitch-ctx-ar-dark", "ar", "dark", [["eval", QS_ON.ar], ["type", "تقرير"], ["rclick", "#r1"]], { expect: { menu: true, ctxFirst: "فتح مجلدها في نافذة الحفظ/الفتح" } }],
+  // The quick popup's suggestions carry over: inside documents runs a document search, all types clears the type.
+  ["handover-content-ar-light", "ar", "light", [["eval", "window.__instafind.recv({ type: 'query', q: 'عقد الإيجار', content: true, all_kinds: false })"], ["wait", 300]], { expect: { content: true, rows: 3, inside: true } }],
+  ["handover-kinds-en-light", "en", "light", [["chip", "kind", 1], ["eval", "window.__instafind.recv({ type: 'query', q: 'report', content: false, all_kinds: true })"], ["wait", 150]], { expect: { chipsOn: 0, inside: false } }],
+  // Windows' "Open with" and Properties in the result menu (Properties last, as in Explorer; Alt+Enter too).
+  ["ctx-open-with-ar-light", "ar", "light", [["type", "تقرير"], ["rclick", "#r1"], ["click", "#ctx [data-op=open_with]"], ["wait", 50]], { expect: { lastSent: "open_with" } }],
+  ["ctx-properties-en-dark", "en", "dark", [["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:last-child"], ["wait", 10], ["wait", 50]], { expect: { lastSent: "properties" } }],
+  ["alt-enter-en-light", "en", "light", [["type", "report"], ["key", "Alt+Enter"], ["wait", 50]], { expect: { lastSent: "properties", opens: 0 } }],
+  // "Clear history and recent files" (the classic label): on with opened files and no searches; it clears the files too.
+  ["history-clear-ar-light", "ar", "light", [["click", "#hist-btn"]], { noSearches: true, expect: { menu: true, clearItem: "مسح السجل والملفات الأخيرة|on" } }],
+  ["history-cleared-en-light", "en", "light", [["click", "#hist-btn"], ["click", "#hist-clear"], ["wait", 50], ["click", "#hist-btn"]], { expect: { lastSent: "clear_recent", recentRows: 0, clearItem: "Clear history and recent files|off" } }],
+  // The Store build's rating question: a row above the status line that keeps the focus in the box; one answer.
+  ["rating-ar-light", "ar", "light", [["type", "تقرير"], ["eval", "window.__instafind.recv({ type: 'rating' })"], ["wait", 50]], { expect: { rating: true, focus: "q" } }],
+  ["rating-later-en-dark", "en", "dark", [["type", "report"], ["eval", "window.__instafind.recv({ type: 'rating' })"], ["click", "#rate-later"], ["wait", 50]], { expect: { rating: false, lastSent: "rating" } }],
+  // "Check for updates" beside "Report a problem" (both mandatory); the Store version says the Store, in its privacy line too.
+  ["updates-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#check-updates"], ["wait", 50]], { expect: { settings: true, lastSent: "check_updates", updBtn: "التحقق من التحديثات…" } }],
+  ["updates-store-en-dark", "en", "dark", [["key", "Control+,"]], { store: true, expect: { settings: true, updBtn: "Updates from Microsoft Store…", trustStore: true } }],
+  ["trust-store-ar-light", "ar", "light", [], { store: true, expect: { trustStore: true } }],
+  // Accessibility: the recent files from the keyboard (Tab, arrows, Enter), named menus, the box's name
+  // following its hint, and every focusable control with a name.
+  ["recent-keys-ar-light", "ar", "light", [["focus", "#recent"], ["key", "ArrowDown"], ["key", "Enter"], ["wait", 50]], { expect: { lastSent: "open", recentActive: "rr1", opens: 1 } }],
+  ["recent-menu-en-dark", "en", "dark", [["focus", "#recent"], ["key", "Shift+F10"]], { expect: { menu: true, a11y: true } }],
+  ["a11y-content-en-light", "en", "light", [["click", "#chip-content"]], { expect: { qName: "Search inside documents, then press Enter…", a11y: true } }],
+  ["a11y-results-ar-light", "ar", "light", [["type", "تقرير"], ["click", "#chip-sort"]], { expect: { menu: true, a11y: true, rowsA11y: true } }],
+  ["a11y-rows-en-dark", "en", "dark", [["type", "report"], ["key", "ArrowDown"]], { ariaOptions: 11, expect: { rowsA11y: true } }],
+  ["a11y-grid-ar-light", "ar", "light", [["type", "تقرير"], ["key", "Control+t"], ["wait", 200]], { expect: { rowsA11y: true } }],
+  ["a11y-docs-en-light", "en", "light", [["click", "#chip-content"], ["type", "lease agreement"], ["key", "Enter"], ["wait", 300]], { expect: { rowsA11y: true } }],
+  // A long Arabic name in the preview wraps and lines up on the right, in either interface language; an English one on the left.
+  ["pv-name-ar-light", "ar", "light", [["type", "123-45"]], { expect: { pvNameSide: "right" } }],
+  ["pv-name-en-ui-ar-name-en-light", "en", "light", [["type", "فاتورة"]], { expect: { pvNameSide: "right" } }],
+  ["pv-name-en-dark", "en", "dark", [["type", "report"]], { expect: { pvNameSide: "left" } }],
+  ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
 (async () => {
@@ -361,13 +419,15 @@ const SHOTS = [
       if (!file.startsWith(ASSETS) || !fs.existsSync(file)) return route.fulfill({ status: 404, headers, body: "" });
       route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || "application/octet-stream", headers, body: fs.readFileSync(file) });
     });
-    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched });
+    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches, store: !!opts.store });
     await pg.goto(ORIGIN + "/");
     await pg.waitForFunction(() => document.querySelector("#menu-kind") && document.querySelector("#menu-kind").children.length > 0);
     for (const [what, a, b] of steps) {
       if (what === "type") { await pg.fill("#q", a); await pg.waitForTimeout(150); }
       else if (what === "key") { await pg.keyboard.press(a); await pg.waitForTimeout(60); }
       else if (what === "click") { await pg.click(a); await pg.waitForTimeout(120); }
+      else if (what === "dblclick") { await pg.dblclick(a); await pg.waitForTimeout(80); }
+      else if (what === "focus") { await pg.focus(a); }
       else if (what === "rclick") { await pg.click(a, { button: "right" }); await pg.waitForTimeout(120); }
       else if (what === "fill") { await pg.fill(a, b); }
       else if (what === "chip") { await pg.click(`#chip-${a}`); await pg.click(`#menu-${a} [data-k="${b}"]`); await pg.waitForTimeout(120); }
@@ -468,10 +528,16 @@ const SHOTS = [
         downByCols: (() => { const l = document.getElementById("list"); const cols = getComputedStyle(l).gridTemplateColumns.split(" ").length; return cols > 1 && l.getAttribute("aria-activedescendant") === "r" + cols; })(),
         tagline: visible(document.querySelector("#view-nores .tagline")),
         dateW: document.body.style.getPropertyValue("--w-date"),
+        sizeW: document.body.style.getPropertyValue("--w-size"),
+        grips: document.querySelectorAll("#cols .grip").length,
+        nameSized: /px/.test(document.body.style.getPropertyValue("--c-name")),
+        nameCellMatches: (() => { const hd = document.querySelector("#cols .cwrap.start"), nm = document.querySelector("#list .row .nm"); return !!hd && !!nm && Math.abs(hd.getBoundingClientRect().width - nm.parentElement.children[1].getBoundingClientRect().width) < 2; })(),
         linesTop: (() => { const l = document.querySelector(".preview .pv-lines, .preview .snip"); return !!l && l.getBoundingClientRect().top < innerHeight * 0.75; })(),
         zoom: document.documentElement.style.zoom || "1",
         pathPx: [...document.querySelectorAll("#list .row .n2")].every((p) => parseFloat(getComputedStyle(p).fontSize) >= 13.5),
-        termsAr: document.getElementById("cols").textContent.includes("تاريخ التعديل") && document.getElementById("status-text").textContent.startsWith("وجدت"),
+        termsAr: document.getElementById("cols").textContent.includes("تاريخ التعديل") && document.getElementById("status-text").textContent.startsWith("عدد النتائج: "),
+        // Arabic counts read «label: n», never «n نتيجة/ملف» (no noun to agree with the number).
+        countsAr: !/[0-9٠-٩] ?(نتيجة|نتائج|ملف|مستند|تطابق)/.test(document.body.innerText),
         dateTime: /[0-9٠-٩]{1,2}:[0-9٠-٩]{2}/.test([...document.querySelectorAll(".facts dd")].map((d) => d.textContent).join(" ")),
         actbar: visible(document.getElementById("actbar")) ? document.querySelectorAll("#actbar .btn").length : 0,
         labels: [...document.querySelectorAll(".hbtn .hlbl")].every((l) => visible(l) && l.textContent.trim()),
@@ -479,9 +545,41 @@ const SHOTS = [
         preview: visible(document.getElementById("preview")),
         bannerSlim: document.getElementById("banner").classList.contains("slim") && document.getElementById("banner").getBoundingClientRect().height <= 48,
         dlgName: !!document.querySelector("#dlg-h .fname"),
+        qswitch: visible(document.getElementById("qswitch")),
+        rating: visible(document.getElementById("rating")),
+        // The preview's name lines up with its own direction (an Arabic name on the right, even on several lines).
+        pvNameSide: (() => { const n = document.querySelector(".pv-name"); if (!n || !visible(n)) return null; const b = n.getBoundingClientRect(), t = n.firstElementChild.getBoundingClientRect(); return Math.abs(b.right - t.right) < 2 ? "right" : Math.abs(b.left - t.left) < 2 ? "left" : "middle"; })(),
+        recentActive: document.getElementById("recent").getAttribute("aria-activedescendant"),
+        // Every result row is an option of the named "Results" listbox, with a name, its selection and its place.
+        rowsA11y: (() => {
+          const l = document.getElementById("list"), rows = [...l.querySelectorAll(".row")];
+          const ok = l.getAttribute("role") === "listbox" && !!l.getAttribute("aria-label") && rows.every((r) => r.getAttribute("role") === "option" && r.parentElement === l && (r.getAttribute("aria-label") || "").length > 3 && /^(true|false)$/.test(r.getAttribute("aria-selected")) && +r.getAttribute("aria-posinset") >= 1 && r.hasAttribute("aria-setsize"));
+          return rows.length > 0 && ok && rows.filter((r) => r.getAttribute("aria-selected") === "true").length === 1;
+        })(),
+        qName: document.getElementById("q").getAttribute("aria-label"),
+        // Every visible menu, list and focusable control has a name a screen reader can say.
+        a11y: (() => {
+          const named = (el) => (el.getAttribute("aria-label") || "").trim() || (el.getAttribute("aria-labelledby") && document.getElementById(el.getAttribute("aria-labelledby"))?.textContent.trim()) || (el.textContent || "").trim();
+          const bad = [...document.querySelectorAll('[role=menu], [role=listbox], [role=separator][tabindex], button, input, [role=switch]')].filter(visible).filter((el) => !named(el));
+          if (bad.length) window.__fakeErrors.push("no accessible name: " + bad.map((el) => el.id || el.className).join(", "));
+          return !bad.length;
+        })(),
+        updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent : null; })(),
+        trustStore: [...document.querySelectorAll('[data-i18n="trust"], .settings .muted')].filter(visible).every((el) => el.textContent.includes("Microsoft Store") && !el.textContent.includes("GitHub")),
+        clearItem: (() => { const it = document.getElementById("hist-clear"); return it ? `${it.textContent}|${it.getAttribute("aria-disabled") === "true" ? "off" : "on"}` : null; })(),
+        recentRows: document.querySelectorAll("#recent .row").length,
+        inside: document.getElementById("chip-content").getAttribute("aria-pressed") === "true",
+        ctxFirst: (() => { const it = document.querySelector("#ctx:not([hidden]) [role=menuitem] span"); return it ? it.textContent : null; })(),
       };
     }, lang);
     for (const b of check.bad) errors.push(`${name}: ${b}`);
+    // Chromium's own accessibility tree (what WebView2 hands to UI Automation)
+    // has each result row as an option of the "Results" listbox, with its name.
+    if (opts.ariaOptions) {
+      const tree = await pg.locator("#list").ariaSnapshot();
+      const options = (tree.match(/^\s*- option /gm) || []).length;
+      if (!/^- listbox "(Results|النتائج)"/.test(tree) || options < opts.ariaOptions) errors.push(`${name}: accessibility tree has ${options} options:\n${tree.slice(0, 400)}`);
+    }
     const want = opts.expect || {};
     if (check.stale && !("stale" in want)) errors.push(`${name}: a request named an older list: ${check.stale}`);
     for (const [k, v] of Object.entries(want)) {

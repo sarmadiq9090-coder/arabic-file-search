@@ -34,7 +34,7 @@ sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["bzip
 sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["compress"] }
 
 [target.'cfg(windows)'.dependencies]
-native-windows-gui = { version = "1.0.13", default-features = false, features = ["list-view", "animation-timer", "clipboard", "menu", "file-dialog", "status-bar", "high-dpi", "tray-notification", "combobox", "notice", "textbox"] }
+native-windows-gui = { version = "1.0.13", default-features = false, features = ["list-view", "animation-timer", "clipboard", "menu", "file-dialog", "status-bar", "high-dpi", "tray-notification", "combobox", "notice", "textbox", "frame"] }
 winapi = { version = "0.3", features = ["winuser", "consoleapi", "wincon", "processenv", "commctrl", "shellapi", "fileapi", "winbase", "combaseapi", "objbase", "timezoneapi", "minwinbase", "libloaderapi", "uxtheme", "synchapi", "errhandlingapi", "sysinfoapi", "winerror", "handleapi", "processthreadsapi", "wingdi", "oleidl", "ole2", "objidl", "unknwnbase", "guiddef", "windef", "minwindef", "usp10", "winhttp", "winnt", "winreg", "dbt", "ioapiset", "shobjidl_core", "shlobj", "knownfolders", "shtypes",
     # Quick search: open windows (windows.rs) and system commands (system.rs).
     "dwmapi", "powerbase", "powrprof", "reason", "securitybaseapi"] }

@@ -295,7 +295,7 @@ impl App {
                 }
                 nwg::Event::OnTimerTick if handle == app.timer && r.state.borrow().busy => {
                     let n = r.progress.load(Ordering::Relaxed);
-                    r.set_status(&trf!("جارٍ العمل… ({} ملف)", "Working… ({} files)", fmt_num(n)));
+                    r.set_status(&trf!("جارٍ العمل… (عدد الملفات: {})", "Working… ({} files)", fmt_num(n)));
                 }
                 _ => {}
             }
@@ -370,10 +370,10 @@ impl App {
             let mut msg = if n == 0 {
                 tr!("لا توجد ملفات نصية عادية في النتائج الحالية. ابحث أولاً (مثلاً: ‎.txt).", "No plain text files in the current results. Search first (e.g. .txt).").to_string()
             } else {
-                trf!("سيُبحث في {} ملفاً نصياً من النتائج الحالية.", "{} plain text files from the current results will be searched.", fmt_num(n))
+                trf!("سيُبحث في الملفات النصية من النتائج الحالية، وعددها: {}.", "{} plain text files from the current results will be searched.", fmt_num(n))
             };
             if others > 0 {
-                msg.push_str(&trf!(" ({} نتيجة أخرى ليست ملفات نصية عادية وستُترك.)", " ({} other results are not plain text files and are left alone.)", fmt_num(others)));
+                msg.push_str(&trf!(" (نتائج أخرى ليست ملفات نصية عادية وستُترك، عددها: {}.)", " ({} other results are not plain text files and are left alone.)", fmt_num(others)));
             }
             r.set_status(&msg);
         }
@@ -447,7 +447,7 @@ impl App {
         let params = nwg::MessageParams {
             title: tr!("استبدال نص في الملفات", "Replace text in files"),
             content: &trf!(
-                "استبدال «{}» بـ «{}» في {} ملفاً ({} تطابقاً)؟\n\nتُحفظ نسخة احتياطية من كل ملف أولاً، ويمكنك التراجع عن آخر استبدال.",
+                "استبدال «{}» بـ «{}»؟ عدد الملفات: {}، عدد التطابقات: {}.\n\nتُحفظ نسخة احتياطية من كل ملف أولاً، ويمكنك التراجع عن آخر استبدال.",
                 "Replace “{}” with “{}” in {} files ({} matches)?\n\nA backup copy of each file is saved first, and you can undo the last replace.",
                 opts.find,
                 opts.replace,
@@ -478,7 +478,7 @@ impl App {
         let params = nwg::MessageParams {
             title: tr!("التراجع عن آخر استبدال", "Undo last replace"),
             content: &trf!(
-                "إرجاع {} ملفاً إلى ما كانت عليه قبل استبدال «{}» بـ «{}» ({})؟\n\nالملفات التي عُدّلت بعد الاستبدال لن تُمسّ.",
+                "إرجاع الملفات إلى ما كانت عليه قبل استبدال «{1}» بـ «{2}» ({3})؟ عدد الملفات: {0}.\n\nالملفات التي عُدّلت بعد الاستبدال لن تُمسّ.",
                 "Restore {} files to how they were before “{}” was replaced with “{}” ({})?\n\nFiles edited since the replace are left as they are.",
                 fmt_num(index.files.len()),
                 index.find,
@@ -528,14 +528,14 @@ impl App {
                     r.set_checked(i, row.can);
                 }
                 let mut msg = trf!(
-                    "{} تطابقاً في {} ملفاً. ملفات بلا تطابق: {}.",
+                    "عدد التطابقات: {}، في ملفات عددها: {}. ملفات بلا تطابق: {}.",
                     "{} matches in {} files. Files without a match: {}.",
                     fmt_num(total),
                     fmt_num(files),
                     fmt_num(none)
                 );
                 if skipped_n > 0 {
-                    msg.push_str(&trf!(" تُركت {} ملفات (السبب في القائمة).", " {} files skipped (reason in the list).", fmt_num(skipped_n)));
+                    msg.push_str(&trf!(" الملفات المتروكة: {} (السبب في القائمة).", " {} files skipped (reason in the list).", fmt_num(skipped_n)));
                 }
                 r.set_status(&msg);
                 let mut st = r.state.borrow_mut();
@@ -547,13 +547,13 @@ impl App {
                 r.clear_preview();
                 let total: usize = rep.done.iter().map(|(_, n)| n).sum();
                 let mut msg = trf!(
-                    "تم: {} استبدالاً في {} ملفاً.",
+                    "تم. عدد الاستبدالات: {}، في ملفات عددها: {}.",
                     "Done: {} replacements in {} files.",
                     fmt_num(total),
                     fmt_num(rep.done.len())
                 );
                 if !rep.skipped.is_empty() {
-                    msg.push_str(&trf!(" لم يُعدَّل {} ملفاً.", " {} files were not changed.", fmt_num(rep.skipped.len())));
+                    msg.push_str(&trf!(" ملفات لم تُعدَّل: {}.", " {} files were not changed.", fmt_num(rep.skipped.len())));
                 }
                 r.set_status(&msg);
                 let mut t = String::new();
@@ -570,12 +570,12 @@ impl App {
             }
             Done::Undone(Err(e)) => r.set_status(&e),
             Done::Undone(Ok(rep)) => {
-                let mut msg = trf!("أُرجع {} ملفاً.", "{} files restored.", fmt_num(rep.restored.len()));
+                let mut msg = trf!("أُرجعت الملفات. عددها: {}.", "{} files restored.", fmt_num(rep.restored.len()));
                 if !rep.conflicts.is_empty() {
-                    msg.push_str(&trf!(" {} ملفاً تغيّر بعد الاستبدال فتُرك كما هو.", " {} files changed after the replace and were left as they are.", fmt_num(rep.conflicts.len())));
+                    msg.push_str(&trf!(" ملفات تغيّرت بعد الاستبدال فتُركت كما هي: {}.", " {} files changed after the replace and were left as they are.", fmt_num(rep.conflicts.len())));
                 }
                 if !rep.failed.is_empty() {
-                    msg.push_str(&trf!(" تعذر إرجاع {} ملفاً.", " {} files could not be restored.", fmt_num(rep.failed.len())));
+                    msg.push_str(&trf!(" ملفات تعذر إرجاعها: {}.", " {} files could not be restored.", fmt_num(rep.failed.len())));
                 }
                 r.set_status(&msg);
                 let mut t = String::new();

@@ -147,7 +147,7 @@ impl App {
         // Not borrowed while the clipboard notifies its previous owner.
         drop(st);
         if shell::copy_text(&self.window, &text) {
-            self.set_status(&trf!("تم نسخ {} مسار.", "Copied {} paths.", fmt_num(n)));
+            self.set_status(&trf!("تم نسخ المسارات. عددها: {}.", "Copied {} paths.", fmt_num(n)));
         } else {
             self.set_status(shell::copy_failed_text());
         }
@@ -268,7 +268,7 @@ impl App {
             };
             let mut t = trf!("{}\r\nعدد التطابقات: {}\r\n", "{}\r\nMatches: {}\r\n", ltr_path(&e.path), digits(m.count.to_string()));
             if m.lines.len() < m.count as usize {
-                t.push_str(&trf!("(أول {} سطر)\r\n", "(first {} lines)\r\n", digits(m.lines.len().to_string())));
+                t.push_str(&trf!("(أول الأسطر فقط، عددها: {})\r\n", "(first {} lines)\r\n", digits(m.lines.len().to_string())));
             }
             for (line, s) in &m.lines {
                 t.push_str(&trf!("\r\nسطر {}:  {}", "\r\nLine {}:  {}", digits(line.to_string()), shown_digits(&s.replace(['\r', '\n'], " "))));
@@ -406,7 +406,7 @@ impl App {
             Ok(rows.len())
         };
         match write() {
-            Ok(n) => self.set_status(&trf!("تم تصدير {} نتيجة.", "Exported {} results.", fmt_num(n))),
+            Ok(n) => self.set_status(&trf!("تم التصدير. عدد النتائج: {}.", "Exported {} results.", fmt_num(n))),
             Err(e) => {
                 let text = trf!("تعذر حفظ الملف:\n{e}", "Could not save the file:\n{e}");
                 self.with_modal_owner(|owner| nwg::modal_error_message(nwg::ControlHandle::Hwnd(owner), tr!("خطأ", "Error"), &text));
