@@ -20,6 +20,13 @@
 #   D. Settings as 0.10.0 left them (new_ui=0, no markers): the new look
 #      opens and the markers are saved; then new_ui=0 written by hand after
 #      the move: still the new look.
+#   R. Memory while hidden: with BAHTH_WEBUI_RELEASE_SECS=20 (10 min for
+#      users), a search is typed and the window is hidden to the tray: the
+#      page is suspended, then its WebView2 is closed and every msedgewebview2
+#      process exits (well before 11 min; CI never waits 10 real minutes),
+#      without counting as a failure (no classic window, no new_ui_failed);
+#      a second launch shows the window, the page is created again
+#      ("recreated on show in N ms") and the search box still holds the query.
 #   F. The fallback: with BAHTH_WEBUI_FAIL=1 (WebView2 taken as failing to
 #      start) the classic window takes over and says why, and settings.txt
 #      keeps new_ui=1 (new_ui_failed=1: this run only); the next start,
@@ -28,7 +35,7 @@
 # Note: in a right-to-left (mirrored) window the client origin is the top
 # RIGHT corner on screen; ClientOnScreen returns the true rectangle.
 #
-# Output: <Out>\newlook.png, newlook-query.png, classic.png, switched.png, fallback.png,
+# Output: <Out>\newlook.png, newlook-query.png, classic.png, switched.png, recreated.png, fallback.png,
 # diagnostics.txt (windows, settings.txt, log.txt, crash.txt), report.md.
 # Runs under Windows PowerShell 5.1 or PowerShell 7 on 64-bit Windows.
 # This file is UTF-8 with a BOM so Windows PowerShell reads the Arabic in it.
@@ -689,6 +696,78 @@ try {
     Alive 'new_ui=0 after the move'
     Check-Crash 'new_ui=0 after the move'
     Stop-Program
+
+    # ------------------------------------------------------------ R. hidden a long while: suspended, then released
+    Say 'part R: the hidden window lets WebView2 go (BAHTH_WEBUI_RELEASE_SECS=20)'
+    Write-Settings 1 -Only
+    Remove-Item $logFile -Force -ErrorAction SilentlyContinue   # this part's lines only
+    $env:BAHTH_WEBUI_RELEASE_SECS = '20'
+    # (Other programs' WebView2 processes, if any, are not the program's.)
+    $baseline = WebView2-Count
+    try {
+        Start-Program
+        $win = Wait-Until { New-Look $script:proc.Id } 40
+        $hello = Wait-Until { (Log-Lines 'webui: page said hello').Count -gt 0 } 40
+        Record 'core' 'part R: the new look opens and its page loads' ($null -ne $win -and [bool]$hello)
+        if ($win -and $hello) {
+            Focus-Window $win.Handle
+            [N]::Chord($VK.CTRL, 0x4B)  # Ctrl+K: the search box, text selected
+            Start-Sleep -Milliseconds 300
+            [N]::Type('notepad')
+            Start-Sleep -Seconds 3
+            $box = Find-Uia $win.Handle ([Windows.Automation.ControlType]::ComboBox) '.'
+            $typed = $null
+            try { if ($box) { $typed = $box.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value } } catch { Say "search box value: $_" }
+            Say "search box before hiding: '$typed'"
+            $running = WebView2-Count
+            Record 'probe' 'WebView2 processes run while the window is on screen' ($running -gt 0) "msedgewebview2 processes: $running"
+            # Hidden to the tray, as by its close button (the tray icon is on).
+            $t0 = Get-Date
+            [void][N]::PostMessage($win.Handle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CLOSE
+            $gone = Wait-Until { $null -eq (New-Look $script:proc.Id) } 10
+            Record 'core' 'the close button hides the window to the tray' ([bool]$gone)
+            $susp = Wait-Until { (Log-Lines 'webui: suspended \(hidden\)').Count -gt 0 } 15
+            Record 'probe' 'the hidden page is suspended' ([bool]$susp) (((Log-Lines 'webui: (suspended|not suspended|can.t suspend)') | Select-Object -Last 1) -join '')
+            $released = Wait-Until { (Log-Lines 'webui: released after').Count -gt 0 } 90
+            Record 'core' 'log.txt: the page is released after the (shortened) time hidden' ([bool]$released) (((Log-Lines 'webui: released') | Select-Object -Last 1) -join '')
+            $none = Wait-Until { (WebView2-Count) -le $baseline } 90
+            Record 'core' 'every msedgewebview2 process exits while the window stays hidden' ([bool]$none) ("{0} left ({1} before the start) after {2:N0} s hidden: {3}" -f (WebView2-Count), $baseline, ((Get-Date) - $t0).TotalSeconds, ((@(Get-Process msedgewebview2 -ErrorAction SilentlyContinue) | ForEach-Object Id) -join ', '))
+            Alive 'released while hidden'
+            # Not a failure: no classic window, nothing in the settings.
+            Record 'core' 'the release brings no classic window' ($null -eq (Classic $script:proc.Id))
+            $bad = @(Log-Lines 'webui: .*(did not load|process failed|showing the page again|using the classic window)')
+            Record 'core' 'the release is not taken as a WebView2 failure' ($bad.Count -eq 0) ($bad -join ' | ')
+            $s = Read-Settings
+            Record 'core' 'the release sets no new_ui_failed and no new_ui_trying' (((Setting $s 'new_ui_failed') -ne '1') -and ((Setting $s 'new_ui_trying') -in @($null, '', '0'))) ("new_ui_failed=$(Setting $s 'new_ui_failed') new_ui_trying=$(Setting $s 'new_ui_trying')")
+            # Shown again (a second launch brings it to the front): the page comes back.
+            $tray = $script:proc
+            $second = Start-Process -FilePath $Exe -PassThru
+            [void]$second.WaitForExit(15000)
+            $script:proc = $tray
+            $win = Wait-Until { New-Look $script:proc.Id } 20
+            Record 'core' 'showing the window again after the release' ($null -ne $win)
+            $again = Wait-Until { (Log-Lines 'webui: recreated on show in \d+ ms').Count -gt 0 } 40
+            Record 'core' 'the page is created again on show' ([bool]$again) (((Log-Lines 'webui: (recreated|page said hello|page created)') | Select-Object -Last 3) -join ' | ')
+            Record 'core' 'and the classic window stays hidden after the show' ($null -eq (Classic $script:proc.Id))
+            if ($win -and $again) {
+                Start-Sleep -Seconds 2
+                $box = Find-Uia $win.Handle ([Windows.Automation.ControlType]::ComboBox) '.'
+                $kept = $null
+                try { if ($box) { $kept = $box.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value } } catch { Say "search box value: $_" }
+                if ($null -eq $kept -or $typed -ne 'notepad') { Record 'probe' 'the search box keeps the query (UI Automation ValuePattern)' ($kept -eq 'notepad') "before hiding '$typed', after '$kept'" }
+                else { Record 'core' 'the search box keeps the query after the page was created again' ($kept -eq 'notepad') "'$kept'" }
+                [void](Shot-Client $win 'recreated')
+            }
+            $bad = @(Log-Lines 'webui: .*(did not load|process failed|showing the page again|using the classic window)')
+            Record 'core' 'no WebView2 failure after the page was created again' ($bad.Count -eq 0) ($bad -join ' | ')
+        }
+        Alive 'after the release'
+        Check-Crash 'after the release'
+        if ($results | Where-Object Result -eq 'FAIL') { Diagnostics 'release' }
+        Stop-Program
+    } finally {
+        Remove-Item Env:BAHTH_WEBUI_RELEASE_SECS -ErrorAction SilentlyContinue
+    }
 
     # ------------------------------------------------------------ F. the fallback is for one run only
     Say 'part F: WebView2 failing (BAHTH_WEBUI_FAIL=1), then a normal start'
