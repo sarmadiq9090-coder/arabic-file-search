@@ -447,7 +447,70 @@
   "Recent searches": "Son aramalar",
   "Save the current search": "Geçerli aramayı kaydet",
   "Clear history and recent files": "Geçmişi ve son kullanılan dosyaları temizle",
-  "Delete all saved searches": "Kayıtlı aramaların tümünü sil"
+  "Delete all saved searches": "Kayıtlı aramaların tümünü sil",
+  "(machine translation)": "(makine çevirisi)",
+  ", ": ", ",
+  "1 KB or more": "1 KB veya daha büyük",
+  "1 MB or more": "1 MB veya daha büyük",
+  "10 MB or more": "10 MB veya daha büyük",
+  "100 KB or more": "100 KB veya daha büyük",
+  "100 KB to 10 MB": "100 KB ile 10 MB arası",
+  "100 MB or more": "100 MB veya daha büyük",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "E-posta programınızda {} adresine bir ileti açıldı (rapor kopyalanamadı: “Kopyala” düğmesine basın, sonra iletiye yapıştırın). Henüz hiçbir şey gönderilmedi.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "E-posta programınızda {} adresine bir ileti açıldı. Raporun tamamı kopyalandı: iletiye yapıştırın (Ctrl+V), sonra “Gönder” düğmesine basın. Henüz hiçbir şey gönderilmedi.",
+  "All types": "Tüm türler",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space zaten başka bir program tarafından kullanılıyor, bu yüzden burada kullanılamaz. {} çalışmaya devam ediyor.",
+  "Another program has {} too. Pick another one.": "{} kısayolunu başka bir program da kullanıyor. Başka bir kısayol seçin.",
+  "Any size": "Tüm boyutlar",
+  "Any time": "Herhangi bir zaman",
+  "Archives": "Arşivler",
+  "Audio": "Ses",
+  "Documents": "Belgeler",
+  "Downloading the update…": "Güncelleştirme indiriliyor…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter aç · Ctrl+Enter klasör · Tab daha fazla · Esc kapat",
+  "Folders": "Klasörler",
+  "GitHub page (public)": "GitHub sayfası (herkese açık)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — sürüm {}\nDosyalarda ve belgelerin içinde Arapça ve İngilizce anında arama.\n\nAramak için herhangi bir yerde {hk} tuşlarına basın.\n{}\n\nDestek: {}\n{}\n\nKullandığı üçüncü taraf bileşenlerin lisansları THIRD-PARTY-NOTICES.txt dosyasındadır. Açılsın mı?",
+  "Last 30 days": "Son 30 gün",
+  "Last 7 days": "Son 7 gün",
+  "No files match your search. Try:": "Aramanızla eşleşen dosya yok. Şunları deneyin:",
+  "No home network connection found; it works on this PC only.": "Ev ağı bağlantısı bulunamadı; yalnızca bu bilgisayarda çalışır.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "Henüz dizin yok: oluşturmak için InstaFind'ı bir kez açın, sonra yeniden deneyin.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "Hiçbir e-posta programı açılmadı. “Kopyala” düğmesine basın ve raporu {} adresine gönderin.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "Hiçbir e-posta programı açılmadı. Rapor kopyalandı: kendi e-postanızdan (telefonunuzda veya tarayıcıda) {} adresine bir iletiye yapıştırın.",
+  "No results yet — results may be incomplete while indexing.": "Henüz sonuç yok — dizin oluşturulurken sonuçlar eksik olabilir.",
+  "No results yet; they may be incomplete while indexing. Try:": "Henüz sonuç yok; dizin oluşturulurken eksik olabilirler. Şunları deneyin:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "Not: Windows Arapça dil paketi yüklü olmadığından resimlerdeki Arapça metin okunamıyor.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "Siz bir düğmeye basmadıkça hiçbir şey gönderilmez. Dosya adları ve yolları rapordan çıkarılır. GitHub sayfası herkese açıktır: herkes okuyabilir. E-postayı yalnızca biz okuruz.",
+  "Older than a year": "Bir yıldan eski",
+  "Open": "Aç",
+  "Open quick search\t{}": "Hızlı aramayı aç\t{}",
+  "Over 1 GB": "1 GB'tan büyük",
+  "Over 10 MB": "10 MB'tan büyük",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "Telefondan arama, güvenlik için telefondan iki saat boyunca hiç istek gelmeyince kendiliğinden kapandı. Yeniden açmak için yukarıdaki kutuyu işaretleyin.",
+  "Pictures": "Resimler",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "Dosya listeniz ilk kez hazırlanıyor (birkaç dakika). Şimdiden arayabilirsiniz; işlem bitince sonuçlar tamamlanır.",
+  "Press {} in any program to open the quick search.": "Hızlı aramayı açmak için herhangi bir programda {} tuşlarına basın.",
+  "Press {} in any program to show or hide InstaFind.": "InstaFind'ı göstermek veya gizlemek için herhangi bir programda {} tuşlarına basın.",
+  "Programs": "Programlar",
+  "Results": "Sonuçlar",
+  "Results may be incomplete while indexing": "Dizin oluşturulurken sonuçlar eksik olabilir",
+  "Results may be incomplete while indexing — try": "Dizin oluşturulurken sonuçlar eksik olabilir — şunu deneyin",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Windows'un WebView2 bileşeni yüklü olmadığı için basit görünümde çalışıyor. Microsoft'tan ücretsiz indirmek için buraya tıklayın.",
+  "Send by email": "E-postayla gönder",
+  "Share": "Pay",
+  "Show the program from anywhere\t{}": "Programı her yerden göster\t{}",
+  "Size": "Boyut",
+  "The list just changed, so nothing was done. Try again.": "Liste az önce değişti, bu yüzden hiçbir şey yapılmadı. Yeniden deneyin.",
+  "The name did not change.": "Ad değişmedi.",
+  "The program will run in the background when Windows starts; show it with {}.": "Program Windows başlarken arka planda çalışacak; {} ile gösterin.",
+  "This year": "Bu yıl",
+  "Today": "Bugün",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "Bir dosya, uygulama veya ayar adı yazın. Yukarı ve Aşağı ok tuşları sonuçlar arasında gezinir; Enter seçili olanı açar.",
+  "Under 100 KB": "100 KB'tan küçük",
+  "Video": "Video",
+  "drive not connected": "sürücü bağlı değil",
+  "{} opens the quick search (otherwise the full window)": "{} hızlı aramayı açar (aksi halde tam pencereyi)"
  },
  "js": {
   "ph": "Dosya adlarında ara…",
@@ -658,6 +721,102 @@
   "sStartup": "Başlangıç",
   "sAutostart": "Windows ile başlat (arka planda)",
   "sAbout": "Hakkında",
-  "version": "FN:(v) => `InstaFind — sürüm ${v}`"
+  "version": "FN:(v) => `InstaFind — sürüm ${v}`",
+  "fDetails": "Dosya ayrıntıları",
+  "helpEx": [
+   [
+    "satış raporu",
+    "iki sözcüğü de içeren adlar"
+   ],
+   [
+    "\"kira sözleşmesi\"",
+    "tam ifade"
+   ],
+   [
+    "rapor .pdf",
+    "yalnızca PDF dosyaları (veya ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "birkaç tür"
+   ],
+   [
+    "fotoğraf|video",
+    "iki sözcükten biri"
+   ],
+   [
+    "sözleşme -eski",
+    "“eski” olmadan (veya !eski)"
+   ],
+   [
+    "size:>10mb",
+    "10 MB'tan büyük"
+   ],
+   [
+    "dm:thisweek",
+    "bu hafta değişenler"
+   ],
+   [
+    "dm:2026-05",
+    "Mayıs 2026'da değişenler"
+   ],
+   [
+    "ww:sözleşme",
+    "yalnızca tam sözcük"
+   ],
+   [
+    "\"kira sözleşmesi\"~5",
+    "iki sözcük en fazla 5 sözcük arayla"
+   ],
+   [
+    "folder: fotoğraflar",
+    "yalnızca klasörler"
+   ],
+   [
+    "root: كتاب",
+    "aynı Arapça kök: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: rapro",
+    "bir yazım hatasını tolere eder"
+   ],
+   [
+    "حجم:>1ج",
+    "Arapça da olur: 1 GB'tan büyük"
+   ],
+   [
+    "احمد",
+    "«أحمد» sözcüğünü de bulur"
+   ]
+  ],
+  "helpH": "Nasıl aranır",
+  "helpInside": "Belgelerin içinde (PDF, Word, Excel, resimler) aramak için “Belgelerin içinde” düğmesine, sonra Enter tuşuna basın.",
+  "helpKey": "Nasıl aranır (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"herhangi bir programdan küçük arama kutusu\"], [\"Ctrl+Alt+G\", \"Kaydet/Aç penceresinde: bir sonucun klasörüne git\"], [\"Enter\", \"dosyayı aç\"], [\"Ctrl+Enter\", \"klasörünü aç\"], [\"↓\", \"sonuçlara (boş kutuda: geçmiş)\"],\n        [\"Ctrl+C\", \"dosyayı kopyala\"], [\"Ctrl+Shift+C\", \"yolu kopyala\"], [\"F2\", \"yeniden adlandır\"], [\"Delete\", \"Geri Dönüşüm Kutusu'na\"], [\"F4\", \"dosyadaki tüm eşleşmeler\"], [\"Ctrl+H\", \"geçmiş\"], [\"Ctrl+T\", \"küçük resimler\"], [\"Ctrl+,\", \"ayarlar\"], [\"F1\", \"bu kart\"]]",
+  "helpKeysH": "Klavye",
+  "helpMore": "Tüm arama yolları…",
+  "helpSub": "Arama kutusuna yazmak için bir örneğe tıklayın. Her filtrenin Arapça yazılışı da vardır.",
+  "kLabel": "Klavye kısayolları",
+  "offline": "sürücü bağlı değil",
+  "qsNone": "Pencerenin taşınacağı bir sonuç yok. Aramayı değiştirin veya iptal etmek için Esc tuşuna basın.",
+  "sHotkeyKeys": "Aramayı açma kısayolu",
+  "sHotkeyKeysSub": "Her programda çalışır. Başka bir program kullanıyorsa başka birini seçin.",
+  "sHotkeyTaken": "FN:(k) => `${k} kısayolunu başka bir program kullanıyor, bu yüzden şu an hiçbir şey yapmıyor. Başka bir kısayol seçin:`",
+  "sLangHelp": "Bu çeviriyi iyileştirmeye yardım edin",
+  "sLangMachine": "(makine çevirisi)",
+  "sPhone": "Telefondan ara",
+  "sPhoneAllow": "Bu ağa izin ver",
+  "sPhoneIdle": "Güvenlik için telefondan iki saat boyunca hiç istek gelmeyince kendiliğinden kapandı. Gerektiğinde yeniden açın.",
+  "sPhoneMore": "Diğer ayarlar…",
+  "sPhoneMoreSub": "Bağlantı noktası, dosya indirme ve yeni PIN ile bağlantı",
+  "sPhoneOff": "Kapalı. Adresi ve PIN'i görmek için açın.",
+  "sPhoneOpen": "Telefonun tarayıcısında açın:",
+  "sPhonePin": "ve PIN'i yazın:",
+  "sPhoneQr": "Veya aramayı PIN olmadan açmak için bu kodu telefonun kamerasıyla tarayın. Kimseye göstermeyin.",
+  "sPhoneQrLabel": "Telefondan aramayı açan QR kodu",
+  "sPhoneRow": "Telefondan ara (ev ağı)",
+  "sPhoneSub": "Aynı Wi-Fi ağındaki telefonunuzun tarayıcısından bu bilgisayarın dosyalarında arayın. Salt okunurdur ve yalnızca ev ağınızda çalışır.",
+  "sPhoneWait": "Ağ denetleniyor…",
+  "updChecking": "Güncelleştirmeler denetleniyor…"
  }
 }

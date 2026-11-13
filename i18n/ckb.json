@@ -447,7 +447,70 @@
   "Recent searches": "دوایین گەڕانەکان",
   "Save the current search": "پاشەکەوتکردنی گەڕانی ئێستا",
   "Clear history and recent files": "سڕینەوەی مێژوو و فایلە دواییەکان",
-  "Delete all saved searches": "سڕینەوەی هەموو گەڕانە پاشەکەوتکراوەکان"
+  "Delete all saved searches": "سڕینەوەی هەموو گەڕانە پاشەکەوتکراوەکان",
+  "(machine translation)": "(وەرگێڕانی ئامێر)",
+  ", ": "، ",
+  "1 KB or more": "1 کیلۆبایت یان زیاتر",
+  "1 MB or more": "1 مێگابایت یان زیاتر",
+  "10 MB or more": "10 مێگابایت یان زیاتر",
+  "100 KB or more": "100 کیلۆبایت یان زیاتر",
+  "100 KB to 10 MB": "لە 100 کیلۆبایتەوە تا 10 مێگابایت",
+  "100 MB or more": "100 مێگابایت یان زیاتر",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "نامەیەک بۆ {} لە بەرنامەی ئیمەیڵەکەتدا کرایەوە (ڕاپۆرتەکە کۆپی نەکرا: کرتە لە «کۆپیکردن» بکە، پاشان لەوێدا بیلکێنە). هێشتا هیچ نەنێردراوە.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "نامەیەک بۆ {} لە بەرنامەی ئیمەیڵەکەتدا کرایەوە. ڕاپۆرتە تەواوەکە کۆپی کراوە: لە نامەکەدا بیلکێنە (Ctrl+V)، پاشان کرتە لە «ناردن» بکە. هێشتا هیچ نەنێردراوە.",
+  "All types": "هەموو جۆرەکان",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space پێشتر لەلایەن بەرنامەیەکی ترەوە گیراوە، بۆیە لێرەدا بەکارناهێنرێت. {} هێشتا کار دەکات.",
+  "Another program has {} too. Pick another one.": "بەرنامەیەکی تریش {} بەکاردەهێنێت. یەکێکی تر هەڵبژێرە.",
+  "Any size": "هەر قەبارەیەک",
+  "Any time": "هەر کاتێک",
+  "Archives": "فایلە پەستێنراوەکان",
+  "Audio": "دەنگ",
+  "Documents": "بەڵگەنامەکان",
+  "Downloading the update…": "نوێکردنەوەکە دادەگیرێت…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter کردنەوە · Ctrl+Enter فۆڵدەر · Tab زیاتر · Esc داخستن",
+  "Folders": "فۆڵدەرەکان",
+  "GitHub page (public)": "پەڕەی GitHub (گشتی)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — وەشانی {}\nگەڕانی دەستبەجێ بۆ فایلەکان و لەناو بەڵگەنامەکاندا، بە عەرەبی و ئینگلیزی.\n\nبۆ گەڕان لە هەر شوێنێکەوە {hk} دابگرە.\n{}\n\nپشتگیری: {}\n{}\n\nمۆڵەتی ئەو پێکهاتە دەرەکییانەی بەکاریان دەهێنێت لە THIRD-PARTY-NOTICES.txt دایە. بیکرێتەوە؟",
+  "Last 30 days": "30 ڕۆژی ڕابردوو",
+  "Last 7 days": "7 ڕۆژی ڕابردوو",
+  "No files match your search. Try:": "هیچ فایلێک لەگەڵ گەڕانەکەت ناگونجێت. ئەمانە تاقی بکەرەوە:",
+  "No home network connection found; it works on this PC only.": "هیچ پەیوەندییەک بە تۆڕی ماڵەوە نەدۆزرایەوە؛ تەنها لەسەر ئەم کۆمپیوتەرە کار دەکات.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "هێشتا پێڕست نییە: InstaFind جارێک بکەرەوە بۆ دروستکردنی، پاشان دووبارە هەوڵ بدەرەوە.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "هیچ بەرنامەیەکی ئیمەیڵ نەکرایەوە. کرتە لە «کۆپیکردن» بکە و ڕاپۆرتەکە بۆ {} بنێرە.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "هیچ بەرنامەیەکی ئیمەیڵ نەکرایەوە. ڕاپۆرتەکە کۆپی کراوە: لە ئیمەیڵی خۆتەوە (لە مۆبایل یان وێبگەڕ) لە نامەیەکدا بۆ {} بیلکێنە.",
+  "No results yet — results may be incomplete while indexing.": "هێشتا هیچ ئەنجامێک نییە — لە کاتی پێڕستکردندا لەوانەیە ئەنجامەکان ناتەواو بن.",
+  "No results yet; they may be incomplete while indexing. Try:": "هێشتا هیچ ئەنجامێک نییە؛ لە کاتی پێڕستکردندا لەوانەیە ناتەواو بن. ئەمانە تاقی بکەرەوە:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "تێبینی: دەقی عەرەبی ناو وێنەکان ناخوێنرێتەوە، چونکە پاکێجی زمانی عەرەبیی Windows دانەمەزراوە.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "تا کرتە لە دوگمەیەک نەکەیت هیچ نانێردرێت. ناو و ڕێڕەوی فایلەکان لە ڕاپۆرتەکە لادەبرێن. پەڕەی GitHub گشتییە: هەر کەسێک دەتوانێت بیخوێنێتەوە. ئیمەیڵ تەنها ئێمە دەیخوێنینەوە.",
+  "Older than a year": "کۆنتر لە ساڵێک",
+  "Open": "کردنەوە",
+  "Open quick search\t{}": "کردنەوەی گەڕانی خێرا\t{}",
+  "Over 1 GB": "زیاتر لە 1 گیگابایت",
+  "Over 10 MB": "زیاتر لە 10 مێگابایت",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "گەڕان لە مۆبایلەوە بۆ پاراستن، دوای دوو کاتژمێر بێ هیچ داواکارییەک لە مۆبایلەوە، خۆی کوژایەوە. بۆ هەڵکردنەوەی خانەکەی سەرەوە نیشانە بکە.",
+  "Pictures": "وێنەکان",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "لیستی فایلەکانت بۆ یەکەم جار ئامادە دەکرێت (چەند خولەکێک). ئێستا بگەڕێ؛ کاتێک تەواو بوو ئەنجامەکان تەواو دەبن.",
+  "Press {} in any program to open the quick search.": "لە هەر بەرنامەیەکدا {} دابگرە بۆ کردنەوەی گەڕانی خێرا.",
+  "Press {} in any program to show or hide InstaFind.": "لە هەر بەرنامەیەکدا {} دابگرە بۆ پیشاندان یان شاردنەوەی InstaFind.",
+  "Programs": "بەرنامەکان",
+  "Results": "ئەنجامەکان",
+  "Results may be incomplete while indexing": "لە کاتی پێڕستکردندا لەوانەیە ئەنجامەکان ناتەواو بن",
+  "Results may be incomplete while indexing — try": "لە کاتی پێڕستکردندا لەوانەیە ئەنجامەکان ناتەواو بن — تاقی بکەرەوە",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "بە ڕووکاری سادە کار دەکات چونکە پێکهاتەی WebView2 ی Windows دانەمەزراوە. کرتە لێرە بکە بۆ داگرتنی بە خۆڕایی لە Microsoft.",
+  "Send by email": "ناردن بە ئیمەیڵ",
+  "Share": "بەش",
+  "Show the program from anywhere\t{}": "پیشاندانی بەرنامەکە لە هەر شوێنێکەوە\t{}",
+  "Size": "قەبارە",
+  "The list just changed, so nothing was done. Try again.": "لیستەکە ئێستا گۆڕا، بۆیە هیچ نەکرا. دووبارە هەوڵ بدەرەوە.",
+  "The name did not change.": "ناوەکە نەگۆڕا.",
+  "The program will run in the background when Windows starts; show it with {}.": "بەرنامەکە لە کاتی دەستپێکردنی Windows لە پاشبنەمادا کار دەکات؛ بە {} پیشانی بدە.",
+  "This year": "ئەمساڵ",
+  "Today": "ئەمڕۆ",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "ناوی فایلێک، ئەپێک یان ڕێکخستنێک بنووسە. تیرەکانی سەرەوە و خوارەوە بەناو ئەنجامەکاندا دەڕۆن؛ Enter ئەنجامی دیاریکراو دەکاتەوە.",
+  "Under 100 KB": "کەمتر لە 100 کیلۆبایت",
+  "Video": "ڤیدیۆ",
+  "drive not connected": "دیسک پەیوەست نییە",
+  "{} opens the quick search (otherwise the full window)": "{} گەڕانی خێرا دەکاتەوە (ئەگەرنا پەنجەرە تەواوەکە)"
  },
  "js": {
   "ph": "گەڕان بە ناوی فایل…",
@@ -658,6 +721,102 @@
   "sStartup": "دەستپێکردن",
   "sAutostart": "دەستپێکردن لەگەڵ Windows (لە پشتەوە)",
   "sAbout": "دەربارە",
-  "version": "FN:(v) => `InstaFind — وەشانی ${v}`"
+  "version": "FN:(v) => `InstaFind — وەشانی ${v}`",
+  "fDetails": "وردەکاریی فایل",
+  "helpEx": [
+   [
+    "ڕاپۆرتی فرۆشتن",
+    "ناوەکان کە هەردوو وشەکەیان تێدایە"
+   ],
+   [
+    "\"گرێبەستی کرێ\"",
+    "دەستەواژەکە وەک خۆی"
+   ],
+   [
+    "ڕاپۆرت .pdf",
+    "تەنها فایلی PDF (یان ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "چەند جۆرێک"
+   ],
+   [
+    "وێنە|ڤیدیۆ",
+    "یەکێک لە دوو وشەکە"
+   ],
+   [
+    "گرێبەست -کۆن",
+    "بەبێ «کۆن» (یان !کۆن)"
+   ],
+   [
+    "size:>10mb",
+    "گەورەتر لە 10 مێگابایت"
+   ],
+   [
+    "dm:thisweek",
+    "ئەم هەفتەیە گۆڕاون"
+   ],
+   [
+    "dm:2026-05",
+    "لە مانگی 5ی 2026 گۆڕاون"
+   ],
+   [
+    "ww:گرێبەست",
+    "تەنها وشەی تەواو"
+   ],
+   [
+    "\"گرێبەستی کرێ\"~5",
+    "هەردوو وشە بە لایەنی زۆر 5 وشە لە نێوانیاندا"
+   ],
+   [
+    "folder: وێنەکان",
+    "تەنها فۆڵدەرەکان"
+   ],
+   [
+    "root: كتاب",
+    "هەمان ڕەگی عەرەبی: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: ڕاپۆرد",
+    "هەڵەیەکی نووسین قبووڵ دەکات"
+   ],
+   [
+    "حجم:>1ج",
+    "بە عەرەبیش: گەورەتر لە 1 گیگابایت"
+   ],
+   [
+    "احمد",
+    "«أحمد»یش دەدۆزێتەوە"
+   ]
+  ],
+  "helpH": "چۆن بگەڕێم",
+  "helpInside": "بۆ گەڕان لەناو بەڵگەنامەکاندا (PDF، Word، Excel، وێنەکان): کرتە لە «لەناو بەڵگەنامەکاندا» بکە، پاشان Enter.",
+  "helpKey": "چۆن بگەڕێم (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"خانەی گەڕانی بچووک لە هەر بەرنامەیەکەوە\"], [\"Ctrl+Alt+G\", \"لە پەنجەرەی پاشەکەوت/کردنەوە: چوون بۆ فۆڵدەری ئەنجامێک\"], [\"Enter\", \"کردنەوەی فایلەکە\"], [\"Ctrl+Enter\", \"کردنەوەی فۆڵدەرەکەی\"], [\"↓\", \"بۆ ئەنجامەکان (لە خانەی بەتاڵدا: مێژوو)\"],\n        [\"Ctrl+C\", \"کۆپیکردنی فایلەکە\"], [\"Ctrl+Shift+C\", \"کۆپیکردنی ڕێڕەو\"], [\"F2\", \"ناوگۆڕین\"], [\"Delete\", \"بۆ سەبەتەی خاشاک\"], [\"F4\", \"هەموو هاوتاکان لە فایلەکەدا\"], [\"Ctrl+H\", \"مێژوو\"], [\"Ctrl+T\", \"وێنۆچکەکان\"], [\"Ctrl+,\", \"ڕێکخستنەکان\"], [\"F1\", \"ئەم کارتە\"]]",
+  "helpKeysH": "تەختەکلیل",
+  "helpMore": "هەموو ڕێگاکانی گەڕان…",
+  "helpSub": "کرتە لە نموونەیەک بکە بۆ ئەوەی بچێتە ناو خانەی گەڕان. هەر فلتەرێک نووسینی عەرەبیشی هەیە.",
+  "kLabel": "کورتەڕێکانی تەختەکلیل",
+  "offline": "دیسک پەیوەست نییە",
+  "qsNone": "هیچ ئەنجامێک نییە بۆ گواستنەوەی پەنجەرەکە بۆ فۆڵدەرەکەی. گەڕانەکە بگۆڕە، یان بۆ هەڵوەشاندنەوە Esc دابگرە.",
+  "sHotkeyKeys": "کورتەڕێی کردنەوەی گەڕان",
+  "sHotkeyKeysSub": "لە هەر بەرنامەیەکدا کار دەکات. ئەگەر بەرنامەیەکی تر بەکاری دەهێنێت، یەکێکی تر هەڵبژێرە.",
+  "sHotkeyTaken": "FN:(k) => `بەرنامەیەکی تر ${k} بەکاردەهێنێت، بۆیە ئێستا هیچ ناکات. کورتەڕێیەکی تر هەڵبژێرە:`",
+  "sLangHelp": "یارمەتی باشترکردنی ئەم وەرگێڕانە بدە",
+  "sLangMachine": "(وەرگێڕانی ئامێر)",
+  "sPhone": "گەڕان لە مۆبایلەوە",
+  "sPhoneAllow": "ڕێگەدان بەم تۆڕە",
+  "sPhoneIdle": "بۆ پاراستن، دوای دوو کاتژمێر بێ هیچ داواکارییەک لە مۆبایلەوە، خۆی کوژایەوە. کاتێک پێویستت بوو دووبارە هەڵیبکەرەوە.",
+  "sPhoneMore": "ڕێکخستنی زیاتر…",
+  "sPhoneMoreSub": "پۆرت، داگرتنی فایلەکان، و ژمارەی نهێنی و بەستەری نوێ",
+  "sPhoneOff": "کوژاوەتەوە. هەڵیبکە بۆ بینینی ناونیشان و ژمارەی نهێنی.",
+  "sPhoneOpen": "لە وێبگەڕی مۆبایلەکەدا بیکەرەوە:",
+  "sPhonePin": "و ژمارەی نهێنی بنووسە:",
+  "sPhoneQr": "یان ئەم کۆدە بە کامێرای مۆبایلەکە بخوێنەرەوە بۆ کردنەوەی گەڕان بەبێ ژمارەی نهێنی. نیشانی کەسی مەدە.",
+  "sPhoneQrLabel": "کۆدی QR کە گەڕان لە مۆبایلەوە دەکاتەوە",
+  "sPhoneRow": "گەڕان لە مۆبایلەوە (تۆڕی ماڵەوە)",
+  "sPhoneSub": "لە وێبگەڕی مۆبایلەکەتەوە لەسەر هەمان Wi-Fi لە فایلەکانی ئەم کۆمپیوتەرە بگەڕێ. تەنها بۆ خوێندنەوەیە، و تەنها لەسەر تۆڕی ماڵەوەت.",
+  "sPhoneWait": "پشکنینی تۆڕ…",
+  "updChecking": "پشکنین بۆ نوێکردنەوە…"
  }
 }

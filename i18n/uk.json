@@ -447,7 +447,70 @@
   "Recent searches": "Нещодавні пошуки",
   "Save the current search": "Зберегти поточний пошук",
   "Clear history and recent files": "Очистити журнал і нещодавні файли",
-  "Delete all saved searches": "Видалити всі збережені пошуки"
+  "Delete all saved searches": "Видалити всі збережені пошуки",
+  "(machine translation)": "(машинний переклад)",
+  ", ": ", ",
+  "1 KB or more": "1 КБ і більше",
+  "1 MB or more": "1 МБ і більше",
+  "10 MB or more": "10 МБ і більше",
+  "100 KB or more": "100 КБ і більше",
+  "100 KB to 10 MB": "Від 100 КБ до 10 МБ",
+  "100 MB or more": "100 МБ і більше",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "У поштовій програмі відкрито лист на адресу {} (звіт не вдалося скопіювати: натисніть «Копіювати», потім вставте його в лист). Поки нічого не надіслано.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "У поштовій програмі відкрито лист на адресу {}. Повний звіт скопійовано: вставте його в лист (Ctrl+V), потім натисніть «Надіслати». Поки нічого не надіслано.",
+  "All types": "Усі типи",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Сполучення Alt+Space уже зайняте іншою програмою, тому його не можна використати тут. {} і далі працює.",
+  "Another program has {} too. Pick another one.": "{} також використовує інша програма. Виберіть інше сполучення.",
+  "Any size": "Будь-який розмір",
+  "Any time": "Будь-коли",
+  "Archives": "Архіви",
+  "Audio": "Аудіо",
+  "Documents": "Документи",
+  "Downloading the update…": "Завантаження оновлення…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter відкрити · Ctrl+Enter папка · Tab ще · Esc закрити",
+  "Folders": "Папки",
+  "GitHub page (public)": "Сторінка на GitHub (загальнодоступна)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — версія {}\nМиттєвий пошук файлів і тексту в документах, арабською та англійською.\n\nНатисніть {hk} будь-де, щоб почати пошук.\n{}\n\nПідтримка: {}\n{}\n\nЛіцензії сторонніх компонентів, які використовує програма, — у файлі THIRD-PARTY-NOTICES.txt. Відкрити його?",
+  "Last 30 days": "Останні 30 днів",
+  "Last 7 days": "Останні 7 днів",
+  "No files match your search. Try:": "Немає файлів, що відповідають запиту. Спробуйте:",
+  "No home network connection found; it works on this PC only.": "Підключення до домашньої мережі не знайдено; функція працює лише на цьому комп’ютері.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "Індексу ще немає: відкрийте InstaFind один раз, щоб створити його, і спробуйте знову.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "Поштова програма не відкрилася. Натисніть «Копіювати» й надішліть звіт на адресу {}.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "Поштова програма не відкрилася. Звіт скопійовано: вставте його в лист на адресу {} зі своєї пошти (на телефоні або в браузері).",
+  "No results yet — results may be incomplete while indexing.": "Поки немає результатів — під час індексування результати можуть бути неповними.",
+  "No results yet; they may be incomplete while indexing. Try:": "Поки немає результатів; під час індексування вони можуть бути неповними. Спробуйте:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "Примітка: арабський текст на зображеннях не можна розпізнати, бо арабський мовний пакет Windows не встановлено.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "Нічого не надсилається, доки ви не натиснете кнопку. Імена та шляхи файлів вилучаються зі звіту. Сторінка на GitHub загальнодоступна: її може прочитати будь-хто. Лист читаємо лише ми.",
+  "Older than a year": "Старші за рік",
+  "Open": "Відкрити",
+  "Open quick search\t{}": "Відкрити швидкий пошук\t{}",
+  "Over 1 GB": "Більше 1 ГБ",
+  "Over 10 MB": "Більше 10 МБ",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "Пошук із телефона вимкнувся сам після двох годин без запитів із телефона — для безпеки. Установіть прапорець вище, щоб увімкнути його знову.",
+  "Pictures": "Зображення",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "Список ваших файлів готується вперше (кілька хвилин). Шукайте вже зараз: результати доповняться, коли підготовку буде завершено.",
+  "Press {} in any program to open the quick search.": "Натисніть {} у будь-якій програмі, щоб відкрити швидкий пошук.",
+  "Press {} in any program to show or hide InstaFind.": "Натисніть {} у будь-якій програмі, щоб показати або сховати InstaFind.",
+  "Programs": "Програми",
+  "Results": "Результати",
+  "Results may be incomplete while indexing": "Під час індексування результати можуть бути неповними",
+  "Results may be incomplete while indexing — try": "Під час індексування результати можуть бути неповними — спробуйте",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Увімкнено простий інтерфейс, бо компонент Windows WebView2 не встановлено. Клацніть тут, щоб безкоштовно завантажити його з сайту Microsoft.",
+  "Send by email": "Надіслати поштою",
+  "Share": "Частка",
+  "Show the program from anywhere\t{}": "Показати програму з будь-якого місця\t{}",
+  "Size": "Розмір",
+  "The list just changed, so nothing was done. Try again.": "Список щойно змінився, тому нічого не зроблено. Спробуйте ще раз.",
+  "The name did not change.": "Ім’я не змінилося.",
+  "The program will run in the background when Windows starts; show it with {}.": "Програма працюватиме у фоновому режимі після запуску Windows; показати її можна сполученням {}.",
+  "This year": "Цього року",
+  "Today": "Сьогодні",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "Введіть ім’я файлу, програми або параметра. Стрілки вгору та вниз переходять між результатами; Enter відкриває вибраний.",
+  "Under 100 KB": "Менше 100 КБ",
+  "Video": "Відео",
+  "drive not connected": "диск не підключено",
+  "{} opens the quick search (otherwise the full window)": "{} відкриває швидкий пошук (інакше — повне вікно)"
  },
  "js": {
   "ph": "Пошук за іменами файлів…",
@@ -658,6 +721,102 @@
   "sStartup": "Автозавантаження",
   "sAutostart": "Запускати разом із Windows (у фоновому режимі)",
   "sAbout": "Про програму",
-  "version": "FN:(v) => `InstaFind — версія ${v}`"
+  "version": "FN:(v) => `InstaFind — версія ${v}`",
+  "fDetails": "Відомості про файл",
+  "helpEx": [
+   [
+    "звіт продажі",
+    "імена з обома словами"
+   ],
+   [
+    "\"договір оренди\"",
+    "точна фраза"
+   ],
+   [
+    "звіт .pdf",
+    "лише файли PDF (або ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "кілька типів"
+   ],
+   [
+    "фото|відео",
+    "будь-яке з двох слів"
+   ],
+   [
+    "договір -старий",
+    "без слова «старий» (або !старий)"
+   ],
+   [
+    "size:>10mb",
+    "більше 10 МБ"
+   ],
+   [
+    "dm:thisweek",
+    "змінені цього тижня"
+   ],
+   [
+    "dm:2026-05",
+    "змінені в травні 2026 р."
+   ],
+   [
+    "ww:договір",
+    "лише ціле слово"
+   ],
+   [
+    "\"договір оренди\"~5",
+    "обидва слова не далі ніж за 5 слів одне від одного"
+   ],
+   [
+    "folder: фото",
+    "лише папки"
+   ],
+   [
+    "root: كتاب",
+    "той самий арабський корінь: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: звті",
+    "допускає помилку"
+   ],
+   [
+    "حجم:>1ج",
+    "і арабською: більше 1 ГБ"
+   ],
+   [
+    "احمد",
+    "знаходить і «أحمد»"
+   ]
+  ],
+  "helpH": "Як шукати",
+  "helpInside": "Щоб шукати всередині документів (PDF, Word, Excel, зображення), натисніть «Усередині документів», потім Enter.",
+  "helpKey": "Як шукати (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"маленьке поле пошуку з будь-якої програми\"], [\"Ctrl+Alt+G\", \"у вікні «Зберегти/Відкрити»: перейти до папки результату\"], [\"Enter\", \"відкрити файл\"], [\"Ctrl+Enter\", \"відкрити його папку\"], [\"↓\", \"до результатів (у порожньому полі: журнал)\"],\n        [\"Ctrl+C\", \"копіювати файл\"], [\"Ctrl+Shift+C\", \"копіювати шлях\"], [\"F2\", \"перейменувати\"], [\"Delete\", \"до кошика\"], [\"F4\", \"усі збіги у файлі\"], [\"Ctrl+H\", \"журнал\"], [\"Ctrl+T\", \"ескізи\"], [\"Ctrl+,\", \"параметри\"], [\"F1\", \"ця картка\"]]",
+  "helpKeysH": "Клавіатура",
+  "helpMore": "Усі способи пошуку…",
+  "helpSub": "Клацніть приклад, щоб вставити його в поле пошуку. Кожен фільтр має й арабське написання.",
+  "kLabel": "Сполучення клавіш",
+  "offline": "диск не підключено",
+  "qsNone": "Немає результату, до папки якого можна перевести вікно. Змініть запит або натисніть Esc, щоб скасувати.",
+  "sHotkeyKeys": "Сполучення клавіш для відкриття пошуку",
+  "sHotkeyKeysSub": "Працює в будь-якій програмі. Виберіть інше, якщо його використовує інша програма.",
+  "sHotkeyTaken": "FN:(k) => `Сполучення ${k} зайняте іншою програмою, тому зараз воно не працює. Виберіть інше сполучення:`",
+  "sLangHelp": "Допоможіть покращити цей переклад",
+  "sLangMachine": "(машинний переклад)",
+  "sPhone": "Пошук із телефона",
+  "sPhoneAllow": "Дозволити цю мережу",
+  "sPhoneIdle": "Він вимкнувся сам після двох годин без запитів із телефона — для безпеки. Увімкніть його знову, коли знадобиться.",
+  "sPhoneMore": "Інші параметри…",
+  "sPhoneMoreSub": "Порт, завантаження файлів, новий PIN-код і посилання",
+  "sPhoneOff": "Вимкнено. Увімкніть, щоб побачити адресу та PIN-код.",
+  "sPhoneOpen": "Відкрийте в браузері телефона:",
+  "sPhonePin": "і введіть PIN-код:",
+  "sPhoneQr": "Або відскануйте цей код камерою телефона, щоб відкрити пошук без PIN-коду. Нікому його не показуйте.",
+  "sPhoneQrLabel": "QR-код, що відкриває пошук із телефона",
+  "sPhoneRow": "Пошук із телефона (домашня мережа)",
+  "sPhoneSub": "Шукайте файли цього комп’ютера з браузера телефона в тій самій мережі Wi-Fi. Лише читання і лише у вашій домашній мережі.",
+  "sPhoneWait": "Перевірка мережі…",
+  "updChecking": "Перевірка оновлень…"
  }
 }

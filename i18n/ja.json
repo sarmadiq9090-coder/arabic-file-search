@@ -447,7 +447,70 @@
   "Recent searches": "最近の検索",
   "Save the current search": "現在の検索を保存",
   "Clear history and recent files": "履歴と最近使ったファイルを消去",
-  "Delete all saved searches": "保存した検索をすべて削除"
+  "Delete all saved searches": "保存した検索をすべて削除",
+  "(machine translation)": "(機械翻訳)",
+  ", ": "、",
+  "1 KB or more": "1 KB 以上",
+  "1 MB or more": "1 MB 以上",
+  "10 MB or more": "10 MB 以上",
+  "100 KB or more": "100 KB 以上",
+  "100 KB to 10 MB": "100 KB ～ 10 MB",
+  "100 MB or more": "100 MB 以上",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "メール プログラムで {} 宛てのメッセージを開きました (レポートをコピーできませんでした: [コピー] を押してから、そこに貼り付けてください)。まだ何も送信されていません。",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "メール プログラムで {} 宛てのメッセージを開きました。レポート全体をコピーしました: メッセージに貼り付けて (Ctrl+V)、[送信] を押してください。まだ何も送信されていません。",
+  "All types": "すべての種類",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space は別のプログラムで使用されているため、ここでは使えません。{} は引き続き使えます。",
+  "Another program has {} too. Pick another one.": "{} は別のプログラムでも使用されています。別のキーを選んでください。",
+  "Any size": "すべてのサイズ",
+  "Any time": "すべての期間",
+  "Archives": "圧縮ファイル",
+  "Audio": "オーディオ",
+  "Documents": "ドキュメント",
+  "Downloading the update…": "更新プログラムをダウンロードしています…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter 開く · Ctrl+Enter フォルダー · Tab その他 · Esc 閉じる",
+  "Folders": "フォルダー",
+  "GitHub page (public)": "GitHub ページ (公開)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — バージョン {}\nファイル名とドキュメント内を、アラビア語でも英語でも瞬時に検索します。\n\nどこからでも {hk} を押すと検索できます。\n{}\n\nサポート: {}\n{}\n\n使用しているサードパーティ コンポーネントのライセンスは THIRD-PARTY-NOTICES.txt にあります。開きますか？",
+  "Last 30 days": "過去 30 日間",
+  "Last 7 days": "過去 7 日間",
+  "No files match your search. Try:": "検索に一致するファイルはありません。次をお試しください:",
+  "No home network connection found; it works on this PC only.": "ホーム ネットワークへの接続が見つかりません。この PC でのみ使えます。",
+  "No index yet: open InstaFind once to build it, then try again.\n": "インデックスがまだありません: InstaFind を一度開いてインデックスを作成してから、もう一度お試しください。\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "メール プログラムが開きませんでした。[コピー] を押して、レポートを {} に送ってください。",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "メール プログラムが開きませんでした。レポートはコピー済みです: ご自分のメール (スマートフォンやブラウザー) から {} 宛てのメッセージに貼り付けてください。",
+  "No results yet — results may be incomplete while indexing.": "まだ結果がありません — インデックス作成中は結果が不完全な場合があります。",
+  "No results yet; they may be incomplete while indexing. Try:": "まだ結果がありません。インデックス作成中は不完全な場合があります。次をお試しください:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "注意: Windows のアラビア語言語パックがインストールされていないため、画像内のアラビア語テキストを読み取れません。",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "ボタンを押さない限り何も送信されません。ファイル名とパスはレポートから削除されます。GitHub ページは公開されていて、誰でも読めます。メールは私たちだけが読みます。",
+  "Older than a year": "1 年以上前",
+  "Open": "開く",
+  "Open quick search\t{}": "クイック検索を開く\t{}",
+  "Over 1 GB": "1 GB より大きい",
+  "Over 10 MB": "10 MB より大きい",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "安全のため、スマートフォンからの要求が 2 時間なかったので、スマートフォンからの検索は自動的にオフになりました。もう一度オンにするには、上のチェック ボックスをオンにしてください。",
+  "Pictures": "画像",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "初めてファイル一覧を準備しています (数分かかります)。今すぐ検索できます。完了するにつれて結果がそろいます。",
+  "Press {} in any program to open the quick search.": "どのプログラムからでも {} を押すとクイック検索が開きます。",
+  "Press {} in any program to show or hide InstaFind.": "どのプログラムからでも {} を押すと InstaFind の表示/非表示を切り替えられます。",
+  "Programs": "プログラム",
+  "Results": "結果",
+  "Results may be incomplete while indexing": "インデックス作成中は結果が不完全な場合があります",
+  "Results may be incomplete while indexing — try": "インデックス作成中は結果が不完全な場合があります — 次をお試しください",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Windows の WebView2 コンポーネントがインストールされていないため、シンプルな外観で実行しています。ここをクリックすると Microsoft から無料でダウンロードできます。",
+  "Send by email": "メールで送信",
+  "Share": "割合",
+  "Show the program from anywhere\t{}": "どこからでもプログラムを表示\t{}",
+  "Size": "サイズ",
+  "The list just changed, so nothing was done. Try again.": "一覧が変更されたばかりのため、何も実行しませんでした。もう一度お試しください。",
+  "The name did not change.": "名前は変更されませんでした。",
+  "The program will run in the background when Windows starts; show it with {}.": "Windows の起動時にプログラムがバックグラウンドで実行されます。{} で表示できます。",
+  "This year": "今年",
+  "Today": "今日",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "ファイル、アプリ、設定の名前を入力します。上下の方向キーで結果を移動し、Enter で選択した項目を開きます。",
+  "Under 100 KB": "100 KB 未満",
+  "Video": "ビデオ",
+  "drive not connected": "ドライブが接続されていません",
+  "{} opens the quick search (otherwise the full window)": "{} でクイック検索を開く (オフの場合はフル ウィンドウ)"
  },
  "js": {
   "ph": "ファイル名を検索…",
@@ -658,6 +721,102 @@
   "sStartup": "スタートアップ",
   "sAutostart": "Windows と同時に起動 (バックグラウンド)",
   "sAbout": "バージョン情報",
-  "version": "FN:(v) => `InstaFind — バージョン ${v}`"
+  "version": "FN:(v) => `InstaFind — バージョン ${v}`",
+  "fDetails": "ファイルの詳細",
+  "helpEx": [
+   [
+    "売上 報告書",
+    "両方の語を含む名前"
+   ],
+   [
+    "\"賃貸借契約\"",
+    "完全に一致する語句"
+   ],
+   [
+    "報告書 .pdf",
+    "PDF ファイルのみ (または ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "複数の種類"
+   ],
+   [
+    "写真|ビデオ",
+    "どちらかの語"
+   ],
+   [
+    "契約 -旧",
+    "「旧」を含まない (または !旧)"
+   ],
+   [
+    "size:>10mb",
+    "10 MB より大きい"
+   ],
+   [
+    "dm:thisweek",
+    "今週変更されたもの"
+   ],
+   [
+    "dm:2026-05",
+    "2026 年 5 月に変更されたもの"
+   ],
+   [
+    "ww:contract",
+    "単語全体のみ (contract に一致し contracts には一致しない)"
+   ],
+   [
+    "\"賃貸 契約\"~5",
+    "両方の語が 5 語以内"
+   ],
+   [
+    "folder: 写真",
+    "フォルダーのみ"
+   ],
+   [
+    "root: كتاب",
+    "同じアラビア語の語根: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: reprot",
+    "入力ミスを許容 (report が見つかる)"
+   ],
+   [
+    "حجم:>1ج",
+    "アラビア語でも: 1 GB より大きい"
+   ],
+   [
+    "احمد",
+    "«أحمد» も見つかります"
+   ]
+  ],
+  "helpH": "検索のしかた",
+  "helpInside": "ドキュメント (PDF、Word、Excel、画像) の中を検索するには: [ドキュメントの中] を押してから Enter を押します。",
+  "helpKey": "検索のしかた (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"どのプログラムからでも小さな検索ボックス\"], [\"Ctrl+Alt+G\", \"[保存]/[開く] ダイアログで: 結果のフォルダーへ移動\"], [\"Enter\", \"ファイルを開く\"], [\"Ctrl+Enter\", \"フォルダーを開く\"], [\"↓\", \"結果へ (空のボックスでは履歴)\"], [\"Ctrl+C\", \"ファイルをコピー\"], [\"Ctrl+Shift+C\", \"パスをコピー\"], [\"F2\", \"名前の変更\"], [\"Delete\", \"ごみ箱へ\"], [\"F4\", \"ファイル内のすべての一致\"], [\"Ctrl+H\", \"履歴\"], [\"Ctrl+T\", \"縮小版\"], [\"Ctrl+,\", \"設定\"], [\"F1\", \"このカード\"]]",
+  "helpKeysH": "キーボード",
+  "helpMore": "すべての検索方法…",
+  "helpSub": "例をクリックすると検索ボックスに入力されます。どのフィルターにもアラビア語の書き方があります。",
+  "kLabel": "キーボード ショートカット",
+  "offline": "ドライブが接続されていません",
+  "qsNone": "ダイアログの移動先になる結果がありません。検索を変更するか、Esc を押してキャンセルしてください。",
+  "sHotkeyKeys": "検索を開くショートカット",
+  "sHotkeyKeysSub": "どのプログラムでも使えます。別のプログラムが使っている場合は別のキーを選んでください。",
+  "sHotkeyTaken": "FN:(k) => `${k} は別のプログラムが使っているため、現在は何も起きません。別のショートカットを選んでください:`",
+  "sLangHelp": "この翻訳の改善に協力する",
+  "sLangMachine": "(機械翻訳)",
+  "sPhone": "スマートフォンから検索",
+  "sPhoneAllow": "このネットワークを許可",
+  "sPhoneIdle": "安全のため、スマートフォンからの要求が 2 時間なかったので自動的にオフになりました。必要なときにもう一度オンにしてください。",
+  "sPhoneMore": "その他の設定…",
+  "sPhoneMoreSub": "ポート、ファイルのダウンロード、新しい PIN とリンク",
+  "sPhoneOff": "オフです。オンにするとアドレスと PIN が表示されます。",
+  "sPhoneOpen": "スマートフォンのブラウザーで開く:",
+  "sPhonePin": "PIN を入力:",
+  "sPhoneQr": "または、スマートフォンのカメラでこのコードを読み取ると、PIN なしで検索を開けます。誰にも見せないでください。",
+  "sPhoneQrLabel": "スマートフォンからの検索を開く QR コード",
+  "sPhoneRow": "スマートフォンから検索 (ホーム ネットワーク)",
+  "sPhoneSub": "同じ Wi-Fi につないだスマートフォンのブラウザーから、この PC のファイルを検索します。読み取り専用で、ホーム ネットワークでのみ使えます。",
+  "sPhoneWait": "ネットワークを確認しています…",
+  "updChecking": "更新プログラムを確認しています…"
  }
 }

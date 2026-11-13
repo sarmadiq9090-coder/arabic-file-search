@@ -447,7 +447,70 @@
   "Recent searches": "ⵉⵔⵣⵣⵓⵜⵏ ⵉⵎⴳⴳⵓⵔⴰ",
   "Save the current search": "ⵃⴹⵓ ⴰⵔⵣⵣⵓ ⴰⵎⵉⵔⴰⵏ",
   "Clear history and recent files": "ⵙⴼⴹ ⴰⵎⵣⵔⵓⵢ ⴷ ⵉⴼⵓⵢⵍⴰ ⵉⵎⴳⴳⵓⵔⴰ",
-  "Delete all saved searches": "ⴽⴽⵙ ⵎⴰⵕⵕⴰ ⵉⵔⵣⵣⵓⵜⵏ ⵉⵜⵜⵓⵃⴹⴰⵏ"
+  "Delete all saved searches": "ⴽⴽⵙ ⵎⴰⵕⵕⴰ ⵉⵔⵣⵣⵓⵜⵏ ⵉⵜⵜⵓⵃⴹⴰⵏ",
+  "(machine translation)": "(ⴰⵙⵓⵖⵍ ⵏ ⵜⵎⴰⵛⵉⵏⵜ)",
+  ", ": ", ",
+  "1 KB or more": "1 KB ⵏⵖ ⵓⴳⴳⴰⵔ",
+  "1 MB or more": "1 MB ⵏⵖ ⵓⴳⴳⴰⵔ",
+  "10 MB or more": "10 MB ⵏⵖ ⵓⴳⴳⴰⵔ",
+  "100 KB or more": "100 KB ⵏⵖ ⵓⴳⴳⴰⵔ",
+  "100 KB to 10 MB": "ⵙⴳ 100 KB ⴰⵔ 10 MB",
+  "100 MB or more": "100 MB ⵏⵖ ⵓⴳⴳⴰⵔ",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "ⵜⵕⵥⵎ ⵢⴰⵜ ⵜⵓⵣⵉⵏⵜ ⵉ {} ⴳ ⵓⵖⴰⵡⴰⵙ ⵏ ⵓⵎⴰⵢⵍ ⵏⵏⴽ (ⵓⵔ ⵉⵣⵎⵉⵔ ⵓⵏⵇⵇⵉⵙ ⴰⴷ ⵉⵜⵜⵓⵙⵏⵖⵍ: ⵙⵙⵏⴷ «ⵙⵏⵖⵍ», ⵙ ⵜⵙⵏⵜⵉⴷ ⵜ ⴷⵉⵙ). ⵓⵔ ⵜⵜⵓⵣⵏ ⵓⵍⴰ ⵢⴰⵜ ⴰⵔ ⴷⵖⵉ.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "ⵜⵕⵥⵎ ⵢⴰⵜ ⵜⵓⵣⵉⵏⵜ ⵉ {} ⴳ ⵓⵖⴰⵡⴰⵙ ⵏ ⵓⵎⴰⵢⵍ ⵏⵏⴽ. ⵉⵜⵜⵓⵙⵏⵖⵍ ⵓⵏⵇⵇⵉⵙ ⴰⴽⴽⵯ: ⵙⵏⵜⵉ ⵜ ⴳ ⵜⵓⵣⵉⵏⵜ (Ctrl+V), ⵙ ⵜⵙⵙⵏⴷⴷ «ⴰⵣⵏ». ⵓⵔ ⵜⵜⵓⵣⵏ ⵓⵍⴰ ⵢⴰⵜ ⴰⵔ ⴷⵖⵉ.",
+  "All types": "ⵎⴰⵕⵕⴰ ⵉⵏⴰⵡⵏ",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space ⵉⵜⵜⵓⵙⵎⵔⴰⵙ ⵢⴰⴷ ⵙⴳ ⵢⴰⵏ ⵓⵖⴰⵡⴰⵙ ⵢⴰⴹⵏ, ⵙ ⵓⵢⴰ ⵓⵔ ⵉⵣⵎⵉⵔ ⴰⴷ ⵉⵜⵜⵓⵙⵎⵔⵙ ⴷⴰ. {} ⴰⵔ ⵉⵜⵜⵅⴷⴰⵎ ⴰⵔ ⴷⵖⵉ.",
+  "Another program has {} too. Pick another one.": "ⵢⴰⵏ ⵓⵖⴰⵡⴰⵙ ⵢⴰⴹⵏ ⴰⵔ ⵉⵙⵎⵔⴰⵙ ⵓⵍⴰ ⵏⵜⵜⴰ {}. ⴼⵔⵏ ⵢⴰⵏ ⵢⴰⴹⵏ.",
+  "Any size": "ⴽⵓ ⵜⵉⴷⴷⵉ",
+  "Any time": "ⴽⵓ ⴰⴽⵓⴷ",
+  "Archives": "ⵉⴼⵓⵢⵍⴰ ⵉⵜⵜⵓⵙⵙⵓⵎⵎⵏ",
+  "Audio": "ⵉⵎⵙⵍⵉ",
+  "Documents": "ⵉⵙⵎⵍⵉⵢⵏ",
+  "Downloading the update…": "ⴰⴳⵎ ⵏ ⵓⵙⵎⴰⵢⵏⵓ…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter ⵕⵥⵎ · Ctrl+Enter ⴰⴽⴰⵔⴰⵎ · Tab ⵓⴳⴳⴰⵔ · Esc ⵇⵇⵏ",
+  "Folders": "ⵉⴽⴰⵔⴰⵎⵏ",
+  "GitHub page (public)": "ⵜⴰⵙⵏⴰ ⵏ GitHub (ⵜⴰⵎⴰⵜⴰⵢⵜ)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — ⵜⵓⵏⵖⵉⵍⵜ {}\nⴰⵔⵣⵣⵓ ⴰⵎⵙⵙⵓⴷⵙ ⵏ ⵉⴼⵓⵢⵍⴰ ⴷ ⵡⴰⵏⵙⴰ ⵏ ⵉⵙⵎⵍⵉⵢⵏ, ⵙ ⵜⵄⵔⴰⴱⵜ ⴷ ⵜⵏⴳⵍⵉⵣⵜ.\n\nⵙⵙⵏⴷ {hk} ⴳ ⴽⵓ ⴰⴷⵖⴰⵔ ⵃⵎⴰ ⴰⴷ ⵜⵔⵣⵓⴷ.\n{}\n\nⵜⵉⵡⵉⵙⵉ: {}\n{}\n\nⵜⵓⵔⴰⴳⵉⵏ ⵏ ⵉⴼⵔⴷⵉⵙⵏ ⵏ ⵉⵏⵎⵎⴰⵙⵏ ⵢⴰⴹⵏ ⵏⵏⴰ ⵉⵙⵎⵔⴰⵙ ⵍⵍⴰⵏⵜ ⴳ THIRD-PARTY-NOTICES.txt. ⵉⵙ ⵜⵔⵉⴷ ⴰⴷ ⵜ ⵜⵕⵥⵎⴷ?",
+  "Last 30 days": "30 ⵏ ⵡⵓⵙⵙⴰⵏ ⵉⵎⴳⴳⵓⵔⴰ",
+  "Last 7 days": "7 ⵏ ⵡⵓⵙⵙⴰⵏ ⵉⵎⴳⴳⵓⵔⴰ",
+  "No files match your search. Try:": "ⵓⵍⴰ ⴰⴼⴰⵢⵍⵓ ⵉⵎⵙⴰⵙⴰⵏ ⴷ ⵓⵔⵣⵣⵓ ⵏⵏⴽ. ⴰⵔⵎ:",
+  "No home network connection found; it works on this PC only.": "ⵓⵔ ⵉⵜⵜⵢⴰⴼ ⴽⵔⴰ ⵏ ⵓⵣⴷⴰⵢ ⵖⵔ ⵓⵥⵟⵟⴰ ⵏ ⵜⴷⴷⴰⵔⵜ; ⴰⵔ ⵉⵜⵜⵅⴷⴰⵎ ⵖⴰⵙ ⴳ ⵓⵙⵓⵏⵖⵓ ⴰⴷ.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "ⵓⵍⴰ ⴰⵎⴰⵜⴰⵔ ⴰⵔ ⴷⵖⵉ: ⵕⵥⵎ InstaFind ⵢⴰⵜ ⵜⵉⴽⴽⵍⵜ ⵃⵎⴰ ⴰⴷ ⵜ ⵉⴱⵏⵓ, ⵙ ⵜⴰⵔⵎⴷ ⴷⴰⵖ.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "ⵓⵔ ⵉⵕⵥⵉⵎ ⵓⵍⴰ ⵢⴰⵏ ⵓⵖⴰⵡⴰⵙ ⵏ ⵓⵎⴰⵢⵍ. ⵙⵙⵏⴷ «ⵙⵏⵖⵍ» ⵜⴰⵣⵏⴷ ⴰⵏⵇⵇⵉⵙ ⵉ {}.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "ⵓⵔ ⵉⵕⵥⵉⵎ ⵓⵍⴰ ⵢⴰⵏ ⵓⵖⴰⵡⴰⵙ ⵏ ⵓⵎⴰⵢⵍ. ⵉⵜⵜⵓⵙⵏⵖⵍ ⵓⵏⵇⵇⵉⵙ: ⵙⵏⵜⵉ ⵜ ⴳ ⵢⴰⵜ ⵜⵓⵣⵉⵏⵜ ⵉ {} ⵙⴳ ⵓⵎⴰⵢⵍ ⵏⵏⴽ (ⴳ ⵓⵜⵉⵍⵉⴼⵓⵏ ⵏⵖ ⴳ ⵉⵎⵉⵏⵉⴳ).",
+  "No results yet — results may be incomplete while indexing.": "ⵓⵍⴰ ⵜⴰⵢⴰⴼⵓⵜ ⴰⵔ ⴷⵖⵉ — ⵜⵉⵢⴰⴼⵓⵜⵉⵏ ⵣⵎⵔⵏⵜ ⴰⴷ ⵓⵔ ⴽⵎⵎⵍⵏⵜ ⴳ ⵓⵙⵎⴰⵜⵔ.",
+  "No results yet; they may be incomplete while indexing. Try:": "ⵓⵍⴰ ⵜⴰⵢⴰⴼⵓⵜ ⴰⵔ ⴷⵖⵉ; ⵣⵎⵔⵏⵜ ⴰⴷ ⵓⵔ ⴽⵎⵎⵍⵏⵜ ⴳ ⵓⵙⵎⴰⵜⵔ. ⴰⵔⵎ:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "ⵜⴰⵏⴱⴹⵜ: ⴰⴹⵕⵉⵚ ⴰⵄⵔⴰⴱ ⴳ ⵜⵡⵍⴰⴼⵉⵏ ⵓⵔ ⵉⵣⵎⵉⵔ ⴰⴷ ⵉⵜⵜⵓⵖⵔ, ⴰⵛⴽⵓ ⵜⴰⴽⵔⴰⵙⵜ ⵏ ⵜⵓⵜⵍⴰⵢⵜ ⵜⴰⵄⵔⴰⴱⵜ ⵏ Windows ⵓⵔ ⵜⵜⵓⵙⵔⵙ.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "ⵓⵔ ⵜⵜⵓⵣⵏ ⵓⵍⴰ ⵢⴰⵜ ⴰⵔ ⵜⵙⵙⵏⴷⴷ ⵢⴰⵏ ⵓⵜⵔⴽⵉ. ⵉⵙⵎⴰⵡⵏ ⴷ ⵉⴱⵔⵉⴷⵏ ⵏ ⵉⴼⵓⵢⵍⴰ ⵜⵜⵓⴽⴽⵙⵏ ⵙⴳ ⵓⵏⵇⵇⵉⵙ. ⵜⴰⵙⵏⴰ ⵏ GitHub ⵜⴳⴰ ⵜⴰⵎⴰⵜⴰⵢⵜ: ⴽⵓ ⵢⴰⵏ ⵉⵣⵎⵔ ⴰⴷ ⵜⵜ ⵉⵖⵔ. ⴰⵎⴰⵢⵍ ⵖⴰⵙ ⵏⴽⵏⵉ ⴰⵢ ⵜ ⵉⵖⵔⴰⵏ.",
+  "Older than a year": "ⵢⵓⴼ ⵢⴰⵜ ⵜⵙⴳⴳⵯⴰⵙⵜ",
+  "Open": "ⵕⵥⵎ",
+  "Open quick search\t{}": "ⵕⵥⵎ ⴰⵔⵣⵣⵓ ⴰⵣⵔⵔⴰⴱ\t{}",
+  "Over 1 GB": "ⵓⴳⴳⴰⵔ ⵏ 1 GB",
+  "Over 10 MB": "ⵓⴳⴳⴰⵔ ⵏ 10 MB",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "ⴰⵔⵣⵣⵓ ⵙⴳ ⵓⵜⵉⵍⵉⴼⵓⵏ ⵉⵅⵙⴰ ⵙ ⵉⵎⴰⵏ ⵏⵏⵙ ⴷⴼⴼⵉⵔ ⵙⵏⴰⵜ ⵜⵙⵔⴰⴳⵉⵏ ⴱⵍⴰ ⵓⵍⴰ ⵢⴰⵏ ⵓⵙⵓⵜⵔ ⵙⴳ ⵓⵜⵉⵍⵉⴼⵓⵏ, ⵉ ⵜⵖⵓⴷⵉ. ⵛⵔⴹ ⵜⴰⵙⵓⴷⵓⵏⵜ ⵏ ⵓⴼⵍⵍⴰ ⵃⵎⴰ ⴰⴷ ⵜ ⵜⵙⵙⵏⴽⵔⴷ ⴷⴰⵖ.",
+  "Pictures": "ⵜⵉⵡⵍⴰⴼⵉⵏ",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "ⴰⵔ ⵏⵙⵡⵊⴰⴷ ⵜⴰⵍⴳⴰⵎⵜ ⵏ ⵉⴼⵓⵢⵍⴰ ⵏⵏⴽ ⵜⵉⴽⴽⵍⵜ ⵜⴰⵎⵣⵡⴰⵔⵓⵜ (ⴽⵔⴰ ⵏ ⵜⵓⵙⴷⵉⴷⵉⵏ). ⵔⵣⵓ ⴷⵖⵉ; ⵜⵉⵢⴰⴼⵓⵜⵉⵏ ⴰⴷ ⴽⵎⵎⵍⵏⵜ ⵎⴽ ⵉⴽⵎⵍ.",
+  "Press {} in any program to open the quick search.": "ⵙⵙⵏⴷ {} ⴳ ⴽⵓ ⴰⵖⴰⵡⴰⵙ ⵃⵎⴰ ⴰⴷ ⵜⵕⵥⵎⴷ ⴰⵔⵣⵣⵓ ⴰⵣⵔⵔⴰⴱ.",
+  "Press {} in any program to show or hide InstaFind.": "ⵙⵙⵏⴷ {} ⴳ ⴽⵓ ⴰⵖⴰⵡⴰⵙ ⵃⵎⴰ ⴰⴷ ⵜⵙⵎⴰⵍⴷ ⵏⵖ ⴰⴷ ⵜⴼⴼⵔⴷ InstaFind.",
+  "Programs": "ⵉⵖⴰⵡⴰⵙⵏ",
+  "Results": "ⵜⵉⵢⴰⴼⵓⵜⵉⵏ",
+  "Results may be incomplete while indexing": "ⵜⵉⵢⴰⴼⵓⵜⵉⵏ ⵣⵎⵔⵏⵜ ⴰⴷ ⵓⵔ ⴽⵎⵎⵍⵏⵜ ⴳ ⵓⵙⵎⴰⵜⵔ",
+  "Results may be incomplete while indexing — try": "ⵜⵉⵢⴰⴼⵓⵜⵉⵏ ⵣⵎⵔⵏⵜ ⴰⴷ ⵓⵔ ⴽⵎⵎⵍⵏⵜ ⴳ ⵓⵙⵎⴰⵜⵔ — ⴰⵔⵎ",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "ⴰⵔ ⵉⵜⵜⵅⴷⴰⵎ ⵙ ⵜⵍⵖⴰ ⵜⴰⵙⵍⴰⵢⵜ ⴰⵛⴽⵓ ⴰⴼⵔⴷⵉⵙ WebView2 ⵏ Windows ⵓⵔ ⵉⵜⵜⵓⵙⵔⵙ. ⵙⵙⵏⴷ ⴷⴰ ⵃⵎⴰ ⴰⴷ ⵜ ⵜⴳⵎⴷ ⴱⵍⴰ ⴰⵡⴷⵉⵔ ⵙⴳ Microsoft.",
+  "Send by email": "ⴰⵣⵏ ⵙ ⵓⵎⴰⵢⵍ",
+  "Share": "ⵜⴰⴳⵣⵣⵓⵎⵜ",
+  "Show the program from anywhere\t{}": "ⵙⵎⴰⵍ ⴰⵖⴰⵡⴰⵙ ⵙⴳ ⴽⵓ ⴰⴷⵖⴰⵔ\t{}",
+  "Size": "ⵜⵉⴷⴷⵉ",
+  "The list just changed, so nothing was done. Try again.": "ⵜⴰⵍⴳⴰⵎⵜ ⵜⵏⴼⵍ ⴷⵖⵉ, ⵙ ⵓⵢⴰ ⵓⵔ ⵉⵜⵜⵓⴳ ⵓⵍⴰ ⵢⴰⵜ. ⴰⵔⵎ ⴷⴰⵖ.",
+  "The name did not change.": "ⵉⵙⵎ ⵓⵔ ⵉⵏⴼⵉⵍ.",
+  "The program will run in the background when Windows starts; show it with {}.": "ⴰⵖⴰⵡⴰⵙ ⴰⴷ ⵉⵅⴷⵎ ⵙ ⵜⵓⴼⴼⵔⴰ ⵎⴽ ⵉⴱⴷⴰ Windows; ⵙⵎⴰⵍ ⵜ ⵙ {}.",
+  "This year": "ⵜⴰⵙⴳⴳⵯⴰⵙⵜ ⴰ",
+  "Today": "ⵖⴰⵙⵙⴰ",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "ⴰⵔⵓ ⵉⵙⵎ ⵏ ⵢⴰⵏ ⵓⴼⴰⵢⵍⵓ, ⵢⴰⵏ ⵓⵙⵏⵙ ⵏⵖ ⵢⴰⵜ ⵜⵙⵖⵍⵜ. ⵉⵏⵉⵍⵏ ⵏ ⵓⴼⵍⵍⴰ ⴷ ⵡⴰⴷⴷⴰⵢ ⴰⵔ ⵜⵜⵎⵓⵜⵜⵓⵢⵏ ⴳⵔ ⵜⵢⴰⴼⵓⵜⵉⵏ; Enter ⴰⵔ ⵉⵕⵥⵥⵎ ⵜⴰⵏⵏⴰ ⵉⵜⵜⵓⴼⵔⴰⵏ.",
+  "Under 100 KB": "ⴷⵔⵓⵙ ⵏ 100 KB",
+  "Video": "ⴰⴼⵉⴷⵢⵓ",
+  "drive not connected": "ⴰⴷⵉⵙⴽ ⵓⵔ ⵉⵜⵜⵓⵇⵇⵏ",
+  "{} opens the quick search (otherwise the full window)": "{} ⴰⵔ ⵉⵕⵥⵥⵎ ⴰⵔⵣⵣⵓ ⴰⵣⵔⵔⴰⴱ (ⵎⴽ ⵓⵔ ⵉⴳⵉ, ⴰⵙⴼⴰⵢⵍⵓ ⴰⴽⵎⵎⴰⵍ)"
  },
  "js": {
   "ph": "ⵔⵣⵓ ⵙ ⵉⵙⵎ ⵏ ⵓⴼⴰⵢⵍⵓ…",
@@ -658,6 +721,102 @@
   "sStartup": "ⴰⴱⴷⴰⵢ",
   "sAutostart": "ⴱⴷⵓ ⴰⴽⴷ Windows (ⵙ ⵜⵓⴼⴼⵔⴰ)",
   "sAbout": "ⵅⴼ ⵓⵖⴰⵡⴰⵙ",
-  "version": "FN:(v) => `InstaFind — ⵜⵓⵏⵖⵉⵍⵜ ${v}`"
+  "version": "FN:(v) => `InstaFind — ⵜⵓⵏⵖⵉⵍⵜ ${v}`",
+  "fDetails": "ⵉⴼⵙⵙⵔⵏ ⵏ ⵓⴼⴰⵢⵍⵓ",
+  "helpEx": [
+   [
+    "ⴰⵏⵇⵇⵉⵙ ⵏ ⵜⵏⵣⵣⴰ",
+    "ⵉⵙⵎⴰⵡⵏ ⵉⵍⵍⴰⵏ ⴳⵉⵙⵏ ⵙⵏⴰⵜ ⵜⴳⵓⵔⵉⵡⵉⵏ"
+   ],
+   [
+    "\"ⴰⵎⵢⴰⵏⴰⵡ ⵏ ⵓⴽⵔⴰⵡ\"",
+    "ⵜⴰⵡⵉⵏⵙⵜ ⵙ ⵓⵎⵓⵏ"
+   ],
+   [
+    "ⴰⵏⵇⵇⵉⵙ .pdf",
+    "ⵖⴰⵙ ⵉⴼⵓⵢⵍⴰ PDF (ⵏⵖ ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "ⴽⵔⴰ ⵏ ⵉⵏⴰⵡⵏ"
+   ],
+   [
+    "ⵜⴰⵡⵍⴰⴼⵜ|ⴰⴼⵉⴷⵢⵓ",
+    "ⵢⴰⵜ ⴳ ⵙⵏⴰⵜ ⵜⴳⵓⵔⵉⵡⵉⵏ"
+   ],
+   [
+    "ⴰⵎⵢⴰⵏⴰⵡ -ⴰⵇⴷⵉⵎ",
+    "ⴱⵍⴰ «ⴰⵇⴷⵉⵎ» (ⵏⵖ !ⴰⵇⴷⵉⵎ)"
+   ],
+   [
+    "size:>10mb",
+    "ⵢⵓⴳⵔ 10 MB"
+   ],
+   [
+    "dm:thisweek",
+    "ⵜⵜⵓⵙⵏⴼⵍⵏ ⴳ ⵉⵎⴰⵍⴰⵙⵙ ⴰⴷ"
+   ],
+   [
+    "dm:2026-05",
+    "ⵜⵜⵓⵙⵏⴼⵍⵏ ⴳ ⵎⴰⵢⵢⵓ 2026"
+   ],
+   [
+    "ww:ⴰⵎⵢⴰⵏⴰⵡ",
+    "ⵖⴰⵙ ⵜⴰⴳⵓⵔⵉ ⵜⴰⴽⵎⵎⴰⵍⵜ"
+   ],
+   [
+    "\"ⴰⵎⵢⴰⵏⴰⵡ ⴰⴽⵔⴰⵡ\"~5",
+    "ⵙⵏⴰⵜ ⵜⴳⵓⵔⵉⵡⵉⵏ ⴳⵔⴰⵙⵏⵜ 5 ⵏ ⵜⴳⵓⵔⵉⵡⵉⵏ ⵎⴰⵙ ⵓⴳⴳⴰⵔ"
+   ],
+   [
+    "folder: ⵜⵉⵡⵍⴰⴼⵉⵏ",
+    "ⵖⴰⵙ ⵉⴽⴰⵔⴰⵎⵏ"
+   ],
+   [
+    "root: كتاب",
+    "ⴰⵥⵓⵕ ⴰⵄⵔⴰⴱ ⵏⵏⴰ: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: ⴰⵏⵇⵉⵙⵙ",
+    "ⵉⵇⴱⵍ ⵢⴰⵜ ⵜⵣⴳⵍⵜ ⵏ ⵜⵉⵔⵔⴰ"
+   ],
+   [
+    "حجم:>1ج",
+    "ⵙ ⵜⵄⵔⴰⴱⵜ ⵓⵍⴰ: ⵢⵓⴳⵔ 1 GB"
+   ],
+   [
+    "احمد",
+    "ⵢⵓⴼⴰ ⵓⵍⴰ «أحمد»"
+   ]
+  ],
+  "helpH": "ⵎⴰⵏⵉⵎⴽ ⴰⵔ ⵜⵔⵣⵣⵓⴷ",
+  "helpInside": "ⵃⵎⴰ ⴰⴷ ⵜⵔⵣⵓⴷ ⴳ ⵡⴰⵏⵙⴰ ⵏ ⵉⵙⵎⵍⵉⵢⵏ (PDF, Word, Excel, ⵜⵉⵡⵍⴰⴼⵉⵏ): ⵙⵙⵏⴷ «ⴳ ⵡⴰⵏⵙⴰ ⵏ ⵉⵙⵎⵍⵉⵢⵏ», ⵙ Enter.",
+  "helpKey": "ⵎⴰⵏⵉⵎⴽ ⴰⵔ ⵜⵔⵣⵣⵓⴷ (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"ⵜⴰⵙⵓⴷⵓⵏⵜ ⵜⴰⵎⵥⵥⵢⴰⵏⵜ ⵏ ⵓⵔⵣⵣⵓ ⵙⴳ ⴽⵓ ⴰⵖⴰⵡⴰⵙ\"], [\"Ctrl+Alt+G\", \"ⴳ ⵓⵙⴼⴰⵢⵍⵓ ⵏ ⵓⵃⴹⴰⵢ/ⵓⵕⵥⵥⵎ: ⴷⴷⵓ ⵖⵔ ⵓⴽⴰⵔⴰⵎ ⵏ ⵢⴰⵜ ⵜⵢⴰⴼⵓⵜ\"], [\"Enter\", \"ⵕⵥⵎ ⴰⴼⴰⵢⵍⵓ\"], [\"Ctrl+Enter\", \"ⵕⵥⵎ ⴰⴽⴰⵔⴰⵎ ⵏⵏⵙ\"], [\"↓\", \"ⵖⵔ ⵜⵢⴰⴼⵓⵜⵉⵏ (ⴳ ⵜⴰⵙⵓⴷⵓⵏⵜ ⵜⵉⵍⵉⵜ: ⴰⵎⵣⵔⵓⵢ)\"],\n        [\"Ctrl+C\", \"ⵙⵏⵖⵍ ⴰⴼⴰⵢⵍⵓ\"], [\"Ctrl+Shift+C\", \"ⵙⵏⵖⵍ ⴰⴱⵔⵉⴷ\"], [\"F2\", \"ⵙⵏⴼⵍ ⵉⵙⵎ\"], [\"Delete\", \"ⵖⵔ ⵜⵇⴼⴼⵓⵜ ⵏ ⵓⴽⴽⴰⵙ\"], [\"F4\", \"ⵎⴰⵕⵕⴰ ⵜⵉⵎⵙⴰⵙⴰⵜⵉⵏ ⴳ ⵓⴼⴰⵢⵍⵓ\"], [\"Ctrl+H\", \"ⴰⵎⵣⵔⵓⵢ\"], [\"Ctrl+T\", \"ⵜⵉⵡⵍⴰⴼⵉⵏ ⵉⵎⵥⵥⵢⴰⵏⵏ\"], [\"Ctrl+,\", \"ⵜⵉⵙⵖⴰⵍ\"], [\"F1\", \"ⵜⴰⴽⴰⵕⴹⴰ ⴰ\"]]",
+  "helpKeysH": "ⴰⵏⴰⵙ ⵏ ⵜⵙⵓⵔⵉⵡⵉⵏ",
+  "helpMore": "ⵎⴰⵕⵕⴰ ⵉⴱⵔⵉⴷⵏ ⵏ ⵓⵔⵣⵣⵓ…",
+  "helpSub": "ⵙⵙⵏⴷ ⵖⴼ ⵢⴰⵏ ⵓⵎⴷⵢⴰ ⵃⵎⴰ ⴰⴷ ⵉⴽⵛⵎ ⵜⴰⵙⵓⴷⵓⵏⵜ ⵏ ⵓⵔⵣⵣⵓ. ⴽⵓ ⴰⵙⵖⵣⴼ ⵖⵓⵔⵙ ⵓⵍⴰ ⵜⵉⵔⵔⴰ ⵙ ⵜⵄⵔⴰⴱⵜ.",
+  "kLabel": "ⵉⵏⴰⵍⴽⵎⵏ ⵉⵣⵔⵔⴰⴱⵏ ⵏ ⵓⵏⴰⵙ ⵏ ⵜⵙⵓⵔⵉⵡⵉⵏ",
+  "offline": "ⴰⴷⵉⵙⴽ ⵓⵔ ⵉⵜⵜⵓⵇⵇⵏ",
+  "qsNone": "ⵓⵍⴰ ⵜⴰⵢⴰⴼⵓⵜ ⵖⵔ ⵓⴽⴰⵔⴰⵎ ⵏⵏⵙ ⵔⴰⴷ ⵉⵎⵓⵜⵜⵉ ⵓⵙⴼⴰⵢⵍⵓ. ⵙⵏⴼⵍ ⴰⵔⵣⵣⵓ, ⵏⵖ ⵙⵙⵏⴷ Esc ⵃⵎⴰ ⴰⴷ ⵜⵙⴼⵙⵅⴷ.",
+  "sHotkeyKeys": "ⴰⵏⴰⵍⴽⵎ ⴰⵣⵔⵔⴰⴱ ⵏ ⵓⵕⵥⵥⵎ ⵏ ⵓⵔⵣⵣⵓ",
+  "sHotkeyKeysSub": "ⴰⵔ ⵉⵜⵜⵅⴷⴰⵎ ⴳ ⴽⵓ ⴰⵖⴰⵡⴰⵙ. ⴼⵔⵏ ⵢⴰⵏ ⵢⴰⴹⵏ ⵎⴽ ⴰⵔ ⵜ ⵉⵙⵎⵔⴰⵙ ⵢⴰⵏ ⵓⵖⴰⵡⴰⵙ ⵢⴰⴹⵏ.",
+  "sHotkeyTaken": "FN:(k) => `ⵢⴰⵏ ⵓⵖⴰⵡⴰⵙ ⵢⴰⴹⵏ ⴰⵔ ⵉⵙⵎⵔⴰⵙ ${k}, ⵙ ⵓⵢⴰ ⵓⵔ ⵉⵙⴽⴰⵔ ⵓⵍⴰ ⵢⴰⵜ ⴷⵖⵉ. ⴼⵔⵏ ⵢⴰⵏ ⵓⵏⴰⵍⴽⵎ ⴰⵣⵔⵔⴰⴱ ⵢⴰⴹⵏ:`",
+  "sLangHelp": "ⵄⴰⵡⵏ ⴳ ⵓⵙⵖⵓⴷⵓ ⵏ ⵓⵙⵓⵖⵍ ⴰ",
+  "sLangMachine": "(ⴰⵙⵓⵖⵍ ⵏ ⵜⵎⴰⵛⵉⵏⵜ)",
+  "sPhone": "ⴰⵔⵣⵣⵓ ⵙⴳ ⵓⵜⵉⵍⵉⴼⵓⵏ",
+  "sPhoneAllow": "ⵙⵉⵔⴳ ⴰⵥⵟⵟⴰ ⴰⴷ",
+  "sPhoneIdle": "ⵉⵅⵙⴰ ⵙ ⵉⵎⴰⵏ ⵏⵏⵙ ⴷⴼⴼⵉⵔ ⵙⵏⴰⵜ ⵜⵙⵔⴰⴳⵉⵏ ⴱⵍⴰ ⵓⵍⴰ ⵢⴰⵏ ⵓⵙⵓⵜⵔ ⵙⴳ ⵓⵜⵉⵍⵉⴼⵓⵏ, ⵉ ⵜⵖⵓⴷⵉ. ⵙⵙⵏⴽⵔ ⵜ ⴷⴰⵖ ⵎⴽ ⵜ ⵜⵔⵉⴷ.",
+  "sPhoneMore": "ⵜⵉⵙⵖⴰⵍ ⵢⴰⴹⵏ…",
+  "sPhoneMoreSub": "ⵜⴰⵡⵡⵓⵔⵜ, ⴰⴳⵎ ⵏ ⵉⴼⵓⵢⵍⴰ, ⴷ PIN ⴷ ⵓⵣⴷⴰⵢ ⵉⵎⴰⵢⵏⵓⵜⵏ",
+  "sPhoneOff": "ⵉⵅⵙⴰ. ⵙⵙⵏⴽⵔ ⵜ ⵃⵎⴰ ⴰⴷ ⵜⵥⵕⴷ ⵜⴰⵏⵙⵉⵡⵜ ⴷ PIN.",
+  "sPhoneOpen": "ⵕⵥⵎ ⴳ ⵉⵎⵉⵏⵉⴳ ⵏ ⵓⵜⵉⵍⵉⴼⵓⵏ:",
+  "sPhonePin": "ⵜⴰⵔⵓⴷ PIN:",
+  "sPhoneQr": "ⵏⵖ ⵙⴽⴰⵏⵉ ⵜⴰⵏⵓⵎⵍⵜ ⴰⴷ ⵙ ⵜⵡⵍⴰⴼⵜ ⵏ ⵓⵜⵉⵍⵉⴼⵓⵏ ⵃⵎⴰ ⴰⴷ ⵜⵕⵥⵎⴷ ⴰⵔⵣⵣⵓ ⴱⵍⴰ PIN. ⵓⵔ ⵜⵜ ⵜⵙⵎⴰⵍⴷ ⵉ ⵢⴰⵏ.",
+  "sPhoneQrLabel": "ⵜⴰⵏⵓⵎⵍⵜ QR ⵏⵏⴰ ⵉⵕⵥⵥⵎⵏ ⴰⵔⵣⵣⵓ ⵙⴳ ⵓⵜⵉⵍⵉⴼⵓⵏ",
+  "sPhoneRow": "ⴰⵔⵣⵣⵓ ⵙⴳ ⵓⵜⵉⵍⵉⴼⵓⵏ (ⴰⵥⵟⵟⴰ ⵏ ⵜⴷⴷⴰⵔⵜ)",
+  "sPhoneSub": "ⵔⵣⵓ ⴳ ⵉⴼⵓⵢⵍⴰ ⵏ ⵓⵙⵓⵏⵖⵓ ⴰⴷ ⵙⴳ ⵉⵎⵉⵏⵉⴳ ⵏ ⵓⵜⵉⵍⵉⴼⵓⵏ ⵏⵏⴽ ⴳ Wi-Fi ⵏⵏⴰ. ⵉ ⵜⵖⵓⵔⵉ ⴽⴰ, ⴷ ⵖⴰⵙ ⴳ ⵓⵥⵟⵟⴰ ⵏ ⵜⴷⴷⴰⵔⵜ ⵏⵏⴽ.",
+  "sPhoneWait": "ⴰⵙⵏⵇⴷ ⵏ ⵓⵥⵟⵟⴰ…",
+  "updChecking": "ⴰⵙⵏⵇⴷ ⵏ ⵉⵙⵎⴰⵢⵏⵓⵜⵏ…"
  }
 }

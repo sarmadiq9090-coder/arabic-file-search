@@ -447,7 +447,70 @@
   "Recent searches": "Utafutaji wa hivi karibuni",
   "Save the current search": "Hifadhi utafutaji wa sasa",
   "Clear history and recent files": "Futa historia na faili za hivi karibuni",
-  "Delete all saved searches": "Futa utafutaji wote uliohifadhiwa"
+  "Delete all saved searches": "Futa utafutaji wote uliohifadhiwa",
+  "(machine translation)": "(tafsiri ya mashine)",
+  ", ": ", ",
+  "1 KB or more": "KB 1 au zaidi",
+  "1 MB or more": "MB 1 au zaidi",
+  "10 MB or more": "MB 10 au zaidi",
+  "100 KB or more": "KB 100 au zaidi",
+  "100 KB to 10 MB": "KB 100 hadi MB 10",
+  "100 MB or more": "MB 100 au zaidi",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "Ujumbe kwa {} umefunguliwa katika programu yako ya barua pepe (ripoti haikuweza kunakiliwa: bonyeza “Nakili”, kisha uibandike humo). Bado hakuna kilichotumwa.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "Ujumbe kwa {} umefunguliwa katika programu yako ya barua pepe. Ripoti kamili imenakiliwa: ibandike kwenye ujumbe (Ctrl+V), kisha bonyeza “Tuma”. Bado hakuna kilichotumwa.",
+  "All types": "Aina zote",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space tayari inatumiwa na programu nyingine, kwa hivyo haiwezi kutumika hapa. {} bado inafanya kazi.",
+  "Another program has {} too. Pick another one.": "Programu nyingine pia inatumia {}. Chagua nyingine.",
+  "Any size": "Ukubwa wowote",
+  "Any time": "Wakati wowote",
+  "Archives": "Kumbukumbu zilizobanwa",
+  "Audio": "Sauti",
+  "Documents": "Hati",
+  "Downloading the update…": "Inapakua sasisho…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter fungua · Ctrl+Enter folda · Tab zaidi · Esc funga",
+  "Folders": "Folda",
+  "GitHub page (public)": "Ukurasa wa GitHub (wa umma)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — toleo {}\nUtafutaji wa papo hapo wa faili na ndani ya hati, kwa Kiarabu na Kiingereza.\n\nBonyeza {hk} popote ili kutafuta.\n{}\n\nUsaidizi: {}\n{}\n\nLeseni za vipengele vya wahusika wengine vinavyotumiwa nayo ziko katika THIRD-PARTY-NOTICES.txt. Uifungue?",
+  "Last 30 days": "Siku 30 zilizopita",
+  "Last 7 days": "Siku 7 zilizopita",
+  "No files match your search. Try:": "Hakuna faili zinazolingana na utafutaji wako. Jaribu:",
+  "No home network connection found; it works on this PC only.": "Hakuna muunganisho wa mtandao wa nyumbani uliopatikana; inafanya kazi kwenye Kompyuta hii pekee.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "Bado hakuna faharasa: fungua InstaFind mara moja ili kuiunda, kisha ujaribu tena.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "Hakuna programu ya barua pepe iliyofunguka. Bonyeza “Nakili” na utume ripoti kwa {}.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "Hakuna programu ya barua pepe iliyofunguka. Ripoti imenakiliwa: ibandike kwenye ujumbe kwa {} kutoka kwa barua pepe yako mwenyewe (kwenye simu au kwenye kivinjari).",
+  "No results yet — results may be incomplete while indexing.": "Bado hakuna matokeo — matokeo yanaweza kuwa pungufu wakati wa kuorodhesha.",
+  "No results yet; they may be incomplete while indexing. Try:": "Bado hakuna matokeo; yanaweza kuwa pungufu wakati wa kuorodhesha. Jaribu:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "Kumbuka: maandishi ya Kiarabu ndani ya picha hayawezi kusomwa kwa sababu kifurushi cha lugha ya Kiarabu cha Windows hakijasakinishwa.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "Hakuna kinachotumwa usipobonyeza kitufe. Majina na njia za faili huondolewa kwenye ripoti. Ukurasa wa GitHub ni wa umma: mtu yeyote anaweza kuusoma. Barua pepe husomwa na sisi tu.",
+  "Older than a year": "Zaidi ya mwaka mmoja",
+  "Open": "Fungua",
+  "Open quick search\t{}": "Fungua utafutaji wa haraka\t{}",
+  "Over 1 GB": "Zaidi ya GB 1",
+  "Over 10 MB": "Zaidi ya MB 10",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "Utafutaji kutoka simu ulijizima wenyewe baada ya saa mbili bila ombi lolote kutoka kwa simu, kwa usalama. Weka alama kwenye kisanduku kilicho juu ili kuuwasha tena.",
+  "Pictures": "Picha",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "Tunaandaa orodha ya faili zako kwa mara ya kwanza (dakika chache). Tafuta sasa; matokeo yatakamilika itakapomaliza.",
+  "Press {} in any program to open the quick search.": "Bonyeza {} katika programu yoyote ili kufungua utafutaji wa haraka.",
+  "Press {} in any program to show or hide InstaFind.": "Bonyeza {} katika programu yoyote ili kuonyesha au kuficha InstaFind.",
+  "Programs": "Programu",
+  "Results": "Matokeo",
+  "Results may be incomplete while indexing": "Matokeo yanaweza kuwa pungufu wakati wa kuorodhesha",
+  "Results may be incomplete while indexing — try": "Matokeo yanaweza kuwa pungufu wakati wa kuorodhesha — jaribu",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Inaendeshwa katika mwonekano rahisi kwa sababu kipengele cha WebView2 cha Windows hakijasakinishwa. Bofya hapa ili kukipakua bila malipo kutoka Microsoft.",
+  "Send by email": "Tuma kwa barua pepe",
+  "Share": "Sehemu",
+  "Show the program from anywhere\t{}": "Onyesha programu kutoka popote\t{}",
+  "Size": "Ukubwa",
+  "The list just changed, so nothing was done. Try again.": "Orodha imebadilika sasa hivi, kwa hivyo hakuna kilichofanyika. Jaribu tena.",
+  "The name did not change.": "Jina halikubadilika.",
+  "The program will run in the background when Windows starts; show it with {}.": "Programu itaendeshwa chinichini Windows inapoanza; ionyeshe kwa {}.",
+  "This year": "Mwaka huu",
+  "Today": "Leo",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "Andika jina la faili, programu au mpangilio. Mishale ya Juu na Chini hupitia matokeo; Enter hufungua lililochaguliwa.",
+  "Under 100 KB": "Chini ya KB 100",
+  "Video": "Video",
+  "drive not connected": "diski haijaunganishwa",
+  "{} opens the quick search (otherwise the full window)": "{} hufungua utafutaji wa haraka (vinginevyo dirisha kamili)"
  },
  "js": {
   "ph": "Tafuta majina ya faili…",
@@ -658,6 +721,102 @@
   "sStartup": "Uanzishaji",
   "sAutostart": "Anza pamoja na Windows (chinichini)",
   "sAbout": "Kuhusu",
-  "version": "FN:(v) => `InstaFind — toleo ${v}`"
+  "version": "FN:(v) => `InstaFind — toleo ${v}`",
+  "fDetails": "Maelezo ya faili",
+  "helpEx": [
+   [
+    "ripoti mauzo",
+    "majina yenye maneno yote mawili"
+   ],
+   [
+    "\"mkataba wa kukodisha\"",
+    "kifungu kamili"
+   ],
+   [
+    "ripoti .pdf",
+    "faili za PDF tu (au ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "aina kadhaa"
+   ],
+   [
+    "picha|video",
+    "neno lolote kati ya hayo mawili"
+   ],
+   [
+    "mkataba -zamani",
+    "bila “zamani” (au !zamani)"
+   ],
+   [
+    "size:>10mb",
+    "kubwa kuliko MB 10"
+   ],
+   [
+    "dm:thisweek",
+    "zilizobadilishwa wiki hii"
+   ],
+   [
+    "dm:2026-05",
+    "zilizobadilishwa Mei 2026"
+   ],
+   [
+    "ww:mkataba",
+    "neno zima tu"
+   ],
+   [
+    "\"mkataba kukodisha\"~5",
+    "maneno yote mawili ndani ya maneno 5"
+   ],
+   [
+    "folder: picha",
+    "folda tu"
+   ],
+   [
+    "root: كتاب",
+    "mzizi uleule wa Kiarabu: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: ripito",
+    "huvumilia kosa la kuandika"
+   ],
+   [
+    "حجم:>1ج",
+    "kwa Kiarabu pia: kubwa kuliko GB 1"
+   ],
+   [
+    "احمد",
+    "hupata pia «أحمد»"
+   ]
+  ],
+  "helpH": "Jinsi ya kutafuta",
+  "helpInside": "Ili kutafuta ndani ya hati (PDF, Word, Excel, picha): bonyeza “Ndani ya hati”, kisha Enter.",
+  "helpKey": "Jinsi ya kutafuta (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"kisanduku kidogo cha utafutaji kutoka programu yoyote\"], [\"Ctrl+Alt+G\", \"katika dirisha la Hifadhi/Fungua: nenda kwenye folda ya tokeo\"], [\"Enter\", \"fungua faili\"], [\"Ctrl+Enter\", \"fungua folda yake\"], [\"↓\", \"kwenye matokeo (kisanduku kikiwa tupu: historia)\"],\n        [\"Ctrl+C\", \"nakili faili\"], [\"Ctrl+Shift+C\", \"nakili njia\"], [\"F2\", \"badilisha jina\"], [\"Delete\", \"kwenye Pipa la Kuchakata\"], [\"F4\", \"yote yanayolingana ndani ya faili\"], [\"Ctrl+H\", \"historia\"], [\"Ctrl+T\", \"vijipicha\"], [\"Ctrl+,\", \"mipangilio\"], [\"F1\", \"kadi hii\"]]",
+  "helpKeysH": "Kibodi",
+  "helpMore": "Njia zote za kutafuta…",
+  "helpSub": "Bofya mfano ili uuweke kwenye kisanduku cha utafutaji. Kila kichujio kina pia tahajia ya Kiarabu.",
+  "kLabel": "Njia za mkato za kibodi",
+  "offline": "diski haijaunganishwa",
+  "qsNone": "Hakuna tokeo la kuhamishia dirisha kwenye folda yake. Badilisha utafutaji, au bonyeza Esc ili kughairi.",
+  "sHotkeyKeys": "Njia ya mkato ya kufungua utafutaji",
+  "sHotkeyKeysSub": "Inafanya kazi katika programu yoyote. Chagua nyingine ikiwa programu nyingine inaitumia.",
+  "sHotkeyTaken": "FN:(k) => `Programu nyingine inatumia ${k}, kwa hivyo haifanyi chochote sasa. Chagua njia nyingine ya mkato:`",
+  "sLangHelp": "Saidia kuboresha tafsiri hii",
+  "sLangMachine": "(tafsiri ya mashine)",
+  "sPhone": "Tafuta kutoka simu",
+  "sPhoneAllow": "Ruhusu mtandao huu",
+  "sPhoneIdle": "Ulijizima wenyewe baada ya saa mbili bila ombi lolote kutoka kwa simu, kwa usalama. Uwashe tena utakapouhitaji.",
+  "sPhoneMore": "Mipangilio zaidi…",
+  "sPhoneMoreSub": "Mlango (port), upakuaji wa faili, na PIN na kiungo kipya",
+  "sPhoneOff": "Umezimwa. Uwashe ili uone anwani na PIN.",
+  "sPhoneOpen": "Fungua kwenye kivinjari cha simu:",
+  "sPhonePin": "na uandike PIN:",
+  "sPhoneQr": "Au changanua msimbo huu kwa kamera ya simu ili kufungua utafutaji bila PIN. Usimwonyeshe mtu yeyote.",
+  "sPhoneQrLabel": "Msimbo wa QR unaofungua utafutaji kutoka simu",
+  "sPhoneRow": "Tafuta kutoka simu (mtandao wa nyumbani)",
+  "sPhoneSub": "Tafuta faili za Kompyuta hii kutoka kwenye kivinjari cha simu yako kwenye Wi-Fi ileile. Ni ya kusoma tu, na kwenye mtandao wako wa nyumbani pekee.",
+  "sPhoneWait": "Inaangalia mtandao…",
+  "updChecking": "Inaangalia masasisho…"
  }
 }

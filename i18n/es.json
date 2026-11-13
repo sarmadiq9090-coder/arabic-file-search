@@ -447,7 +447,70 @@
   "Recent searches": "Búsquedas recientes",
   "Save the current search": "Guardar la búsqueda actual",
   "Clear history and recent files": "Borrar el historial y los archivos recientes",
-  "Delete all saved searches": "Eliminar todas las búsquedas guardadas"
+  "Delete all saved searches": "Eliminar todas las búsquedas guardadas",
+  "(machine translation)": "(traducción automática)",
+  ", ": ", ",
+  "1 KB or more": "1 KB o más",
+  "1 MB or more": "1 MB o más",
+  "10 MB or more": "10 MB o más",
+  "100 KB or more": "100 KB o más",
+  "100 KB to 10 MB": "De 100 KB a 10 MB",
+  "100 MB or more": "100 MB o más",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "Se abrió un mensaje para {} en su programa de correo (no se pudo copiar el informe: presione «Copiar» y péguelo allí). Todavía no se envió nada.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "Se abrió un mensaje para {} en su programa de correo. El informe completo está copiado: péguelo en el mensaje (Ctrl+V) y presione «Enviar». Todavía no se envió nada.",
+  "All types": "Todos los tipos",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Otro programa ya usa Alt+Space, así que no se puede usar aquí. {} sigue funcionando.",
+  "Another program has {} too. Pick another one.": "Otro programa también usa {}. Elija otro.",
+  "Any size": "Cualquier tamaño",
+  "Any time": "Cualquier fecha",
+  "Archives": "Archivos comprimidos",
+  "Audio": "Audio",
+  "Documents": "Documentos",
+  "Downloading the update…": "Descargando la actualización…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter abrir · Ctrl+Enter carpeta · Tab más · Esc cerrar",
+  "Folders": "Carpetas",
+  "GitHub page (public)": "Página de GitHub (pública)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind: versión {}\nBúsqueda instantánea de archivos y dentro de documentos, en árabe y en inglés.\n\nPresione {hk} desde cualquier lugar para buscar.\n{}\n\nSoporte técnico: {}\n{}\n\nLas licencias de los componentes de terceros que usa están en THIRD-PARTY-NOTICES.txt. ¿Desea abrirlo?",
+  "Last 30 days": "Últimos 30 días",
+  "Last 7 days": "Últimos 7 días",
+  "No files match your search. Try:": "Ningún archivo coincide con su búsqueda. Pruebe:",
+  "No home network connection found; it works on this PC only.": "No se encontró una conexión a una red doméstica; funciona solo en este equipo.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "Todavía no hay índice: abra InstaFind una vez para crearlo y vuelva a intentarlo.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "No se abrió ningún programa de correo. Presione «Copiar» y envíe el informe a {}.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "No se abrió ningún programa de correo. El informe está copiado: péguelo en un mensaje para {} desde su propio correo (en el teléfono o en el explorador).",
+  "No results yet — results may be incomplete while indexing.": "Todavía no hay resultados; pueden estar incompletos mientras se indexa.",
+  "No results yet; they may be incomplete while indexing. Try:": "Todavía no hay resultados; pueden estar incompletos mientras se indexa. Pruebe:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "Nota: no se puede leer el texto árabe de las imágenes porque no está instalado el paquete de idioma árabe de Windows.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "No se envía nada a menos que presione un botón. Los nombres y las rutas de los archivos se quitan del informe. La página de GitHub es pública: cualquiera puede leerla. Un correo electrónico solo lo leemos nosotros.",
+  "Older than a year": "Hace más de un año",
+  "Open": "Abrir",
+  "Open quick search\t{}": "Abrir la búsqueda rápida\t{}",
+  "Over 1 GB": "Más de 1 GB",
+  "Over 10 MB": "Más de 10 MB",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "La búsqueda desde el teléfono se desactivó sola tras dos horas sin ninguna solicitud de un teléfono, por seguridad. Marque la casilla de arriba para volver a activarla.",
+  "Pictures": "Imágenes",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "Preparando su lista de archivos por primera vez (unos minutos). Ya puede buscar; los resultados se completan cuando termine.",
+  "Press {} in any program to open the quick search.": "Presione {} en cualquier programa para abrir la búsqueda rápida.",
+  "Press {} in any program to show or hide InstaFind.": "Presione {} en cualquier programa para mostrar u ocultar InstaFind.",
+  "Programs": "Programas",
+  "Results": "Resultados",
+  "Results may be incomplete while indexing": "Los resultados pueden estar incompletos mientras se indexa",
+  "Results may be incomplete while indexing — try": "Los resultados pueden estar incompletos mientras se indexa; pruebe",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Se usa el aspecto simple porque el componente WebView2 de Windows no está instalado. Haga clic aquí para descargarlo gratis de Microsoft.",
+  "Send by email": "Enviar por correo",
+  "Share": "Proporción",
+  "Show the program from anywhere\t{}": "Mostrar el programa desde cualquier lugar\t{}",
+  "Size": "Tamaño",
+  "The list just changed, so nothing was done. Try again.": "La lista acaba de cambiar, así que no se hizo nada. Vuelva a intentarlo.",
+  "The name did not change.": "El nombre no cambió.",
+  "The program will run in the background when Windows starts; show it with {}.": "El programa se ejecutará en segundo plano al iniciar Windows; muéstrelo con {}.",
+  "This year": "Este año",
+  "Today": "Hoy",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "Escriba el nombre de un archivo, una aplicación o una configuración. Las flechas Arriba y Abajo recorren los resultados; Enter abre el seleccionado.",
+  "Under 100 KB": "Menos de 100 KB",
+  "Video": "Video",
+  "drive not connected": "unidad no conectada",
+  "{} opens the quick search (otherwise the full window)": "{} abre la búsqueda rápida (si no, la ventana completa)"
  },
  "js": {
   "ph": "Buscar nombres de archivo…",
@@ -658,6 +721,102 @@
   "sStartup": "Inicio",
   "sAutostart": "Iniciar con Windows (en segundo plano)",
   "sAbout": "Acerca de",
-  "version": "FN:(v) => `InstaFind: versión ${v}`"
+  "version": "FN:(v) => `InstaFind: versión ${v}`",
+  "fDetails": "Detalles del archivo",
+  "helpEx": [
+   [
+    "informe ventas",
+    "nombres con las dos palabras"
+   ],
+   [
+    "\"contrato de alquiler\"",
+    "la frase exacta"
+   ],
+   [
+    "informe .pdf",
+    "solo archivos PDF (o ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "varios tipos"
+   ],
+   [
+    "foto|video",
+    "cualquiera de las dos palabras"
+   ],
+   [
+    "contrato -viejo",
+    "sin «viejo» (o !viejo)"
+   ],
+   [
+    "size:>10mb",
+    "mayores de 10 MB"
+   ],
+   [
+    "dm:thisweek",
+    "modificados esta semana"
+   ],
+   [
+    "dm:2026-05",
+    "modificados en mayo de 2026"
+   ],
+   [
+    "ww:contrato",
+    "solo la palabra completa"
+   ],
+   [
+    "\"contrato alquiler\"~5",
+    "las dos palabras a 5 palabras como máximo"
+   ],
+   [
+    "folder: fotos",
+    "solo carpetas"
+   ],
+   [
+    "root: كتاب",
+    "misma raíz árabe: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: imforme",
+    "tolera un error de escritura"
+   ],
+   [
+    "حجم:>1ج",
+    "también en árabe: mayores de 1 GB"
+   ],
+   [
+    "احمد",
+    "también encuentra «أحمد»"
+   ]
+  ],
+  "helpH": "Cómo buscar",
+  "helpInside": "Para buscar dentro de los documentos (PDF, Word, Excel, imágenes): presione «Dentro de los documentos» y luego Enter.",
+  "helpKey": "Cómo buscar (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"el cuadro de búsqueda pequeño desde cualquier programa\"], [\"Ctrl+Alt+G\", \"en un cuadro Guardar/Abrir: ir a la carpeta de un resultado\"], [\"Enter\", \"abrir el archivo\"], [\"Ctrl+Enter\", \"abrir su carpeta\"], [\"↓\", \"a los resultados (con el cuadro vacío: historial)\"],\n        [\"Ctrl+C\", \"copiar el archivo\"], [\"Ctrl+Shift+C\", \"copiar la ruta\"], [\"F2\", \"cambiar el nombre\"], [\"Delete\", \"a la Papelera de reciclaje\"], [\"F4\", \"todas las coincidencias en el archivo\"], [\"Ctrl+H\", \"historial\"], [\"Ctrl+T\", \"miniaturas\"], [\"Ctrl+,\", \"configuración\"], [\"F1\", \"esta tarjeta\"]]",
+  "helpKeysH": "Teclado",
+  "helpMore": "Todas las formas de buscar…",
+  "helpSub": "Haga clic en un ejemplo para ponerlo en el cuadro de búsqueda. Cada filtro también tiene una escritura en árabe.",
+  "kLabel": "Métodos abreviados de teclado",
+  "offline": "unidad no conectada",
+  "qsNone": "No hay ningún resultado a cuya carpeta llevar el cuadro de diálogo. Cambie la búsqueda o presione Esc para cancelar.",
+  "sHotkeyKeys": "Método abreviado para abrir la búsqueda",
+  "sHotkeyKeysSub": "Funciona en cualquier programa. Elija otro si otro programa lo usa.",
+  "sHotkeyTaken": "FN:(k) => `Otro programa usa ${k}, así que ahora no hace nada. Elija otro método abreviado:`",
+  "sLangHelp": "Ayude a mejorar esta traducción",
+  "sLangMachine": "(traducción automática)",
+  "sPhone": "Buscar desde el teléfono",
+  "sPhoneAllow": "Permitir esta red",
+  "sPhoneIdle": "Se desactivó sola tras dos horas sin ninguna solicitud de un teléfono, por seguridad. Vuelva a activarla cuando la necesite.",
+  "sPhoneMore": "Más opciones…",
+  "sPhoneMoreSub": "El puerto, la descarga de archivos y un PIN y vínculo nuevos",
+  "sPhoneOff": "Desactivada. Actívela para ver la dirección y el PIN.",
+  "sPhoneOpen": "Abra en el explorador del teléfono:",
+  "sPhonePin": "y escriba el PIN:",
+  "sPhoneQr": "O escanee este código con la cámara del teléfono para abrir la búsqueda sin el PIN. No se lo muestre a nadie.",
+  "sPhoneQrLabel": "Código QR que abre la búsqueda desde el teléfono",
+  "sPhoneRow": "Buscar desde el teléfono (red doméstica)",
+  "sPhoneSub": "Busque en los archivos de este equipo desde el explorador del teléfono en la misma red Wi-Fi. Solo lectura, y solo en su red doméstica.",
+  "sPhoneWait": "Comprobando la red…",
+  "updChecking": "Buscando actualizaciones…"
  }
 }

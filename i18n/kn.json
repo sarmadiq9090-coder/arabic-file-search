@@ -447,7 +447,70 @@
   "Recent searches": "ಇತ್ತೀಚಿನ ಹುಡುಕಾಟಗಳು",
   "Save the current search": "ಪ್ರಸ್ತುತ ಹುಡುಕಾಟವನ್ನು ಉಳಿಸಿ",
   "Clear history and recent files": "ಇತಿಹಾಸ ಮತ್ತು ಇತ್ತೀಚಿನ ಫೈಲ್‌ಗಳನ್ನು ತೆರವುಗೊಳಿಸಿ",
-  "Delete all saved searches": "ಉಳಿಸಿದ ಎಲ್ಲಾ ಹುಡುಕಾಟಗಳನ್ನು ಅಳಿಸಿ"
+  "Delete all saved searches": "ಉಳಿಸಿದ ಎಲ್ಲಾ ಹುಡುಕಾಟಗಳನ್ನು ಅಳಿಸಿ",
+  "(machine translation)": "(ಯಂತ್ರ ಅನುವಾದ)",
+  ", ": ", ",
+  "1 KB or more": "1 KB ಅಥವಾ ಹೆಚ್ಚು",
+  "1 MB or more": "1 MB ಅಥವಾ ಹೆಚ್ಚು",
+  "10 MB or more": "10 MB ಅಥವಾ ಹೆಚ್ಚು",
+  "100 KB or more": "100 KB ಅಥವಾ ಹೆಚ್ಚು",
+  "100 KB to 10 MB": "100 KB ಯಿಂದ 10 MB",
+  "100 MB or more": "100 MB ಅಥವಾ ಹೆಚ್ಚು",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "ನಿಮ್ಮ ಮೇಲ್ ಪ್ರೋಗ್ರಾಂನಲ್ಲಿ {} ಗೆ ಒಂದು ಸಂದೇಶ ತೆರೆದಿದೆ (ವರದಿಯನ್ನು ನಕಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ: “ನಕಲಿಸಿ” ಒತ್ತಿ, ನಂತರ ಅದನ್ನು ಅಲ್ಲಿ ಅಂಟಿಸಿ). ಇನ್ನೂ ಏನನ್ನೂ ಕಳುಹಿಸಿಲ್ಲ.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "ನಿಮ್ಮ ಮೇಲ್ ಪ್ರೋಗ್ರಾಂನಲ್ಲಿ {} ಗೆ ಒಂದು ಸಂದೇಶ ತೆರೆದಿದೆ. ಪೂರ್ಣ ವರದಿಯನ್ನು ನಕಲಿಸಲಾಗಿದೆ: ಅದನ್ನು ಸಂದೇಶದಲ್ಲಿ ಅಂಟಿಸಿ (Ctrl+V), ನಂತರ “ಕಳುಹಿಸಿ” ಒತ್ತಿ. ಇನ್ನೂ ಏನನ್ನೂ ಕಳುಹಿಸಿಲ್ಲ.",
+  "All types": "ಎಲ್ಲಾ ಪ್ರಕಾರಗಳು",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space ಅನ್ನು ಈಗಾಗಲೇ ಬೇರೊಂದು ಪ್ರೋಗ್ರಾಂ ತೆಗೆದುಕೊಂಡಿದೆ, ಆದ್ದರಿಂದ ಅದನ್ನು ಇಲ್ಲಿ ಬಳಸಲು ಸಾಧ್ಯವಿಲ್ಲ. {} ಇನ್ನೂ ಕೆಲಸ ಮಾಡುತ್ತದೆ.",
+  "Another program has {} too. Pick another one.": "ಬೇರೊಂದು ಪ್ರೋಗ್ರಾಂ ಕೂಡ {} ಅನ್ನು ಬಳಸುತ್ತಿದೆ. ಬೇರೊಂದನ್ನು ಆರಿಸಿ.",
+  "Any size": "ಯಾವುದೇ ಗಾತ್ರ",
+  "Any time": "ಯಾವುದೇ ಸಮಯ",
+  "Archives": "ಸಂಕುಚಿತ ಫೈಲ್‌ಗಳು",
+  "Audio": "ಆಡಿಯೋ",
+  "Documents": "ಡಾಕ್ಯುಮೆಂಟ್‌ಗಳು",
+  "Downloading the update…": "ನವೀಕರಣ ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter ತೆರೆಯಿರಿ · Ctrl+Enter ಫೋಲ್ಡರ್ · Tab ಇನ್ನಷ್ಟು · Esc ಮುಚ್ಚಿ",
+  "Folders": "ಫೋಲ್ಡರ್‌ಗಳು",
+  "GitHub page (public)": "GitHub ಪುಟ (ಸಾರ್ವಜನಿಕ)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — ಆವೃತ್ತಿ {}\nಫೈಲ್‌ಗಳಲ್ಲಿ ಮತ್ತು ಡಾಕ್ಯುಮೆಂಟ್‌ಗಳ ಒಳಗೆ ತಕ್ಷಣದ ಹುಡುಕಾಟ, ಅರೇಬಿಕ್ ಮತ್ತು ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ.\n\nಹುಡುಕಲು ಎಲ್ಲಿಯಾದರೂ {hk} ಒತ್ತಿ.\n{}\n\nಬೆಂಬಲ: {}\n{}\n\nಇದು ಬಳಸುವ ಮೂರನೇ ವ್ಯಕ್ತಿಯ ಘಟಕಗಳ ಪರವಾನಗಿಗಳು THIRD-PARTY-NOTICES.txt ನಲ್ಲಿವೆ. ಅದನ್ನು ತೆರೆಯಬೇಕೆ?",
+  "Last 30 days": "ಕಳೆದ 30 ದಿನಗಳು",
+  "Last 7 days": "ಕಳೆದ 7 ದಿನಗಳು",
+  "No files match your search. Try:": "ನಿಮ್ಮ ಹುಡುಕಾಟಕ್ಕೆ ಹೊಂದುವ ಫೈಲ್‌ಗಳಿಲ್ಲ. ಇವುಗಳನ್ನು ಪ್ರಯತ್ನಿಸಿ:",
+  "No home network connection found; it works on this PC only.": "ಮನೆಯ ನೆಟ್‌ವರ್ಕ್ ಸಂಪರ್ಕ ಕಂಡುಬಂದಿಲ್ಲ; ಇದು ಈ PC ಯಲ್ಲಿ ಮಾತ್ರ ಕೆಲಸ ಮಾಡುತ್ತದೆ.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "ಇನ್ನೂ ಸೂಚಿಕೆ ಇಲ್ಲ: ಅದನ್ನು ರಚಿಸಲು InstaFind ಅನ್ನು ಒಮ್ಮೆ ತೆರೆಯಿರಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "ಯಾವುದೇ ಮೇಲ್ ಪ್ರೋಗ್ರಾಂ ತೆರೆಯಲಿಲ್ಲ. “ನಕಲಿಸಿ” ಒತ್ತಿ ಮತ್ತು ವರದಿಯನ್ನು {} ಗೆ ಕಳುಹಿಸಿ.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "ಯಾವುದೇ ಮೇಲ್ ಪ್ರೋಗ್ರಾಂ ತೆರೆಯಲಿಲ್ಲ. ವರದಿಯನ್ನು ನಕಲಿಸಲಾಗಿದೆ: ನಿಮ್ಮ ಸ್ವಂತ ಮೇಲ್‌ನಿಂದ (ಫೋನ್‌ನಲ್ಲಿ ಅಥವಾ ಬ್ರೌಸರ್‌ನಲ್ಲಿ) {} ಗೆ ಕಳುಹಿಸುವ ಸಂದೇಶದಲ್ಲಿ ಅದನ್ನು ಅಂಟಿಸಿ.",
+  "No results yet — results may be incomplete while indexing.": "ಇನ್ನೂ ಫಲಿತಾಂಶಗಳಿಲ್ಲ — ಸೂಚಿಕೆ ರಚನೆಯಾಗುತ್ತಿರುವಾಗ ಫಲಿತಾಂಶಗಳು ಅಪೂರ್ಣವಾಗಿರಬಹುದು.",
+  "No results yet; they may be incomplete while indexing. Try:": "ಇನ್ನೂ ಫಲಿತಾಂಶಗಳಿಲ್ಲ; ಸೂಚಿಕೆ ರಚನೆಯಾಗುತ್ತಿರುವಾಗ ಅವು ಅಪೂರ್ಣವಾಗಿರಬಹುದು. ಇವುಗಳನ್ನು ಪ್ರಯತ್ನಿಸಿ:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "ಗಮನಿಸಿ: ಚಿತ್ರಗಳಲ್ಲಿನ ಅರೇಬಿಕ್ ಪಠ್ಯವನ್ನು ಓದಲಾಗುವುದಿಲ್ಲ: Windows ಅರೇಬಿಕ್ ಭಾಷಾ ಪ್ಯಾಕ್ ಸ್ಥಾಪಿತವಾಗಿಲ್ಲ.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "ನೀವು ಬಟನ್ ಒತ್ತದ ಹೊರತು ಏನನ್ನೂ ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ. ಫೈಲ್ ಹೆಸರುಗಳು ಮತ್ತು ಪಾತ್‌ಗಳನ್ನು ವರದಿಯಿಂದ ತೆಗೆದುಹಾಕಲಾಗುತ್ತದೆ. GitHub ಪುಟ ಸಾರ್ವಜನಿಕವಾಗಿದೆ: ಯಾರಾದರೂ ಅದನ್ನು ಓದಬಹುದು. ಇಮೇಲ್ ಅನ್ನು ನಾವು ಮಾತ್ರ ಓದುತ್ತೇವೆ.",
+  "Older than a year": "ಒಂದು ವರ್ಷಕ್ಕಿಂತ ಹಳೆಯವು",
+  "Open": "ತೆರೆಯಿರಿ",
+  "Open quick search\t{}": "ತ್ವರಿತ ಹುಡುಕಾಟ ತೆರೆಯಿರಿ\t{}",
+  "Over 1 GB": "1 GB ಗಿಂತ ದೊಡ್ಡವು",
+  "Over 10 MB": "10 MB ಗಿಂತ ದೊಡ್ಡವು",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "ಸುರಕ್ಷತೆಗಾಗಿ, ಫೋನ್‌ನಿಂದ ಎರಡು ಗಂಟೆ ಯಾವುದೇ ವಿನಂತಿ ಬರದ ಕಾರಣ ಫೋನ್ ಹುಡುಕಾಟ ತಾನಾಗಿಯೇ ಆಫ್ ಆಯಿತು. ಮತ್ತೆ ಆನ್ ಮಾಡಲು ಮೇಲಿನ ಪೆಟ್ಟಿಗೆಯನ್ನು ಟಿಕ್ ಮಾಡಿ.",
+  "Pictures": "ಚಿತ್ರಗಳು",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "ಮೊದಲ ಬಾರಿಗೆ ನಿಮ್ಮ ಫೈಲ್ ಪಟ್ಟಿಯನ್ನು ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ (ಕೆಲವು ನಿಮಿಷಗಳು). ಈಗಲೇ ಹುಡುಕಿ; ಮುಗಿದಂತೆ ಫಲಿತಾಂಶಗಳು ತುಂಬುತ್ತವೆ.",
+  "Press {} in any program to open the quick search.": "ತ್ವರಿತ ಹುಡುಕಾಟ ತೆರೆಯಲು ಯಾವುದೇ ಪ್ರೋಗ್ರಾಂನಲ್ಲಿ {} ಒತ್ತಿ.",
+  "Press {} in any program to show or hide InstaFind.": "InstaFind ಅನ್ನು ತೋರಿಸಲು ಅಥವಾ ಮರೆಮಾಡಲು ಯಾವುದೇ ಪ್ರೋಗ್ರಾಂನಲ್ಲಿ {} ಒತ್ತಿ.",
+  "Programs": "ಪ್ರೋಗ್ರಾಂಗಳು",
+  "Results": "ಫಲಿತಾಂಶಗಳು",
+  "Results may be incomplete while indexing": "ಸೂಚಿಕೆ ರಚನೆಯಾಗುತ್ತಿರುವಾಗ ಫಲಿತಾಂಶಗಳು ಅಪೂರ್ಣವಾಗಿರಬಹುದು",
+  "Results may be incomplete while indexing — try": "ಸೂಚಿಕೆ ರಚನೆಯಾಗುತ್ತಿರುವಾಗ ಫಲಿತಾಂಶಗಳು ಅಪೂರ್ಣವಾಗಿರಬಹುದು — ಇವುಗಳನ್ನು ಪ್ರಯತ್ನಿಸಿ",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Windows ನ WebView2 ಘಟಕ ಸ್ಥಾಪಿತವಾಗಿಲ್ಲದ ಕಾರಣ ಸರಳ ನೋಟದಲ್ಲಿ ರನ್ ಆಗುತ್ತಿದೆ. Microsoft ನಿಂದ ಅದನ್ನು ಉಚಿತವಾಗಿ ಡೌನ್‌ಲೋಡ್ ಮಾಡಲು ಇಲ್ಲಿ ಕ್ಲಿಕ್ ಮಾಡಿ.",
+  "Send by email": "ಇಮೇಲ್ ಮೂಲಕ ಕಳುಹಿಸಿ",
+  "Share": "ಪಾಲು",
+  "Show the program from anywhere\t{}": "ಪ್ರೋಗ್ರಾಂ ಅನ್ನು ಎಲ್ಲಿಂದಲಾದರೂ ತೋರಿಸಿ\t{}",
+  "Size": "ಗಾತ್ರ",
+  "The list just changed, so nothing was done. Try again.": "ಪಟ್ಟಿ ಈಗಷ್ಟೇ ಬದಲಾಯಿತು, ಆದ್ದರಿಂದ ಏನನ್ನೂ ಮಾಡಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+  "The name did not change.": "ಹೆಸರು ಬದಲಾಗಲಿಲ್ಲ.",
+  "The program will run in the background when Windows starts; show it with {}.": "Windows ಪ್ರಾರಂಭವಾದಾಗ ಪ್ರೋಗ್ರಾಂ ಹಿನ್ನೆಲೆಯಲ್ಲಿ ರನ್ ಆಗುತ್ತದೆ; {} ನಿಂದ ಅದನ್ನು ತೋರಿಸಿ.",
+  "This year": "ಈ ವರ್ಷ",
+  "Today": "ಇಂದು",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "ಫೈಲ್, ಅಪ್ಲಿಕೇಶನ್ ಅಥವಾ ಸೆಟ್ಟಿಂಗ್‌ನ ಹೆಸರನ್ನು ಟೈಪ್ ಮಾಡಿ. ಮೇಲೆ ಮತ್ತು ಕೆಳಗೆ ಬಾಣಗಳು ಫಲಿತಾಂಶಗಳ ನಡುವೆ ಸರಿಸುತ್ತವೆ; Enter ಆಯ್ಕೆಮಾಡಿದ್ದನ್ನು ತೆರೆಯುತ್ತದೆ.",
+  "Under 100 KB": "100 KB ಗಿಂತ ಚಿಕ್ಕವು",
+  "Video": "ವೀಡಿಯೊ",
+  "drive not connected": "ಡ್ರೈವ್ ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
+  "{} opens the quick search (otherwise the full window)": "{} ತ್ವರಿತ ಹುಡುಕಾಟವನ್ನು ತೆರೆಯುತ್ತದೆ (ಇಲ್ಲದಿದ್ದರೆ ಪೂರ್ಣ ವಿಂಡೋ)"
  },
  "js": {
   "ph": "ಫೈಲ್ ಹೆಸರುಗಳಲ್ಲಿ ಹುಡುಕಿ…",
@@ -658,6 +721,102 @@
   "sStartup": "ಪ್ರಾರಂಭ",
   "sAutostart": "Windows ಜೊತೆಗೆ ಪ್ರಾರಂಭಿಸಿ (ಹಿನ್ನೆಲೆಯಲ್ಲಿ)",
   "sAbout": "ಕುರಿತು",
-  "version": "FN:(v) => `InstaFind — ಆವೃತ್ತಿ ${v}`"
+  "version": "FN:(v) => `InstaFind — ಆವೃತ್ತಿ ${v}`",
+  "fDetails": "ಫೈಲ್ ವಿವರಗಳು",
+  "helpEx": [
+   [
+    "ಮಾರಾಟ ವರದಿ",
+    "ಎರಡೂ ಪದಗಳಿರುವ ಹೆಸರುಗಳು"
+   ],
+   [
+    "\"ಬಾಡಿಗೆ ಒಪ್ಪಂದ\"",
+    "ನಿಖರ ಪದಗುಚ್ಛ"
+   ],
+   [
+    "ವರದಿ .pdf",
+    "PDF ಫೈಲ್‌ಗಳು ಮಾತ್ರ (ಅಥವಾ ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "ಹಲವು ಪ್ರಕಾರಗಳು"
+   ],
+   [
+    "ಫೋಟೋ|ವೀಡಿಯೊ",
+    "ಯಾವುದಾದರೂ ಒಂದು ಪದ"
+   ],
+   [
+    "ಒಪ್ಪಂದ -ಹಳೆಯ",
+    "“ಹಳೆಯ” ಇಲ್ಲದೆ (ಅಥವಾ !ಹಳೆಯ)"
+   ],
+   [
+    "size:>10mb",
+    "10 MB ಗಿಂತ ದೊಡ್ಡವು"
+   ],
+   [
+    "dm:thisweek",
+    "ಈ ವಾರ ಬದಲಾದವು"
+   ],
+   [
+    "dm:2026-05",
+    "ಮೇ 2026 ರಲ್ಲಿ ಬದಲಾದವು"
+   ],
+   [
+    "ww:ಒಪ್ಪಂದ",
+    "ಪೂರ್ಣ ಪದ ಮಾತ್ರ"
+   ],
+   [
+    "\"ಬಾಡಿಗೆ ಒಪ್ಪಂದ\"~5",
+    "ಎರಡೂ ಪದಗಳು 5 ಪದಗಳ ಒಳಗೆ"
+   ],
+   [
+    "folder: ಫೋಟೋಗಳು",
+    "ಫೋಲ್ಡರ್‌ಗಳು ಮಾತ್ರ"
+   ],
+   [
+    "root: كتاب",
+    "ಅದೇ ಅರೇಬಿಕ್ ಮೂಲ ಪದ: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: reprot",
+    "ಕಾಗುಣಿತ ದೋಷವನ್ನು ಸಹಿಸುತ್ತದೆ (“report” ಅನ್ನು ಹುಡುಕುತ್ತದೆ)"
+   ],
+   [
+    "حجم:>1ج",
+    "ಅರೇಬಿಕ್‌ನಲ್ಲೂ: 1 GB ಗಿಂತ ದೊಡ್ಡವು"
+   ],
+   [
+    "احمد",
+    "«أحمد» ಅನ್ನೂ ಹುಡುಕುತ್ತದೆ"
+   ]
+  ],
+  "helpH": "ಹುಡುಕುವುದು ಹೇಗೆ",
+  "helpInside": "ಡಾಕ್ಯುಮೆಂಟ್‌ಗಳ ಒಳಗೆ (PDF, Word, Excel, ಚಿತ್ರಗಳು) ಹುಡುಕಲು: “ಡಾಕ್ಯುಮೆಂಟ್‌ಗಳ ಒಳಗೆ” ಒತ್ತಿ, ನಂತರ Enter.",
+  "helpKey": "ಹುಡುಕುವುದು ಹೇಗೆ (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"ಯಾವುದೇ ಪ್ರೋಗ್ರಾಂನಿಂದ ಸಣ್ಣ ಹುಡುಕಾಟ ಪೆಟ್ಟಿಗೆ\"], [\"Ctrl+Alt+G\", \"Save/Open ಸಂವಾದದಲ್ಲಿ: ಫಲಿತಾಂಶದ ಫೋಲ್ಡರ್‌ಗೆ ಹೋಗಿ\"], [\"Enter\", \"ಫೈಲ್ ತೆರೆಯಿರಿ\"], [\"Ctrl+Enter\", \"ಅದರ ಫೋಲ್ಡರ್ ತೆರೆಯಿರಿ\"], [\"↓\", \"ಫಲಿತಾಂಶಗಳಿಗೆ (ಖಾಲಿ ಪೆಟ್ಟಿಗೆಯಲ್ಲಿ: ಇತಿಹಾಸ)\"], [\"Ctrl+C\", \"ಫೈಲ್ ನಕಲಿಸಿ\"], [\"Ctrl+Shift+C\", \"ಪಾತ್ ನಕಲಿಸಿ\"], [\"F2\", \"ಮರುಹೆಸರಿಸಿ\"], [\"Delete\", \"ಮರುಬಳಕೆ ಬುಟ್ಟಿಗೆ\"], [\"F4\", \"ಫೈಲ್‌ನಲ್ಲಿನ ಎಲ್ಲಾ ಹೊಂದಾಣಿಕೆಗಳು\"], [\"Ctrl+H\", \"ಇತಿಹಾಸ\"], [\"Ctrl+T\", \"ಥಂಬ್‌ನೇಲ್‌ಗಳು\"], [\"Ctrl+,\", \"ಸೆಟ್ಟಿಂಗ್‌ಗಳು\"], [\"F1\", \"ಈ ಕಾರ್ಡ್\"]]",
+  "helpKeysH": "ಕೀಬೋರ್ಡ್",
+  "helpMore": "ಹುಡುಕುವ ಎಲ್ಲಾ ವಿಧಾನಗಳು…",
+  "helpSub": "ಉದಾಹರಣೆಯನ್ನು ಹುಡುಕಾಟ ಪೆಟ್ಟಿಗೆಯಲ್ಲಿ ಹಾಕಲು ಅದನ್ನು ಕ್ಲಿಕ್ ಮಾಡಿ. ಪ್ರತಿಯೊಂದು ಫಿಲ್ಟರ್‌ಗೂ ಅರೇಬಿಕ್ ಕಾಗುಣಿತವಿದೆ.",
+  "kLabel": "ಕೀಬೋರ್ಡ್ ಶಾರ್ಟ್‌ಕಟ್‌ಗಳು",
+  "offline": "ಡ್ರೈವ್ ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
+  "qsNone": "ಸಂವಾದವನ್ನು ಸರಿಸಲು ಯಾವುದೇ ಫಲಿತಾಂಶವಿಲ್ಲ. ಹುಡುಕಾಟವನ್ನು ಬದಲಿಸಿ, ಅಥವಾ ರದ್ದುಗೊಳಿಸಲು Esc ಒತ್ತಿ.",
+  "sHotkeyKeys": "ಹುಡುಕಾಟ ತೆರೆಯುವ ಶಾರ್ಟ್‌ಕಟ್",
+  "sHotkeyKeysSub": "ಯಾವುದೇ ಪ್ರೋಗ್ರಾಂನಲ್ಲಿ ಕೆಲಸ ಮಾಡುತ್ತದೆ. ಬೇರೊಂದು ಪ್ರೋಗ್ರಾಂ ಅದನ್ನು ಬಳಸುತ್ತಿದ್ದರೆ ಬೇರೊಂದನ್ನು ಆರಿಸಿ.",
+  "sHotkeyTaken": "FN:(k) => `ಬೇರೊಂದು ಪ್ರೋಗ್ರಾಂ ${k} ಅನ್ನು ಬಳಸುತ್ತಿದೆ, ಆದ್ದರಿಂದ ಅದು ಈಗ ಏನನ್ನೂ ಮಾಡುವುದಿಲ್ಲ. ಬೇರೊಂದು ಶಾರ್ಟ್‌ಕಟ್ ಆರಿಸಿ:`",
+  "sLangHelp": "ಈ ಅನುವಾದವನ್ನು ಸುಧಾರಿಸಲು ಸಹಾಯ ಮಾಡಿ",
+  "sLangMachine": "(ಯಂತ್ರ ಅನುವಾದ)",
+  "sPhone": "ಫೋನ್‌ನಿಂದ ಹುಡುಕಿ",
+  "sPhoneAllow": "ಈ ನೆಟ್‌ವರ್ಕ್ ಅನ್ನು ಅನುಮತಿಸಿ",
+  "sPhoneIdle": "ಸುರಕ್ಷತೆಗಾಗಿ, ಫೋನ್‌ನಿಂದ ಎರಡು ಗಂಟೆ ಯಾವುದೇ ವಿನಂತಿ ಬರದ ಕಾರಣ ಇದು ತಾನಾಗಿಯೇ ಆಫ್ ಆಯಿತು. ಅಗತ್ಯವಿದ್ದಾಗ ಮತ್ತೆ ಆನ್ ಮಾಡಿ.",
+  "sPhoneMore": "ಇನ್ನಷ್ಟು ಸೆಟ್ಟಿಂಗ್‌ಗಳು…",
+  "sPhoneMoreSub": "ಪೋರ್ಟ್, ಫೈಲ್‌ಗಳ ಡೌನ್‌ಲೋಡ್, ಮತ್ತು ಹೊಸ PIN ಮತ್ತು ಲಿಂಕ್",
+  "sPhoneOff": "ಆಫ್ ಆಗಿದೆ. ವಿಳಾಸ ಮತ್ತು PIN ನೋಡಲು ಇದನ್ನು ಆನ್ ಮಾಡಿ.",
+  "sPhoneOpen": "ಫೋನ್‌ನ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ತೆರೆಯಿರಿ:",
+  "sPhonePin": "ಮತ್ತು PIN ಟೈಪ್ ಮಾಡಿ:",
+  "sPhoneQr": "ಅಥವಾ PIN ಇಲ್ಲದೆ ಹುಡುಕಾಟ ತೆರೆಯಲು ಫೋನ್‌ನ ಕ್ಯಾಮೆರಾದಿಂದ ಈ ಕೋಡ್ ಸ್ಕ್ಯಾನ್ ಮಾಡಿ. ಇದನ್ನು ಯಾರಿಗೂ ತೋರಿಸಬೇಡಿ.",
+  "sPhoneQrLabel": "ಫೋನ್ ಹುಡುಕಾಟ ತೆರೆಯುವ QR ಕೋಡ್",
+  "sPhoneRow": "ಫೋನ್‌ನಿಂದ ಹುಡುಕಿ (ಮನೆಯ ನೆಟ್‌ವರ್ಕ್)",
+  "sPhoneSub": "ಅದೇ Wi-Fi ನಲ್ಲಿರುವ ನಿಮ್ಮ ಫೋನ್‌ನ ಬ್ರೌಸರ್‌ನಿಂದ ಈ PC ಯ ಫೈಲ್‌ಗಳನ್ನು ಹುಡುಕಿ. ಓದಲು ಮಾತ್ರ, ಮತ್ತು ನಿಮ್ಮ ಮನೆಯ ನೆಟ್‌ವರ್ಕ್‌ನಲ್ಲಿ ಮಾತ್ರ.",
+  "sPhoneWait": "ನೆಟ್‌ವರ್ಕ್ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…",
+  "updChecking": "ನವೀಕರಣಗಳಿಗಾಗಿ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…"
  }
 }

@@ -447,7 +447,70 @@
   "Recent searches": "சமீபத்திய தேடல்கள்",
   "Save the current search": "தற்போதைய தேடலைச் சேமி",
   "Clear history and recent files": "வரலாற்றையும் சமீபத்திய கோப்புகளையும் அழி",
-  "Delete all saved searches": "சேமித்த எல்லா தேடல்களையும் நீக்கு"
+  "Delete all saved searches": "சேமித்த எல்லா தேடல்களையும் நீக்கு",
+  "(machine translation)": "(இயந்திர மொழிபெயர்ப்பு)",
+  ", ": ", ",
+  "1 KB or more": "1 KB அல்லது அதற்கு மேல்",
+  "1 MB or more": "1 MB அல்லது அதற்கு மேல்",
+  "10 MB or more": "10 MB அல்லது அதற்கு மேல்",
+  "100 KB or more": "100 KB அல்லது அதற்கு மேல்",
+  "100 KB to 10 MB": "100 KB முதல் 10 MB வரை",
+  "100 MB or more": "100 MB அல்லது அதற்கு மேல்",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "உங்கள் மின்னஞ்சல் நிரலில் {} முகவரிக்கு ஒரு செய்தி திறக்கப்பட்டது (அறிக்கையை நகலெடுக்க முடியவில்லை: “நகலெடு” அழுத்தி, பின்னர் அதை அங்கே ஒட்டவும்). இன்னும் எதுவும் அனுப்பப்படவில்லை.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "உங்கள் மின்னஞ்சல் நிரலில் {} முகவரிக்கு ஒரு செய்தி திறக்கப்பட்டது. முழு அறிக்கையும் நகலெடுக்கப்பட்டது: அதைச் செய்தியில் ஒட்டி (Ctrl+V), பின்னர் “அனுப்பு” அழுத்தவும். இன்னும் எதுவும் அனுப்பப்படவில்லை.",
+  "All types": "எல்லா வகைகளும்",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space-ஐ ஏற்கெனவே வேறொரு நிரல் பயன்படுத்துகிறது, எனவே அதை இங்கு பயன்படுத்த முடியாது. {} இன்னும் செயல்படும்.",
+  "Another program has {} too. Pick another one.": "வேறொரு நிரலும் {}-ஐப் பயன்படுத்துகிறது. வேறொன்றைத் தேர்ந்தெடுக்கவும்.",
+  "Any size": "எந்த அளவும்",
+  "Any time": "எந்த நேரமும்",
+  "Archives": "சுருக்கக் கோப்புகள்",
+  "Audio": "ஒலி",
+  "Documents": "ஆவணங்கள்",
+  "Downloading the update…": "புதுப்பிப்பு பதிவிறக்கப்படுகிறது…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter திற · Ctrl+Enter கோப்புறை · Tab மேலும் · Esc மூடு",
+  "Folders": "கோப்புறைகள்",
+  "GitHub page (public)": "GitHub பக்கம் (பொது)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — பதிப்பு {}\nகோப்புகளிலும் ஆவணங்களுக்குள்ளும் உடனடித் தேடல், அரபு மற்றும் ஆங்கிலத்தில்.\n\nஎங்கிருந்தும் தேட {hk} அழுத்தவும்.\n{}\n\nஆதரவு: {}\n{}\n\nஇது பயன்படுத்தும் மூன்றாம் தரப்புக் கூறுகளின் உரிமங்கள் THIRD-PARTY-NOTICES.txt-இல் உள்ளன. அதைத் திறக்கவா?",
+  "Last 30 days": "கடந்த 30 நாட்கள்",
+  "Last 7 days": "கடந்த 7 நாட்கள்",
+  "No files match your search. Try:": "உங்கள் தேடலுக்குப் பொருந்தும் கோப்புகள் இல்லை. இவற்றை முயலவும்:",
+  "No home network connection found; it works on this PC only.": "வீட்டு நெட்வொர்க் இணைப்பு எதுவும் கிடைக்கவில்லை; இது இந்த PC-இல் மட்டுமே செயல்படும்.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "இன்னும் அட்டவணை இல்லை: அதை உருவாக்க InstaFind-ஐ ஒருமுறை திறந்து, பின்னர் மீண்டும் முயலவும்.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "மின்னஞ்சல் நிரல் எதுவும் திறக்கவில்லை. “நகலெடு” அழுத்தி அறிக்கையை {} முகவரிக்கு அனுப்பவும்.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "மின்னஞ்சல் நிரல் எதுவும் திறக்கவில்லை. அறிக்கை நகலெடுக்கப்பட்டது: உங்கள் சொந்த மின்னஞ்சலிலிருந்து (தொலைபேசியில் அல்லது உலாவியில்) {} முகவரிக்கான செய்தியில் அதை ஒட்டவும்.",
+  "No results yet — results may be incomplete while indexing.": "இன்னும் முடிவுகள் இல்லை — அட்டவணையிடும்போது முடிவுகள் முழுமையற்றதாக இருக்கலாம்.",
+  "No results yet; they may be incomplete while indexing. Try:": "இன்னும் முடிவுகள் இல்லை; அட்டவணையிடும்போது அவை முழுமையற்றதாக இருக்கலாம். இவற்றை முயலவும்:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "குறிப்பு: படங்களில் உள்ள அரபு உரையைப் படிக்க முடியாது: Windows அரபு மொழித் தொகுப்பு நிறுவப்படவில்லை.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "நீங்கள் ஒரு பொத்தானை அழுத்தாத வரை எதுவும் அனுப்பப்படாது. கோப்புப் பெயர்களும் பாதைகளும் அறிக்கையிலிருந்து நீக்கப்படும். GitHub பக்கம் பொதுவானது: யார் வேண்டுமானாலும் அதைப் படிக்கலாம். மின்னஞ்சலை நாங்கள் மட்டுமே படிப்போம்.",
+  "Older than a year": "ஓராண்டுக்கு மேல் பழையவை",
+  "Open": "திற",
+  "Open quick search\t{}": "விரைவுத் தேடலைத் திற\t{}",
+  "Over 1 GB": "1 GB-ஐ விடப் பெரியவை",
+  "Over 10 MB": "10 MB-ஐ விடப் பெரியவை",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "பாதுகாப்புக்காக, தொலைபேசியிலிருந்து இரண்டு மணிநேரம் கோரிக்கை எதுவும் வராததால் தொலைபேசித் தேடல் தானாக நின்றது. மீண்டும் இயக்க மேலே உள்ள பெட்டியைத் தேர்வுசெய்யவும்.",
+  "Pictures": "படங்கள்",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "முதல் முறையாக உங்கள் கோப்புப் பட்டியல் தயாராகிறது (சில நிமிடங்கள்). இப்போதே தேடலாம்; முடிந்ததும் முடிவுகள் நிரம்பும்.",
+  "Press {} in any program to open the quick search.": "விரைவுத் தேடலைத் திறக்க எந்த நிரலிலும் {} அழுத்தவும்.",
+  "Press {} in any program to show or hide InstaFind.": "InstaFind-ஐக் காட்ட அல்லது மறைக்க எந்த நிரலிலும் {} அழுத்தவும்.",
+  "Programs": "நிரல்கள்",
+  "Results": "முடிவுகள்",
+  "Results may be incomplete while indexing": "அட்டவணையிடும்போது முடிவுகள் முழுமையற்றதாக இருக்கலாம்",
+  "Results may be incomplete while indexing — try": "அட்டவணையிடும்போது முடிவுகள் முழுமையற்றதாக இருக்கலாம் — இவற்றை முயலவும்",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Windows-இன் WebView2 கூறு நிறுவப்படாததால் எளிய தோற்றத்தில் இயங்குகிறது. Microsoft-இலிருந்து அதை இலவசமாகப் பதிவிறக்க இங்கே கிளிக் செய்யவும்.",
+  "Send by email": "மின்னஞ்சலில் அனுப்பு",
+  "Share": "பங்கு",
+  "Show the program from anywhere\t{}": "நிரலை எங்கிருந்தும் காட்டு\t{}",
+  "Size": "அளவு",
+  "The list just changed, so nothing was done. Try again.": "பட்டியல் இப்போதுதான் மாறியது, எனவே எதுவும் செய்யப்படவில்லை. மீண்டும் முயலவும்.",
+  "The name did not change.": "பெயர் மாறவில்லை.",
+  "The program will run in the background when Windows starts; show it with {}.": "Windows தொடங்கும்போது நிரல் பின்னணியில் இயங்கும்; {} மூலம் அதைக் காட்டலாம்.",
+  "This year": "இந்த ஆண்டு",
+  "Today": "இன்று",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "ஒரு கோப்பு, பயன்பாடு அல்லது அமைப்பின் பெயரைத் தட்டச்சு செய்யவும். மேல், கீழ் அம்புகள் முடிவுகளுக்கிடையே நகர்த்தும்; Enter தேர்ந்தெடுத்ததைத் திறக்கும்.",
+  "Under 100 KB": "100 KB-ஐ விடச் சிறியவை",
+  "Video": "வீடியோ",
+  "drive not connected": "இயக்ககம் இணைக்கப்படவில்லை",
+  "{} opens the quick search (otherwise the full window)": "{} விரைவுத் தேடலைத் திறக்கும் (இல்லையெனில் முழுச் சாளரம்)"
  },
  "js": {
   "ph": "கோப்புப் பெயர்களில் தேடு…",
@@ -658,6 +721,102 @@
   "sStartup": "தொடக்கம்",
   "sAutostart": "Windows உடன் தொடங்கு (பின்னணியில்)",
   "sAbout": "பற்றி",
-  "version": "FN:(v) => `InstaFind — பதிப்பு ${v}`"
+  "version": "FN:(v) => `InstaFind — பதிப்பு ${v}`",
+  "fDetails": "கோப்பு விவரங்கள்",
+  "helpEx": [
+   [
+    "விற்பனை அறிக்கை",
+    "இரண்டு சொற்களும் உள்ள பெயர்கள்"
+   ],
+   [
+    "\"குத்தகை ஒப்பந்தம்\"",
+    "சரியான சொற்றொடர்"
+   ],
+   [
+    "அறிக்கை .pdf",
+    "PDF கோப்புகள் மட்டும் (அல்லது ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "பல வகைகள்"
+   ],
+   [
+    "புகைப்படம்|வீடியோ",
+    "இரண்டில் ஏதேனும் ஒரு சொல்"
+   ],
+   [
+    "ஒப்பந்தம் -பழைய",
+    "“பழைய” இல்லாமல் (அல்லது !பழைய)"
+   ],
+   [
+    "size:>10mb",
+    "10 MB-ஐ விடப் பெரியவை"
+   ],
+   [
+    "dm:thisweek",
+    "இந்த வாரம் மாற்றியவை"
+   ],
+   [
+    "dm:2026-05",
+    "மே 2026-இல் மாற்றியவை"
+   ],
+   [
+    "ww:ஒப்பந்தம்",
+    "முழுச் சொல் மட்டும்"
+   ],
+   [
+    "\"குத்தகை ஒப்பந்தம்\"~5",
+    "இரு சொற்களும் 5 சொற்களுக்குள்"
+   ],
+   [
+    "folder: புகைப்படங்கள்",
+    "கோப்புறைகள் மட்டும்"
+   ],
+   [
+    "root: كتاب",
+    "அதே அரபு வேர்ச்சொல்: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: reprot",
+    "எழுத்துப்பிழையைப் பொறுத்துக்கொள்ளும் (“report”-ஐக் கண்டறியும்)"
+   ],
+   [
+    "حجم:>1ج",
+    "அரபிலும்: 1 GB-ஐ விடப் பெரியவை"
+   ],
+   [
+    "احمد",
+    "«أحمد» என்பதையும் கண்டறியும்"
+   ]
+  ],
+  "helpH": "எப்படித் தேடுவது",
+  "helpInside": "ஆவணங்களுக்குள் (PDF, Word, Excel, படங்கள்) தேட: “ஆவணங்களுக்குள்” அழுத்தி, பின்னர் Enter.",
+  "helpKey": "எப்படித் தேடுவது (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"எந்த நிரலிலிருந்தும் சிறிய தேடல் பெட்டி\"], [\"Ctrl+Alt+G\", \"Save/Open உரையாடலில்: முடிவின் கோப்புறைக்குச் செல்\"], [\"Enter\", \"கோப்பைத் திற\"], [\"Ctrl+Enter\", \"அதன் கோப்புறையைத் திற\"], [\"↓\", \"முடிவுகளுக்கு (வெற்றுப் பெட்டியில்: வரலாறு)\"], [\"Ctrl+C\", \"கோப்பை நகலெடு\"], [\"Ctrl+Shift+C\", \"பாதையை நகலெடு\"], [\"F2\", \"மறுபெயரிடு\"], [\"Delete\", \"மறுசுழற்சித் தொட்டிக்கு\"], [\"F4\", \"கோப்பிலுள்ள எல்லாப் பொருத்தங்களும்\"], [\"Ctrl+H\", \"வரலாறு\"], [\"Ctrl+T\", \"சிறுபடங்கள்\"], [\"Ctrl+,\", \"அமைப்புகள்\"], [\"F1\", \"இந்த அட்டை\"]]",
+  "helpKeysH": "விசைப்பலகை",
+  "helpMore": "தேடுவதற்கான எல்லா வழிகளும்…",
+  "helpSub": "ஓர் எடுத்துக்காட்டைத் தேடல் பெட்டியில் இட அதைக் கிளிக் செய்யவும். ஒவ்வொரு வடிப்பானுக்கும் அரபு எழுத்துக்கூட்டலும் உண்டு.",
+  "kLabel": "விசைப்பலகைக் குறுக்குவழிகள்",
+  "offline": "இயக்ககம் இணைக்கப்படவில்லை",
+  "qsNone": "உரையாடல் சாளரத்தை நகர்த்த முடிவு எதுவும் இல்லை. தேடலை மாற்றவும், அல்லது ரத்துசெய்ய Esc அழுத்தவும்.",
+  "sHotkeyKeys": "தேடலைத் திறக்கும் குறுக்குவழி",
+  "sHotkeyKeysSub": "எந்த நிரலிலும் செயல்படும். வேறொரு நிரல் இதைப் பயன்படுத்தினால் வேறொன்றைத் தேர்ந்தெடுக்கவும்.",
+  "sHotkeyTaken": "FN:(k) => `வேறொரு நிரல் ${k}-ஐப் பயன்படுத்துகிறது, எனவே இது இப்போது எதுவும் செய்யாது. வேறொரு குறுக்குவழியைத் தேர்ந்தெடுக்கவும்:`",
+  "sLangHelp": "இந்த மொழிபெயர்ப்பை மேம்படுத்த உதவுங்கள்",
+  "sLangMachine": "(இயந்திர மொழிபெயர்ப்பு)",
+  "sPhone": "தொலைபேசியிலிருந்து தேடு",
+  "sPhoneAllow": "இந்த நெட்வொர்க்கை அனுமதி",
+  "sPhoneIdle": "பாதுகாப்புக்காக, தொலைபேசியிலிருந்து இரண்டு மணிநேரம் கோரிக்கை எதுவும் வராததால் இது தானாக நின்றது. தேவைப்படும்போது மீண்டும் இயக்கவும்.",
+  "sPhoneMore": "மேலும் அமைப்புகள்…",
+  "sPhoneMoreSub": "போர்ட், கோப்புகளைப் பதிவிறக்குதல், புதிய PIN மற்றும் இணைப்பு",
+  "sPhoneOff": "முடக்கத்தில். முகவரியையும் PIN-ஐயும் பார்க்க இதை இயக்கவும்.",
+  "sPhoneOpen": "தொலைபேசியின் உலாவியில் திறக்கவும்:",
+  "sPhonePin": "PIN-ஐத் தட்டச்சு செய்யவும்:",
+  "sPhoneQr": "அல்லது PIN இல்லாமல் தேடலைத் திறக்க, தொலைபேசியின் கேமராவால் இந்தக் குறியீட்டை ஸ்கேன் செய்யவும். இதை யாருக்கும் காட்ட வேண்டாம்.",
+  "sPhoneQrLabel": "தொலைபேசித் தேடலைத் திறக்கும் QR குறியீடு",
+  "sPhoneRow": "தொலைபேசியிலிருந்து தேடு (வீட்டு நெட்வொர்க்)",
+  "sPhoneSub": "அதே Wi-Fi-இல் உள்ள உங்கள் தொலைபேசியின் உலாவியிலிருந்து இந்த PC-இன் கோப்புகளைத் தேடுங்கள். படிக்க மட்டும், உங்கள் வீட்டு நெட்வொர்க்கில் மட்டும்.",
+  "sPhoneWait": "நெட்வொர்க் சரிபார்க்கப்படுகிறது…",
+  "updChecking": "புதுப்பிப்புகள் சரிபார்க்கப்படுகின்றன…"
  }
 }

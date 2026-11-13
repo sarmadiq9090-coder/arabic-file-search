@@ -447,7 +447,70 @@
   "Recent searches": "وروستي لټونونه",
   "Save the current search": "اوسنی لټون خوندي کړئ",
   "Clear history and recent files": "مخینه او وروستۍ دوتنې پاکول",
-  "Delete all saved searches": "ټول خوندي شوي لټونونه ړنګول"
+  "Delete all saved searches": "ټول خوندي شوي لټونونه ړنګول",
+  "(machine translation)": "(ماشیني ژباړه)",
+  ", ": "، ",
+  "1 KB or more": "1 KB یا ډېر",
+  "1 MB or more": "1 MB یا ډېر",
+  "10 MB or more": "10 MB یا ډېر",
+  "100 KB or more": "100 KB یا ډېر",
+  "100 KB to 10 MB": "له 100 KB تر 10 MB",
+  "100 MB or more": "100 MB یا ډېر",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "ستاسو د برېښنالیک په پروګرام کې {} ته یو پیغام پرانیستل شو (راپور کاپي نه شو: «کاپي» کېکاږئ، بیا یې هلته ولګوئ). تر اوسه هېڅ نه دي لېږل شوي.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "ستاسو د برېښنالیک په پروګرام کې {} ته یو پیغام پرانیستل شو. بشپړ راپور کاپي شوی: په پیغام کې یې ولګوئ (Ctrl+V)، بیا «لېږل» کېکاږئ. تر اوسه هېڅ نه دي لېږل شوي.",
+  "All types": "ټول ډولونه",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space دمخه بل پروګرام کاروي، نو دلته نه شي کارېدای. {} لا هم کار کوي.",
+  "Another program has {} too. Pick another one.": "بل پروګرام هم {} کاروي. بله وټاکئ.",
+  "Any size": "هره اندازه",
+  "Any time": "هر وخت",
+  "Archives": "کمپرېس شوې دوتنې",
+  "Audio": "غږ",
+  "Documents": "اسناد",
+  "Downloading the update…": "اوسمهال ښکته کېږي…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter پرانیستل · Ctrl+Enter پوښۍ · Tab نور · Esc تړل",
+  "Folders": "پوښۍ",
+  "GitHub page (public)": "د GitHub پاڼه (عامه)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — نسخه {}\nد دوتنو او د اسنادو دننه سمدستي لټون، په عربي او انګلیسي.\n\nد لټون لپاره له هر ځایه {hk} کېکاږئ.\n{}\n\nملاتړ: {}\n{}\n\nد هغو بهرنیو برخو جوازونه چې دا یې کاروي په THIRD-PARTY-NOTICES.txt کې دي. پرانیستل یې شي؟",
+  "Last 30 days": "وروستۍ 30 ورځې",
+  "Last 7 days": "وروستۍ 7 ورځې",
+  "No files match your search. Try:": "هېڅ دوتنه ستاسو له لټون سره سمون نه خوري. دا وازمویئ:",
+  "No home network connection found; it works on this PC only.": "د کور شبکې سره هېڅ اتصال ونه موندل شو؛ یوازې په همدې کمپیوټر کار کوي.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "تر اوسه انډکس نشته: د جوړولو لپاره یې InstaFind یو ځل پرانیزئ، بیا بیا هڅه وکړئ.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "د برېښنالیک هېڅ پروګرام پرانیستل نه شو. «کاپي» کېکاږئ او راپور {} ته ولېږئ.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "د برېښنالیک هېڅ پروګرام پرانیستل نه شو. راپور کاپي شوی: له خپل برېښنالیک څخه (په تلیفون یا براوزر کې) {} ته په یو پیغام کې یې ولګوئ.",
+  "No results yet — results may be incomplete while indexing.": "تر اوسه پایلې نشته — د انډکس جوړېدو پر مهال کېدای شي پایلې نیمګړې وي.",
+  "No results yet; they may be incomplete while indexing. Try:": "تر اوسه پایلې نشته؛ د انډکس جوړېدو پر مهال کېدای شي نیمګړې وي. دا وازمویئ:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "یادونه: په انځورونو کې عربي متن نه شي لوستل کېدای ځکه چې د Windows د عربي ژبې کڅوړه نه ده نصب شوې.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "تر څو چې تاسو یو تڼی کېنه کاږئ، هېڅ نه لېږل کېږي. د دوتنو نومونه او مسیرونه له راپور څخه لرې کېږي. د GitHub پاڼه عامه ده: هر څوک یې لوستلای شي. برېښنالیک یوازې موږ لولو.",
+  "Older than a year": "له یو کال زوړ",
+  "Open": "پرانیستل",
+  "Open quick search\t{}": "چټک لټون پرانیزئ\t{}",
+  "Over 1 GB": "له 1 GB ډېر",
+  "Over 10 MB": "له 10 MB ډېر",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "له تلیفون څخه لټون د خوندیتوب لپاره، له تلیفون څخه د دوو ساعتونو لپاره د هېڅ غوښتنې له نه راتلو وروسته، پخپله بند شو. د بیا چالانولو لپاره پورته بکس په نښه کړئ.",
+  "Pictures": "انځورونه",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "ستاسو د دوتنو لېست د لومړي ځل لپاره چمتو کېږي (څو دقیقې). همدا اوس ولټوئ؛ کله چې پای ته ورسېږي پایلې بشپړېږي.",
+  "Press {} in any program to open the quick search.": "د چټک لټون د پرانیستلو لپاره په هر پروګرام کې {} کېکاږئ.",
+  "Press {} in any program to show or hide InstaFind.": "د InstaFind د ښودلو یا پټولو لپاره په هر پروګرام کې {} کېکاږئ.",
+  "Programs": "پروګرامونه",
+  "Results": "پایلې",
+  "Results may be incomplete while indexing": "د انډکس جوړېدو پر مهال کېدای شي پایلې نیمګړې وي",
+  "Results may be incomplete while indexing — try": "د انډکس جوړېدو پر مهال کېدای شي پایلې نیمګړې وي — وازمویئ",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "په ساده بڼه چلېږي ځکه چې د Windows د WebView2 برخه نه ده نصب شوې. دلته کلیک وکړئ چې وړیا یې له Microsoft څخه ښکته کړئ.",
+  "Send by email": "د برېښنالیک له لارې لېږل",
+  "Share": "برخه",
+  "Show the program from anywhere\t{}": "پروګرام له هر ځایه ښودل\t{}",
+  "Size": "اندازه",
+  "The list just changed, so nothing was done. Try again.": "لېست همدا اوس بدل شو، نو هېڅ ونه شول. بیا هڅه وکړئ.",
+  "The name did not change.": "نوم بدل نه شو.",
+  "The program will run in the background when Windows starts; show it with {}.": "پروګرام به د Windows د پیل پر مهال په شالید کې چلېږي؛ په {} یې ښکاره کړئ.",
+  "This year": "سږکال",
+  "Today": "نن",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "د یوې دوتنې، اپلیکېشن یا امستنې نوم ولیکئ. پورته او ښکته غشي د پایلو ترمنځ ځي؛ Enter ټاکل شوې پایله پرانیزي.",
+  "Under 100 KB": "له 100 KB کم",
+  "Video": "ویډیو",
+  "drive not connected": "ډرایو نه دی نښلول شوی",
+  "{} opens the quick search (otherwise the full window)": "{} چټک لټون پرانیزي (که نه بشپړه کړکۍ)"
  },
  "js": {
   "ph": "د دوتنو نومونه ولټوئ…",
@@ -658,6 +721,102 @@
   "sStartup": "پیل",
   "sAutostart": "له Windows سره پیل (په شالید کې)",
   "sAbout": "په اړه",
-  "version": "FN:(v) => `InstaFind — نسخه ${v}`"
+  "version": "FN:(v) => `InstaFind — نسخه ${v}`",
+  "fDetails": "د دوتنې جزئیات",
+  "helpEx": [
+   [
+    "د پلور راپور",
+    "هغه نومونه چې دواړه کلمې لري"
+   ],
+   [
+    "\"د کرایې تړون\"",
+    "دقیقه جمله"
+   ],
+   [
+    "راپور .pdf",
+    "یوازې PDF دوتنې (یا ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "څو ډولونه"
+   ],
+   [
+    "انځور|ویډیو",
+    "له دواړو کلمو یوه"
+   ],
+   [
+    "تړون -زوړ",
+    "پرته له «زوړ» (یا !زوړ)"
+   ],
+   [
+    "size:>10mb",
+    "له 10 MB څخه لوی"
+   ],
+   [
+    "dm:thisweek",
+    "پدې اونۍ کې بدل شوي"
+   ],
+   [
+    "dm:2026-05",
+    "د 2026 په می کې بدل شوي"
+   ],
+   [
+    "ww:تړون",
+    "یوازې بشپړه کلمه"
+   ],
+   [
+    "\"کرایې تړون\"~5",
+    "دواړه کلمې تر 5 کلمو په واټن"
+   ],
+   [
+    "folder: انځورونه",
+    "یوازې پوښۍ"
+   ],
+   [
+    "root: كتاب",
+    "همغه عربي ریښه: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: راپرو",
+    "یوه لیکنیزه تېروتنه زغمي"
+   ],
+   [
+    "حجم:>1ج",
+    "په عربي هم: له 1 GB څخه لوی"
+   ],
+   [
+    "احمد",
+    "«أحمد» هم مومي"
+   ]
+  ],
+  "helpH": "څنګه ولټوو",
+  "helpInside": "د اسنادو دننه د لټون لپاره (PDF، Word، Excel، انځورونه): «د اسنادو دننه» کېکاږئ، بیا Enter.",
+  "helpKey": "څنګه ولټوو (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"له هر پروګرام څخه د لټون کوچنی بکس\"], [\"Ctrl+Alt+G\", \"د خوندي کولو/پرانیستلو په کړکۍ کې: د یوې پایلې پوښۍ ته تلل\"], [\"Enter\", \"دوتنه پرانیستل\"], [\"Ctrl+Enter\", \"د هغې پوښۍ پرانیستل\"], [\"↓\", \"پایلو ته (په تش بکس کې: مخینه)\"],\n        [\"Ctrl+C\", \"دوتنه کاپي کول\"], [\"Ctrl+Shift+C\", \"مسیر کاپي کول\"], [\"F2\", \"نوم بدلول\"], [\"Delete\", \"د بیا کارونې ټوکرۍ ته\"], [\"F4\", \"په دوتنه کې ټول سمونونه\"], [\"Ctrl+H\", \"مخینه\"], [\"Ctrl+T\", \"کوچني انځورونه\"], [\"Ctrl+,\", \"امستنې\"], [\"F1\", \"دا کارت\"]]",
+  "helpKeysH": "کیبورډ",
+  "helpMore": "د لټون ټولې لارې…",
+  "helpSub": "په یوې بېلګې کلیک وکړئ چې د لټون بکس کې ولیکل شي. هر فلټر عربي لیکدود هم لري.",
+  "kLabel": "د کیبورډ لنډلارې",
+  "offline": "ډرایو نه دی نښلول شوی",
+  "qsNone": "داسې پایله نشته چې کړکۍ یې پوښۍ ته ولېږدول شي. لټون بدل کړئ، یا د لغوه کولو لپاره Esc کېکاږئ.",
+  "sHotkeyKeys": "د لټون د پرانیستلو لنډلاره",
+  "sHotkeyKeysSub": "په هر پروګرام کې کار کوي. که بل پروګرام یې کاروي، بله وټاکئ.",
+  "sHotkeyTaken": "FN:(k) => `${k} بل پروګرام کاروي، نو اوس هېڅ نه کوي. بله لنډلاره وټاکئ:`",
+  "sLangHelp": "د دې ژباړې په ښه کولو کې مرسته وکړئ",
+  "sLangMachine": "(ماشیني ژباړه)",
+  "sPhone": "له تلیفون څخه لټون",
+  "sPhoneAllow": "دې شبکې ته اجازه ورکړئ",
+  "sPhoneIdle": "د خوندیتوب لپاره، له تلیفون څخه د دوو ساعتونو لپاره د هېڅ غوښتنې له نه راتلو وروسته پخپله بند شو. کله چې اړتیا ولرئ بیا یې چالان کړئ.",
+  "sPhoneMore": "نورې امستنې…",
+  "sPhoneMoreSub": "پورټ، د دوتنو ښکته کول، او نوی PIN کوډ او لینک",
+  "sPhoneOff": "بند دی. د پتې او PIN کوډ لیدلو لپاره یې چالان کړئ.",
+  "sPhoneOpen": "د تلیفون په براوزر کې پرانیزئ:",
+  "sPhonePin": "او PIN کوډ ولیکئ:",
+  "sPhoneQr": "یا دا کوډ د تلیفون په کمره سکن کړئ چې لټون پرته له PIN کوډ پرانیستل شي. هېچا ته یې مه ښیئ.",
+  "sPhoneQrLabel": "QR کوډ چې له تلیفون څخه لټون پرانیزي",
+  "sPhoneRow": "له تلیفون څخه لټون (د کور شبکه)",
+  "sPhoneSub": "په همغه Wi-Fi کې د خپل تلیفون له براوزر څخه د دې کمپیوټر دوتنې ولټوئ. یوازې د لوستلو لپاره، او یوازې ستاسو د کور په شبکه کې.",
+  "sPhoneWait": "شبکه کتل کېږي…",
+  "updChecking": "اوسمهالونه کتل کېږي…"
  }
 }

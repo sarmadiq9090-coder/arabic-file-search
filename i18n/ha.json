@@ -447,7 +447,70 @@
   "Recent searches": "Binciken kwanan nan",
   "Save the current search": "Ajiye binciken yanzu",
   "Clear history and recent files": "Share tarihi da fayilolin kwanan nan",
-  "Delete all saved searches": "Share duk binciken da aka ajiye"
+  "Delete all saved searches": "Share duk binciken da aka ajiye",
+  "(machine translation)": "(fassarar na’ura)",
+  ", ": ", ",
+  "1 KB or more": "KB 1 ko fiye",
+  "1 MB or more": "MB 1 ko fiye",
+  "10 MB or more": "MB 10 ko fiye",
+  "100 KB or more": "KB 100 ko fiye",
+  "100 KB to 10 MB": "Daga KB 100 zuwa MB 10",
+  "100 MB or more": "MB 100 ko fiye",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "An buɗe saƙo zuwa {} a shirin imel ɗinka (ba a iya kwafin rahoton ba: danna “Kwafi”, sannan ka liƙa shi a ciki). Ba a aika komai ba tukuna.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "An buɗe saƙo zuwa {} a shirin imel ɗinka. An kwafi cikakken rahoton: liƙa shi a cikin saƙon (Ctrl+V), sannan danna “Aika”. Ba a aika komai ba tukuna.",
+  "All types": "Duk nau’uka",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Wani shiri ya riga ya mallaki Alt+Space, don haka ba za a iya amfani da shi a nan ba. {} na ci gaba da aiki.",
+  "Another program has {} too. Pick another one.": "Wani shiri ma na amfani da {}. Zaɓi wata.",
+  "Any size": "Kowane girma",
+  "Any time": "Kowane lokaci",
+  "Archives": "Fayilolin matsewa",
+  "Audio": "Sauti",
+  "Documents": "Takardu",
+  "Downloading the update…": "Ana sauke sabuntawar…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter buɗe · Ctrl+Enter babban fayil · Tab ƙari · Esc rufe",
+  "Folders": "Manyan fayiloli",
+  "GitHub page (public)": "Shafin GitHub (na jama’a)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — siga {}\nBincike nan take na fayiloli da cikin takardu, da Larabci da Turanci.\n\nDanna {hk} a ko’ina don bincike.\n{}\n\nTallafi: {}\n{}\n\nLasisin ɓangarorin waje da yake amfani da su suna cikin THIRD-PARTY-NOTICES.txt. A buɗe shi?",
+  "Last 30 days": "Kwanaki 30 da suka gabata",
+  "Last 7 days": "Kwanaki 7 da suka gabata",
+  "No files match your search. Try:": "Babu fayilolin da suka dace da bincikenka. Gwada:",
+  "No home network connection found; it works on this PC only.": "Ba a sami haɗin hanyar sadarwa ta gida ba; yana aiki a wannan kwamfuta kawai.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "Babu fihirisa tukuna: buɗe InstaFind sau ɗaya don gina ta, sannan ka sake gwadawa.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "Babu shirin imel da ya buɗe. Danna “Kwafi” ka aika rahoton zuwa {}.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "Babu shirin imel da ya buɗe. An kwafi rahoton: liƙa shi a cikin saƙo zuwa {} daga imel ɗinka (a waya ko a burauza).",
+  "No results yet — results may be incomplete while indexing.": "Babu sakamako tukuna — sakamako na iya zama ba cikakke ba yayin yin fihirisa.",
+  "No results yet; they may be incomplete while indexing. Try:": "Babu sakamako tukuna; suna iya zama ba cikakku ba yayin yin fihirisa. Gwada:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "Lura: ba za a iya karanta rubutun Larabci a cikin hotuna ba saboda ba a shigar da fakitin harshen Larabci na Windows ba.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "Ba a aika komai sai idan ka danna maɓalli. Ana cire sunaye da hanyoyin fayiloli daga rahoton. Shafin GitHub na jama’a ne: kowa na iya karanta shi. Imel kuwa mu kaɗai muke karanta shi.",
+  "Older than a year": "Ya wuce shekara ɗaya",
+  "Open": "Buɗe",
+  "Open quick search\t{}": "Buɗe bincike mai sauri\t{}",
+  "Over 1 GB": "Ya fi GB 1",
+  "Over 10 MB": "Ya fi MB 10",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "Bincike daga waya ya kashe kansa bayan awa biyu ba tare da wata buƙata daga waya ba, don tsaro. Duba akwatin da ke sama don sake kunna shi.",
+  "Pictures": "Hotuna",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "Ana shirya jerin fayilolinka a karon farko (’yan mintuna). Yi bincike yanzu; sakamako za su cika idan an gama.",
+  "Press {} in any program to open the quick search.": "Danna {} a kowane shiri don buɗe bincike mai sauri.",
+  "Press {} in any program to show or hide InstaFind.": "Danna {} a kowane shiri don nuna ko ɓoye InstaFind.",
+  "Programs": "Shirye-shirye",
+  "Results": "Sakamako",
+  "Results may be incomplete while indexing": "Sakamako na iya zama ba cikakke ba yayin yin fihirisa",
+  "Results may be incomplete while indexing — try": "Sakamako na iya zama ba cikakke ba yayin yin fihirisa — gwada",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Ana aiki a salo mai sauƙi saboda ba a shigar da ɓangaren WebView2 na Windows ba. Danna nan don sauke shi kyauta daga Microsoft.",
+  "Send by email": "Aika ta imel",
+  "Share": "Kaso",
+  "Show the program from anywhere\t{}": "Nuna shirin daga ko’ina\t{}",
+  "Size": "Girma",
+  "The list just changed, so nothing was done. Try again.": "Jerin ya canza yanzu, don haka ba a yi komai ba. Sake gwadawa.",
+  "The name did not change.": "Sunan bai canza ba.",
+  "The program will run in the background when Windows starts; show it with {}.": "Shirin zai yi aiki a bayan fage idan Windows ta fara; nuna shi da {}.",
+  "This year": "Wannan shekara",
+  "Today": "Yau",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "Rubuta sunan fayil, manhaja ko saiti. Kibiyoyin Sama da Ƙasa suna bi ta sakamako; Enter na buɗe wanda aka zaɓa.",
+  "Under 100 KB": "Ƙasa da KB 100",
+  "Video": "Bidiyo",
+  "drive not connected": "faifai ba a haɗa shi ba",
+  "{} opens the quick search (otherwise the full window)": "{} na buɗe bincike mai sauri (in ba haka ba cikakken taga)"
  },
  "js": {
   "ph": "Bincika sunayen fayiloli…",
@@ -658,6 +721,102 @@
   "sStartup": "Farawa",
   "sAutostart": "Fara tare da Windows (a bayan fage)",
   "sAbout": "Game da",
-  "version": "FN:(v) => `InstaFind — siga ${v}`"
+  "version": "FN:(v) => `InstaFind — siga ${v}`",
+  "fDetails": "Bayanan fayil",
+  "helpEx": [
+   [
+    "rahoto tallace-tallace",
+    "sunaye masu kalmomin biyu"
+   ],
+   [
+    "\"yarjejeniyar haya\"",
+    "ainihin jumlar"
+   ],
+   [
+    "rahoto .pdf",
+    "fayilolin PDF kawai (ko ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "nau’uka da yawa"
+   ],
+   [
+    "hoto|bidiyo",
+    "ɗaya daga cikin kalmomin"
+   ],
+   [
+    "kwangila -tsoho",
+    "ba tare da “tsoho” ba (ko !tsoho)"
+   ],
+   [
+    "size:>10mb",
+    "sun fi MB 10 girma"
+   ],
+   [
+    "dm:thisweek",
+    "an canza su a wannan makon"
+   ],
+   [
+    "dm:2026-05",
+    "an canza su a Mayu 2026"
+   ],
+   [
+    "ww:kwangila",
+    "cikakkiyar kalma kawai"
+   ],
+   [
+    "\"yarjejeniyar haya\"~5",
+    "kalmomin biyu a tsakanin kalmomi 5"
+   ],
+   [
+    "folder: hotuna",
+    "manyan fayiloli kawai"
+   ],
+   [
+    "root: كتاب",
+    "tushen Larabci ɗaya: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: rahtoo",
+    "yana jure kuskuren rubutu"
+   ],
+   [
+    "حجم:>1ج",
+    "da Larabci ma: sun fi GB 1 girma"
+   ],
+   [
+    "احمد",
+    "yana samun «أحمد» ma"
+   ]
+  ],
+  "helpH": "Yadda ake bincike",
+  "helpInside": "Don bincike a cikin takardu (PDF, Word, Excel, hotuna): danna “A cikin takardu”, sannan Enter.",
+  "helpKey": "Yadda ake bincike (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"ƙaramin akwatin bincike daga kowane shiri\"], [\"Ctrl+Alt+G\", \"a taga Ajiye/Buɗe: je zuwa babban fayil ɗin sakamako\"], [\"Enter\", \"buɗe fayil ɗin\"], [\"Ctrl+Enter\", \"buɗe babban fayil ɗinsa\"], [\"↓\", \"zuwa sakamako (a akwati maras komai: tarihi)\"],\n        [\"Ctrl+C\", \"kwafi fayil ɗin\"], [\"Ctrl+Shift+C\", \"kwafi hanyar\"], [\"F2\", \"sake suna\"], [\"Delete\", \"zuwa Kwandon Shara\"], [\"F4\", \"duk abubuwan da suka dace a cikin fayil\"], [\"Ctrl+H\", \"tarihi\"], [\"Ctrl+T\", \"ƙananan hotuna\"], [\"Ctrl+,\", \"saituna\"], [\"F1\", \"wannan katin\"]]",
+  "helpKeysH": "Allon madannai",
+  "helpMore": "Duk hanyoyin bincike…",
+  "helpSub": "Danna misali don saka shi a akwatin bincike. Kowane matattara yana da rubutun Larabci ma.",
+  "kLabel": "Gajerun hanyoyin madannai",
+  "offline": "faifai ba a haɗa shi ba",
+  "qsNone": "Babu sakamakon da za a matsar da taga zuwa babban fayil ɗinsa. Canza binciken, ko danna Esc don soke.",
+  "sHotkeyKeys": "Gajeriyar hanya don buɗe bincike",
+  "sHotkeyKeysSub": "Yana aiki a kowane shiri. Zaɓi wata idan wani shiri na amfani da ita.",
+  "sHotkeyTaken": "FN:(k) => `Wani shiri na amfani da ${k}, don haka ba ta yin komai yanzu. Zaɓi wata gajeriyar hanya:`",
+  "sLangHelp": "Taimaka inganta wannan fassarar",
+  "sLangMachine": "(fassarar na’ura)",
+  "sPhone": "Bincike daga waya",
+  "sPhoneAllow": "Ba da izini ga wannan hanyar sadarwa",
+  "sPhoneIdle": "Ya kashe kansa bayan awa biyu ba tare da wata buƙata daga waya ba, don tsaro. Sake kunna shi idan kana buƙata.",
+  "sPhoneMore": "Ƙarin saituna…",
+  "sPhoneMoreSub": "Tashar (port), sauke fayiloli, da sabon PIN da hanyar haɗi",
+  "sPhoneOff": "A kashe. Kunna shi don ganin adireshin da PIN.",
+  "sPhoneOpen": "Buɗe a burauzar waya:",
+  "sPhonePin": "kuma rubuta PIN:",
+  "sPhoneQr": "Ko ka duba wannan lambar da kyamarar waya don buɗe binciken ba tare da PIN ba. Kada ka nuna wa kowa.",
+  "sPhoneQrLabel": "Lambar QR da ke buɗe bincike daga waya",
+  "sPhoneRow": "Bincike daga waya (hanyar sadarwa ta gida)",
+  "sPhoneSub": "Bincika fayilolin wannan kwamfuta daga burauzar wayarka a kan Wi-Fi ɗaya. Karantawa kawai, kuma a hanyar sadarwa ta gidanka kawai.",
+  "sPhoneWait": "Ana duba hanyar sadarwa…",
+  "updChecking": "Ana duba sabuntawa…"
  }
 }

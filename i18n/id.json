@@ -447,7 +447,70 @@
   "Recent searches": "Pencarian terbaru",
   "Save the current search": "Simpan pencarian saat ini",
   "Clear history and recent files": "Hapus riwayat dan file terbaru",
-  "Delete all saved searches": "Hapus semua pencarian tersimpan"
+  "Delete all saved searches": "Hapus semua pencarian tersimpan",
+  "(machine translation)": "(terjemahan mesin)",
+  ", ": ", ",
+  "1 KB or more": "1 KB atau lebih",
+  "1 MB or more": "1 MB atau lebih",
+  "10 MB or more": "10 MB atau lebih",
+  "100 KB or more": "100 KB atau lebih",
+  "100 KB to 10 MB": "100 KB hingga 10 MB",
+  "100 MB or more": "100 MB atau lebih",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "Pesan ke {} telah terbuka di program email Anda (laporan tidak dapat disalin: tekan “Salin”, lalu tempel di sana). Belum ada yang dikirim.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "Pesan ke {} telah terbuka di program email Anda. Laporan lengkap telah disalin: tempel di pesan (Ctrl+V), lalu tekan “Kirim”. Belum ada yang dikirim.",
+  "All types": "Semua jenis",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space sudah digunakan oleh program lain, jadi tidak dapat digunakan di sini. {} tetap berfungsi.",
+  "Another program has {} too. Pick another one.": "Program lain juga menggunakan {}. Pilih yang lain.",
+  "Any size": "Ukuran apa pun",
+  "Any time": "Kapan saja",
+  "Archives": "Arsip",
+  "Audio": "Audio",
+  "Documents": "Dokumen",
+  "Downloading the update…": "Mengunduh pembaruan…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter buka · Ctrl+Enter folder · Tab lainnya · Esc tutup",
+  "Folders": "Folder",
+  "GitHub page (public)": "Halaman GitHub (publik)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — versi {}\nPencarian instan untuk file dan isi dokumen, dalam bahasa Arab dan Inggris.\n\nTekan {hk} di mana saja untuk mencari.\n{}\n\nDukungan: {}\n{}\n\nLisensi komponen pihak ketiga yang digunakan ada di THIRD-PARTY-NOTICES.txt. Buka file tersebut?",
+  "Last 30 days": "30 hari terakhir",
+  "Last 7 days": "7 hari terakhir",
+  "No files match your search. Try:": "Tidak ada file yang cocok dengan pencarian Anda. Coba:",
+  "No home network connection found; it works on this PC only.": "Tidak ada koneksi jaringan rumah; ini hanya berfungsi di PC ini.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "Belum ada indeks: buka InstaFind sekali untuk membuatnya, lalu coba lagi.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "Tidak ada program email yang terbuka. Tekan “Salin” lalu kirim laporan ke {}.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "Tidak ada program email yang terbuka. Laporan telah disalin: tempel dalam pesan ke {} dari email Anda sendiri (di ponsel atau di browser).",
+  "No results yet — results may be incomplete while indexing.": "Belum ada hasil — hasil mungkin belum lengkap selama pengindeksan.",
+  "No results yet; they may be incomplete while indexing. Try:": "Belum ada hasil; hasil mungkin belum lengkap selama pengindeksan. Coba:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "Catatan: teks Arab di dalam gambar tidak dapat dibaca: paket bahasa Arab Windows belum terpasang.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "Tidak ada yang dikirim kecuali Anda menekan tombol. Nama file dan jalur dihapus dari laporan. Halaman GitHub bersifat publik: siapa pun dapat membacanya. Email hanya dibaca oleh kami.",
+  "Older than a year": "Lebih dari setahun",
+  "Open": "Buka",
+  "Open quick search\t{}": "Buka pencarian cepat\t{}",
+  "Over 1 GB": "Lebih dari 1 GB",
+  "Over 10 MB": "Lebih dari 10 MB",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "Demi keamanan, pencarian dari ponsel mati dengan sendirinya setelah dua jam tanpa permintaan dari ponsel. Centang kotak di atas untuk menyalakannya lagi.",
+  "Pictures": "Gambar",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "Menyiapkan daftar file Anda untuk pertama kalinya (beberapa menit). Cari sekarang; hasil akan terisi saat selesai.",
+  "Press {} in any program to open the quick search.": "Tekan {} di program apa pun untuk membuka pencarian cepat.",
+  "Press {} in any program to show or hide InstaFind.": "Tekan {} di program apa pun untuk menampilkan atau menyembunyikan InstaFind.",
+  "Programs": "Program",
+  "Results": "Hasil",
+  "Results may be incomplete while indexing": "Hasil mungkin belum lengkap selama pengindeksan",
+  "Results may be incomplete while indexing — try": "Hasil mungkin belum lengkap selama pengindeksan — coba",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Berjalan dalam tampilan sederhana karena komponen WebView2 Windows belum terpasang. Klik di sini untuk mengunduhnya gratis dari Microsoft.",
+  "Send by email": "Kirim lewat email",
+  "Share": "Porsi",
+  "Show the program from anywhere\t{}": "Tampilkan program dari mana saja\t{}",
+  "Size": "Ukuran",
+  "The list just changed, so nothing was done. Try again.": "Daftar baru saja berubah, jadi tidak ada yang dilakukan. Coba lagi.",
+  "The name did not change.": "Nama tidak berubah.",
+  "The program will run in the background when Windows starts; show it with {}.": "Program akan berjalan di latar belakang saat Windows dimulai; tampilkan dengan {}.",
+  "This year": "Tahun ini",
+  "Today": "Hari ini",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "Ketik nama file, aplikasi, atau pengaturan. Panah Atas dan Bawah berpindah di antara hasil; Enter membuka yang dipilih.",
+  "Under 100 KB": "Kurang dari 100 KB",
+  "Video": "Video",
+  "drive not connected": "drive tidak tersambung",
+  "{} opens the quick search (otherwise the full window)": "{} membuka pencarian cepat (jika tidak, jendela penuh)"
  },
  "js": {
   "ph": "Cari nama file…",
@@ -658,6 +721,102 @@
   "sStartup": "Startup",
   "sAutostart": "Mulai bersama Windows (di latar belakang)",
   "sAbout": "Tentang",
-  "version": "FN:(v) => `InstaFind — versi ${v}`"
+  "version": "FN:(v) => `InstaFind — versi ${v}`",
+  "fDetails": "Detail file",
+  "helpEx": [
+   [
+    "laporan penjualan",
+    "nama yang memuat kedua kata"
+   ],
+   [
+    "\"perjanjian sewa\"",
+    "frasa persis"
+   ],
+   [
+    "laporan .pdf",
+    "hanya file PDF (atau ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "beberapa jenis"
+   ],
+   [
+    "foto|video",
+    "salah satu kata"
+   ],
+   [
+    "kontrak -lama",
+    "tanpa “lama” (atau !lama)"
+   ],
+   [
+    "size:>10mb",
+    "lebih besar dari 10 MB"
+   ],
+   [
+    "dm:thisweek",
+    "diubah minggu ini"
+   ],
+   [
+    "dm:2026-05",
+    "diubah pada Mei 2026"
+   ],
+   [
+    "ww:kontrak",
+    "hanya kata utuh"
+   ],
+   [
+    "\"kontrak sewa\"~5",
+    "kedua kata berjarak paling jauh 5 kata"
+   ],
+   [
+    "folder: foto",
+    "hanya folder"
+   ],
+   [
+    "root: كتاب",
+    "akar kata Arab yang sama: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: lapoarn",
+    "menoleransi salah ketik"
+   ],
+   [
+    "حجم:>1ج",
+    "dalam bahasa Arab juga: lebih besar dari 1 GB"
+   ],
+   [
+    "احمد",
+    "juga menemukan «أحمد»"
+   ]
+  ],
+  "helpH": "Cara mencari",
+  "helpInside": "Untuk mencari di dalam dokumen (PDF, Word, Excel, gambar): tekan “Di dalam dokumen”, lalu Enter.",
+  "helpKey": "Cara mencari (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"kotak pencarian kecil dari program apa pun\"], [\"Ctrl+Alt+G\", \"di dialog Simpan/Buka: buka folder hasil\"], [\"Enter\", \"buka file\"], [\"Ctrl+Enter\", \"buka foldernya\"], [\"↓\", \"ke hasil (di kotak kosong: riwayat)\"], [\"Ctrl+C\", \"salin file\"], [\"Ctrl+Shift+C\", \"salin jalur\"], [\"F2\", \"ganti nama\"], [\"Delete\", \"ke Tempat Sampah\"], [\"F4\", \"semua kecocokan di file\"], [\"Ctrl+H\", \"riwayat\"], [\"Ctrl+T\", \"gambar mini\"], [\"Ctrl+,\", \"pengaturan\"], [\"F1\", \"kartu ini\"]]",
+  "helpKeysH": "Keyboard",
+  "helpMore": "Semua cara mencari…",
+  "helpSub": "Klik contoh untuk memasukkannya ke kotak pencarian. Setiap filter juga punya ejaan Arab.",
+  "kLabel": "Pintasan keyboard",
+  "offline": "drive tidak tersambung",
+  "qsNone": "Tidak ada hasil untuk memindahkan dialog. Ubah pencarian, atau tekan Esc untuk membatalkan.",
+  "sHotkeyKeys": "Pintasan untuk membuka pencarian",
+  "sHotkeyKeysSub": "Berfungsi di program apa pun. Pilih yang lain jika program lain menggunakannya.",
+  "sHotkeyTaken": "FN:(k) => `Program lain menggunakan ${k}, jadi sekarang tidak berfungsi. Pilih pintasan lain:`",
+  "sLangHelp": "Bantu perbaiki terjemahan ini",
+  "sLangMachine": "(terjemahan mesin)",
+  "sPhone": "Cari dari ponsel",
+  "sPhoneAllow": "Izinkan jaringan ini",
+  "sPhoneIdle": "Demi keamanan, fitur ini mati dengan sendirinya setelah dua jam tanpa permintaan dari ponsel. Nyalakan lagi saat Anda membutuhkannya.",
+  "sPhoneMore": "Pengaturan lainnya…",
+  "sPhoneMoreSub": "Port, mengunduh file, serta PIN dan tautan baru",
+  "sPhoneOff": "Mati. Nyalakan untuk melihat alamat dan PIN.",
+  "sPhoneOpen": "Buka di browser ponsel:",
+  "sPhonePin": "lalu ketik PIN:",
+  "sPhoneQr": "Atau pindai kode ini dengan kamera ponsel untuk membuka pencarian tanpa PIN. Jangan perlihatkan kepada siapa pun.",
+  "sPhoneQrLabel": "Kode QR untuk membuka pencarian dari ponsel",
+  "sPhoneRow": "Cari dari ponsel (jaringan rumah)",
+  "sPhoneSub": "Cari file PC ini dari browser ponsel Anda di Wi-Fi yang sama. Hanya baca, dan hanya di jaringan rumah Anda.",
+  "sPhoneWait": "Memeriksa jaringan…",
+  "updChecking": "Memeriksa pembaruan…"
  }
 }

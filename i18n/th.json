@@ -447,7 +447,70 @@
   "Recent searches": "การค้นหาล่าสุด",
   "Save the current search": "บันทึกการค้นหาปัจจุบัน",
   "Clear history and recent files": "ล้างประวัติและไฟล์ล่าสุด",
-  "Delete all saved searches": "ลบการค้นหาที่บันทึกไว้ทั้งหมด"
+  "Delete all saved searches": "ลบการค้นหาที่บันทึกไว้ทั้งหมด",
+  "(machine translation)": "(แปลโดยเครื่อง)",
+  ", ": ", ",
+  "1 KB or more": "1 KB ขึ้นไป",
+  "1 MB or more": "1 MB ขึ้นไป",
+  "10 MB or more": "10 MB ขึ้นไป",
+  "100 KB or more": "100 KB ขึ้นไป",
+  "100 KB to 10 MB": "100 KB ถึง 10 MB",
+  "100 MB or more": "100 MB ขึ้นไป",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "เปิดข้อความถึง {} ในโปรแกรมอีเมลของคุณแล้ว (คัดลอกรายงานไม่ได้: กด “คัดลอก” แล้ววางลงในข้อความนั้น) ยังไม่มีการส่งสิ่งใด",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "เปิดข้อความถึง {} ในโปรแกรมอีเมลของคุณแล้ว คัดลอกรายงานฉบับเต็มแล้ว: วางลงในข้อความ (Ctrl+V) แล้วกด “ส่ง” ยังไม่มีการส่งสิ่งใด",
+  "All types": "ทุกชนิด",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space ถูกใช้โดยโปรแกรมอื่นแล้ว จึงใช้ที่นี่ไม่ได้ {} ยังใช้งานได้",
+  "Another program has {} too. Pick another one.": "โปรแกรมอื่นก็ใช้ {} อยู่ด้วย โปรดเลือกปุ่มอื่น",
+  "Any size": "ทุกขนาด",
+  "Any time": "ทุกเวลา",
+  "Archives": "ไฟล์บีบอัด",
+  "Audio": "เสียง",
+  "Documents": "เอกสาร",
+  "Downloading the update…": "กำลังดาวน์โหลดการอัปเดต…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter เปิด · Ctrl+Enter โฟลเดอร์ · Tab เพิ่มเติม · Esc ปิด",
+  "Folders": "โฟลเดอร์",
+  "GitHub page (public)": "หน้า GitHub (สาธารณะ)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — เวอร์ชัน {}\nค้นหาไฟล์และเนื้อหาภายในเอกสารได้ทันที ทั้งภาษาอาหรับและภาษาอังกฤษ\n\nกด {hk} ที่ใดก็ได้เพื่อค้นหา\n{}\n\nการสนับสนุน: {}\n{}\n\nใบอนุญาตของคอมโพเนนต์ของบุคคลที่สามที่ใช้อยู่ใน THIRD-PARTY-NOTICES.txt ต้องการเปิดไฟล์นี้หรือไม่",
+  "Last 30 days": "30 วันที่ผ่านมา",
+  "Last 7 days": "7 วันที่ผ่านมา",
+  "No files match your search. Try:": "ไม่มีไฟล์ที่ตรงกับการค้นหาของคุณ ลอง:",
+  "No home network connection found; it works on this PC only.": "ไม่พบการเชื่อมต่อเครือข่ายภายในบ้าน ใช้งานได้บนพีซีเครื่องนี้เท่านั้น",
+  "No index yet: open InstaFind once to build it, then try again.\n": "ยังไม่มีดัชนี: เปิด InstaFind หนึ่งครั้งเพื่อสร้างดัชนี แล้วลองอีกครั้ง\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "ไม่มีโปรแกรมอีเมลเปิดขึ้น กด “คัดลอก” แล้วส่งรายงานไปที่ {}",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "ไม่มีโปรแกรมอีเมลเปิดขึ้น คัดลอกรายงานแล้ว: วางลงในข้อความถึง {} จากอีเมลของคุณเอง (บนโทรศัพท์หรือในเบราว์เซอร์)",
+  "No results yet — results may be incomplete while indexing.": "ยังไม่มีผลลัพธ์ — ผลลัพธ์อาจไม่ครบระหว่างการทำดัชนี",
+  "No results yet; they may be incomplete while indexing. Try:": "ยังไม่มีผลลัพธ์ และอาจไม่ครบระหว่างการทำดัชนี ลอง:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "หมายเหตุ: อ่านข้อความภาษาอาหรับในรูปภาพไม่ได้ เนื่องจากไม่ได้ติดตั้งชุดภาษาอาหรับของ Windows",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "จะไม่มีการส่งสิ่งใดจนกว่าคุณจะกดปุ่ม ชื่อไฟล์และเส้นทางจะถูกลบออกจากรายงาน หน้า GitHub เป็นสาธารณะ: ใครก็อ่านได้ ส่วนอีเมลมีเพียงเราที่อ่าน",
+  "Older than a year": "เก่ากว่าหนึ่งปี",
+  "Open": "เปิด",
+  "Open quick search\t{}": "เปิดการค้นหาด่วน\t{}",
+  "Over 1 GB": "ใหญ่กว่า 1 GB",
+  "Over 10 MB": "ใหญ่กว่า 10 MB",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "เพื่อความปลอดภัย การค้นหาจากโทรศัพท์ปิดตัวเองหลังจากไม่มีคำขอจากโทรศัพท์เป็นเวลาสองชั่วโมง ทำเครื่องหมายในช่องด้านบนเพื่อเปิดอีกครั้ง",
+  "Pictures": "รูปภาพ",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "กำลังเตรียมรายการไฟล์ของคุณเป็นครั้งแรก (ไม่กี่นาที) ค้นหาได้เลย ผลลัพธ์จะครบเมื่อเสร็จ",
+  "Press {} in any program to open the quick search.": "กด {} ในโปรแกรมใดก็ได้เพื่อเปิดการค้นหาด่วน",
+  "Press {} in any program to show or hide InstaFind.": "กด {} ในโปรแกรมใดก็ได้เพื่อแสดงหรือซ่อน InstaFind",
+  "Programs": "โปรแกรม",
+  "Results": "ผลลัพธ์",
+  "Results may be incomplete while indexing": "ผลลัพธ์อาจไม่ครบระหว่างการทำดัชนี",
+  "Results may be incomplete while indexing — try": "ผลลัพธ์อาจไม่ครบระหว่างการทำดัชนี — ลอง",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "กำลังทำงานในรูปแบบอย่างง่าย เนื่องจากไม่ได้ติดตั้งคอมโพเนนต์ WebView2 ของ Windows คลิกที่นี่เพื่อดาวน์โหลดฟรีจาก Microsoft",
+  "Send by email": "ส่งทางอีเมล",
+  "Share": "สัดส่วน",
+  "Show the program from anywhere\t{}": "แสดงโปรแกรมได้จากทุกที่\t{}",
+  "Size": "ขนาด",
+  "The list just changed, so nothing was done. Try again.": "รายการเพิ่งเปลี่ยน จึงไม่ได้ทำสิ่งใด ลองอีกครั้ง",
+  "The name did not change.": "ชื่อไม่ได้เปลี่ยน",
+  "The program will run in the background when Windows starts; show it with {}.": "โปรแกรมจะทำงานในเบื้องหลังเมื่อ Windows เริ่มทำงาน แสดงโปรแกรมได้ด้วย {}",
+  "This year": "ปีนี้",
+  "Today": "วันนี้",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "พิมพ์ชื่อไฟล์ แอป หรือการตั้งค่า ลูกศรขึ้นและลงใช้เลื่อนผ่านผลลัพธ์ Enter เปิดรายการที่เลือก",
+  "Under 100 KB": "เล็กกว่า 100 KB",
+  "Video": "วิดีโอ",
+  "drive not connected": "ไม่ได้เชื่อมต่อไดรฟ์",
+  "{} opens the quick search (otherwise the full window)": "{} เปิดการค้นหาด่วน (หากปิดไว้ จะเปิดหน้าต่างเต็ม)"
  },
  "js": {
   "ph": "ค้นหาชื่อไฟล์…",
@@ -658,6 +721,102 @@
   "sStartup": "การเริ่มต้น",
   "sAutostart": "เริ่มพร้อม Windows (ทำงานในเบื้องหลัง)",
   "sAbout": "เกี่ยวกับ",
-  "version": "FN:(v) => `InstaFind — เวอร์ชัน ${v}`"
+  "version": "FN:(v) => `InstaFind — เวอร์ชัน ${v}`",
+  "fDetails": "รายละเอียดไฟล์",
+  "helpEx": [
+   [
+    "รายงาน ยอดขาย",
+    "ชื่อที่มีทั้งสองคำ"
+   ],
+   [
+    "\"สัญญาเช่า\"",
+    "ตรงทั้งวลี"
+   ],
+   [
+    "รายงาน .pdf",
+    "เฉพาะไฟล์ PDF (หรือ ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "หลายชนิด"
+   ],
+   [
+    "รูปภาพ|วิดีโอ",
+    "คำใดคำหนึ่ง"
+   ],
+   [
+    "สัญญา -เก่า",
+    "ไม่มีคำว่า “เก่า” (หรือ !เก่า)"
+   ],
+   [
+    "size:>10mb",
+    "ใหญ่กว่า 10 MB"
+   ],
+   [
+    "dm:thisweek",
+    "เปลี่ยนแปลงในสัปดาห์นี้"
+   ],
+   [
+    "dm:2026-05",
+    "เปลี่ยนแปลงในเดือนพฤษภาคม 2026"
+   ],
+   [
+    "ww:contract",
+    "ทั้งคำเท่านั้น (contract แต่ไม่ใช่ contracts)"
+   ],
+   [
+    "\"สัญญา เช่า\"~5",
+    "ทั้งสองคำห่างกันไม่เกิน 5 คำ"
+   ],
+   [
+    "folder: รูปภาพ",
+    "เฉพาะโฟลเดอร์"
+   ],
+   [
+    "root: كتاب",
+    "รากศัพท์ภาษาอาหรับเดียวกัน: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: reprot",
+    "ยอมรับการพิมพ์ผิด (พบ “report”)"
+   ],
+   [
+    "حجم:>1ج",
+    "ใช้ภาษาอาหรับก็ได้: ใหญ่กว่า 1 GB"
+   ],
+   [
+    "احمد",
+    "พบ «أحمد» ด้วย"
+   ]
+  ],
+  "helpH": "วิธีค้นหา",
+  "helpInside": "หากต้องการค้นหาภายในเอกสาร (PDF, Word, Excel, รูปภาพ): กด “ภายในเอกสาร” แล้วกด Enter",
+  "helpKey": "วิธีค้นหา (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"กล่องค้นหาขนาดเล็กจากทุกโปรแกรม\"], [\"Ctrl+Alt+G\", \"ในกล่องโต้ตอบบันทึก/เปิด: ไปยังโฟลเดอร์ของผลลัพธ์\"], [\"Enter\", \"เปิดไฟล์\"], [\"Ctrl+Enter\", \"เปิดโฟลเดอร์ของไฟล์\"], [\"↓\", \"ไปที่ผลลัพธ์ (ในช่องว่าง: ประวัติ)\"], [\"Ctrl+C\", \"คัดลอกไฟล์\"], [\"Ctrl+Shift+C\", \"คัดลอกเส้นทาง\"], [\"F2\", \"เปลี่ยนชื่อ\"], [\"Delete\", \"ย้ายไปที่ถังรีไซเคิล\"], [\"F4\", \"ทุกจุดที่ตรงกันในไฟล์\"], [\"Ctrl+H\", \"ประวัติ\"], [\"Ctrl+T\", \"รูปขนาดย่อ\"], [\"Ctrl+,\", \"การตั้งค่า\"], [\"F1\", \"การ์ดนี้\"]]",
+  "helpKeysH": "แป้นพิมพ์",
+  "helpMore": "วิธีค้นหาทั้งหมด…",
+  "helpSub": "คลิกตัวอย่างเพื่อใส่ลงในช่องค้นหา ตัวกรองทุกตัวมีการสะกดแบบภาษาอาหรับด้วย",
+  "kLabel": "แป้นพิมพ์ลัด",
+  "offline": "ไม่ได้เชื่อมต่อไดรฟ์",
+  "qsNone": "ไม่มีผลลัพธ์ที่จะย้ายกล่องโต้ตอบไป เปลี่ยนการค้นหา หรือกด Esc เพื่อยกเลิก",
+  "sHotkeyKeys": "คีย์ลัดเปิดการค้นหา",
+  "sHotkeyKeysSub": "ใช้ได้ในทุกโปรแกรม เลือกคีย์อื่นหากโปรแกรมอื่นใช้คีย์นี้อยู่",
+  "sHotkeyTaken": "FN:(k) => `โปรแกรมอื่นใช้ ${k} อยู่ จึงใช้งานไม่ได้ในขณะนี้ เลือกคีย์ลัดอื่น:`",
+  "sLangHelp": "ช่วยปรับปรุงคำแปลนี้",
+  "sLangMachine": "(แปลโดยเครื่อง)",
+  "sPhone": "ค้นหาจากโทรศัพท์",
+  "sPhoneAllow": "อนุญาตเครือข่ายนี้",
+  "sPhoneIdle": "เพื่อความปลอดภัย ฟีเจอร์นี้ปิดตัวเองหลังจากไม่มีคำขอจากโทรศัพท์เป็นเวลาสองชั่วโมง เปิดอีกครั้งเมื่อต้องการใช้",
+  "sPhoneMore": "การตั้งค่าเพิ่มเติม…",
+  "sPhoneMoreSub": "พอร์ต การดาวน์โหลดไฟล์ และ PIN กับลิงก์ใหม่",
+  "sPhoneOff": "ปิดอยู่ เปิดเพื่อดูที่อยู่และ PIN",
+  "sPhoneOpen": "เปิดในเบราว์เซอร์ของโทรศัพท์:",
+  "sPhonePin": "แล้วพิมพ์ PIN:",
+  "sPhoneQr": "หรือสแกนรหัสนี้ด้วยกล้องโทรศัพท์เพื่อเปิดการค้นหาโดยไม่ต้องใช้ PIN อย่าให้ใครเห็นรหัสนี้",
+  "sPhoneQrLabel": "รหัส QR สำหรับเปิดการค้นหาจากโทรศัพท์",
+  "sPhoneRow": "ค้นหาจากโทรศัพท์ (เครือข่ายภายในบ้าน)",
+  "sPhoneSub": "ค้นหาไฟล์ในพีซีเครื่องนี้จากเบราว์เซอร์ของโทรศัพท์ที่ใช้ Wi-Fi เดียวกัน อ่านได้อย่างเดียว และใช้ได้เฉพาะในเครือข่ายภายในบ้านของคุณ",
+  "sPhoneWait": "กำลังตรวจสอบเครือข่าย…",
+  "updChecking": "กำลังตรวจหาการอัปเดต…"
  }
 }

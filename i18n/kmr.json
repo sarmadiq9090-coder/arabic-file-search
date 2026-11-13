@@ -447,7 +447,70 @@
   "Recent searches": "Lêgerînên dawî",
   "Save the current search": "Lêgerîna niha tomar bike",
   "Clear history and recent files": "Dîrok û pelên dawî paqij bike",
-  "Delete all saved searches": "Hemû lêgerînên tomarkirî jê bibe"
+  "Delete all saved searches": "Hemû lêgerînên tomarkirî jê bibe",
+  "(machine translation)": "(wergera makîneyê)",
+  ", ": ", ",
+  "1 KB or more": "1 KB an zêdetir",
+  "1 MB or more": "1 MB an zêdetir",
+  "10 MB or more": "10 MB an zêdetir",
+  "100 KB or more": "100 KB an zêdetir",
+  "100 KB to 10 MB": "Ji 100 KB heta 10 MB",
+  "100 MB or more": "100 MB an zêdetir",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "Di bernameya e-nameyê de peyamek ji {} re vebû (rapor nehat kopîkirin: pêl “Kopî bike” bike, paşê wê li wir pêve bike). Hê tiştek nehatiye şandin.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "Di bernameya e-nameyê de peyamek ji {} re vebû. Rapora tevahî hat kopîkirin: wê di peyamê de pêve bike (Ctrl+V), paşê pêl “Bişîne” bike. Hê tiştek nehatiye şandin.",
+  "All types": "Hemû cure",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space jixwe ji aliyê bernameyeke din ve tê bikaranîn, ji ber vê li vir nayê bikaranîn. {} hê jî dixebite.",
+  "Another program has {} too. Pick another one.": "Bernameyeke din jî {} bi kar tîne. Yekî din hilbijêre.",
+  "Any size": "Her mezinahî",
+  "Any time": "Her dem",
+  "Archives": "Arşîv",
+  "Audio": "Deng",
+  "Documents": "Belge",
+  "Downloading the update…": "Rojanekirin tê daxistin…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter veke · Ctrl+Enter peldank · Tab zêdetir · Esc bigire",
+  "Folders": "Peldank",
+  "GitHub page (public)": "Rûpela GitHub (giştî)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — guherto {}\nLêgerîna tavilê ya pelan û di nav belgeyan de, bi erebî û îngilîzî.\n\nJi bo lêgerînê li her derê pêl {hk} bike.\n{}\n\nPiştgirî: {}\n{}\n\nLîsansên pêkhateyên aliyên sêyem ên ku bi kar tîne di THIRD-PARTY-NOTICES.txt de ne. Bila vebe?",
+  "Last 30 days": "30 rojên dawî",
+  "Last 7 days": "7 rojên dawî",
+  "No files match your search. Try:": "Tu pel li gorî lêgerîna te nayên. Biceribîne:",
+  "No home network connection found; it works on this PC only.": "Girêdana tora malê nehat dîtin; tenê li ser vê komputerê dixebite.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "Hê pêrist tune: ji bo avakirina wê carekê InstaFind veke, paşê dîsa biceribîne.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "Tu bernameya e-nameyê venebû. Pêl “Kopî bike” bike û raporê ji {} re bişîne.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "Tu bernameya e-nameyê venebû. Rapor hat kopîkirin: wê di peyamekê de ji {} re ji e-nameya xwe (li ser telefonê an di gerokê de) pêve bike.",
+  "No results yet — results may be incomplete while indexing.": "Hê encam tune — dema pêristkirinê dibe ku encam ne temam bin.",
+  "No results yet; they may be incomplete while indexing. Try:": "Hê encam tune; dema pêristkirinê dibe ku ne temam bin. Biceribîne:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "Nîşe: nivîsa erebî ya di wêneyan de nayê xwendin, ji ber ku pakêta zimanê erebî ya Windows nehatiye sazkirin.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "Heta tu pêl bişkokekê nekî, tiştek nayê şandin. Nav û riyên pelan ji raporê têne rakirin. Rûpela GitHub giştî ye: her kes dikare wê bixwîne. E-nameyê tenê em dixwînin.",
+  "Older than a year": "Ji salekê kevntir",
+  "Open": "Veke",
+  "Open quick search\t{}": "Lêgerîna bilez veke\t{}",
+  "Over 1 GB": "Ji 1 GB zêdetir",
+  "Over 10 MB": "Ji 10 MB zêdetir",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "Lêgerîna ji telefonê ji bo ewlehiyê piştî du demjimêran bê ti daxwazeke ji telefonê bi xwe girtî bû. Ji bo dîsa vekirinê qutiya li jor nîşan bike.",
+  "Pictures": "Wêne",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "Lîsteya pelên te cara yekem tê amadekirin (çend deqe). Niha bigere; dema biqede encam temam dibin.",
+  "Press {} in any program to open the quick search.": "Ji bo vekirina lêgerîna bilez di her bernameyê de pêl {} bike.",
+  "Press {} in any program to show or hide InstaFind.": "Ji bo nîşandan an veşartina InstaFind di her bernameyê de pêl {} bike.",
+  "Programs": "Bername",
+  "Results": "Encam",
+  "Results may be incomplete while indexing": "Dema pêristkirinê dibe ku encam ne temam bin",
+  "Results may be incomplete while indexing — try": "Dema pêristkirinê dibe ku encam ne temam bin — biceribîne",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Bi rûxara sade dixebite ji ber ku pêkhateya WebView2 ya Windows nehatiye sazkirin. Ji bo daxistina wê ya belaş ji Microsoft li vir bitikîne.",
+  "Send by email": "Bi e-nameyê bişîne",
+  "Share": "Par",
+  "Show the program from anywhere\t{}": "Bernameyê ji her derê nîşan bide\t{}",
+  "Size": "Mezinahî",
+  "The list just changed, so nothing was done. Try again.": "Lîste niha guherî, ji ber vê tiştek nehat kirin. Dîsa biceribîne.",
+  "The name did not change.": "Nav neguherî.",
+  "The program will run in the background when Windows starts; show it with {}.": "Dema Windows dest pê dike, bername dê li paşperdeyê bixebite; bi {} nîşan bide.",
+  "This year": "Îsal",
+  "Today": "Îro",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "Navê pelekê, sepanekê an mîhengekê binivîse. Tîrên Jor û Jêr di nav encaman de digerin; Enter ya hilbijartî vedike.",
+  "Under 100 KB": "Ji 100 KB kêmtir",
+  "Video": "Vîdyo",
+  "drive not connected": "dîsk ne girêdayî ye",
+  "{} opens the quick search (otherwise the full window)": "{} lêgerîna bilez vedike (an na pencereya tevahî)"
  },
  "js": {
   "ph": "Li navên pelan bigere…",
@@ -658,6 +721,102 @@
   "sStartup": "Destpêk",
   "sAutostart": "Bi Windows re dest pê bike (li paşxanê)",
   "sAbout": "Derbarê",
-  "version": "FN:(v) => `InstaFind — guherto ${v}`"
+  "version": "FN:(v) => `InstaFind — guherto ${v}`",
+  "fDetails": "Hûrguliyên pelê",
+  "helpEx": [
+   [
+    "rapora firotanê",
+    "navên ku her du peyv tê de ne"
+   ],
+   [
+    "\"peymana kirê\"",
+    "hevoka tam"
+   ],
+   [
+    "rapor .pdf",
+    "tenê pelên PDF (an ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "çend cure"
+   ],
+   [
+    "wêne|vîdyo",
+    "yek ji her du peyvan"
+   ],
+   [
+    "peyman -kevn",
+    "bê “kevn” (an !kevn)"
+   ],
+   [
+    "size:>10mb",
+    "ji 10 MB mezintir"
+   ],
+   [
+    "dm:thisweek",
+    "vê hefteyê hatine guhertin"
+   ],
+   [
+    "dm:2026-05",
+    "di Gulana 2026an de hatine guhertin"
+   ],
+   [
+    "ww:peyman",
+    "tenê peyva tevahî"
+   ],
+   [
+    "\"peymana kirê\"~5",
+    "her du peyv herî zêde 5 peyvan ji hev dûr"
+   ],
+   [
+    "folder: wêne",
+    "tenê peldank"
+   ],
+   [
+    "root: كتاب",
+    "heman koka erebî: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: rapro",
+    "xeletiyeke nivîsînê qebûl dike"
+   ],
+   [
+    "حجم:>1ج",
+    "bi erebî jî: ji 1 GB mezintir"
+   ],
+   [
+    "احمد",
+    "“أحمد” jî dibîne"
+   ]
+  ],
+  "helpH": "Meriv çawa digere",
+  "helpInside": "Ji bo lêgerîna di nav belgeyan de (PDF, Word, Excel, wêne): pêl “Di nav belgeyan de” bike, paşê Enter.",
+  "helpKey": "Meriv çawa digere (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"qutiya lêgerînê ya biçûk ji her bernameyê\"], [\"Ctrl+Alt+G\", \"di pencereya Tomar bike/Veke de: biçe peldanka encamekê\"], [\"Enter\", \"pelê veke\"], [\"Ctrl+Enter\", \"peldanka wê veke\"], [\"↓\", \"ber bi encaman (di qutiya vala de: dîrok)\"],\n        [\"Ctrl+C\", \"pelê kopî bike\"], [\"Ctrl+Shift+C\", \"riyê kopî bike\"], [\"F2\", \"navê biguherîne\"], [\"Delete\", \"bo Selika Çopê\"], [\"F4\", \"hemû lihevhatin di pelê de\"], [\"Ctrl+H\", \"dîrok\"], [\"Ctrl+T\", \"wêneyên biçûk\"], [\"Ctrl+,\", \"mîheng\"], [\"F1\", \"ev kart\"]]",
+  "helpKeysH": "Klavye",
+  "helpMore": "Hemû awayên lêgerînê…",
+  "helpSub": "Li mînakekê bitikîne da ku bikeve qutiya lêgerînê. Her parzûnek bi erebî jî tê nivîsîn.",
+  "kLabel": "Kurterêyên klavyeyê",
+  "offline": "dîsk ne girêdayî ye",
+  "qsNone": "Encamek tune ku pencere biçe peldanka wê. Lêgerînê biguherîne, an ji bo betalkirinê pêl Esc bike.",
+  "sHotkeyKeys": "Kurterêya vekirina lêgerînê",
+  "sHotkeyKeysSub": "Di her bernameyê de dixebite. Heke bernameyeke din wê bi kar tîne, yekî din hilbijêre.",
+  "sHotkeyTaken": "FN:(k) => `Bernameyeke din ${k} bi kar tîne, ji ber vê niha tiştekî nake. Kurterêyeke din hilbijêre:`",
+  "sLangHelp": "Alîkariya baştirkirina vê wergerê bike",
+  "sLangMachine": "(wergera makîneyê)",
+  "sPhone": "Lêgerîn ji telefonê",
+  "sPhoneAllow": "Destûrê bide vê torê",
+  "sPhoneIdle": "Ji bo ewlehiyê piştî du demjimêran bê ti daxwazeke ji telefonê bi xwe girtî bû. Dema hewce be, dîsa veke.",
+  "sPhoneMore": "Mîhengên din…",
+  "sPhoneMoreSub": "Port, daxistina pelan, û PIN û girêdaneke nû",
+  "sPhoneOff": "Girtî ye. Ji bo dîtina navnîşan û PIN-ê veke.",
+  "sPhoneOpen": "Di geroka telefonê de veke:",
+  "sPhonePin": "û PIN-ê binivîse:",
+  "sPhoneQr": "An jî vê kodê bi kameraya telefonê bişopîne da ku lêgerîn bê PIN vebe. Wê nîşanî kesî nede.",
+  "sPhoneQrLabel": "Koda QR ya ku lêgerîna ji telefonê vedike",
+  "sPhoneRow": "Lêgerîn ji telefonê (tora malê)",
+  "sPhoneSub": "Ji geroka telefona xwe ya li ser heman Wi-Fi di pelên vê komputerê de bigere. Tenê ji bo xwendinê ye, û tenê li ser tora mala te.",
+  "sPhoneWait": "Tor tê kontrolkirin…",
+  "updChecking": "Li rojanekirinan tê kontrolkirin…"
  }
 }

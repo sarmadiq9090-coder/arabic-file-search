@@ -447,7 +447,70 @@
   "Recent searches": "ସାମ୍ପ୍ରତିକ ସନ୍ଧାନ",
   "Save the current search": "ବର୍ତ୍ତମାନର ସନ୍ଧାନ ସେଭ୍ କରନ୍ତୁ",
   "Clear history and recent files": "ଇତିହାସ ଏବଂ ସାମ୍ପ୍ରତିକ ଫାଇଲ୍ ସଫା କରନ୍ତୁ",
-  "Delete all saved searches": "ସମସ୍ତ ସେଭ୍ ହୋଇଥିବା ସନ୍ଧାନ ବିଲୋପ କରନ୍ତୁ"
+  "Delete all saved searches": "ସମସ୍ତ ସେଭ୍ ହୋଇଥିବା ସନ୍ଧାନ ବିଲୋପ କରନ୍ତୁ",
+  "(machine translation)": "(ମେସିନ୍ ଅନୁବାଦ)",
+  ", ": ", ",
+  "1 KB or more": "1 KB କିମ୍ବା ଅଧିକ",
+  "1 MB or more": "1 MB କିମ୍ବା ଅଧିକ",
+  "10 MB or more": "10 MB କିମ୍ବା ଅଧିକ",
+  "100 KB or more": "100 KB କିମ୍ବା ଅଧିକ",
+  "100 KB to 10 MB": "100 KB ରୁ 10 MB",
+  "100 MB or more": "100 MB କିମ୍ବା ଅଧିକ",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "ଆପଣଙ୍କ ମେଲ୍ ପ୍ରୋଗ୍ରାମରେ {} କୁ ଏକ ବାର୍ତ୍ତା ଖୋଲିଛି (ରିପୋର୍ଟ କପି କରାଯାଇପାରିଲା ନାହିଁ: “କପି କରନ୍ତୁ” ଦବାନ୍ତୁ, ତା’ପରେ ସେଠାରେ ପେଷ୍ଟ କରନ୍ତୁ)। ଏପର୍ଯ୍ୟନ୍ତ କିଛି ପଠାଯାଇନାହିଁ।",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "ଆପଣଙ୍କ ମେଲ୍ ପ୍ରୋଗ୍ରାମରେ {} କୁ ଏକ ବାର୍ତ୍ତା ଖୋଲିଛି। ସମ୍ପୂର୍ଣ୍ଣ ରିପୋର୍ଟ କପି ହୋଇଛି: ଏହାକୁ ବାର୍ତ୍ତାରେ ପେଷ୍ଟ କରନ୍ତୁ (Ctrl+V), ତା’ପରେ “ପଠାନ୍ତୁ” ଦବାନ୍ତୁ। ଏପର୍ଯ୍ୟନ୍ତ କିଛି ପଠାଯାଇନାହିଁ।",
+  "All types": "ସମସ୍ତ ପ୍ରକାର",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space କୁ ପୂର୍ବରୁ ଅନ୍ୟ ଏକ ପ୍ରୋଗ୍ରାମ ନେଇସାରିଛି, ତେଣୁ ଏହାକୁ ଏଠାରେ ବ୍ୟବହାର କରାଯାଇପାରିବ ନାହିଁ। {} ଏବେ ବି କାମ କରେ।",
+  "Another program has {} too. Pick another one.": "ଅନ୍ୟ ଏକ ପ୍ରୋଗ୍ରାମ ମଧ୍ୟ {} ବ୍ୟବହାର କରୁଛି। ଅନ୍ୟ ଏକ ବାଛନ୍ତୁ।",
+  "Any size": "ଯେକୌଣସି ଆକାର",
+  "Any time": "ଯେକୌଣସି ସମୟ",
+  "Archives": "ସଙ୍କୁଚିତ ଫାଇଲ୍",
+  "Audio": "ଅଡିଓ",
+  "Documents": "ଡକ୍ୟୁମେଣ୍ଟ",
+  "Downloading the update…": "ଅପଡେଟ୍ ଡାଉନଲୋଡ୍ ହେଉଛି…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter ଖୋଲନ୍ତୁ · Ctrl+Enter ଫୋଲ୍ଡର୍ · Tab ଅଧିକ · Esc ବନ୍ଦ କରନ୍ତୁ",
+  "Folders": "ଫୋଲ୍ଡର୍",
+  "GitHub page (public)": "GitHub ପୃଷ୍ଠା (ସାର୍ବଜନୀନ)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — ସଂସ୍କରଣ {}\nଫାଇଲ୍‌ରେ ଏବଂ ଡକ୍ୟୁମେଣ୍ଟ ଭିତରେ ତତକ୍ଷଣାତ୍ ସନ୍ଧାନ, ଆରବୀ ଏବଂ ଇଂରାଜୀରେ।\n\nସନ୍ଧାନ କରିବାକୁ ଯେକୌଣସି ସ୍ଥାନରେ {hk} ଦବାନ୍ତୁ।\n{}\n\nସହାୟତା: {}\n{}\n\nଏହା ବ୍ୟବହାର କରୁଥିବା ତୃତୀୟ-ପକ୍ଷ ଉପାଦାନଗୁଡ଼ିକର ଲାଇସେନ୍ସ THIRD-PARTY-NOTICES.txt ରେ ଅଛି। ଏହାକୁ ଖୋଲିବେ କି?",
+  "Last 30 days": "ଗତ 30 ଦିନ",
+  "Last 7 days": "ଗତ 7 ଦିନ",
+  "No files match your search. Try:": "ଆପଣଙ୍କ ସନ୍ଧାନ ସହ କୌଣସି ଫାଇଲ୍ ମେଳ ଖାଉନାହିଁ। ଚେଷ୍ଟା କରନ୍ତୁ:",
+  "No home network connection found; it works on this PC only.": "କୌଣସି ଘରୋଇ ନେଟୱର୍କ ସଂଯୋଗ ମିଳିଲା ନାହିଁ; ଏହା କେବଳ ଏହି PC ରେ କାମ କରେ।",
+  "No index yet: open InstaFind once to build it, then try again.\n": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଇଣ୍ଡେକ୍ସ ନାହିଁ: ଏହାକୁ ତିଆରି କରିବାକୁ InstaFind ଥରେ ଖୋଲନ୍ତୁ, ତା’ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "କୌଣସି ମେଲ୍ ପ୍ରୋଗ୍ରାମ ଖୋଲିଲା ନାହିଁ। “କପି କରନ୍ତୁ” ଦବାଇ ରିପୋର୍ଟ {} କୁ ପଠାନ୍ତୁ।",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "କୌଣସି ମେଲ୍ ପ୍ରୋଗ୍ରାମ ଖୋଲିଲା ନାହିଁ। ରିପୋର୍ଟ କପି ହୋଇଛି: ଆପଣଙ୍କ ନିଜ ମେଲ୍‌ରୁ (ଫୋନରେ କିମ୍ବା ବ୍ରାଉଜରରେ) {} କୁ ପଠାଯିବା ବାର୍ତ୍ତାରେ ଏହାକୁ ପେଷ୍ଟ କରନ୍ତୁ।",
+  "No results yet — results may be incomplete while indexing.": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଫଳାଫଳ ନାହିଁ — ଇଣ୍ଡେକ୍ସ ହେଉଥିବା ସମୟରେ ଫଳାଫଳ ଅସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରେ।",
+  "No results yet; they may be incomplete while indexing. Try:": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଫଳାଫଳ ନାହିଁ; ଇଣ୍ଡେକ୍ସ ହେଉଥିବା ସମୟରେ ସେଗୁଡ଼ିକ ଅସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରେ। ଚେଷ୍ଟା କରନ୍ତୁ:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "ଧ୍ୟାନ ଦିଅନ୍ତୁ: ଛବି ଭିତରେ ଥିବା ଆରବୀ ଲେଖା ପଢ଼ାଯାଇପାରିବ ନାହିଁ: Windows ର ଆରବୀ ଭାଷା ପ୍ୟାକ୍ ଇନଷ୍ଟଲ୍ ହୋଇନାହିଁ।",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "ଆପଣ ଏକ ବଟନ୍ ନ ଦବାଇବା ପର୍ଯ୍ୟନ୍ତ କିଛି ପଠାଯାଏ ନାହିଁ। ଫାଇଲ୍ ନାମ ଏବଂ ପାଥ୍ ରିପୋର୍ଟରୁ ହଟାଯାଏ। GitHub ପୃଷ୍ଠା ସାର୍ବଜନୀନ: ଯେକେହି ଏହାକୁ ପଢ଼ିପାରିବେ। ଇମେଲ୍ କେବଳ ଆମେ ପଢ଼ୁ।",
+  "Older than a year": "ଏକ ବର୍ଷରୁ ପୁରୁଣା",
+  "Open": "ଖୋଲନ୍ତୁ",
+  "Open quick search\t{}": "ଶୀଘ୍ର ସନ୍ଧାନ ଖୋଲନ୍ତୁ\t{}",
+  "Over 1 GB": "1 GB ରୁ ବଡ଼",
+  "Over 10 MB": "10 MB ରୁ ବଡ଼",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "ସୁରକ୍ଷା ପାଇଁ, ଫୋନରୁ ଦୁଇ ଘଣ୍ଟା କୌଣସି ଅନୁରୋଧ ନ ଆସିବାରୁ ଫୋନ ସନ୍ଧାନ ନିଜେ ବନ୍ଦ ହୋଇଗଲା। ଏହାକୁ ପୁଣି ଚାଲୁ କରିବାକୁ ଉପର ବାକ୍ସରେ ଟିକ୍ ଦିଅନ୍ତୁ।",
+  "Pictures": "ଛବି",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "ପ୍ରଥମ ଥର ପାଇଁ ଆପଣଙ୍କ ଫାଇଲ୍ ତାଲିକା ପ୍ରସ୍ତୁତ ହେଉଛି (କିଛି ମିନିଟ୍)। ଏବେ ସନ୍ଧାନ କରନ୍ତୁ; ଶେଷ ହେବା ସହ ଫଳାଫଳ ପୂରଣ ହେବ।",
+  "Press {} in any program to open the quick search.": "ଶୀଘ୍ର ସନ୍ଧାନ ଖୋଲିବାକୁ ଯେକୌଣସି ପ୍ରୋଗ୍ରାମରେ {} ଦବାନ୍ତୁ।",
+  "Press {} in any program to show or hide InstaFind.": "InstaFind ଦେଖାଇବାକୁ କିମ୍ବା ଲୁଚାଇବାକୁ ଯେକୌଣସି ପ୍ରୋଗ୍ରାମରେ {} ଦବାନ୍ତୁ।",
+  "Programs": "ପ୍ରୋଗ୍ରାମ",
+  "Results": "ଫଳାଫଳ",
+  "Results may be incomplete while indexing": "ଇଣ୍ଡେକ୍ସ ହେଉଥିବା ସମୟରେ ଫଳାଫଳ ଅସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରେ",
+  "Results may be incomplete while indexing — try": "ଇଣ୍ଡେକ୍ସ ହେଉଥିବା ସମୟରେ ଫଳାଫଳ ଅସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରେ — ଚେଷ୍ଟା କରନ୍ତୁ",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Windows ର WebView2 ଉପାଦାନ ଇନଷ୍ଟଲ୍ ହୋଇନଥିବାରୁ ସରଳ ରୂପରେ ଚାଲୁଛି। Microsoft ରୁ ଏହାକୁ ମାଗଣାରେ ଡାଉନଲୋଡ୍ କରିବାକୁ ଏଠାରେ କ୍ଲିକ୍ କରନ୍ତୁ।",
+  "Send by email": "ଇମେଲ୍ ଦ୍ୱାରା ପଠାନ୍ତୁ",
+  "Share": "ଅଂଶ",
+  "Show the program from anywhere\t{}": "ପ୍ରୋଗ୍ରାମକୁ ଯେକୌଣସି ସ୍ଥାନରୁ ଦେଖାନ୍ତୁ\t{}",
+  "Size": "ଆକାର",
+  "The list just changed, so nothing was done. Try again.": "ତାଲିକା ଏବେ ବଦଳିଗଲା, ତେଣୁ କିଛି କରାଗଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+  "The name did not change.": "ନାମ ବଦଳିଲା ନାହିଁ।",
+  "The program will run in the background when Windows starts; show it with {}.": "Windows ଆରମ୍ଭ ହେଲେ ପ୍ରୋଗ୍ରାମ ପୃଷ୍ଠଭୂମିରେ ଚାଲିବ; {} ସହିତ ଏହାକୁ ଦେଖାନ୍ତୁ।",
+  "This year": "ଏହି ବର୍ଷ",
+  "Today": "ଆଜି",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "ଏକ ଫାଇଲ୍, ଆପ୍ କିମ୍ବା ସେଟିଂର ନାମ ଟାଇପ୍ କରନ୍ତୁ। ଉପର ଓ ତଳ ତୀର ଫଳାଫଳ ମଧ୍ୟରେ ଯାଏ; Enter ବଛାଯାଇଥିବା ଫଳାଫଳକୁ ଖୋଲେ।",
+  "Under 100 KB": "100 KB ରୁ ଛୋଟ",
+  "Video": "ଭିଡିଓ",
+  "drive not connected": "ଡ୍ରାଇଭ୍ ସଂଯୁକ୍ତ ନାହିଁ",
+  "{} opens the quick search (otherwise the full window)": "{} ଶୀଘ୍ର ସନ୍ଧାନ ଖୋଲେ (ନଚେତ୍ ପୂର୍ଣ୍ଣ ୱିଣ୍ଡୋ)"
  },
  "js": {
   "ph": "ଫାଇଲ୍ ନାମରେ ସନ୍ଧାନ କରନ୍ତୁ…",
@@ -658,6 +721,102 @@
   "sStartup": "ଷ୍ଟାର୍ଟଅପ୍",
   "sAutostart": "Windows ସହିତ ଆରମ୍ଭ କରନ୍ତୁ (ପୃଷ୍ଠଭୂମିରେ)",
   "sAbout": "ବିଷୟରେ",
-  "version": "FN:(v) => `InstaFind — ସଂସ୍କରଣ ${v}`"
+  "version": "FN:(v) => `InstaFind — ସଂସ୍କରଣ ${v}`",
+  "fDetails": "ଫାଇଲ୍ ବିବରଣୀ",
+  "helpEx": [
+   [
+    "ବିକ୍ରି ରିପୋର୍ଟ",
+    "ଦୁଇଟି ଶବ୍ଦ ଥିବା ନାମ"
+   ],
+   [
+    "\"ଭଡ଼ା ଚୁକ୍ତି\"",
+    "ସଠିକ୍ ବାକ୍ୟାଂଶ"
+   ],
+   [
+    "ରିପୋର୍ଟ .pdf",
+    "କେବଳ PDF ଫାଇଲ୍ (କିମ୍ବା ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "ଏକାଧିକ ପ୍ରକାର"
+   ],
+   [
+    "ଫଟୋ|ଭିଡିଓ",
+    "ଯେକୌଣସି ଗୋଟିଏ ଶବ୍ଦ"
+   ],
+   [
+    "ଚୁକ୍ତି -ପୁରୁଣା",
+    "“ପୁରୁଣା” ବିନା (କିମ୍ବା !ପୁରୁଣା)"
+   ],
+   [
+    "size:>10mb",
+    "10 MB ରୁ ବଡ଼"
+   ],
+   [
+    "dm:thisweek",
+    "ଏହି ସପ୍ତାହରେ ବଦଳିଥିବା"
+   ],
+   [
+    "dm:2026-05",
+    "ମେ 2026 ରେ ବଦଳିଥିବା"
+   ],
+   [
+    "ww:ଚୁକ୍ତି",
+    "କେବଳ ସମ୍ପୂର୍ଣ୍ଣ ଶବ୍ଦ"
+   ],
+   [
+    "\"ଭଡ଼ା ଚୁକ୍ତି\"~5",
+    "ଦୁଇଟି ଶବ୍ଦ 5 ଶବ୍ଦ ମଧ୍ୟରେ"
+   ],
+   [
+    "folder: ଫଟୋ",
+    "କେବଳ ଫୋଲ୍ଡର୍"
+   ],
+   [
+    "root: كتاب",
+    "ସମାନ ଆରବୀ ମୂଳ ଶବ୍ଦ: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: reprot",
+    "ଟାଇପ୍ ଭୁଲ ସହିନିଏ (“report” ଖୋଜେ)"
+   ],
+   [
+    "حجم:>1ج",
+    "ଆରବୀରେ ମଧ୍ୟ: 1 GB ରୁ ବଡ଼"
+   ],
+   [
+    "احمد",
+    "«أحمد» କୁ ମଧ୍ୟ ଖୋଜେ"
+   ]
+  ],
+  "helpH": "କିପରି ସନ୍ଧାନ କରିବେ",
+  "helpInside": "ଡକ୍ୟୁମେଣ୍ଟ ଭିତରେ (PDF, Word, Excel, ଛବି) ସନ୍ଧାନ କରିବାକୁ: “ଡକ୍ୟୁମେଣ୍ଟ ଭିତରେ” ଦବାନ୍ତୁ, ତା’ପରେ Enter।",
+  "helpKey": "କିପରି ସନ୍ଧାନ କରିବେ (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"ଯେକୌଣସି ପ୍ରୋଗ୍ରାମରୁ ଛୋଟ ସନ୍ଧାନ ବାକ୍ସ\"], [\"Ctrl+Alt+G\", \"Save/Open ଡାୟଲଗ୍‌ରେ: ଏକ ଫଳାଫଳର ଫୋଲ୍ଡର୍‌କୁ ଯାଆନ୍ତୁ\"], [\"Enter\", \"ଫାଇଲ୍ ଖୋଲନ୍ତୁ\"], [\"Ctrl+Enter\", \"ଏହାର ଫୋଲ୍ଡର୍ ଖୋଲନ୍ତୁ\"], [\"↓\", \"ଫଳାଫଳକୁ (ଖାଲି ବାକ୍ସରେ: ଇତିହାସ)\"], [\"Ctrl+C\", \"ଫାଇଲ୍ କପି କରନ୍ତୁ\"], [\"Ctrl+Shift+C\", \"ପାଥ୍ କପି କରନ୍ତୁ\"], [\"F2\", \"ପୁନଃନାମକରଣ\"], [\"Delete\", \"ରିସାଇକଲ୍ ବିନ୍‌କୁ\"], [\"F4\", \"ଫାଇଲ୍‌ରେ ସମସ୍ତ ମେଳ\"], [\"Ctrl+H\", \"ଇତିହାସ\"], [\"Ctrl+T\", \"ଥମ୍ବନେଲ୍\"], [\"Ctrl+,\", \"ସେଟିଂସ୍\"], [\"F1\", \"ଏହି କାର୍ଡ\"]]",
+  "helpKeysH": "କୀବୋର୍ଡ୍",
+  "helpMore": "ସନ୍ଧାନ କରିବାର ସମସ୍ତ ଉପାୟ…",
+  "helpSub": "ଏକ ଉଦାହରଣକୁ ସନ୍ଧାନ ବାକ୍ସରେ ରଖିବାକୁ ତାହା ଉପରେ କ୍ଲିକ୍ କରନ୍ତୁ। ପ୍ରତ୍ୟେକ ଫିଲ୍ଟରର ଏକ ଆରବୀ ବନାନ ମଧ୍ୟ ଅଛି।",
+  "kLabel": "କୀବୋର୍ଡ୍ ସର୍ଟକଟ୍",
+  "offline": "ଡ୍ରାଇଭ୍ ସଂଯୁକ୍ତ ନାହିଁ",
+  "qsNone": "ଡାୟଲଗ୍‌କୁ ଘୁଞ୍ଚାଇବା ପାଇଁ କୌଣସି ଫଳାଫଳ ନାହିଁ। ସନ୍ଧାନ ବଦଳାନ୍ତୁ, କିମ୍ବା ବାତିଲ୍ କରିବାକୁ Esc ଦବାନ୍ତୁ।",
+  "sHotkeyKeys": "ସନ୍ଧାନ ଖୋଲିବାର ସର୍ଟକଟ୍",
+  "sHotkeyKeysSub": "ଯେକୌଣସି ପ୍ରୋଗ୍ରାମରେ କାମ କରେ। ଅନ୍ୟ ଏକ ପ୍ରୋଗ୍ରାମ ଏହାକୁ ବ୍ୟବହାର କରୁଥିଲେ ଅନ୍ୟ ଏକ ବାଛନ୍ତୁ।",
+  "sHotkeyTaken": "FN:(k) => `ଅନ୍ୟ ଏକ ପ୍ରୋଗ୍ରାମ ${k} ବ୍ୟବହାର କରୁଛି, ତେଣୁ ଏହା ଏବେ କିଛି କରେ ନାହିଁ। ଅନ୍ୟ ଏକ ସର୍ଟକଟ୍ ବାଛନ୍ତୁ:`",
+  "sLangHelp": "ଏହି ଅନୁବାଦକୁ ଉନ୍ନତ କରିବାରେ ସାହାଯ୍ୟ କରନ୍ତୁ",
+  "sLangMachine": "(ମେସିନ୍ ଅନୁବାଦ)",
+  "sPhone": "ଫୋନରୁ ସନ୍ଧାନ",
+  "sPhoneAllow": "ଏହି ନେଟୱର୍କକୁ ଅନୁମତି ଦିଅନ୍ତୁ",
+  "sPhoneIdle": "ସୁରକ୍ଷା ପାଇଁ, ଫୋନରୁ ଦୁଇ ଘଣ୍ଟା କୌଣସି ଅନୁରୋଧ ନ ଆସିବାରୁ ଏହା ନିଜେ ବନ୍ଦ ହୋଇଗଲା। ଆବଶ୍ୟକ ହେଲେ ଏହାକୁ ପୁଣି ଚାଲୁ କରନ୍ତୁ।",
+  "sPhoneMore": "ଅଧିକ ସେଟିଂସ୍…",
+  "sPhoneMoreSub": "ପୋର୍ଟ, ଫାଇଲ୍ ଡାଉନଲୋଡ୍, ଏବଂ ନୂଆ PIN ଓ ଲିଙ୍କ୍",
+  "sPhoneOff": "ବନ୍ଦ। ଠିକଣା ଏବଂ PIN ଦେଖିବାକୁ ଏହାକୁ ଚାଲୁ କରନ୍ତୁ।",
+  "sPhoneOpen": "ଫୋନର ବ୍ରାଉଜରରେ ଖୋଲନ୍ତୁ:",
+  "sPhonePin": "ଏବଂ PIN ଟାଇପ୍ କରନ୍ତୁ:",
+  "sPhoneQr": "କିମ୍ବା PIN ବିନା ସନ୍ଧାନ ଖୋଲିବାକୁ ଫୋନର କ୍ୟାମେରାରେ ଏହି କୋଡ୍ ସ୍କାନ୍ କରନ୍ତୁ। ଏହାକୁ କାହାକୁ ଦେଖାନ୍ତୁ ନାହିଁ।",
+  "sPhoneQrLabel": "ଫୋନ ସନ୍ଧାନ ଖୋଲୁଥିବା QR କୋଡ୍",
+  "sPhoneRow": "ଫୋନରୁ ସନ୍ଧାନ (ଘରୋଇ ନେଟୱର୍କ)",
+  "sPhoneSub": "ସେହି Wi-Fi ରେ ଥିବା ଆପଣଙ୍କ ଫୋନର ବ୍ରାଉଜରରୁ ଏହି PC ର ଫାଇଲ୍ ସନ୍ଧାନ କରନ୍ତୁ। କେବଳ ପଢ଼ିବା ପାଇଁ, ଏବଂ କେବଳ ଆପଣଙ୍କ ଘରୋଇ ନେଟୱର୍କରେ।",
+  "sPhoneWait": "ନେଟୱର୍କ ଯାଞ୍ଚ କରାଯାଉଛି…",
+  "updChecking": "ଅପଡେଟ୍ ଯାଞ୍ଚ କରାଯାଉଛି…"
  }
 }

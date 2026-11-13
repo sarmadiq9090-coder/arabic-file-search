@@ -447,7 +447,70 @@
   "Recent searches": "Zuletzt verwendete Suchen",
   "Save the current search": "Aktuelle Suche speichern",
   "Clear history and recent files": "Verlauf und zuletzt verwendete Dateien löschen",
-  "Delete all saved searches": "Alle gespeicherten Suchen löschen"
+  "Delete all saved searches": "Alle gespeicherten Suchen löschen",
+  "(machine translation)": "(maschinelle Übersetzung)",
+  ", ": ", ",
+  "1 KB or more": "1 KB oder mehr",
+  "1 MB or more": "1 MB oder mehr",
+  "10 MB or more": "10 MB oder mehr",
+  "100 KB or more": "100 KB oder mehr",
+  "100 KB to 10 MB": "100 KB bis 10 MB",
+  "100 MB or more": "100 MB oder mehr",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "In Ihrem E-Mail-Programm wurde eine Nachricht an {} geöffnet (der Bericht konnte nicht kopiert werden: Klicken Sie auf „Kopieren“, und fügen Sie ihn dort ein). Es wurde noch nichts gesendet.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "In Ihrem E-Mail-Programm wurde eine Nachricht an {} geöffnet. Der vollständige Bericht ist kopiert: Fügen Sie ihn in die Nachricht ein (Ctrl+V), und klicken Sie dann auf „Senden“. Es wurde noch nichts gesendet.",
+  "All types": "Alle Typen",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space wird bereits von einem anderen Programm verwendet und kann hier deshalb nicht genutzt werden. {} funktioniert weiterhin.",
+  "Another program has {} too. Pick another one.": "Ein anderes Programm verwendet {} ebenfalls. Wählen Sie eine andere.",
+  "Any size": "Jede Größe",
+  "Any time": "Beliebiger Zeitraum",
+  "Archives": "Archive",
+  "Audio": "Audio",
+  "Documents": "Dokumente",
+  "Downloading the update…": "Das Update wird heruntergeladen…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter öffnen · Ctrl+Enter Ordner · Tab mehr · Esc schließen",
+  "Folders": "Ordner",
+  "GitHub page (public)": "GitHub-Seite (öffentlich)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind – Version {}\nSofortsuche nach Dateien und in Dokumenten, auf Arabisch und Englisch.\n\nDrücken Sie {hk} an beliebiger Stelle, um zu suchen.\n{}\n\nSupport: {}\n{}\n\nDie Lizenzen der verwendeten Komponenten von Drittanbietern stehen in THIRD-PARTY-NOTICES.txt. Jetzt öffnen?",
+  "Last 30 days": "Letzte 30 Tage",
+  "Last 7 days": "Letzte 7 Tage",
+  "No files match your search. Try:": "Keine Dateien entsprechen Ihrer Suche. Versuchen Sie:",
+  "No home network connection found; it works on this PC only.": "Keine Verbindung zu einem Heimnetzwerk gefunden; die Funktion arbeitet nur auf diesem PC.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "Noch kein Index: Öffnen Sie InstaFind einmal, um ihn zu erstellen, und versuchen Sie es dann erneut.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "Es wurde kein E-Mail-Programm geöffnet. Klicken Sie auf „Kopieren“, und senden Sie den Bericht an {}.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "Es wurde kein E-Mail-Programm geöffnet. Der Bericht ist kopiert: Fügen Sie ihn in eine Nachricht an {} aus Ihrem eigenen E-Mail-Konto ein (auf dem Smartphone oder im Browser).",
+  "No results yet — results may be incomplete while indexing.": "Noch keine Ergebnisse – während der Indizierung können Ergebnisse fehlen.",
+  "No results yet; they may be incomplete while indexing. Try:": "Noch keine Ergebnisse; während der Indizierung können welche fehlen. Versuchen Sie:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "Hinweis: Arabischer Text in Bildern kann nicht gelesen werden, weil das arabische Sprachpaket von Windows nicht installiert ist.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "Es wird nichts gesendet, solange Sie keine Schaltfläche drücken. Dateinamen und Pfade werden aus dem Bericht entfernt. Die GitHub-Seite ist öffentlich: Jeder kann sie lesen. Eine E-Mail lesen nur wir.",
+  "Older than a year": "Älter als ein Jahr",
+  "Open": "Öffnen",
+  "Open quick search\t{}": "Schnellsuche öffnen\t{}",
+  "Over 1 GB": "Über 1 GB",
+  "Over 10 MB": "Über 10 MB",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "Die Suche vom Smartphone hat sich nach zwei Stunden ohne Anfrage von einem Smartphone zur Sicherheit selbst ausgeschaltet. Aktivieren Sie das Kontrollkästchen oben, um sie wieder einzuschalten.",
+  "Pictures": "Bilder",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "Ihre Dateiliste wird zum ersten Mal vorbereitet (einige Minuten). Sie können schon suchen; die Ergebnisse werden am Ende vervollständigt.",
+  "Press {} in any program to open the quick search.": "Drücken Sie {} in einem beliebigen Programm, um die Schnellsuche zu öffnen.",
+  "Press {} in any program to show or hide InstaFind.": "Drücken Sie {} in einem beliebigen Programm, um InstaFind ein- oder auszublenden.",
+  "Programs": "Programme",
+  "Results": "Ergebnisse",
+  "Results may be incomplete while indexing": "Während der Indizierung können Ergebnisse fehlen",
+  "Results may be incomplete while indexing — try": "Während der Indizierung können Ergebnisse fehlen – versuchen Sie",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Einfaches Design aktiv, weil die Windows-Komponente WebView2 nicht installiert ist. Klicken Sie hier, um sie kostenlos von Microsoft herunterzuladen.",
+  "Send by email": "Per E-Mail senden",
+  "Share": "Anteil",
+  "Show the program from anywhere\t{}": "Programm von überall anzeigen\t{}",
+  "Size": "Größe",
+  "The list just changed, so nothing was done. Try again.": "Die Liste hat sich gerade geändert, daher wurde nichts ausgeführt. Versuchen Sie es erneut.",
+  "The name did not change.": "Der Name wurde nicht geändert.",
+  "The program will run in the background when Windows starts; show it with {}.": "Das Programm läuft beim Start von Windows im Hintergrund; mit {} blenden Sie es ein.",
+  "This year": "Dieses Jahr",
+  "Today": "Heute",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "Geben Sie den Namen einer Datei, einer App oder einer Einstellung ein. Mit den Pfeiltasten nach oben und unten gehen Sie durch die Ergebnisse; Enter öffnet das ausgewählte.",
+  "Under 100 KB": "Unter 100 KB",
+  "Video": "Video",
+  "drive not connected": "Laufwerk nicht verbunden",
+  "{} opens the quick search (otherwise the full window)": "{} öffnet die Schnellsuche (sonst das vollständige Fenster)"
  },
  "js": {
   "ph": "Dateinamen durchsuchen…",
@@ -658,6 +721,102 @@
   "sStartup": "Autostart",
   "sAutostart": "Mit Windows starten (im Hintergrund)",
   "sAbout": "Info",
-  "version": "FN:(v) => `InstaFind – Version ${v}`"
+  "version": "FN:(v) => `InstaFind – Version ${v}`",
+  "fDetails": "Dateidetails",
+  "helpEx": [
+   [
+    "bericht umsatz",
+    "Namen mit beiden Wörtern"
+   ],
+   [
+    "\"Vertrag Wohnung\"",
+    "genau diese Wortfolge"
+   ],
+   [
+    "bericht .pdf",
+    "nur PDF-Dateien (oder ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "mehrere Typen"
+   ],
+   [
+    "foto|video",
+    "eines der beiden Wörter"
+   ],
+   [
+    "vertrag -alt",
+    "ohne „alt“ (oder !alt)"
+   ],
+   [
+    "size:>10mb",
+    "größer als 10 MB"
+   ],
+   [
+    "dm:thisweek",
+    "diese Woche geändert"
+   ],
+   [
+    "dm:2026-05",
+    "im Mai 2026 geändert"
+   ],
+   [
+    "ww:vertrag",
+    "nur ganzes Wort"
+   ],
+   [
+    "\"Mietvertrag Wohnung\"~5",
+    "beide Wörter höchstens 5 Wörter voneinander entfernt"
+   ],
+   [
+    "folder: fotos",
+    "nur Ordner"
+   ],
+   [
+    "root: كتاب",
+    "gleiche arabische Wurzel: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: bericth",
+    "verzeiht einen Tippfehler"
+   ],
+   [
+    "حجم:>1ج",
+    "auch auf Arabisch: größer als 1 GB"
+   ],
+   [
+    "احمد",
+    "findet auch „أحمد“"
+   ]
+  ],
+  "helpH": "So suchen Sie",
+  "helpInside": "Um in Dokumenten (PDF, Word, Excel, Bilder) zu suchen: Klicken Sie auf „In Dokumenten“, dann Enter.",
+  "helpKey": "So suchen Sie (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"das kleine Suchfeld aus jedem Programm\"], [\"Ctrl+Alt+G\", \"in einem Speichern/Öffnen-Dialog: zum Ordner eines Ergebnisses wechseln\"], [\"Enter\", \"die Datei öffnen\"], [\"Ctrl+Enter\", \"ihren Ordner öffnen\"], [\"↓\", \"zu den Ergebnissen (bei leerem Feld: Verlauf)\"],\n        [\"Ctrl+C\", \"die Datei kopieren\"], [\"Ctrl+Shift+C\", \"den Pfad kopieren\"], [\"F2\", \"umbenennen\"], [\"Delete\", \"in den Papierkorb\"], [\"F4\", \"alle Treffer in der Datei\"], [\"Ctrl+H\", \"Verlauf\"], [\"Ctrl+T\", \"Miniaturansichten\"], [\"Ctrl+,\", \"Einstellungen\"], [\"F1\", \"diese Übersicht\"]]",
+  "helpKeysH": "Tastatur",
+  "helpMore": "Alle Suchmöglichkeiten…",
+  "helpSub": "Klicken Sie auf ein Beispiel, um es ins Suchfeld zu übernehmen. Jeder Filter hat auch eine arabische Schreibweise.",
+  "kLabel": "Tastenkombinationen",
+  "offline": "Laufwerk nicht verbunden",
+  "qsNone": "Kein Ergebnis, zu dessen Ordner der Dialog wechseln könnte. Ändern Sie die Suche, oder drücken Sie Esc zum Abbrechen.",
+  "sHotkeyKeys": "Tastenkombination zum Öffnen der Suche",
+  "sHotkeyKeysSub": "Funktioniert in jedem Programm. Wählen Sie eine andere, wenn ein anderes Programm sie verwendet.",
+  "sHotkeyTaken": "FN:(k) => `Ein anderes Programm verwendet ${k}, daher bewirkt sie jetzt nichts. Wählen Sie eine andere Tastenkombination:`",
+  "sLangHelp": "Helfen Sie, diese Übersetzung zu verbessern",
+  "sLangMachine": "(maschinelle Übersetzung)",
+  "sPhone": "Vom Smartphone suchen",
+  "sPhoneAllow": "Dieses Netzwerk zulassen",
+  "sPhoneIdle": "Sie hat sich nach zwei Stunden ohne Anfrage von einem Smartphone zur Sicherheit selbst ausgeschaltet. Schalten Sie sie wieder ein, wenn Sie sie brauchen.",
+  "sPhoneMore": "Weitere Einstellungen…",
+  "sPhoneMoreSub": "Der Port, das Herunterladen von Dateien sowie eine neue PIN und ein neuer Link",
+  "sPhoneOff": "Aus. Schalten Sie die Funktion ein, um die Adresse und die PIN zu sehen.",
+  "sPhoneOpen": "Im Browser des Smartphones öffnen:",
+  "sPhonePin": "und die PIN eingeben:",
+  "sPhoneQr": "Oder scannen Sie diesen Code mit der Kamera des Smartphones, um die Suche ohne PIN zu öffnen. Zeigen Sie ihn niemandem.",
+  "sPhoneQrLabel": "QR-Code, der die Suche vom Smartphone öffnet",
+  "sPhoneRow": "Vom Smartphone suchen (Heimnetzwerk)",
+  "sPhoneSub": "Durchsuchen Sie die Dateien dieses PCs im Browser Ihres Smartphones im selben WLAN. Nur Lesezugriff, und nur in Ihrem Heimnetzwerk.",
+  "sPhoneWait": "Netzwerk wird geprüft…",
+  "updChecking": "Es wird nach Updates gesucht…"
  }
 }

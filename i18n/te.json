@@ -447,7 +447,70 @@
   "Recent searches": "ఇటీవలి శోధనలు",
   "Save the current search": "ప్రస్తుత శోధనను సేవ్ చేయి",
   "Clear history and recent files": "చరిత్ర మరియు ఇటీవలి ఫైల్‌లను క్లియర్ చేయి",
-  "Delete all saved searches": "సేవ్ చేసిన అన్ని శోధనలను తొలగించు"
+  "Delete all saved searches": "సేవ్ చేసిన అన్ని శోధనలను తొలగించు",
+  "(machine translation)": "(యంత్ర అనువాదం)",
+  ", ": ", ",
+  "1 KB or more": "1 KB లేదా అంతకంటే ఎక్కువ",
+  "1 MB or more": "1 MB లేదా అంతకంటే ఎక్కువ",
+  "10 MB or more": "10 MB లేదా అంతకంటే ఎక్కువ",
+  "100 KB or more": "100 KB లేదా అంతకంటే ఎక్కువ",
+  "100 KB to 10 MB": "100 KB నుండి 10 MB",
+  "100 MB or more": "100 MB లేదా అంతకంటే ఎక్కువ",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "మీ మెయిల్ ప్రోగ్రామ్‌లో {}కు ఒక సందేశం తెరవబడింది (నివేదికను కాపీ చేయడం సాధ్యం కాలేదు: “కాపీ చేయి” నొక్కి, ఆపై దాన్ని అక్కడ అతికించండి). ఇంకా ఏదీ పంపబడలేదు.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "మీ మెయిల్ ప్రోగ్రామ్‌లో {}కు ఒక సందేశం తెరవబడింది. పూర్తి నివేదిక కాపీ చేయబడింది: దాన్ని సందేశంలో అతికించి (Ctrl+V), ఆపై “పంపు” నొక్కండి. ఇంకా ఏదీ పంపబడలేదు.",
+  "All types": "అన్ని రకాలు",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Spaceను ఇప్పటికే వేరొక ప్రోగ్రామ్ తీసుకుంది, కాబట్టి దాన్ని ఇక్కడ ఉపయోగించలేరు. {} ఇప్పటికీ పని చేస్తుంది.",
+  "Another program has {} too. Pick another one.": "వేరొక ప్రోగ్రామ్ కూడా {}ను ఉపయోగిస్తోంది. వేరొకటి ఎంచుకోండి.",
+  "Any size": "ఏ పరిమాణమైనా",
+  "Any time": "ఎప్పుడైనా",
+  "Archives": "కుదించిన ఫైల్‌లు",
+  "Audio": "ఆడియో",
+  "Documents": "పత్రాలు",
+  "Downloading the update…": "నవీకరణ డౌన్‌లోడ్ అవుతోంది…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter తెరువు · Ctrl+Enter ఫోల్డర్ · Tab మరిన్ని · Esc మూసివేయి",
+  "Folders": "ఫోల్డర్‌లు",
+  "GitHub page (public)": "GitHub పేజీ (పబ్లిక్)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — సంస్కరణ {}\nఫైల్‌లలో మరియు పత్రాల లోపల తక్షణ శోధన, అరబిక్ మరియు ఇంగ్లీష్‌లో.\n\nశోధించడానికి ఎక్కడైనా {hk} నొక్కండి.\n{}\n\nమద్దతు: {}\n{}\n\nఇది ఉపయోగించే మూడవ పక్ష భాగాల లైసెన్స్‌లు THIRD-PARTY-NOTICES.txtలో ఉన్నాయి. దాన్ని తెరవాలా?",
+  "Last 30 days": "గత 30 రోజులు",
+  "Last 7 days": "గత 7 రోజులు",
+  "No files match your search. Try:": "మీ శోధనకు సరిపోయే ఫైల్‌లు లేవు. ఇవి ప్రయత్నించండి:",
+  "No home network connection found; it works on this PC only.": "ఇంటి నెట్‌వర్క్ కనెక్షన్ ఏదీ కనుగొనబడలేదు; ఇది ఈ PCలో మాత్రమే పని చేస్తుంది.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "ఇంకా సూచిక లేదు: దాన్ని నిర్మించడానికి InstaFindను ఒకసారి తెరిచి, ఆపై మళ్లీ ప్రయత్నించండి.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "మెయిల్ ప్రోగ్రామ్ ఏదీ తెరుచుకోలేదు. “కాపీ చేయి” నొక్కి నివేదికను {}కు పంపండి.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "మెయిల్ ప్రోగ్రామ్ ఏదీ తెరుచుకోలేదు. నివేదిక కాపీ చేయబడింది: మీ స్వంత మెయిల్ నుండి (ఫోన్‌లో లేదా బ్రౌజర్‌లో) {}కు పంపే సందేశంలో దాన్ని అతికించండి.",
+  "No results yet — results may be incomplete while indexing.": "ఇంకా ఫలితాలు లేవు — సూచిక చేస్తున్నప్పుడు ఫలితాలు అసంపూర్ణంగా ఉండవచ్చు.",
+  "No results yet; they may be incomplete while indexing. Try:": "ఇంకా ఫలితాలు లేవు; సూచిక చేస్తున్నప్పుడు అవి అసంపూర్ణంగా ఉండవచ్చు. ఇవి ప్రయత్నించండి:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "గమనిక: చిత్రాల్లోని అరబిక్ వచనాన్ని చదవలేము: Windows అరబిక్ భాషా ప్యాక్ ఇన్‌స్టాల్ చేయబడలేదు.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "మీరు ఒక బటన్‌ను నొక్కితే తప్ప ఏదీ పంపబడదు. ఫైల్ పేర్లు మరియు మార్గాలు నివేదిక నుండి తీసివేయబడతాయి. GitHub పేజీ పబ్లిక్: దాన్ని ఎవరైనా చదవగలరు. ఇమెయిల్‌ను మేము మాత్రమే చదువుతాము.",
+  "Older than a year": "ఒక సంవత్సరం కంటే పాతవి",
+  "Open": "తెరువు",
+  "Open quick search\t{}": "త్వరిత శోధనను తెరువు\t{}",
+  "Over 1 GB": "1 GB కంటే పెద్దవి",
+  "Over 10 MB": "10 MB కంటే పెద్దవి",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "భద్రత కోసం, ఫోన్ నుండి రెండు గంటలు ఏ అభ్యర్థనా రానందున ఫోన్ శోధన దానంతట అదే ఆగిపోయింది. మళ్లీ ఆన్ చేయడానికి పై పెట్టెను టిక్ చేయండి.",
+  "Pictures": "చిత్రాలు",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "మొదటిసారిగా మీ ఫైల్ జాబితాను సిద్ధం చేస్తున్నాము (కొన్ని నిమిషాలు). ఇప్పుడే శోధించండి; పూర్తయ్యే కొద్దీ ఫలితాలు నిండుతాయి.",
+  "Press {} in any program to open the quick search.": "త్వరిత శోధనను తెరవడానికి ఏ ప్రోగ్రామ్‌లోనైనా {} నొక్కండి.",
+  "Press {} in any program to show or hide InstaFind.": "InstaFindను చూపడానికి లేదా దాచడానికి ఏ ప్రోగ్రామ్‌లోనైనా {} నొక్కండి.",
+  "Programs": "ప్రోగ్రామ్‌లు",
+  "Results": "ఫలితాలు",
+  "Results may be incomplete while indexing": "సూచిక చేస్తున్నప్పుడు ఫలితాలు అసంపూర్ణంగా ఉండవచ్చు",
+  "Results may be incomplete while indexing — try": "సూచిక చేస్తున్నప్పుడు ఫలితాలు అసంపూర్ణంగా ఉండవచ్చు — ఇవి ప్రయత్నించండి",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Windows యొక్క WebView2 భాగం ఇన్‌స్టాల్ చేయబడనందున సాధారణ రూపంలో నడుస్తోంది. Microsoft నుండి దాన్ని ఉచితంగా డౌన్‌లోడ్ చేయడానికి ఇక్కడ క్లిక్ చేయండి.",
+  "Send by email": "ఇమెయిల్ ద్వారా పంపు",
+  "Share": "వాటా",
+  "Show the program from anywhere\t{}": "ప్రోగ్రామ్‌ను ఎక్కడి నుండైనా చూపు\t{}",
+  "Size": "పరిమాణం",
+  "The list just changed, so nothing was done. Try again.": "జాబితా ఇప్పుడే మారింది, కాబట్టి ఏమీ చేయలేదు. మళ్లీ ప్రయత్నించండి.",
+  "The name did not change.": "పేరు మారలేదు.",
+  "The program will run in the background when Windows starts; show it with {}.": "Windows ప్రారంభమైనప్పుడు ప్రోగ్రామ్ నేపథ్యంలో నడుస్తుంది; {}తో దాన్ని చూపండి.",
+  "This year": "ఈ సంవత్సరం",
+  "Today": "ఈరోజు",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "ఫైల్, అనువర్తనం లేదా సెట్టింగ్ పేరును టైప్ చేయండి. పైకి, కిందికి బాణాలు ఫలితాల మధ్య కదులుతాయి; Enter ఎంచుకున్నదాన్ని తెరుస్తుంది.",
+  "Under 100 KB": "100 KB కంటే చిన్నవి",
+  "Video": "వీడియో",
+  "drive not connected": "డ్రైవ్ కనెక్ట్ కాలేదు",
+  "{} opens the quick search (otherwise the full window)": "{} త్వరిత శోధనను తెరుస్తుంది (లేకపోతే పూర్తి విండో)"
  },
  "js": {
   "ph": "ఫైల్ పేర్లలో శోధించు…",
@@ -658,6 +721,102 @@
   "sStartup": "ప్రారంభం",
   "sAutostart": "Windowsతో ప్రారంభించు (నేపథ్యంలో)",
   "sAbout": "గురించి",
-  "version": "FN:(v) => `InstaFind — సంస్కరణ ${v}`"
+  "version": "FN:(v) => `InstaFind — సంస్కరణ ${v}`",
+  "fDetails": "ఫైల్ వివరాలు",
+  "helpEx": [
+   [
+    "అమ్మకాల నివేదిక",
+    "రెండు పదాలు ఉన్న పేర్లు"
+   ],
+   [
+    "\"అద్దె ఒప్పందం\"",
+    "ఖచ్చితమైన పదబంధం"
+   ],
+   [
+    "నివేదిక .pdf",
+    "PDF ఫైల్‌లు మాత్రమే (లేదా ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "అనేక రకాలు"
+   ],
+   [
+    "ఫోటో|వీడియో",
+    "రెండింటిలో ఏదో ఒక పదం"
+   ],
+   [
+    "ఒప్పందం -పాత",
+    "“పాత” లేకుండా (లేదా !పాత)"
+   ],
+   [
+    "size:>10mb",
+    "10 MB కంటే పెద్దవి"
+   ],
+   [
+    "dm:thisweek",
+    "ఈ వారం మారినవి"
+   ],
+   [
+    "dm:2026-05",
+    "మే 2026లో మారినవి"
+   ],
+   [
+    "ww:ఒప్పందం",
+    "పూర్తి పదం మాత్రమే"
+   ],
+   [
+    "\"అద్దె ఒప్పందం\"~5",
+    "రెండు పదాలు 5 పదాల లోపల"
+   ],
+   [
+    "folder: ఫోటోలు",
+    "ఫోల్డర్‌లు మాత్రమే"
+   ],
+   [
+    "root: كتاب",
+    "అదే అరబిక్ మూల పదం: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: reprot",
+    "అక్షర దోషాన్ని సహిస్తుంది (“report”ను కనుగొంటుంది)"
+   ],
+   [
+    "حجم:>1ج",
+    "అరబిక్‌లో కూడా: 1 GB కంటే పెద్దవి"
+   ],
+   [
+    "احمد",
+    "«أحمد»ను కూడా కనుగొంటుంది"
+   ]
+  ],
+  "helpH": "ఎలా శోధించాలి",
+  "helpInside": "పత్రాల లోపల (PDF, Word, Excel, చిత్రాలు) శోధించడానికి: “పత్రాల లోపల” నొక్కి, ఆపై Enter.",
+  "helpKey": "ఎలా శోధించాలి (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"ఏ ప్రోగ్రామ్ నుండైనా చిన్న శోధన పెట్టె\"], [\"Ctrl+Alt+G\", \"Save/Open డైలాగ్‌లో: ఫలితం ఫోల్డర్‌కు వెళ్లు\"], [\"Enter\", \"ఫైల్‌ను తెరువు\"], [\"Ctrl+Enter\", \"దాని ఫోల్డర్‌ను తెరువు\"], [\"↓\", \"ఫలితాలకు (ఖాళీ పెట్టెలో: చరిత్ర)\"], [\"Ctrl+C\", \"ఫైల్‌ను కాపీ చేయి\"], [\"Ctrl+Shift+C\", \"మార్గాన్ని కాపీ చేయి\"], [\"F2\", \"పేరు మార్చు\"], [\"Delete\", \"రీసైకిల్ బిన్‌కు\"], [\"F4\", \"ఫైల్‌లోని అన్ని సరిపోలికలు\"], [\"Ctrl+H\", \"చరిత్ర\"], [\"Ctrl+T\", \"సూక్ష్మచిత్రాలు\"], [\"Ctrl+,\", \"సెట్టింగ్‌లు\"], [\"F1\", \"ఈ కార్డ్\"]]",
+  "helpKeysH": "కీబోర్డ్",
+  "helpMore": "శోధించడానికి అన్ని మార్గాలు…",
+  "helpSub": "ఉదాహరణను శోధన పెట్టెలో ఉంచడానికి దాన్ని క్లిక్ చేయండి. ప్రతి ఫిల్టర్‌కు అరబిక్ స్పెల్లింగ్ కూడా ఉంది.",
+  "kLabel": "కీబోర్డ్ సత్వరమార్గాలు",
+  "offline": "డ్రైవ్ కనెక్ట్ కాలేదు",
+  "qsNone": "డైలాగ్‌ను తరలించడానికి ఫలితం ఏదీ లేదు. శోధనను మార్చండి, లేదా రద్దు చేయడానికి Esc నొక్కండి.",
+  "sHotkeyKeys": "శోధనను తెరిచే సత్వరమార్గం",
+  "sHotkeyKeysSub": "ఏ ప్రోగ్రామ్‌లోనైనా పని చేస్తుంది. వేరొక ప్రోగ్రామ్ దాన్ని ఉపయోగిస్తే వేరొకటి ఎంచుకోండి.",
+  "sHotkeyTaken": "FN:(k) => `వేరొక ప్రోగ్రామ్ ${k}ను ఉపయోగిస్తోంది, కాబట్టి ఇది ఇప్పుడు ఏమీ చేయదు. వేరొక సత్వరమార్గాన్ని ఎంచుకోండి:`",
+  "sLangHelp": "ఈ అనువాదాన్ని మెరుగుపరచడంలో సహాయపడండి",
+  "sLangMachine": "(యంత్ర అనువాదం)",
+  "sPhone": "ఫోన్ నుండి శోధించు",
+  "sPhoneAllow": "ఈ నెట్‌వర్క్‌ను అనుమతించు",
+  "sPhoneIdle": "భద్రత కోసం, ఫోన్ నుండి రెండు గంటలు ఏ అభ్యర్థనా రానందున ఇది దానంతట అదే ఆగిపోయింది. అవసరమైనప్పుడు మళ్లీ ఆన్ చేయండి.",
+  "sPhoneMore": "మరిన్ని సెట్టింగ్‌లు…",
+  "sPhoneMoreSub": "పోర్ట్, ఫైల్‌లను డౌన్‌లోడ్ చేయడం, మరియు కొత్త PIN మరియు లింక్",
+  "sPhoneOff": "ఆఫ్‌లో ఉంది. చిరునామా మరియు PIN చూడటానికి దీన్ని ఆన్ చేయండి.",
+  "sPhoneOpen": "ఫోన్ బ్రౌజర్‌లో తెరవండి:",
+  "sPhonePin": "మరియు PIN టైప్ చేయండి:",
+  "sPhoneQr": "లేదా PIN లేకుండా శోధనను తెరవడానికి ఫోన్ కెమెరాతో ఈ కోడ్‌ను స్కాన్ చేయండి. దీన్ని ఎవరికీ చూపవద్దు.",
+  "sPhoneQrLabel": "ఫోన్ శోధనను తెరిచే QR కోడ్",
+  "sPhoneRow": "ఫోన్ నుండి శోధించు (ఇంటి నెట్‌వర్క్)",
+  "sPhoneSub": "అదే Wi-Fiలో ఉన్న మీ ఫోన్ బ్రౌజర్ నుండి ఈ PC ఫైల్‌లను శోధించండి. చదవడానికి మాత్రమే, మరియు మీ ఇంటి నెట్‌వర్క్‌లో మాత్రమే.",
+  "sPhoneWait": "నెట్‌వర్క్ తనిఖీ చేయబడుతోంది…",
+  "updChecking": "నవీకరణల కోసం తనిఖీ చేస్తోంది…"
  }
 }

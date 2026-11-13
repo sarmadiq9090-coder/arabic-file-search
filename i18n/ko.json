@@ -447,7 +447,70 @@
   "Recent searches": "최근 검색",
   "Save the current search": "현재 검색 저장",
   "Clear history and recent files": "기록과 최근 파일 지우기",
-  "Delete all saved searches": "저장된 검색 모두 삭제"
+  "Delete all saved searches": "저장된 검색 모두 삭제",
+  "(machine translation)": "(기계 번역)",
+  ", ": ", ",
+  "1 KB or more": "1 KB 이상",
+  "1 MB or more": "1 MB 이상",
+  "10 MB or more": "10 MB 이상",
+  "100 KB or more": "100 KB 이상",
+  "100 KB to 10 MB": "100 KB~10 MB",
+  "100 MB or more": "100 MB 이상",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "메일 프로그램에서 {}에게 보내는 메시지가 열렸습니다(보고서를 복사할 수 없음: “복사”를 누른 다음 그곳에 붙여 넣으세요). 아직 아무것도 보내지 않았습니다.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "메일 프로그램에서 {}에게 보내는 메시지가 열렸습니다. 전체 보고서가 복사되었습니다: 메시지에 붙여 넣은(Ctrl+V) 다음 “보내기”를 누르세요. 아직 아무것도 보내지 않았습니다.",
+  "All types": "모든 형식",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space는 이미 다른 프로그램이 사용하고 있어 여기서 쓸 수 없습니다. {}은(는) 계속 사용할 수 있습니다.",
+  "Another program has {} too. Pick another one.": "다른 프로그램도 {}을(를) 사용합니다. 다른 키를 선택하세요.",
+  "Any size": "모든 크기",
+  "Any time": "모든 기간",
+  "Archives": "압축 파일",
+  "Audio": "오디오",
+  "Documents": "문서",
+  "Downloading the update…": "업데이트를 다운로드하는 중…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter 열기 · Ctrl+Enter 폴더 · Tab 더 보기 · Esc 닫기",
+  "Folders": "폴더",
+  "GitHub page (public)": "GitHub 페이지(공개)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — 버전 {}\n파일과 문서 안을 아랍어와 영어로 즉시 검색합니다.\n\n어디서나 {hk}을(를) 눌러 검색하세요.\n{}\n\n지원: {}\n{}\n\n사용하는 타사 구성 요소의 라이선스는 THIRD-PARTY-NOTICES.txt에 있습니다. 여시겠습니까?",
+  "Last 30 days": "최근 30일",
+  "Last 7 days": "최근 7일",
+  "No files match your search. Try:": "검색과 일치하는 파일이 없습니다. 다음을 시도해 보세요:",
+  "No home network connection found; it works on this PC only.": "홈 네트워크 연결을 찾을 수 없습니다. 이 PC에서만 작동합니다.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "아직 인덱스가 없습니다: InstaFind를 한 번 열어 인덱스를 만든 다음 다시 시도하세요.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "메일 프로그램이 열리지 않았습니다. “복사”를 누르고 보고서를 {}(으)로 보내세요.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "메일 프로그램이 열리지 않았습니다. 보고서가 복사되었습니다: 본인의 메일(휴대폰 또는 브라우저)에서 {}에게 보내는 메시지에 붙여 넣으세요.",
+  "No results yet — results may be incomplete while indexing.": "아직 결과가 없습니다 — 인덱싱 중에는 결과가 불완전할 수 있습니다.",
+  "No results yet; they may be incomplete while indexing. Try:": "아직 결과가 없습니다. 인덱싱 중에는 불완전할 수 있습니다. 다음을 시도해 보세요:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "참고: Windows 아랍어 언어 팩이 설치되어 있지 않아 이미지 속 아랍어 텍스트를 읽을 수 없습니다.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "버튼을 누르지 않으면 아무것도 전송되지 않습니다. 파일 이름과 경로는 보고서에서 제거됩니다. GitHub 페이지는 공개되어 누구나 읽을 수 있습니다. 이메일은 저희만 읽습니다.",
+  "Older than a year": "1년 이상 지난 항목",
+  "Open": "열기",
+  "Open quick search\t{}": "빠른 검색 열기\t{}",
+  "Over 1 GB": "1 GB 초과",
+  "Over 10 MB": "10 MB 초과",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "안전을 위해 휴대폰에서 2시간 동안 요청이 없어 휴대폰에서 검색이 자동으로 꺼졌습니다. 다시 켜려면 위의 확인란을 선택하세요.",
+  "Pictures": "사진",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "처음으로 파일 목록을 준비하는 중입니다(몇 분). 지금 바로 검색하세요. 완료되면 결과가 채워집니다.",
+  "Press {} in any program to open the quick search.": "어느 프로그램에서나 {}을(를) 누르면 빠른 검색이 열립니다.",
+  "Press {} in any program to show or hide InstaFind.": "어느 프로그램에서나 {}을(를) 누르면 InstaFind를 표시하거나 숨깁니다.",
+  "Programs": "프로그램",
+  "Results": "결과",
+  "Results may be incomplete while indexing": "인덱싱 중에는 결과가 불완전할 수 있습니다",
+  "Results may be incomplete while indexing — try": "인덱싱 중에는 결과가 불완전할 수 있습니다 — 다음을 시도해 보세요",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Windows의 WebView2 구성 요소가 설치되어 있지 않아 간단한 모양으로 실행 중입니다. 여기를 클릭하면 Microsoft에서 무료로 다운로드할 수 있습니다.",
+  "Send by email": "이메일로 보내기",
+  "Share": "비율",
+  "Show the program from anywhere\t{}": "어디서나 프로그램 표시\t{}",
+  "Size": "크기",
+  "The list just changed, so nothing was done. Try again.": "목록이 방금 바뀌어 아무 작업도 하지 않았습니다. 다시 시도하세요.",
+  "The name did not change.": "이름이 바뀌지 않았습니다.",
+  "The program will run in the background when Windows starts; show it with {}.": "Windows가 시작될 때 프로그램이 백그라운드에서 실행됩니다. {}(으)로 표시하세요.",
+  "This year": "올해",
+  "Today": "오늘",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "파일, 앱 또는 설정의 이름을 입력하세요. 위쪽/아래쪽 화살표로 결과 사이를 이동하고, Enter로 선택한 항목을 엽니다.",
+  "Under 100 KB": "100 KB 미만",
+  "Video": "동영상",
+  "drive not connected": "드라이브가 연결되지 않음",
+  "{} opens the quick search (otherwise the full window)": "{}(으)로 빠른 검색 열기(끄면 전체 창)"
  },
  "js": {
   "ph": "파일 이름 검색…",
@@ -658,6 +721,102 @@
   "sStartup": "시작 프로그램",
   "sAutostart": "Windows 시작 시 실행(백그라운드)",
   "sAbout": "정보",
-  "version": "FN:(v) => `InstaFind — 버전 ${v}`"
+  "version": "FN:(v) => `InstaFind — 버전 ${v}`",
+  "fDetails": "파일 세부 정보",
+  "helpEx": [
+   [
+    "매출 보고서",
+    "두 단어가 모두 들어간 이름"
+   ],
+   [
+    "\"임대 계약서\"",
+    "정확한 구문"
+   ],
+   [
+    "보고서 .pdf",
+    "PDF 파일만(또는 ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "여러 형식"
+   ],
+   [
+    "사진|동영상",
+    "두 단어 중 하나"
+   ],
+   [
+    "계약서 -이전",
+    "“이전” 제외(또는 !이전)"
+   ],
+   [
+    "size:>10mb",
+    "10 MB보다 큰 파일"
+   ],
+   [
+    "dm:thisweek",
+    "이번 주에 변경됨"
+   ],
+   [
+    "dm:2026-05",
+    "2026년 5월에 변경됨"
+   ],
+   [
+    "ww:계약서",
+    "단어 전체만"
+   ],
+   [
+    "\"임대 계약서\"~5",
+    "두 단어가 5단어 이내"
+   ],
+   [
+    "folder: 사진",
+    "폴더만"
+   ],
+   [
+    "root: كتاب",
+    "같은 아랍어 어근: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: reprot",
+    "오타 허용(report를 찾음)"
+   ],
+   [
+    "حجم:>1ج",
+    "아랍어로도: 1 GB보다 큰 파일"
+   ],
+   [
+    "احمد",
+    "«أحمد»도 찾습니다"
+   ]
+  ],
+  "helpH": "검색 방법",
+  "helpInside": "문서(PDF, Word, Excel, 사진) 안을 검색하려면: “문서 안”을 누른 다음 Enter를 누르세요.",
+  "helpKey": "검색 방법(F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"어느 프로그램에서나 작은 검색 상자\"], [\"Ctrl+Alt+G\", \"저장/열기 대화 상자에서: 결과의 폴더로 이동\"], [\"Enter\", \"파일 열기\"], [\"Ctrl+Enter\", \"해당 폴더 열기\"], [\"↓\", \"결과로 이동(빈 상자에서는 기록)\"], [\"Ctrl+C\", \"파일 복사\"], [\"Ctrl+Shift+C\", \"경로 복사\"], [\"F2\", \"이름 바꾸기\"], [\"Delete\", \"휴지통으로\"], [\"F4\", \"파일의 모든 일치 항목\"], [\"Ctrl+H\", \"기록\"], [\"Ctrl+T\", \"미리 보기 아이콘\"], [\"Ctrl+,\", \"설정\"], [\"F1\", \"이 카드\"]]",
+  "helpKeysH": "키보드",
+  "helpMore": "모든 검색 방법…",
+  "helpSub": "예제를 클릭하면 검색 상자에 입력됩니다. 모든 필터는 아랍어로도 쓸 수 있습니다.",
+  "kLabel": "바로 가기 키",
+  "offline": "드라이브가 연결되지 않음",
+  "qsNone": "대화 상자를 이동할 결과가 없습니다. 검색을 바꾸거나 Esc를 눌러 취소하세요.",
+  "sHotkeyKeys": "검색을 여는 바로 가기 키",
+  "sHotkeyKeysSub": "어느 프로그램에서나 작동합니다. 다른 프로그램이 사용 중이면 다른 키를 선택하세요.",
+  "sHotkeyTaken": "FN:(k) => `다른 프로그램이 ${k}을(를) 사용하고 있어 지금은 작동하지 않습니다. 다른 바로 가기 키를 선택하세요:`",
+  "sLangHelp": "이 번역 개선 돕기",
+  "sLangMachine": "(기계 번역)",
+  "sPhone": "휴대폰에서 검색",
+  "sPhoneAllow": "이 네트워크 허용",
+  "sPhoneIdle": "안전을 위해 휴대폰에서 2시간 동안 요청이 없어 자동으로 꺼졌습니다. 필요할 때 다시 켜세요.",
+  "sPhoneMore": "기타 설정…",
+  "sPhoneMoreSub": "포트, 파일 다운로드, 새 PIN 및 링크",
+  "sPhoneOff": "꺼져 있습니다. 켜면 주소와 PIN이 표시됩니다.",
+  "sPhoneOpen": "휴대폰 브라우저에서 열기:",
+  "sPhonePin": "그리고 PIN 입력:",
+  "sPhoneQr": "또는 휴대폰 카메라로 이 코드를 스캔하면 PIN 없이 검색이 열립니다. 아무에게도 보여 주지 마세요.",
+  "sPhoneQrLabel": "휴대폰에서 검색을 여는 QR 코드",
+  "sPhoneRow": "휴대폰에서 검색(홈 네트워크)",
+  "sPhoneSub": "같은 Wi-Fi에 연결된 휴대폰 브라우저에서 이 PC의 파일을 검색합니다. 읽기 전용이며 홈 네트워크에서만 작동합니다.",
+  "sPhoneWait": "네트워크를 확인하는 중…",
+  "updChecking": "업데이트를 확인하는 중…"
  }
 }

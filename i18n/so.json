@@ -447,7 +447,70 @@
   "Recent searches": "Raadintii dhowaa",
   "Save the current search": "Kaydi raadinta hadda",
   "Clear history and recent files": "Nadiifi taariikhda iyo faylasha dhowaan la furay",
-  "Delete all saved searches": "Tirtir dhammaan raadinta la kaydiyay"
+  "Delete all saved searches": "Tirtir dhammaan raadinta la kaydiyay",
+  "(machine translation)": "(tarjumaad mashiin)",
+  ", ": ", ",
+  "1 KB or more": "1 KB ama ka badan",
+  "1 MB or more": "1 MB ama ka badan",
+  "10 MB or more": "10 MB ama ka badan",
+  "100 KB or more": "100 KB ama ka badan",
+  "100 KB to 10 MB": "100 KB ilaa 10 MB",
+  "100 MB or more": "100 MB ama ka badan",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "Fariin loo diro {} ayaa ka furantay barnaamijkaaga iimaylka (warbixinta lama koobiyeyn karin: riix “Koobiyee”, kadibna halkaas ku dheji). Weli waxba lama dirin.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "Fariin loo diro {} ayaa ka furantay barnaamijkaaga iimaylka. Warbixinta oo dhan waa la koobiyeeyay: ku dheji fariinta (Ctrl+V), kadibna riix “Dir”. Weli waxba lama dirin.",
+  "All types": "Dhammaan noocyada",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space waxaa horay u qabsaday barnaamij kale, sidaa darteed halkan looma isticmaali karo. {} weli wuu shaqeynayaa.",
+  "Another program has {} too. Pick another one.": "Barnaamij kale ayaa sidoo kale isticmaalaya {}. Dooro mid kale.",
+  "Any size": "Cabbir kasta",
+  "Any time": "Waqti kasta",
+  "Archives": "Faylal la cufan yahay",
+  "Audio": "Cod",
+  "Documents": "Dukumentiyo",
+  "Downloading the update…": "Cusboonaysiinta ayaa la soo dejinayaa…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter fur · Ctrl+Enter galka · Tab wax kale · Esc xir",
+  "Folders": "Galal",
+  "GitHub page (public)": "Bogga GitHub (dadweyne)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — daabacaadda {}\nRaadin degdeg ah oo faylasha iyo gudaha dukumentiyada ah, Carabi iyo Ingiriisi.\n\nRiix {hk} meel kasta si aad u raadiso.\n{}\n\nTaageero: {}\n{}\n\nLiisamada qaybaha dhinac saddexaad ee uu isticmaalo waxay ku jiraan THIRD-PARTY-NOTICES.txt. Ma la furaa?",
+  "Last 30 days": "30-kii maalmood ee la soo dhaafay",
+  "Last 7 days": "7-dii maalmood ee la soo dhaafay",
+  "No files match your search. Try:": "Ma jiraan faylal la mid ah raadintaada. Isku day:",
+  "No home network connection found; it works on this PC only.": "Lama helin xiriir shabakadda guriga ah; wuxuu ka shaqeeyaa kombiyuutarkan oo keliya.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "Weli ma jiro tusmo: fur InstaFind hal mar si loo dhiso, kadibna isku day mar kale.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "Ma furmin barnaamij iimayl. Riix “Koobiyee” oo warbixinta u dir {}.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "Ma furmin barnaamij iimayl. Warbixinta waa la koobiyeeyay: ku dheji fariin loo diro {} oo ka timid iimaylkaaga (taleefanka ama biraawsarka).",
+  "No results yet — results may be incomplete while indexing.": "Weli natiijooyin ma jiraan — natiijooyinku waxay noqon karaan kuwo aan dhammaystirnayn inta tusmaynta socoto.",
+  "No results yet; they may be incomplete while indexing. Try:": "Weli natiijooyin ma jiraan; waxay noqon karaan kuwo aan dhammaystirnayn inta tusmaynta socoto. Isku day:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "Ogow: qoraalka Carabiga ee sawirrada ku jira lama akhrin karo: xirmada luqadda Carabiga ee Windows lama rakibin.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "Waxba lama diro ilaa aad badhan riixdo. Magacyada faylasha iyo dariiqyada waa laga saaraa warbixinta. Bogga GitHub waa dadweyne: qof kasta wuu akhrin karaa. Iimaylka annaga keliya ayaa akhrina.",
+  "Older than a year": "Ka da' weyn sannad",
+  "Open": "Fur",
+  "Open quick search\t{}": "Fur raadinta degdegga ah\t{}",
+  "Over 1 GB": "Ka weyn 1 GB",
+  "Over 10 MB": "Ka weyn 10 MB",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "Raadinta taleefanku iskeed ayay u damisay ammaan darteed, kadib laba saacadood oo aan taleefan wax codsan. Calaamadee sanduuqa sare si aad mar kale u shiddo.",
+  "Pictures": "Sawirro",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "Liiska faylashaada ayaa markii ugu horreysay la diyaarinayaa (dhowr daqiiqo). Hadda raadi; natiijooyinku way buuxsamayaan marka uu dhammaado.",
+  "Press {} in any program to open the quick search.": "Riix {} barnaamij kasta si aad u furto raadinta degdegga ah.",
+  "Press {} in any program to show or hide InstaFind.": "Riix {} barnaamij kasta si aad u muujiso ama u qariso InstaFind.",
+  "Programs": "Barnaamijyo",
+  "Results": "Natiijooyin",
+  "Results may be incomplete while indexing": "Natiijooyinku waxay noqon karaan kuwo aan dhammaystirnayn inta tusmaynta socoto",
+  "Results may be incomplete while indexing — try": "Natiijooyinku waxay noqon karaan kuwo aan dhammaystirnayn inta tusmaynta socoto — isku day",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Wuxuu ku shaqeynayaa muuqaalka fudud sababtoo ah qaybta WebView2 ee Windows lama rakibin. Halkan guji si aad bilaash uga soo dejiso Microsoft.",
+  "Send by email": "Ku dir iimayl",
+  "Share": "Saami",
+  "Show the program from anywhere\t{}": "Ka muuji barnaamijka meel kasta\t{}",
+  "Size": "Cabbir",
+  "The list just changed, so nothing was done. Try again.": "Liisku hadda ayuu isbeddelay, sidaa darteed waxba lama samayn. Isku day mar kale.",
+  "The name did not change.": "Magacu isma beddelin.",
+  "The program will run in the background when Windows starts; show it with {}.": "Barnaamijku wuxuu gadaal ka shaqeyn doonaa marka Windows bilaabmo; ku muuji {}.",
+  "This year": "Sannadkan",
+  "Today": "Maanta",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "Qor magaca fayl, barnaamij ama dejin. Fallaadhaha Kor iyo Hoos waxay dhex maraan natiijooyinka; Enter wuxuu furaa midka la doortay.",
+  "Under 100 KB": "Ka yar 100 KB",
+  "Video": "Fiidiyow",
+  "drive not connected": "darawalka lama xiriirin",
+  "{} opens the quick search (otherwise the full window)": "{} wuxuu furaa raadinta degdegga ah (haddii kale daaqadda buuxda)"
  },
  "js": {
   "ph": "Ka raadi magacyada faylasha…",
@@ -658,6 +721,102 @@
   "sStartup": "Bilaabid",
   "sAutostart": "Ku bilow Windows (gadaal)",
   "sAbout": "Ku saabsan",
-  "version": "FN:(v) => `InstaFind — daabacaadda ${v}`"
+  "version": "FN:(v) => `InstaFind — daabacaadda ${v}`",
+  "fDetails": "Faahfaahinta faylka",
+  "helpEx": [
+   [
+    "warbixin iibka",
+    "magacyo leh labada eray"
+   ],
+   [
+    "\"heshiis kiro\"",
+    "weedha saxda ah"
+   ],
+   [
+    "warbixin .pdf",
+    "faylasha PDF oo keliya (ama ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "noocyo badan"
+   ],
+   [
+    "sawir|fiidiyow",
+    "mid ka mid ah labada eray"
+   ],
+   [
+    "heshiis -duug",
+    "aan lahayn “duug” (ama !duug)"
+   ],
+   [
+    "size:>10mb",
+    "ka weyn 10 MB"
+   ],
+   [
+    "dm:thisweek",
+    "la beddelay toddobaadkan"
+   ],
+   [
+    "dm:2026-05",
+    "la beddelay May 2026"
+   ],
+   [
+    "ww:heshiis",
+    "erayga oo dhan oo keliya"
+   ],
+   [
+    "\"heshiis kiro\"~5",
+    "labada eray oo ku jira 5 eray gudahood"
+   ],
+   [
+    "folder: sawirro",
+    "galalka oo keliya"
+   ],
+   [
+    "root: كتاب",
+    "isla xididka Carabiga: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: warbxiin",
+    "wuu u dulqaataa khalad qoraal"
+   ],
+   [
+    "حجم:>1ج",
+    "Carabi ahaan sidoo kale: ka weyn 1 GB"
+   ],
+   [
+    "احمد",
+    "sidoo kale wuxuu helaa «أحمد»"
+   ]
+  ],
+  "helpH": "Sida loo raadiyo",
+  "helpInside": "Si aad gudaha dukumentiyada (PDF, Word, Excel, sawirro) uga raadiso: riix “Gudaha dukumentiyada”, kadibna Enter.",
+  "helpKey": "Sida loo raadiyo (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"sanduuqa raadinta yar ee barnaamij kasta\"], [\"Ctrl+Alt+G\", \"daaqadda Save/Open: u gudub galka natiijada\"], [\"Enter\", \"fur faylka\"], [\"Ctrl+Enter\", \"fur galkiisa\"], [\"↓\", \"natiijooyinka (sanduuq madhan: taariikhda)\"], [\"Ctrl+C\", \"koobiyee faylka\"], [\"Ctrl+Shift+C\", \"koobiyee dariiqa\"], [\"F2\", \"magac u beddel\"], [\"Delete\", \"u dir Qashin-qubka\"], [\"F4\", \"dhammaan isku-ekaanshaha faylka\"], [\"Ctrl+H\", \"taariikhda\"], [\"Ctrl+T\", \"sawirrada yaryar\"], [\"Ctrl+,\", \"dejinta\"], [\"F1\", \"kaarkan\"]]",
+  "helpKeysH": "Kiiboodhka",
+  "helpMore": "Dhammaan siyaabaha raadinta…",
+  "helpSub": "Guji tusaale si loogu qoro sanduuqa raadinta. Shaandhayn kasta waxay sidoo kale leedahay higaad Carabi ah.",
+  "kLabel": "Furayaasha gaagaaban ee kiiboodhka",
+  "offline": "darawalka lama xiriirin",
+  "qsNone": "Ma jirto natiijo loo raro daaqadda. Beddel raadinta, ama riix Esc si aad u joojiso.",
+  "sHotkeyKeys": "Furaha gaaban ee furaya raadinta",
+  "sHotkeyKeysSub": "Wuxuu ka shaqeeyaa barnaamij kasta. Dooro mid kale haddii barnaamij kale isticmaalo.",
+  "sHotkeyTaken": "FN:(k) => `Barnaamij kale ayaa isticmaalaya ${k}, sidaa darteed hadda waxba ma qabto. Dooro furo gaaban oo kale:`",
+  "sLangHelp": "Naga caawi hagaajinta tarjumaaddan",
+  "sLangMachine": "(tarjumaad mashiin)",
+  "sPhone": "Ka raadi taleefanka",
+  "sPhoneAllow": "Oggolow shabakaddan",
+  "sPhoneIdle": "Iskeed ayay u damisay ammaan darteed, kadib laba saacadood oo aan taleefan wax codsan. Mar kale shid markaad u baahato.",
+  "sPhoneMore": "Dejin kale…",
+  "sPhoneMoreSub": "Dekedda, soo dejinta faylasha, iyo PIN iyo xiriiriye cusub",
+  "sPhoneOff": "Waa dansan tahay. Shid si aad u aragto cinwaanka iyo PIN-ka.",
+  "sPhoneOpen": "Ka fur biraawsarka taleefanka:",
+  "sPhonePin": "oo qor PIN-ka:",
+  "sPhoneQr": "Ama ku sawir koodhkan kamaradda taleefanka si raadintu u furanto PIN la'aan. Cidna ha tusin.",
+  "sPhoneQrLabel": "Koodh QR oo fura raadinta taleefanka",
+  "sPhoneRow": "Ka raadi taleefanka (shabakadda guriga)",
+  "sPhoneSub": "Ka raadi faylasha kombiyuutarkan biraawsarka taleefankaaga oo ku jira isla Wi-Fi-ga. Akhris keliya, oo shabakadda gurigaaga oo keliya.",
+  "sPhoneWait": "Shabakadda ayaa la hubinayaa…",
+  "updChecking": "Cusboonaysiinta ayaa la hubinayaa…"
  }
 }

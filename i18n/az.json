@@ -447,7 +447,70 @@
   "Recent searches": "Son axtarışlar",
   "Save the current search": "Cari axtarışı yadda saxla",
   "Clear history and recent files": "Tarixçəni və son faylları təmizlə",
-  "Delete all saved searches": "Bütün saxlanılmış axtarışları sil"
+  "Delete all saved searches": "Bütün saxlanılmış axtarışları sil",
+  "(machine translation)": "(maşın tərcüməsi)",
+  ", ": ", ",
+  "1 KB or more": "1 KB və daha çox",
+  "1 MB or more": "1 MB və daha çox",
+  "10 MB or more": "10 MB və daha çox",
+  "100 KB or more": "100 KB və daha çox",
+  "100 KB to 10 MB": "100 KB-dan 10 MB-a qədər",
+  "100 MB or more": "100 MB və daha çox",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "E-poçt proqramınızda {} ünvanına məktub açıldı (hesabatı kopyalamaq mümkün olmadı: “Kopyala” basın, sonra onu məktuba yapışdırın). Hələ heç nə göndərilməyib.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "E-poçt proqramınızda {} ünvanına məktub açıldı. Tam hesabat kopyalandı: onu məktuba yapışdırın (Ctrl+V), sonra “Göndər” basın. Hələ heç nə göndərilməyib.",
+  "All types": "Bütün növlər",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space artıq başqa proqram tərəfindən istifadə olunur, ona görə burada istifadə edilə bilməz. {} işləməyə davam edir.",
+  "Another program has {} too. Pick another one.": "{} qısayolundan başqa proqram da istifadə edir. Başqasını seçin.",
+  "Any size": "İstənilən ölçü",
+  "Any time": "İstənilən vaxt",
+  "Archives": "Arxivlər",
+  "Audio": "Audio",
+  "Documents": "Sənədlər",
+  "Downloading the update…": "Yeniləmə endirilir…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter aç · Ctrl+Enter qovluq · Tab daha çox · Esc bağla",
+  "Folders": "Qovluqlar",
+  "GitHub page (public)": "GitHub səhifəsi (ictimai)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — versiya {}\nFayllarda və sənədlərin daxilində ərəb və ingilis dillərində ani axtarış.\n\nAxtarmaq üçün istənilən yerdə {hk} basın.\n{}\n\nDəstək: {}\n{}\n\nİstifadə etdiyi üçüncü tərəf komponentlərinin lisenziyaları THIRD-PARTY-NOTICES.txt faylındadır. Açılsın?",
+  "Last 30 days": "Son 30 gün",
+  "Last 7 days": "Son 7 gün",
+  "No files match your search. Try:": "Axtarışınıza uyğun fayl yoxdur. Bunları sınayın:",
+  "No home network connection found; it works on this PC only.": "Ev şəbəkəsi bağlantısı tapılmadı; yalnız bu kompüterdə işləyir.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "Hələ indeks yoxdur: onu yaratmaq üçün InstaFind-ı bir dəfə açın, sonra yenidən cəhd edin.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "Heç bir e-poçt proqramı açılmadı. “Kopyala” basın və hesabatı {} ünvanına göndərin.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "Heç bir e-poçt proqramı açılmadı. Hesabat kopyalandı: onu öz e-poçtunuzdan (telefonda və ya brauzerdə) {} ünvanına məktuba yapışdırın.",
+  "No results yet — results may be incomplete while indexing.": "Hələ nəticə yoxdur — indeksləmə zamanı nəticələr natamam ola bilər.",
+  "No results yet; they may be incomplete while indexing. Try:": "Hələ nəticə yoxdur; indeksləmə zamanı natamam ola bilər. Bunları sınayın:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "Qeyd: Windows-un ərəb dil paketi quraşdırılmadığı üçün şəkillərdəki ərəb mətni oxuna bilmir.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "Siz düymə basmasanız, heç nə göndərilmir. Fayl adları və yolları hesabatdan silinir. GitHub səhifəsi ictimaidir: onu hər kəs oxuya bilər. E-poçtu yalnız biz oxuyuruq.",
+  "Older than a year": "Bir ildən köhnə",
+  "Open": "Aç",
+  "Open quick search\t{}": "Sürətli axtarışı aç\t{}",
+  "Over 1 GB": "1 GB-dan böyük",
+  "Over 10 MB": "10 MB-dan böyük",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "Telefondan axtarış təhlükəsizlik üçün iki saat ərzində telefondan heç bir sorğu gəlmədiyindən özü söndü. Yenidən yandırmaq üçün yuxarıdakı qutunu işarələyin.",
+  "Pictures": "Şəkillər",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "Fayl siyahınız ilk dəfə hazırlanır (bir neçə dəqiqə). İndi axtara bilərsiniz; bitəndə nəticələr tamamlanacaq.",
+  "Press {} in any program to open the quick search.": "Sürətli axtarışı açmaq üçün istənilən proqramda {} basın.",
+  "Press {} in any program to show or hide InstaFind.": "InstaFind-ı göstərmək və ya gizlətmək üçün istənilən proqramda {} basın.",
+  "Programs": "Proqramlar",
+  "Results": "Nəticələr",
+  "Results may be incomplete while indexing": "İndeksləmə zamanı nəticələr natamam ola bilər",
+  "Results may be incomplete while indexing — try": "İndeksləmə zamanı nəticələr natamam ola bilər — sınayın",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Windows-un WebView2 komponenti quraşdırılmadığı üçün sadə görünüşdə işləyir. Onu Microsoft-dan pulsuz endirmək üçün bura klikləyin.",
+  "Send by email": "E-poçtla göndər",
+  "Share": "Pay",
+  "Show the program from anywhere\t{}": "Proqramı istənilən yerdən göstər\t{}",
+  "Size": "Ölçü",
+  "The list just changed, so nothing was done. Try again.": "Siyahı indicə dəyişdi, ona görə heç nə edilmədi. Yenidən cəhd edin.",
+  "The name did not change.": "Ad dəyişmədi.",
+  "The program will run in the background when Windows starts; show it with {}.": "Proqram Windows başlayanda arxa planda işləyəcək; onu {} ilə göstərin.",
+  "This year": "Bu il",
+  "Today": "Bu gün",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "Fayl, tətbiq və ya parametr adını yazın. Yuxarı və Aşağı oxlar nəticələr arasında keçir; Enter seçiləni açır.",
+  "Under 100 KB": "100 KB-dan kiçik",
+  "Video": "Video",
+  "drive not connected": "disk qoşulmayıb",
+  "{} opens the quick search (otherwise the full window)": "{} sürətli axtarışı açır (əks halda tam pəncərəni)"
  },
  "js": {
   "ph": "Fayl adlarında axtarın…",
@@ -658,6 +721,102 @@
   "sStartup": "Başlanğıc",
   "sAutostart": "Windows ilə başlat (arxa planda)",
   "sAbout": "Haqqında",
-  "version": "FN:(v) => `InstaFind — versiya ${v}`"
+  "version": "FN:(v) => `InstaFind — versiya ${v}`",
+  "fDetails": "Fayl təfərrüatları",
+  "helpEx": [
+   [
+    "satış hesabatı",
+    "hər iki sözü olan adlar"
+   ],
+   [
+    "\"icarə müqaviləsi\"",
+    "dəqiq ifadə"
+   ],
+   [
+    "hesabat .pdf",
+    "yalnız PDF faylları (və ya ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "bir neçə növ"
+   ],
+   [
+    "foto|video",
+    "iki sözdən biri"
+   ],
+   [
+    "müqavilə -köhnə",
+    "“köhnə” olmadan (və ya !köhnə)"
+   ],
+   [
+    "size:>10mb",
+    "10 MB-dan böyük"
+   ],
+   [
+    "dm:thisweek",
+    "bu həftə dəyişdirilib"
+   ],
+   [
+    "dm:2026-05",
+    "2026-cı ilin mayında dəyişdirilib"
+   ],
+   [
+    "ww:müqavilə",
+    "yalnız tam söz"
+   ],
+   [
+    "\"icarə müqaviləsi\"~5",
+    "hər iki söz ən çoxu 5 söz aralıqla"
+   ],
+   [
+    "folder: fotolar",
+    "yalnız qovluqlar"
+   ],
+   [
+    "root: كتاب",
+    "eyni ərəb kökü: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: hesbat",
+    "bir yazı səhvinə dözür"
+   ],
+   [
+    "حجم:>1ج",
+    "ərəbcə də olar: 1 GB-dan böyük"
+   ],
+   [
+    "احمد",
+    "«أحمد» sözünü də tapır"
+   ]
+  ],
+  "helpH": "Necə axtarmalı",
+  "helpInside": "Sənədlərin daxilində (PDF, Word, Excel, şəkillər) axtarmaq üçün “Sənədlərin daxilində” basın, sonra Enter.",
+  "helpKey": "Necə axtarmalı (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"istənilən proqramdan kiçik axtarış qutusu\"], [\"Ctrl+Alt+G\", \"Saxla/Aç pəncərəsində: nəticənin qovluğuna keç\"], [\"Enter\", \"faylı aç\"], [\"Ctrl+Enter\", \"onun qovluğunu aç\"], [\"↓\", \"nəticələrə (boş qutuda: tarixçə)\"],\n        [\"Ctrl+C\", \"faylı kopyala\"], [\"Ctrl+Shift+C\", \"yolu kopyala\"], [\"F2\", \"adını dəyiş\"], [\"Delete\", \"Zibil qutusuna\"], [\"F4\", \"fayldakı bütün uyğunluqlar\"], [\"Ctrl+H\", \"tarixçə\"], [\"Ctrl+T\", \"miniatürlər\"], [\"Ctrl+,\", \"parametrlər\"], [\"F1\", \"bu kart\"]]",
+  "helpKeysH": "Klaviatura",
+  "helpMore": "Bütün axtarış üsulları…",
+  "helpSub": "Axtarış qutusuna yazmaq üçün nümunəyə klikləyin. Hər filtrin ərəbcə yazılışı da var.",
+  "kLabel": "Klaviatura qısayolları",
+  "offline": "disk qoşulmayıb",
+  "qsNone": "Pəncərəni qovluğuna köçürmək üçün nəticə yoxdur. Axtarışı dəyişin və ya ləğv etmək üçün Esc basın.",
+  "sHotkeyKeys": "Axtarışı açmaq üçün qısayol",
+  "sHotkeyKeysSub": "İstənilən proqramda işləyir. Başqa proqram onu istifadə edirsə, başqasını seçin.",
+  "sHotkeyTaken": "FN:(k) => `${k} qısayolundan başqa proqram istifadə edir, ona görə indi heç nə etmir. Başqa qısayol seçin:`",
+  "sLangHelp": "Bu tərcüməni yaxşılaşdırmağa kömək edin",
+  "sLangMachine": "(maşın tərcüməsi)",
+  "sPhone": "Telefondan axtarış",
+  "sPhoneAllow": "Bu şəbəkəyə icazə ver",
+  "sPhoneIdle": "Təhlükəsizlik üçün iki saat ərzində telefondan heç bir sorğu gəlmədiyindən özü söndü. Lazım olanda yenidən yandırın.",
+  "sPhoneMore": "Digər parametrlər…",
+  "sPhoneMoreSub": "Port, faylların endirilməsi, yeni PIN kod və keçid",
+  "sPhoneOff": "Sönülüdür. Ünvanı və PIN kodu görmək üçün yandırın.",
+  "sPhoneOpen": "Telefonun brauzerində açın:",
+  "sPhonePin": "və PIN kodu yazın:",
+  "sPhoneQr": "Və ya axtarışı PIN kodsuz açmaq üçün bu kodu telefonun kamerası ilə skan edin. Onu heç kimə göstərməyin.",
+  "sPhoneQrLabel": "Telefondan axtarışı açan QR kod",
+  "sPhoneRow": "Telefondan axtarış (ev şəbəkəsi)",
+  "sPhoneSub": "Eyni Wi-Fi şəbəkəsindəki telefonunuzun brauzerindən bu kompüterin fayllarında axtarın. Yalnız oxumaq üçündür və yalnız ev şəbəkənizdə işləyir.",
+  "sPhoneWait": "Şəbəkə yoxlanılır…",
+  "updChecking": "Yeniləmələr yoxlanılır…"
  }
 }

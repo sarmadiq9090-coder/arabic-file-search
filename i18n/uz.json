@@ -447,7 +447,70 @@
   "Recent searches": "Soʻnggi qidiruvlar",
   "Save the current search": "Joriy qidiruvni saqlash",
   "Clear history and recent files": "Tarix va soʻnggi fayllarni tozalash",
-  "Delete all saved searches": "Barcha saqlangan qidiruvlarni oʻchirish"
+  "Delete all saved searches": "Barcha saqlangan qidiruvlarni oʻchirish",
+  "(machine translation)": "(mashina tarjimasi)",
+  ", ": ", ",
+  "1 KB or more": "1 KB va undan katta",
+  "1 MB or more": "1 MB va undan katta",
+  "10 MB or more": "10 MB va undan katta",
+  "100 KB or more": "100 KB va undan katta",
+  "100 KB to 10 MB": "100 KB dan 10 MB gacha",
+  "100 MB or more": "100 MB va undan katta",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "Pochta dasturingizda {} manziliga xat ochildi (hisobotni nusxalab boʻlmadi: “Nusxalash” ni bosing, soʻng uni xatga joylang). Hali hech narsa yuborilmadi.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "Pochta dasturingizda {} manziliga xat ochildi. Toʻliq hisobot nusxalandi: uni xatga joylang (Ctrl+V), soʻng “Yuborish” ni bosing. Hali hech narsa yuborilmadi.",
+  "All types": "Barcha turlar",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space allaqachon boshqa dastur tomonidan band, shuning uchun bu yerda ishlatib boʻlmaydi. {} ishlashda davom etadi.",
+  "Another program has {} too. Pick another one.": "{} dan boshqa dastur ham foydalanmoqda. Boshqasini tanlang.",
+  "Any size": "Istalgan hajm",
+  "Any time": "Istalgan vaqt",
+  "Archives": "Arxivlar",
+  "Audio": "Audio",
+  "Documents": "Hujjatlar",
+  "Downloading the update…": "Yangilanish yuklab olinmoqda…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter ochish · Ctrl+Enter jild · Tab yana · Esc yopish",
+  "Folders": "Jildlar",
+  "GitHub page (public)": "GitHub sahifasi (ommaviy)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — versiya {}\nFayllarni va hujjatlar ichidan arab va ingliz tillarida bir zumda qidirish.\n\nQidirish uchun istalgan joyda {hk} ni bosing.\n{}\n\nYordam: {}\n{}\n\nU foydalanadigan uchinchi tomon komponentlarining litsenziyalari THIRD-PARTY-NOTICES.txt faylida. Ochilsinmi?",
+  "Last 30 days": "Oxirgi 30 kun",
+  "Last 7 days": "Oxirgi 7 kun",
+  "No files match your search. Try:": "Qidiruvingizga mos fayl yoʻq. Sinab koʻring:",
+  "No home network connection found; it works on this PC only.": "Uy tarmogʻiga ulanish topilmadi; faqat shu kompyuterda ishlaydi.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "Hali indeks yoʻq: uni yaratish uchun InstaFind ni bir marta oching, soʻng qayta urinib koʻring.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "Hech qanday pochta dasturi ochilmadi. “Nusxalash” ni bosing va hisobotni {} manziliga yuboring.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "Hech qanday pochta dasturi ochilmadi. Hisobot nusxalandi: uni oʻz pochtangizdan (telefonda yoki brauzerda) {} manziliga xatga joylang.",
+  "No results yet — results may be incomplete while indexing.": "Hali natija yoʻq — indekslash vaqtida natijalar toʻliq boʻlmasligi mumkin.",
+  "No results yet; they may be incomplete while indexing. Try:": "Hali natija yoʻq; indekslash vaqtida ular toʻliq boʻlmasligi mumkin. Sinab koʻring:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "Eslatma: Windows arab tili paketi oʻrnatilmagani uchun rasmlardagi arabcha matnni oʻqib boʻlmaydi.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "Siz tugmani bosmaguningizcha hech narsa yuborilmaydi. Fayl nomlari va yoʻllari hisobotdan olib tashlanadi. GitHub sahifasi ommaviy: uni istalgan kishi oʻqiy oladi. E-pochtani faqat biz oʻqiymiz.",
+  "Older than a year": "Bir yildan eski",
+  "Open": "Ochish",
+  "Open quick search\t{}": "Tezkor qidiruvni ochish\t{}",
+  "Over 1 GB": "1 GB dan katta",
+  "Over 10 MB": "10 MB dan katta",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "Telefondan qidirish xavfsizlik uchun ikki soat davomida telefondan hech qanday soʻrov kelmagani sababli oʻzi oʻchdi. Qayta yoqish uchun yuqoridagi katakchani belgilang.",
+  "Pictures": "Rasmlar",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "Fayllaringiz roʻyxati ilk bor tayyorlanmoqda (bir necha daqiqa). Hozir qidiravering; tugagach natijalar toʻldiriladi.",
+  "Press {} in any program to open the quick search.": "Tezkor qidiruvni ochish uchun istalgan dasturda {} ni bosing.",
+  "Press {} in any program to show or hide InstaFind.": "InstaFind ni koʻrsatish yoki yashirish uchun istalgan dasturda {} ni bosing.",
+  "Programs": "Dasturlar",
+  "Results": "Natijalar",
+  "Results may be incomplete while indexing": "Indekslash vaqtida natijalar toʻliq boʻlmasligi mumkin",
+  "Results may be incomplete while indexing — try": "Indekslash vaqtida natijalar toʻliq boʻlmasligi mumkin — sinab koʻring",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Windows’ning WebView2 komponenti oʻrnatilmagani uchun oddiy koʻrinishda ishlamoqda. Uni Microsoft’dan bepul yuklab olish uchun shu yerni bosing.",
+  "Send by email": "E-pochta orqali yuborish",
+  "Share": "Ulush",
+  "Show the program from anywhere\t{}": "Dasturni istalgan joydan koʻrsatish\t{}",
+  "Size": "Hajm",
+  "The list just changed, so nothing was done. Try again.": "Roʻyxat hozirgina oʻzgardi, shuning uchun hech narsa bajarilmadi. Qayta urinib koʻring.",
+  "The name did not change.": "Nom oʻzgarmadi.",
+  "The program will run in the background when Windows starts; show it with {}.": "Dastur Windows ishga tushganda fonda ishlaydi; uni {} bilan koʻrsating.",
+  "This year": "Shu yil",
+  "Today": "Bugun",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "Fayl, ilova yoki sozlama nomini yozing. Yuqori va Pastki strelkalar natijalar boʻylab yuradi; Enter tanlanganini ochadi.",
+  "Under 100 KB": "100 KB dan kichik",
+  "Video": "Video",
+  "drive not connected": "disk ulanmagan",
+  "{} opens the quick search (otherwise the full window)": "{} tezkor qidiruvni ochadi (aks holda toʻliq oynani)"
  },
  "js": {
   "ph": "Fayl nomlarida qidiring…",
@@ -658,6 +721,102 @@
   "sStartup": "Ishga tushish",
   "sAutostart": "Windows bilan ishga tushirish (fonda)",
   "sAbout": "Dastur haqida",
-  "version": "FN:(v) => `InstaFind — versiya ${v}`"
+  "version": "FN:(v) => `InstaFind — versiya ${v}`",
+  "fDetails": "Fayl tafsilotlari",
+  "helpEx": [
+   [
+    "savdo hisoboti",
+    "ikkala soʻz bor nomlar"
+   ],
+   [
+    "\"ijara shartnomasi\"",
+    "aynan shu ibora"
+   ],
+   [
+    "hisobot .pdf",
+    "faqat PDF fayllar (yoki ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "bir necha tur"
+   ],
+   [
+    "foto|video",
+    "ikki soʻzdan biri"
+   ],
+   [
+    "shartnoma -eski",
+    "“eski” soʻzisiz (yoki !eski)"
+   ],
+   [
+    "size:>10mb",
+    "10 MB dan katta"
+   ],
+   [
+    "dm:thisweek",
+    "shu hafta oʻzgargan"
+   ],
+   [
+    "dm:2026-05",
+    "2026-yil mayida oʻzgargan"
+   ],
+   [
+    "ww:shartnoma",
+    "faqat butun soʻz"
+   ],
+   [
+    "\"ijara shartnomasi\"~5",
+    "ikkala soʻz koʻpi bilan 5 soʻz oraligʻida"
+   ],
+   [
+    "folder: rasmlar",
+    "faqat jildlar"
+   ],
+   [
+    "root: كتاب",
+    "bir xil arabcha oʻzak: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: hisbot",
+    "imlo xatosiga chidaydi"
+   ],
+   [
+    "حجم:>1ج",
+    "arabcha ham boʻladi: 1 GB dan katta"
+   ],
+   [
+    "احمد",
+    "«أحمد» ni ham topadi"
+   ]
+  ],
+  "helpH": "Qanday qidirish kerak",
+  "helpInside": "Hujjatlar ichidan (PDF, Word, Excel, rasmlar) qidirish uchun “Hujjatlar ichida” ni, soʻng Enter ni bosing.",
+  "helpKey": "Qanday qidirish kerak (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"istalgan dasturdan kichik qidiruv maydoni\"], [\"Ctrl+Alt+G\", \"Saqlash/Ochish oynasida: natija jildiga oʻtish\"], [\"Enter\", \"faylni ochish\"], [\"Ctrl+Enter\", \"uning jildini ochish\"], [\"↓\", \"natijalarga (boʻsh maydonda: tarix)\"],\n        [\"Ctrl+C\", \"faylni nusxalash\"], [\"Ctrl+Shift+C\", \"yoʻlni nusxalash\"], [\"F2\", \"nomini oʻzgartirish\"], [\"Delete\", \"Savatga\"], [\"F4\", \"fayldagi barcha mosliklar\"], [\"Ctrl+H\", \"tarix\"], [\"Ctrl+T\", \"eskizlar\"], [\"Ctrl+,\", \"sozlamalar\"], [\"F1\", \"shu karta\"]]",
+  "helpKeysH": "Klaviatura",
+  "helpMore": "Qidirishning barcha usullari…",
+  "helpSub": "Qidiruv maydoniga qoʻyish uchun misolni bosing. Har bir filtrning arabcha yozilishi ham bor.",
+  "kLabel": "Tugmalar birikmalari",
+  "offline": "disk ulanmagan",
+  "qsNone": "Oynani jildiga koʻchirish uchun natija yoʻq. Qidiruvni oʻzgartiring yoki bekor qilish uchun Esc ni bosing.",
+  "sHotkeyKeys": "Qidiruvni ochish uchun tugmalar birikmasi",
+  "sHotkeyKeysSub": "Istalgan dasturda ishlaydi. Agar uni boshqa dastur ishlatsa, boshqasini tanlang.",
+  "sHotkeyTaken": "FN:(k) => `${k} dan boshqa dastur foydalanmoqda, shuning uchun u hozir hech narsa qilmaydi. Boshqa tugmalar birikmasini tanlang:`",
+  "sLangHelp": "Bu tarjimani yaxshilashga yordam bering",
+  "sLangMachine": "(mashina tarjimasi)",
+  "sPhone": "Telefondan qidirish",
+  "sPhoneAllow": "Bu tarmoqqa ruxsat berish",
+  "sPhoneIdle": "Xavfsizlik uchun ikki soat davomida telefondan hech qanday soʻrov kelmagani sababli oʻzi oʻchdi. Kerak boʻlganda qayta yoqing.",
+  "sPhoneMore": "Boshqa sozlamalar…",
+  "sPhoneMoreSub": "Port, fayllarni yuklab olish, yangi PIN-kod va havola",
+  "sPhoneOff": "Oʻchiq. Manzil va PIN-kodni koʻrish uchun yoqing.",
+  "sPhoneOpen": "Telefon brauzerida oching:",
+  "sPhonePin": "va PIN-kodni yozing:",
+  "sPhoneQr": "Yoki qidiruvni PIN-kodsiz ochish uchun bu kodni telefon kamerasi bilan skanerlang. Uni hech kimga koʻrsatmang.",
+  "sPhoneQrLabel": "Telefondan qidiruvni ochadigan QR-kod",
+  "sPhoneRow": "Telefondan qidirish (uy tarmogʻi)",
+  "sPhoneSub": "Xuddi shu Wi-Fi tarmogʻidagi telefoningiz brauzeridan bu kompyuter fayllarini qidiring. Faqat oʻqish uchun va faqat uy tarmogʻingizda.",
+  "sPhoneWait": "Tarmoq tekshirilmoqda…",
+  "updChecking": "Yangilanishlar tekshirilmoqda…"
  }
 }

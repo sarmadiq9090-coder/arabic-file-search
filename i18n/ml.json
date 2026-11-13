@@ -447,7 +447,70 @@
   "Recent searches": "സമീപകാല തിരയലുകൾ",
   "Save the current search": "നിലവിലെ തിരയൽ സംരക്ഷിക്കുക",
   "Clear history and recent files": "ചരിത്രവും സമീപകാല ഫയലുകളും മായ്ക്കുക",
-  "Delete all saved searches": "സംരക്ഷിച്ച എല്ലാ തിരയലുകളും ഇല്ലാതാക്കുക"
+  "Delete all saved searches": "സംരക്ഷിച്ച എല്ലാ തിരയലുകളും ഇല്ലാതാക്കുക",
+  "(machine translation)": "(യന്ത്ര വിവർത്തനം)",
+  ", ": ", ",
+  "1 KB or more": "1 KB അല്ലെങ്കിൽ കൂടുതൽ",
+  "1 MB or more": "1 MB അല്ലെങ്കിൽ കൂടുതൽ",
+  "10 MB or more": "10 MB അല്ലെങ്കിൽ കൂടുതൽ",
+  "100 KB or more": "100 KB അല്ലെങ്കിൽ കൂടുതൽ",
+  "100 KB to 10 MB": "100 KB മുതൽ 10 MB വരെ",
+  "100 MB or more": "100 MB അല്ലെങ്കിൽ കൂടുതൽ",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "നിങ്ങളുടെ മെയിൽ പ്രോഗ്രാമിൽ {} എന്നതിലേക്കുള്ള ഒരു സന്ദേശം തുറന്നു (റിപ്പോർട്ട് പകർത്താൻ കഴിഞ്ഞില്ല: “പകർത്തുക” അമർത്തി, തുടർന്ന് അത് അവിടെ ഒട്ടിക്കുക). ഇതുവരെ ഒന്നും അയച്ചിട്ടില്ല.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "നിങ്ങളുടെ മെയിൽ പ്രോഗ്രാമിൽ {} എന്നതിലേക്കുള്ള ഒരു സന്ദേശം തുറന്നു. പൂർണ്ണ റിപ്പോർട്ട് പകർത്തിയിട്ടുണ്ട്: അത് സന്ദേശത്തിൽ ഒട്ടിച്ച് (Ctrl+V), തുടർന്ന് “അയയ്ക്കുക” അമർത്തുക. ഇതുവരെ ഒന്നും അയച്ചിട്ടില്ല.",
+  "All types": "എല്ലാ തരങ്ങളും",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space ഇതിനകം മറ്റൊരു പ്രോഗ്രാം എടുത്തിട്ടുണ്ട്, അതിനാൽ ഇത് ഇവിടെ ഉപയോഗിക്കാൻ കഴിയില്ല. {} ഇപ്പോഴും പ്രവർത്തിക്കും.",
+  "Another program has {} too. Pick another one.": "മറ്റൊരു പ്രോഗ്രാമും {} ഉപയോഗിക്കുന്നു. മറ്റൊന്ന് തിരഞ്ഞെടുക്കുക.",
+  "Any size": "ഏത് വലുപ്പവും",
+  "Any time": "ഏത് സമയവും",
+  "Archives": "കംപ്രസ് ചെയ്ത ഫയലുകൾ",
+  "Audio": "ഓഡിയോ",
+  "Documents": "പ്രമാണങ്ങൾ",
+  "Downloading the update…": "അപ്‌ഡേറ്റ് ഡൗൺലോഡ് ചെയ്യുന്നു…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter തുറക്കുക · Ctrl+Enter ഫോൾഡർ · Tab കൂടുതൽ · Esc അടയ്ക്കുക",
+  "Folders": "ഫോൾഡറുകൾ",
+  "GitHub page (public)": "GitHub പേജ് (പൊതു)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — പതിപ്പ് {}\nഫയലുകളിലും പ്രമാണങ്ങൾക്കുള്ളിലും തൽക്ഷണ തിരയൽ, അറബിയിലും ഇംഗ്ലീഷിലും.\n\nതിരയാൻ എവിടെയും {hk} അമർത്തുക.\n{}\n\nപിന്തുണ: {}\n{}\n\nഇത് ഉപയോഗിക്കുന്ന മൂന്നാം കക്ഷി ഘടകങ്ങളുടെ ലൈസൻസുകൾ THIRD-PARTY-NOTICES.txt-ൽ ഉണ്ട്. അത് തുറക്കണോ?",
+  "Last 30 days": "കഴിഞ്ഞ 30 ദിവസം",
+  "Last 7 days": "കഴിഞ്ഞ 7 ദിവസം",
+  "No files match your search. Try:": "നിങ്ങളുടെ തിരയലുമായി പൊരുത്തപ്പെടുന്ന ഫയലുകളൊന്നുമില്ല. ഇവ പരീക്ഷിക്കുക:",
+  "No home network connection found; it works on this PC only.": "ഹോം നെറ്റ്‌വർക്ക് കണക്ഷനൊന്നും കണ്ടെത്തിയില്ല; ഇത് ഈ PC-യിൽ മാത്രമേ പ്രവർത്തിക്കൂ.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "ഇതുവരെ സൂചികയില്ല: അത് നിർമ്മിക്കാൻ InstaFind ഒരിക്കൽ തുറന്ന്, തുടർന്ന് വീണ്ടും ശ്രമിക്കുക.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "മെയിൽ പ്രോഗ്രാമൊന്നും തുറന്നില്ല. “പകർത്തുക” അമർത്തി റിപ്പോർട്ട് {} എന്നതിലേക്ക് അയയ്ക്കുക.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "മെയിൽ പ്രോഗ്രാമൊന്നും തുറന്നില്ല. റിപ്പോർട്ട് പകർത്തിയിട്ടുണ്ട്: നിങ്ങളുടെ സ്വന്തം മെയിലിൽ നിന്ന് (ഫോണിലോ ബ്രൗസറിലോ) {} എന്നതിലേക്കുള്ള ഒരു സന്ദേശത്തിൽ ഇത് ഒട്ടിക്കുക.",
+  "No results yet — results may be incomplete while indexing.": "ഇതുവരെ ഫലങ്ങളില്ല — സൂചികയിലാക്കുമ്പോൾ ഫലങ്ങൾ അപൂർണ്ണമായിരിക്കാം.",
+  "No results yet; they may be incomplete while indexing. Try:": "ഇതുവരെ ഫലങ്ങളില്ല; സൂചികയിലാക്കുമ്പോൾ അവ അപൂർണ്ണമായിരിക്കാം. ഇവ പരീക്ഷിക്കുക:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "ശ്രദ്ധിക്കുക: ചിത്രങ്ങളിലെ അറബി വാചകം വായിക്കാൻ കഴിയില്ല: Windows അറബി ഭാഷാ പായ്ക്ക് ഇൻസ്റ്റാൾ ചെയ്തിട്ടില്ല.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "നിങ്ങൾ ഒരു ബട്ടൺ അമർത്താതെ ഒന്നും അയയ്ക്കില്ല. ഫയൽ പേരുകളും പാത്തുകളും റിപ്പോർട്ടിൽ നിന്ന് നീക്കം ചെയ്യും. GitHub പേജ് പൊതുവാണ്: ആർക്കും അത് വായിക്കാം. ഇമെയിൽ ഞങ്ങൾ മാത്രമേ വായിക്കൂ.",
+  "Older than a year": "ഒരു വർഷത്തിൽ കൂടുതൽ പഴയത്",
+  "Open": "തുറക്കുക",
+  "Open quick search\t{}": "ദ്രുത തിരയൽ തുറക്കുക\t{}",
+  "Over 1 GB": "1 GB-യിൽ കൂടുതൽ",
+  "Over 10 MB": "10 MB-യിൽ കൂടുതൽ",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "സുരക്ഷയ്ക്കായി, ഫോണിൽ നിന്ന് രണ്ട് മണിക്കൂർ അഭ്യർത്ഥനയൊന്നും വരാത്തതിനാൽ ഫോൺ തിരയൽ സ്വയം ഓഫായി. വീണ്ടും ഓണാക്കാൻ മുകളിലെ ബോക്സിൽ ടിക്ക് ചെയ്യുക.",
+  "Pictures": "ചിത്രങ്ങൾ",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "ആദ്യമായി നിങ്ങളുടെ ഫയൽ ലിസ്റ്റ് തയ്യാറാക്കുന്നു (കുറച്ച് മിനിറ്റ്). ഇപ്പോൾ തന്നെ തിരയുക; പൂർത്തിയാകുന്നതനുസരിച്ച് ഫലങ്ങൾ നിറയും.",
+  "Press {} in any program to open the quick search.": "ദ്രുത തിരയൽ തുറക്കാൻ ഏത് പ്രോഗ്രാമിലും {} അമർത്തുക.",
+  "Press {} in any program to show or hide InstaFind.": "InstaFind കാണിക്കാനോ മറയ്ക്കാനോ ഏത് പ്രോഗ്രാമിലും {} അമർത്തുക.",
+  "Programs": "പ്രോഗ്രാമുകൾ",
+  "Results": "ഫലങ്ങൾ",
+  "Results may be incomplete while indexing": "സൂചികയിലാക്കുമ്പോൾ ഫലങ്ങൾ അപൂർണ്ണമായിരിക്കാം",
+  "Results may be incomplete while indexing — try": "സൂചികയിലാക്കുമ്പോൾ ഫലങ്ങൾ അപൂർണ്ണമായിരിക്കാം — ഇവ പരീക്ഷിക്കുക",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Windows-ന്റെ WebView2 ഘടകം ഇൻസ്റ്റാൾ ചെയ്യാത്തതിനാൽ ലളിതമായ രൂപത്തിൽ പ്രവർത്തിക്കുന്നു. Microsoft-ൽ നിന്ന് ഇത് സൗജന്യമായി ഡൗൺലോഡ് ചെയ്യാൻ ഇവിടെ ക്ലിക്ക് ചെയ്യുക.",
+  "Send by email": "ഇമെയിൽ വഴി അയയ്ക്കുക",
+  "Share": "പങ്ക്",
+  "Show the program from anywhere\t{}": "പ്രോഗ്രാം എവിടെ നിന്നും കാണിക്കുക\t{}",
+  "Size": "വലുപ്പം",
+  "The list just changed, so nothing was done. Try again.": "ലിസ്റ്റ് ഇപ്പോൾ മാറി, അതിനാൽ ഒന്നും ചെയ്തില്ല. വീണ്ടും ശ്രമിക്കുക.",
+  "The name did not change.": "പേര് മാറിയില്ല.",
+  "The program will run in the background when Windows starts; show it with {}.": "Windows ആരംഭിക്കുമ്പോൾ പ്രോഗ്രാം പശ്ചാത്തലത്തിൽ പ്രവർത്തിക്കും; {} ഉപയോഗിച്ച് ഇത് കാണിക്കുക.",
+  "This year": "ഈ വർഷം",
+  "Today": "ഇന്ന്",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "ഒരു ഫയലിന്റെയോ ആപ്പിന്റെയോ ക്രമീകരണത്തിന്റെയോ പേര് ടൈപ്പ് ചെയ്യുക. മുകളിലേക്കും താഴേക്കുമുള്ള അമ്പുകൾ ഫലങ്ങളിലൂടെ നീങ്ങുന്നു; Enter തിരഞ്ഞെടുത്തത് തുറക്കുന്നു.",
+  "Under 100 KB": "100 KB-യിൽ കുറവ്",
+  "Video": "വീഡിയോ",
+  "drive not connected": "ഡ്രൈവ് കണക്റ്റ് ചെയ്തിട്ടില്ല",
+  "{} opens the quick search (otherwise the full window)": "{} ദ്രുത തിരയൽ തുറക്കുന്നു (അല്ലെങ്കിൽ പൂർണ്ണ വിൻഡോ)"
  },
  "js": {
   "ph": "ഫയൽ പേരുകളിൽ തിരയുക…",
@@ -658,6 +721,102 @@
   "sStartup": "സ്റ്റാർട്ടപ്പ്",
   "sAutostart": "Windows-നൊപ്പം ആരംഭിക്കുക (പശ്ചാത്തലത്തിൽ)",
   "sAbout": "വിവരം",
-  "version": "FN:(v) => `InstaFind — പതിപ്പ് ${v}`"
+  "version": "FN:(v) => `InstaFind — പതിപ്പ് ${v}`",
+  "fDetails": "ഫയൽ വിശദാംശങ്ങൾ",
+  "helpEx": [
+   [
+    "വിൽപ്പന റിപ്പോർട്ട്",
+    "രണ്ട് വാക്കുകളുമുള്ള പേരുകൾ"
+   ],
+   [
+    "\"വാടക കരാർ\"",
+    "കൃത്യമായ വാചകം"
+   ],
+   [
+    "റിപ്പോർട്ട് .pdf",
+    "PDF ഫയലുകൾ മാത്രം (അല്ലെങ്കിൽ ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "നിരവധി തരങ്ങൾ"
+   ],
+   [
+    "ഫോട്ടോ|വീഡിയോ",
+    "ഏതെങ്കിലും ഒരു വാക്ക്"
+   ],
+   [
+    "കരാർ -പഴയ",
+    "“പഴയ” ഇല്ലാതെ (അല്ലെങ്കിൽ !പഴയ)"
+   ],
+   [
+    "size:>10mb",
+    "10 MB-യിൽ കൂടുതൽ"
+   ],
+   [
+    "dm:thisweek",
+    "ഈ ആഴ്ച മാറിയവ"
+   ],
+   [
+    "dm:2026-05",
+    "2026 മേയിൽ മാറിയവ"
+   ],
+   [
+    "ww:കരാർ",
+    "പൂർണ്ണ വാക്ക് മാത്രം"
+   ],
+   [
+    "\"വാടക കരാർ\"~5",
+    "രണ്ട് വാക്കുകളും 5 വാക്കുകൾക്കുള്ളിൽ"
+   ],
+   [
+    "folder: ഫോട്ടോകൾ",
+    "ഫോൾഡറുകൾ മാത്രം"
+   ],
+   [
+    "root: كتاب",
+    "അതേ അറബി മൂലപദം: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: reprot",
+    "അക്ഷരത്തെറ്റ് സഹിക്കും (“report” കണ്ടെത്തും)"
+   ],
+   [
+    "حجم:>1ج",
+    "അറബിയിലും: 1 GB-യിൽ കൂടുതൽ"
+   ],
+   [
+    "احمد",
+    "«أحمد» എന്നതും കണ്ടെത്തും"
+   ]
+  ],
+  "helpH": "എങ്ങനെ തിരയാം",
+  "helpInside": "പ്രമാണങ്ങൾക്കുള്ളിൽ (PDF, Word, Excel, ചിത്രങ്ങൾ) തിരയാൻ: “പ്രമാണങ്ങൾക്കുള്ളിൽ” അമർത്തി, തുടർന്ന് Enter.",
+  "helpKey": "എങ്ങനെ തിരയാം (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"ഏത് പ്രോഗ്രാമിൽ നിന്നും ചെറിയ തിരയൽ ബോക്സ്\"], [\"Ctrl+Alt+G\", \"Save/Open ഡയലോഗിൽ: ഒരു ഫലത്തിന്റെ ഫോൾഡറിലേക്ക് പോകുക\"], [\"Enter\", \"ഫയൽ തുറക്കുക\"], [\"Ctrl+Enter\", \"അതിന്റെ ഫോൾഡർ തുറക്കുക\"], [\"↓\", \"ഫലങ്ങളിലേക്ക് (ശൂന്യമായ ബോക്സിൽ: ചരിത്രം)\"], [\"Ctrl+C\", \"ഫയൽ പകർത്തുക\"], [\"Ctrl+Shift+C\", \"പാത്ത് പകർത്തുക\"], [\"F2\", \"പേരുമാറ്റുക\"], [\"Delete\", \"റീസൈക്കിൾ ബിന്നിലേക്ക്\"], [\"F4\", \"ഫയലിലെ എല്ലാ പൊരുത്തങ്ങളും\"], [\"Ctrl+H\", \"ചരിത്രം\"], [\"Ctrl+T\", \"ലഘുചിത്രങ്ങൾ\"], [\"Ctrl+,\", \"ക്രമീകരണങ്ങൾ\"], [\"F1\", \"ഈ കാർഡ്\"]]",
+  "helpKeysH": "കീബോർഡ്",
+  "helpMore": "തിരയാനുള്ള എല്ലാ വഴികളും…",
+  "helpSub": "ഒരു ഉദാഹരണം തിരയൽ ബോക്സിൽ ഇടാൻ അതിൽ ക്ലിക്ക് ചെയ്യുക. ഓരോ ഫിൽട്ടറിനും ഒരു അറബി അക്ഷരവിന്യാസവുമുണ്ട്.",
+  "kLabel": "കീബോർഡ് കുറുക്കുവഴികൾ",
+  "offline": "ഡ്രൈവ് കണക്റ്റ് ചെയ്തിട്ടില്ല",
+  "qsNone": "ഡയലോഗ് നീക്കാൻ ഫലമൊന്നുമില്ല. തിരയൽ മാറ്റുക, അല്ലെങ്കിൽ റദ്ദാക്കാൻ Esc അമർത്തുക.",
+  "sHotkeyKeys": "തിരയൽ തുറക്കാനുള്ള കുറുക്കുവഴി",
+  "sHotkeyKeysSub": "ഏത് പ്രോഗ്രാമിലും പ്രവർത്തിക്കും. മറ്റൊരു പ്രോഗ്രാം ഇത് ഉപയോഗിക്കുന്നെങ്കിൽ മറ്റൊന്ന് തിരഞ്ഞെടുക്കുക.",
+  "sHotkeyTaken": "FN:(k) => `മറ്റൊരു പ്രോഗ്രാം ${k} ഉപയോഗിക്കുന്നു, അതിനാൽ ഇത് ഇപ്പോൾ ഒന്നും ചെയ്യുന്നില്ല. മറ്റൊരു കുറുക്കുവഴി തിരഞ്ഞെടുക്കുക:`",
+  "sLangHelp": "ഈ വിവർത്തനം മെച്ചപ്പെടുത്താൻ സഹായിക്കുക",
+  "sLangMachine": "(യന്ത്ര വിവർത്തനം)",
+  "sPhone": "ഫോണിൽ നിന്ന് തിരയുക",
+  "sPhoneAllow": "ഈ നെറ്റ്‌വർക്ക് അനുവദിക്കുക",
+  "sPhoneIdle": "സുരക്ഷയ്ക്കായി, ഫോണിൽ നിന്ന് രണ്ട് മണിക്കൂർ അഭ്യർത്ഥനയൊന്നും വരാത്തതിനാൽ ഇത് സ്വയം ഓഫായി. ആവശ്യമുള്ളപ്പോൾ വീണ്ടും ഓണാക്കുക.",
+  "sPhoneMore": "കൂടുതൽ ക്രമീകരണങ്ങൾ…",
+  "sPhoneMoreSub": "പോർട്ട്, ഫയലുകൾ ഡൗൺലോഡ് ചെയ്യൽ, പുതിയ PIN-ഉം ലിങ്കും",
+  "sPhoneOff": "ഓഫാണ്. വിലാസവും PIN-ഉം കാണാൻ ഇത് ഓണാക്കുക.",
+  "sPhoneOpen": "ഫോണിന്റെ ബ്രൗസറിൽ തുറക്കുക:",
+  "sPhonePin": "PIN ടൈപ്പ് ചെയ്യുക:",
+  "sPhoneQr": "അല്ലെങ്കിൽ PIN ഇല്ലാതെ തിരയൽ തുറക്കാൻ ഫോണിന്റെ ക്യാമറ ഉപയോഗിച്ച് ഈ കോഡ് സ്കാൻ ചെയ്യുക. ഇത് ആരെയും കാണിക്കരുത്.",
+  "sPhoneQrLabel": "ഫോൺ തിരയൽ തുറക്കുന്ന QR കോഡ്",
+  "sPhoneRow": "ഫോണിൽ നിന്ന് തിരയുക (ഹോം നെറ്റ്‌വർക്ക്)",
+  "sPhoneSub": "അതേ Wi-Fi-യിലുള്ള നിങ്ങളുടെ ഫോണിന്റെ ബ്രൗസറിൽ നിന്ന് ഈ PC-യിലെ ഫയലുകൾ തിരയുക. വായിക്കാൻ മാത്രം, നിങ്ങളുടെ ഹോം നെറ്റ്‌വർക്കിൽ മാത്രം.",
+  "sPhoneWait": "നെറ്റ്‌വർക്ക് പരിശോധിക്കുന്നു…",
+  "updChecking": "അപ്‌ഡേറ്റുകൾക്കായി പരിശോധിക്കുന്നു…"
  }
 }

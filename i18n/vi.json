@@ -447,7 +447,70 @@
   "Recent searches": "Tìm kiếm gần đây",
   "Save the current search": "Lưu tìm kiếm hiện tại",
   "Clear history and recent files": "Xóa lịch sử và các tệp gần đây",
-  "Delete all saved searches": "Xóa mọi tìm kiếm đã lưu"
+  "Delete all saved searches": "Xóa mọi tìm kiếm đã lưu",
+  "(machine translation)": "(dịch máy)",
+  ", ": ", ",
+  "1 KB or more": "1 KB trở lên",
+  "1 MB or more": "1 MB trở lên",
+  "10 MB or more": "10 MB trở lên",
+  "100 KB or more": "100 KB trở lên",
+  "100 KB to 10 MB": "100 KB đến 10 MB",
+  "100 MB or more": "100 MB trở lên",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "Một thư gửi {} đã mở trong chương trình email của bạn (không thể sao chép báo cáo: hãy nhấn “Sao chép”, rồi dán vào đó). Chưa có gì được gửi.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "Một thư gửi {} đã mở trong chương trình email của bạn. Toàn bộ báo cáo đã được sao chép: hãy dán vào thư (Ctrl+V), rồi nhấn “Gửi”. Chưa có gì được gửi.",
+  "All types": "Mọi loại",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space đã được một chương trình khác sử dụng, nên không thể dùng ở đây. {} vẫn hoạt động.",
+  "Another program has {} too. Pick another one.": "Một chương trình khác cũng dùng {}. Hãy chọn phím khác.",
+  "Any size": "Mọi kích thước",
+  "Any time": "Mọi lúc",
+  "Archives": "Tệp nén",
+  "Audio": "Âm thanh",
+  "Documents": "Tài liệu",
+  "Downloading the update…": "Đang tải bản cập nhật…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter mở · Ctrl+Enter thư mục · Tab thêm · Esc đóng",
+  "Folders": "Thư mục",
+  "GitHub page (public)": "Trang GitHub (công khai)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — phiên bản {}\nTìm kiếm tức thì tệp và nội dung bên trong tài liệu, bằng tiếng Ả Rập và tiếng Anh.\n\nNhấn {hk} ở bất cứ đâu để tìm kiếm.\n{}\n\nHỗ trợ: {}\n{}\n\nGiấy phép của các thành phần bên thứ ba mà chương trình sử dụng có trong THIRD-PARTY-NOTICES.txt. Mở tệp đó?",
+  "Last 30 days": "30 ngày qua",
+  "Last 7 days": "7 ngày qua",
+  "No files match your search. Try:": "Không có tệp nào khớp với tìm kiếm của bạn. Hãy thử:",
+  "No home network connection found; it works on this PC only.": "Không tìm thấy kết nối mạng gia đình; chỉ hoạt động trên PC này.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "Chưa có chỉ mục: hãy mở InstaFind một lần để tạo chỉ mục, rồi thử lại.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "Không mở được chương trình email nào. Hãy nhấn “Sao chép” và gửi báo cáo tới {}.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "Không mở được chương trình email nào. Đã sao chép báo cáo: hãy dán nó vào thư gửi {} từ email của bạn (trên điện thoại hoặc trong trình duyệt).",
+  "No results yet — results may be incomplete while indexing.": "Chưa có kết quả — kết quả có thể chưa đầy đủ khi đang lập chỉ mục.",
+  "No results yet; they may be incomplete while indexing. Try:": "Chưa có kết quả; kết quả có thể chưa đầy đủ khi đang lập chỉ mục. Hãy thử:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "Lưu ý: không thể đọc chữ Ả Rập trong hình ảnh vì chưa cài gói ngôn ngữ Ả Rập của Windows.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "Không có gì được gửi trừ khi bạn nhấn một nút. Tên tệp và đường dẫn sẽ bị xóa khỏi báo cáo. Trang GitHub là công khai: ai cũng có thể đọc. Email thì chỉ chúng tôi đọc.",
+  "Older than a year": "Cũ hơn một năm",
+  "Open": "Mở",
+  "Open quick search\t{}": "Mở tìm kiếm nhanh\t{}",
+  "Over 1 GB": "Trên 1 GB",
+  "Over 10 MB": "Trên 10 MB",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "Để an toàn, tìm từ điện thoại đã tự tắt sau hai giờ không có yêu cầu nào từ điện thoại. Đánh dấu ô bên trên để bật lại.",
+  "Pictures": "Hình ảnh",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "Đang chuẩn bị danh sách tệp của bạn lần đầu (vài phút). Cứ tìm ngay; kết quả sẽ đầy đủ dần khi hoàn tất.",
+  "Press {} in any program to open the quick search.": "Nhấn {} trong bất kỳ chương trình nào để mở tìm kiếm nhanh.",
+  "Press {} in any program to show or hide InstaFind.": "Nhấn {} trong bất kỳ chương trình nào để hiện hoặc ẩn InstaFind.",
+  "Programs": "Chương trình",
+  "Results": "Kết quả",
+  "Results may be incomplete while indexing": "Kết quả có thể chưa đầy đủ khi đang lập chỉ mục",
+  "Results may be incomplete while indexing — try": "Kết quả có thể chưa đầy đủ khi đang lập chỉ mục — hãy thử",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Đang chạy ở giao diện đơn giản vì chưa cài thành phần WebView2 của Windows. Nhấp vào đây để tải miễn phí từ Microsoft.",
+  "Send by email": "Gửi qua email",
+  "Share": "Tỷ lệ",
+  "Show the program from anywhere\t{}": "Hiện chương trình từ mọi nơi\t{}",
+  "Size": "Kích thước",
+  "The list just changed, so nothing was done. Try again.": "Danh sách vừa thay đổi nên chưa có gì được thực hiện. Hãy thử lại.",
+  "The name did not change.": "Tên không thay đổi.",
+  "The program will run in the background when Windows starts; show it with {}.": "Chương trình sẽ chạy trong nền khi Windows khởi động; hiện nó bằng {}.",
+  "This year": "Năm nay",
+  "Today": "Hôm nay",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "Nhập tên tệp, ứng dụng hoặc cài đặt. Phím mũi tên Lên và Xuống di chuyển qua các kết quả; Enter mở mục đã chọn.",
+  "Under 100 KB": "Dưới 100 KB",
+  "Video": "Video",
+  "drive not connected": "ổ đĩa chưa kết nối",
+  "{} opens the quick search (otherwise the full window)": "{} mở tìm kiếm nhanh (nếu không, mở toàn bộ cửa sổ)"
  },
  "js": {
   "ph": "Tìm tên tệp…",
@@ -658,6 +721,102 @@
   "sStartup": "Khởi động",
   "sAutostart": "Khởi động cùng Windows (chạy trong nền)",
   "sAbout": "Giới thiệu",
-  "version": "FN:(v) => `InstaFind — phiên bản ${v}`"
+  "version": "FN:(v) => `InstaFind — phiên bản ${v}`",
+  "fDetails": "Chi tiết tệp",
+  "helpEx": [
+   [
+    "báo cáo bán hàng",
+    "tên có cả hai từ"
+   ],
+   [
+    "\"hợp đồng thuê\"",
+    "đúng cụm từ"
+   ],
+   [
+    "baocao .pdf",
+    "chỉ tệp PDF (hoặc ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "nhiều loại"
+   ],
+   [
+    "ảnh|video",
+    "một trong hai từ"
+   ],
+   [
+    "hợp đồng -cũ",
+    "không có “cũ” (hoặc !cũ)"
+   ],
+   [
+    "size:>10mb",
+    "lớn hơn 10 MB"
+   ],
+   [
+    "dm:thisweek",
+    "thay đổi trong tuần này"
+   ],
+   [
+    "dm:2026-05",
+    "thay đổi trong tháng 5/2026"
+   ],
+   [
+    "ww:baocao",
+    "chỉ nguyên từ"
+   ],
+   [
+    "\"hợp đồng thuê\"~5",
+    "hai từ cách nhau tối đa 5 từ"
+   ],
+   [
+    "folder: ảnh",
+    "chỉ thư mục"
+   ],
+   [
+    "root: كتاب",
+    "cùng gốc từ tiếng Ả Rập: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: reprot",
+    "chấp nhận lỗi gõ (tìm thấy “report”)"
+   ],
+   [
+    "حجم:>1ج",
+    "bằng tiếng Ả Rập cũng được: lớn hơn 1 GB"
+   ],
+   [
+    "احمد",
+    "cũng tìm thấy «أحمد»"
+   ]
+  ],
+  "helpH": "Cách tìm kiếm",
+  "helpInside": "Để tìm bên trong tài liệu (PDF, Word, Excel, hình ảnh): nhấn “Bên trong tài liệu”, rồi Enter.",
+  "helpKey": "Cách tìm kiếm (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"hộp tìm kiếm nhỏ từ mọi chương trình\"], [\"Ctrl+Alt+G\", \"trong hộp thoại Lưu/Mở: đi tới thư mục của kết quả\"], [\"Enter\", \"mở tệp\"], [\"Ctrl+Enter\", \"mở thư mục chứa tệp\"], [\"↓\", \"tới kết quả (khi ô trống: lịch sử)\"], [\"Ctrl+C\", \"sao chép tệp\"], [\"Ctrl+Shift+C\", \"sao chép đường dẫn\"], [\"F2\", \"đổi tên\"], [\"Delete\", \"vào Thùng rác\"], [\"F4\", \"mọi chỗ khớp trong tệp\"], [\"Ctrl+H\", \"lịch sử\"], [\"Ctrl+T\", \"hình thu nhỏ\"], [\"Ctrl+,\", \"cài đặt\"], [\"F1\", \"thẻ này\"]]",
+  "helpKeysH": "Bàn phím",
+  "helpMore": "Mọi cách tìm kiếm…",
+  "helpSub": "Nhấp vào một ví dụ để đưa nó vào ô tìm kiếm. Mỗi bộ lọc cũng có cách viết bằng tiếng Ả Rập.",
+  "kLabel": "Phím tắt",
+  "offline": "ổ đĩa chưa kết nối",
+  "qsNone": "Không có kết quả nào để chuyển hộp thoại tới. Hãy đổi tìm kiếm, hoặc nhấn Esc để hủy.",
+  "sHotkeyKeys": "Phím tắt mở tìm kiếm",
+  "sHotkeyKeysSub": "Hoạt động trong mọi chương trình. Hãy chọn phím khác nếu chương trình khác đang dùng phím này.",
+  "sHotkeyTaken": "FN:(k) => `Một chương trình khác đang dùng ${k}, nên hiện phím này không có tác dụng. Hãy chọn phím tắt khác:`",
+  "sLangHelp": "Giúp cải thiện bản dịch này",
+  "sLangMachine": "(dịch máy)",
+  "sPhone": "Tìm từ điện thoại",
+  "sPhoneAllow": "Cho phép mạng này",
+  "sPhoneIdle": "Để an toàn, tính năng này đã tự tắt sau hai giờ không có yêu cầu nào từ điện thoại. Hãy bật lại khi bạn cần.",
+  "sPhoneMore": "Cài đặt khác…",
+  "sPhoneMoreSub": "Cổng, tải tệp xuống, và mã PIN cùng liên kết mới",
+  "sPhoneOff": "Đang tắt. Bật lên để xem địa chỉ và mã PIN.",
+  "sPhoneOpen": "Mở trong trình duyệt của điện thoại:",
+  "sPhonePin": "và nhập mã PIN:",
+  "sPhoneQr": "Hoặc quét mã này bằng camera điện thoại để mở tìm kiếm mà không cần mã PIN. Đừng cho ai xem mã này.",
+  "sPhoneQrLabel": "Mã QR mở tìm kiếm từ điện thoại",
+  "sPhoneRow": "Tìm từ điện thoại (mạng gia đình)",
+  "sPhoneSub": "Tìm tệp trên PC này từ trình duyệt điện thoại của bạn khi dùng cùng Wi-Fi. Chỉ đọc, và chỉ trong mạng gia đình của bạn.",
+  "sPhoneWait": "Đang kiểm tra mạng…",
+  "updChecking": "Đang kiểm tra bản cập nhật…"
  }
 }

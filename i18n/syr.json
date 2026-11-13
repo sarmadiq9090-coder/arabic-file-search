@@ -447,7 +447,70 @@
   "Recent searches": "ܒܨܝ̈ܐ ܐܚܪ̈ܝܐ",
   "Save the current search": "ܢܛܪܐ ܕܒܨܝܐ ܕܗܫܐ",
   "Clear history and recent files": "ܕܘܟܝܐ ܕܬܫܥܝܬܐ ܘܦܝ̈ܠܐ ܐܚܪ̈ܝܐ",
-  "Delete all saved searches": "ܫܝܦܐ ܕܟܠ ܒܨܝ̈ܐ ܢܛܝܪ̈ܐ"
+  "Delete all saved searches": "ܫܝܦܐ ܕܟܠ ܒܨܝ̈ܐ ܢܛܝܪ̈ܐ",
+  "(machine translation)": "(ܬܘܪܓܡܐ ܡܟܝܢܝܐ)",
+  ", ": "، ",
+  "1 KB or more": "1 KB ܐܘ ܝܬܝܪ",
+  "1 MB or more": "1 MB ܐܘ ܝܬܝܪ",
+  "10 MB or more": "10 MB ܐܘ ܝܬܝܪ",
+  "100 KB or more": "100 KB ܐܘ ܝܬܝܪ",
+  "100 KB to 10 MB": "ܡܢ 100 KB ܗܠ 10 MB",
+  "100 MB or more": "100 MB ܐܘ ܝܬܝܪ",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "ܐܓܪܬܐ ܠ{} ܐܬܦܬܚܬ ܓܘ ܬܘܟܢܝܬܐ ܕܐܝܡܝܠ ܕܝܘܟ (ܡܘܕܥܢܘܬܐ ܠܐ ܡܨܝܐ ܕܡܬܢܣܚܐ: ܠܚܘܨ «ܢܣܚܐ»، ܘܒܬܪ ܗܕܐ ܕܒܘܩ ܠܗ̇ ܬܡܢ). ܡܕܡ ܠܐ ܐܬܫܕܪ ܗܠ ܗܫܐ.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "ܐܓܪܬܐ ܠ{} ܐܬܦܬܚܬ ܓܘ ܬܘܟܢܝܬܐ ܕܐܝܡܝܠ ܕܝܘܟ. ܡܘܕܥܢܘܬܐ ܡܫܡܠܝܬܐ ܐܬܢܣܚܬ: ܕܒܘܩ ܠܗ̇ ܓܘ ܐܓܪܬܐ (Ctrl+V)، ܘܒܬܪ ܗܕܐ ܠܚܘܨ «ܫܕܪ». ܡܕܡ ܠܐ ܐܬܫܕܪ ܗܠ ܗܫܐ.",
+  "All types": "ܟܠ ܙܢ̈ܐ",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space ܒܡܦܠܚܐ ܝܠܗ ܡܢ ܬܘܟܢܝܬܐ ܐ̄ܚܪܬܐ، ܡܛܠ ܗܕܐ ܠܐ ܡܨܐ ܕܡܬܦܠܚ ܐܟܐ. {} ܗܝܕܝܟ ܦܠܚܐ ܝܠܗ.",
+  "Another program has {} too. Pick another one.": "ܬܘܟܢܝܬܐ ܐ̄ܚܪܬܐ ܐܦ ܗܝ ܡܦܠܚܐ ܝܠܗ̇ {}. ܓܒܝ ܚܕ ܐ̄ܚܪܢܐ.",
+  "Any size": "ܟܠ ܪܒܘܬܐ",
+  "Any time": "ܟܠ ܙܒܢܐ",
+  "Archives": "ܦܝ̈ܠܐ ܥܨܝܪ̈ܐ",
+  "Audio": "ܩܠܐ",
+  "Documents": "ܟܬܒ̈ܬܐ",
+  "Downloading the update…": "ܡܚܬܐ ܕܚܘܕܬܐ…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter ܦܬܚܐ · Ctrl+Enter ܦܘܠܕܪ · Tab ܝܬܝܪ · Esc ܣܟܪܐ",
+  "Folders": "ܦܘܠܕܪ̈ܐ",
+  "GitHub page (public)": "ܦܐܬܐ ܕGitHub (ܓܘܢܝܬܐ)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — ܡܦܩܬܐ {}\nܒܨܝܐ ܥܓܠܐ ܕܦܝ̈ܠܐ ܘܓܘ ܟܬܒ̈ܬܐ، ܒܥܪܒܝܐ ܘܒܐܢܓܠܝܙܝܐ.\n\nܠܚܘܨ {hk} ܡܢ ܟܠ ܕܘܟܐ ܩܐ ܒܨܝܐ.\n{}\n\nܥܘܕܪܢܐ: {}\n{}\n\nܦܣܝܣܘܝܬ̈ܐ ܕܡܢܘܬ̈ܐ ܕܓܒ̈ܐ ܐ̄ܚܪ̈ܢܐ ܕܡܦܠܚܐ ܠܗܘܢ ܐܝܬܝܗܝ ܓܘ THIRD-PARTY-NOTICES.txt. ܟܒܥܝܬ ܦܬܚܐ ܠܗ؟",
+  "Last 30 days": "30 ܝܘܡ̈ܢ ܐ̄ܚܪ̈ܝܐ",
+  "Last 7 days": "7 ܝܘܡ̈ܢ ܐ̄ܚܪ̈ܝܐ",
+  "No files match your search. Try:": "ܠܝܬ ܦܝ̈ܠܐ ܕܦܚܡܝ ܠܒܨܝܐ ܕܝܘܟ. ܢܣܝ:",
+  "No home network connection found; it works on this PC only.": "ܠܐ ܐܫܬܟܚ ܚܘܝܕܐ ܕܡܨܕܐ ܕܒܝܬܐ؛ ܦܠܚܐ ܥܠ ܐܕܐ ܚܫܘܒܬܐ ܒܠܚܘܕ.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "ܠܝܬ ܦܗܪܣܬܐ ܗܠ ܗܫܐ: ܦܬܘܚ InstaFind ܚܕ ܙܒܢܐ ܩܐ ܒܢܝܐ ܠܗ̇، ܘܒܬܪ ܗܕܐ ܢܣܝ ܬܘܒ.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "ܠܐ ܐܬܦܬܚܬ ܬܘܟܢܝܬܐ ܕܐܝܡܝܠ. ܠܚܘܨ «ܢܣܚܐ» ܘܫܕܪ ܡܘܕܥܢܘܬܐ ܠ{}.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "ܠܐ ܐܬܦܬܚܬ ܬܘܟܢܝܬܐ ܕܐܝܡܝܠ. ܡܘܕܥܢܘܬܐ ܐܬܢܣܚܬ: ܕܒܘܩ ܠܗ̇ ܓܘ ܐܓܪܬܐ ܠ{} ܡܢ ܐܝܡܝܠ ܕܝܘܟ (ܥܠ ܬܠܝܦܘܢ ܐܘ ܓܘ ܒܪܐܘܙܪ).",
+  "No results yet — results may be incomplete while indexing.": "ܠܝܬ ܦܠ̈ܛܐ ܗܠ ܗܫܐ — ܦܠ̈ܛܐ ܡܨܝ ܕܗܘܝ ܚܣܝܪ̈ܐ ܒܙܒܢܐ ܕܦܗܪܣܬܐ.",
+  "No results yet; they may be incomplete while indexing. Try:": "ܠܝܬ ܦܠ̈ܛܐ ܗܠ ܗܫܐ؛ ܡܨܝ ܕܗܘܝ ܚܣܝܪ̈ܐ ܒܙܒܢܐ ܕܦܗܪܣܬܐ. ܢܣܝ:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "ܡܥܝܪܢܘܬܐ: ܟܬܒܐ ܥܪܒܝܐ ܓܘ ܨܘܪ̈ܬܐ ܠܐ ܡܨܐ ܕܡܬܩܪܐ، ܡܛܠ ܕܚܙܡܐ ܕܠܫܢܐ ܥܪܒܝܐ ܕWindows ܠܐ ܝܠܗ ܩܒܝܥܐ.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "ܡܕܡ ܠܐ ܡܫܬܕܪ ܐܠܐ ܐܢ ܠܚܨܬ ܥܠ ܦܬܐܪܐ. ܫܡܗ̈ܐ ܘܫܒܝ̈ܠܐ ܕܦܝ̈ܠܐ ܡܫܬܩܠܝ ܡܢ ܡܘܕܥܢܘܬܐ. ܦܐܬܐ ܕGitHub ܓܘܢܝܬܐ ܝܠܗ̇: ܟܠ ܐܢܫ ܡܨܐ ܕܩܪܐ ܠܗ̇. ܐܝܡܝܠ ܒܠܚܘܕ ܚܢܢ ܩܪܝܚ ܠܗ.",
+  "Older than a year": "ܥܬܝܩ ܡܢ ܫܢܬܐ",
+  "Open": "ܦܬܘܚ",
+  "Open quick search\t{}": "ܦܬܚܐ ܕܒܨܝܐ ܥܓܠܐ\t{}",
+  "Over 1 GB": "ܝܬܝܪ ܡܢ 1 GB",
+  "Over 10 MB": "ܝܬܝܪ ܡܢ 10 MB",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "ܒܨܝܐ ܡܢ ܬܠܝܦܘܢ ܣܟܪ ܒܢܦܫܗ ܒܬܪ ܬܪܬܝܢ ܫܥ̈ܐ ܕܠܐ ܫܘܐܠܐ ܡܢ ܬܠܝܦܘܢ، ܩܐ ܫܠܡܘܬܐ. ܢܫܘܡ ܩܘܛܝܐ ܕܠܥܠ ܩܐ ܦܬܚܐ ܠܗ ܬܘܒ.",
+  "Pictures": "ܨܘܪ̈ܬܐ",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "ܪܫܝܡܬܐ ܕܦܝ̈ܠܐ ܕܝܘܟ ܒܡܛܝܒܐ ܝܠܗ̇ ܩܐ ܙܒܢܐ ܩܕܡܝܐ (ܩܠܝܠ ܩܛܝܢ̈ܐ). ܒܨܝ ܗܫܐ؛ ܦܠ̈ܛܐ ܒܕ ܓܡܪܝ ܐܡܬܝ ܕܓܡܪܐ.",
+  "Press {} in any program to open the quick search.": "ܠܚܘܨ {} ܓܘ ܟܠ ܬܘܟܢܝܬܐ ܩܐ ܦܬܚܐ ܒܨܝܐ ܥܓܠܐ.",
+  "Press {} in any program to show or hide InstaFind.": "ܠܚܘܨ {} ܓܘ ܟܠ ܬܘܟܢܝܬܐ ܩܐ ܚܘܝܐ ܐܘ ܛܫܝܐ ܕInstaFind.",
+  "Programs": "ܬܘܟܢܝ̈ܬܐ",
+  "Results": "ܦܠ̈ܛܐ",
+  "Results may be incomplete while indexing": "ܦܠ̈ܛܐ ܡܨܝ ܕܗܘܝ ܚܣܝܪ̈ܐ ܒܙܒܢܐ ܕܦܗܪܣܬܐ",
+  "Results may be incomplete while indexing — try": "ܦܠ̈ܛܐ ܡܨܝ ܕܗܘܝ ܚܣܝܪ̈ܐ ܒܙܒܢܐ ܕܦܗܪܣܬܐ — ܢܣܝ",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "ܦܠܚܐ ܒܚܙܘܐ ܦܫܝܛܐ ܡܛܠ ܕܡܢܬܐ WebView2 ܕWindows ܠܐ ܝܠܗ̇ ܩܒܝܥܬܐ. ܠܚܘܨ ܐܟܐ ܩܐ ܡܚܬܐ ܠܗ̇ ܡܓܢ ܡܢ Microsoft.",
+  "Send by email": "ܫܕܪ ܒܐܝܡܝܠ",
+  "Share": "ܡܢܬܐ",
+  "Show the program from anywhere\t{}": "ܚܘܝܐ ܕܬܘܟܢܝܬܐ ܡܢ ܟܠ ܕܘܟܐ\t{}",
+  "Size": "ܪܒܘܬܐ",
+  "The list just changed, so nothing was done. Try again.": "ܪܫܝܡܬܐ ܗܫܐ ܐܫܬܚܠܦܬ، ܡܛܠ ܗܕܐ ܡܕܡ ܠܐ ܐܬܥܒܕ. ܢܣܝ ܬܘܒ.",
+  "The name did not change.": "ܫܡܐ ܠܐ ܐܫܬܚܠܦ.",
+  "The program will run in the background when Windows starts; show it with {}.": "ܬܘܟܢܝܬܐ ܒܕ ܦܠܚܐ ܒܣܬܪܐ ܐܡܬܝ ܕWindows ܫܪܐ؛ ܚܘܝ ܠܗ̇ ܥܡ {}.",
+  "This year": "ܐܕܐ ܫܢܬܐ",
+  "Today": "ܐܕܝܘܡ",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "ܟܬܘܒ ܫܡܐ ܕܦܝܠܐ، ܐܦ ܐܘ ܛܘܝܒܐ. ܓܐܪ̈ܐ ܕܠܥܠ ܘܕܠܬܚܬ ܐܙܠܝ ܒܝܬ ܦܠ̈ܛܐ؛ Enter ܦܬܚܐ ܠܕܓܒܝܐ.",
+  "Under 100 KB": "ܒܨܝܪ ܡܢ 100 KB",
+  "Video": "ܒܝܕܝܘ",
+  "drive not connected": "ܕܝܣܩܐ ܠܐ ܝܠܗ ܚܒܝܫܐ",
+  "{} opens the quick search (otherwise the full window)": "{} ܦܬܚܐ ܒܨܝܐ ܥܓܠܐ (ܐܢ ܠܐ، ܟܘܬܐ ܡܫܡܠܝܬܐ)"
  },
  "js": {
   "ph": "ܒܨܝ ܒܫܡܐ ܕܦܝܠܐ…",
@@ -658,6 +721,102 @@
   "sStartup": "ܫܘܪܝܐ",
   "sAutostart": "ܫܘܪܝܐ ܥܡ Windows (ܒܣܬܪܐ)",
   "sAbout": "ܥܠ ܬܘܟܢܝܬܐ",
-  "version": "FN:(v) => `InstaFind — ܡܦܩܬܐ ${v}`"
+  "version": "FN:(v) => `InstaFind — ܡܦܩܬܐ ${v}`",
+  "fDetails": "ܦܘܪ̈ܫܢܐ ܕܦܝܠܐ",
+  "helpEx": [
+   [
+    "ܡܘܕܥܢܘܬܐ ܡܙܒܢܬܐ",
+    "ܫܡܗ̈ܐ ܕܐܝܬ ܓܘܝܗܝ ܬܪܘܝܗܝ ܡ̈ܠܐ"
+   ],
+   [
+    "\"ܩܝܡܐ ܕܐܓܪܐ\"",
+    "ܦܬܓܡܐ ܚܬܝܬܐ"
+   ],
+   [
+    "ܡܘܕܥܢܘܬܐ .pdf",
+    "ܦܝ̈ܠܐ ܕPDF ܒܠܚܘܕ (ܐܘ ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "ܐܢܝ ܙܢ̈ܐ"
+   ],
+   [
+    "ܨܘܪܬܐ|ܒܝܕܝܘ",
+    "ܚܕܐ ܡܢ ܬܪܬܝܢ ܡ̈ܠܐ"
+   ],
+   [
+    "ܩܝܡܐ -ܥܬܝܩܐ",
+    "ܕܠܐ «ܥܬܝܩܐ» (ܐܘ !ܥܬܝܩܐ)"
+   ],
+   [
+    "size:>10mb",
+    "ܪܒܐ ܡܢ 10 MB"
+   ],
+   [
+    "dm:thisweek",
+    "ܐܫܬܚܠܦܘ ܐܕܐ ܫܒܘܥܐ"
+   ],
+   [
+    "dm:2026-05",
+    "ܐܫܬܚܠܦܘ ܒܐܝܪ 2026"
+   ],
+   [
+    "ww:ܩܝܡܐ",
+    "ܡܠܬܐ ܡܫܡܠܝܬܐ ܒܠܚܘܕ"
+   ],
+   [
+    "\"ܩܝܡܐ ܐܓܪܐ\"~5",
+    "ܬܪܬܝܢ ܡ̈ܠܐ ܒܝܢܬܘܗܝ 5 ܡ̈ܠܐ ܒܝܬܝܪܘܬܐ"
+   ],
+   [
+    "folder: ܨܘܪ̈ܬܐ",
+    "ܦܘܠܕܪ̈ܐ ܒܠܚܘܕ"
+   ],
+   [
+    "root: كتاب",
+    "ܗܘ ܥܩܪܐ ܥܪܒܝܐ: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: ܡܘܕܥܢܬܘܐ",
+    "ܣܒܪܐ ܦܘܕܐ ܕܟܬܒܐ"
+   ],
+   [
+    "حجم:>1ج",
+    "ܒܥܪܒܝܐ ܐܦ: ܪܒܐ ܡܢ 1 GB"
+   ],
+   [
+    "احمد",
+    "ܡܫܟܚ ܐܦ «أحمد»"
+   ]
+  ],
+  "helpH": "ܐܝܟܢܐ ܒܨܝܐ",
+  "helpInside": "ܩܐ ܒܨܝܐ ܓܘ ܟܬܒ̈ܬܐ (PDF، Word، Excel، ܨܘܪ̈ܬܐ): ܠܚܘܨ «ܓܘ ܟܬܒ̈ܬܐ»، ܘܒܬܪ ܗܕܐ Enter.",
+  "helpKey": "ܐܝܟܢܐ ܒܨܝܐ (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"ܩܘܛܝܐ ܙܥܘܪܐ ܕܒܨܝܐ ܡܢ ܟܠ ܬܘܟܢܝܬܐ\"], [\"Ctrl+Alt+G\", \"ܓܘ ܟܘܬܐ ܕܢܛܪܐ/ܦܬܚܐ: ܐܙܠܐ ܠܦܘܠܕܪ ܕܦܠܛܐ\"], [\"Enter\", \"ܦܬܚܐ ܕܦܝܠܐ\"], [\"Ctrl+Enter\", \"ܦܬܚܐ ܕܦܘܠܕܪ ܕܝܠܗ\"], [\"↓\", \"ܠܦܠ̈ܛܐ (ܓܘ ܩܘܛܝܐ ܣܦܝܩܐ: ܬܫܥܝܬܐ)\"],\n        [\"Ctrl+C\", \"ܢܣܚܐ ܕܦܝܠܐ\"], [\"Ctrl+Shift+C\", \"ܢܣܚܐ ܕܫܒܝܠܐ\"], [\"F2\", \"ܫܚܠܘܦܐ ܕܫܡܐ\"], [\"Delete\", \"ܠܣܠܐ ܕܡܫܝ̈ܦܐ\"], [\"F4\", \"ܟܠ ܦܚ̈ܡܐ ܓܘ ܦܝܠܐ\"], [\"Ctrl+H\", \"ܬܫܥܝܬܐ\"], [\"Ctrl+T\", \"ܨܘܪ̈ܬܐ ܙܥܘܪ̈ܬܐ\"], [\"Ctrl+,\", \"ܛܘܝܒ̈ܐ\"], [\"F1\", \"ܐܕܐ ܟܪܛܝܣܐ\"]]",
+  "helpKeysH": "ܠܘܚܐ ܕܩܠܝܕ̈ܐ",
+  "helpMore": "ܟܠ ܐܘܪ̈ܚܬܐ ܕܒܨܝܐ…",
+  "helpSub": "ܠܚܘܨ ܥܠ ܡܬܠܐ ܩܐ ܕܡܬܟܬܒ ܓܘ ܩܘܛܝܐ ܕܒܨܝܐ. ܟܠ ܡܨܠܠܢܐ ܐܝܬ ܠܗ ܐܦ ܟܬܒܐ ܥܪܒܝܐ.",
+  "kLabel": "ܩܝ̈ܣܐ ܕܩܘܪܒܐ ܕܠܘܚܐ ܕܩܠܝܕ̈ܐ",
+  "offline": "ܕܝܣܩܐ ܠܐ ܝܠܗ ܚܒܝܫܐ",
+  "qsNone": "ܠܝܬ ܦܠܛܐ ܩܐ ܫܢܝܐ ܟܘܬܐ ܠܦܘܠܕܪ ܕܝܠܗ. ܫܚܠܦ ܒܨܝܐ، ܐܘ ܠܚܘܨ Esc ܩܐ ܒܛܠܐ.",
+  "sHotkeyKeys": "ܩܝܣܐ ܕܩܘܪܒܐ ܩܐ ܦܬܚܐ ܕܒܨܝܐ",
+  "sHotkeyKeysSub": "ܦܠܚܐ ܓܘ ܟܠ ܬܘܟܢܝܬܐ. ܓܒܝ ܚܕ ܐ̄ܚܪܢܐ ܐܢ ܬܘܟܢܝܬܐ ܐ̄ܚܪܬܐ ܡܦܠܚܐ ܠܗ.",
+  "sHotkeyTaken": "FN:(k) => `ܬܘܟܢܝܬܐ ܐ̄ܚܪܬܐ ܡܦܠܚܐ ܝܠܗ̇ ${k}، ܡܛܠ ܗܕܐ ܗܫܐ ܡܕܡ ܠܐ ܥܒܕ. ܓܒܝ ܩܝܣܐ ܕܩܘܪܒܐ ܐ̄ܚܪܢܐ:`",
+  "sLangHelp": "ܥܕܘܪ ܠܡܛܝܒܘܬܐ ܕܐܕܐ ܬܘܪܓܡܐ",
+  "sLangMachine": "(ܬܘܪܓܡܐ ܡܟܝܢܝܐ)",
+  "sPhone": "ܒܨܝܐ ܡܢ ܬܠܝܦܘܢ",
+  "sPhoneAllow": "ܦܣܝܣܘܬܐ ܠܐܕܐ ܡܨܕܐ",
+  "sPhoneIdle": "ܣܟܪ ܒܢܦܫܗ ܒܬܪ ܬܪܬܝܢ ܫܥ̈ܐ ܕܠܐ ܫܘܐܠܐ ܡܢ ܬܠܝܦܘܢ، ܩܐ ܫܠܡܘܬܐ. ܦܬܘܚ ܠܗ ܬܘܒ ܐܡܬܝ ܕܣܢܝܩܐ ܝܘܬ.",
+  "sPhoneMore": "ܛܘܝܒ̈ܐ ܐ̄ܚܪ̈ܢܐ…",
+  "sPhoneMoreSub": "ܬܪܥܐ، ܡܚܬܐ ܕܦܝ̈ܠܐ، ܘPIN ܘܠܝܢܟ ܚܕ̈ܬܐ",
+  "sPhoneOff": "ܣܟܝܪܐ. ܦܬܘܚ ܠܗ ܩܐ ܚܙܝܐ ܥܢܘܢ ܘPIN.",
+  "sPhoneOpen": "ܦܬܘܚ ܓܘ ܒܪܐܘܙܪ ܕܬܠܝܦܘܢ:",
+  "sPhonePin": "ܘܟܬܘܒ PIN:",
+  "sPhoneQr": "ܐܘ ܣܪܘܩ ܐܕܐ ܪܡܙܐ ܥܡ ܟܡܪܐ ܕܬܠܝܦܘܢ ܩܐ ܦܬܚܐ ܒܨܝܐ ܕܠܐ PIN. ܠܐ ܚܘܝܬ ܠܗ ܠܚܕ ܐܢܫ.",
+  "sPhoneQrLabel": "ܪܡܙܐ QR ܕܦܬܚܐ ܒܨܝܐ ܡܢ ܬܠܝܦܘܢ",
+  "sPhoneRow": "ܒܨܝܐ ܡܢ ܬܠܝܦܘܢ (ܡܨܕܐ ܕܒܝܬܐ)",
+  "sPhoneSub": "ܒܨܝ ܓܘ ܦܝ̈ܠܐ ܕܐܕܐ ܚܫܘܒܬܐ ܡܢ ܒܪܐܘܙܪ ܕܬܠܝܦܘܢ ܕܝܘܟ ܥܠ ܗܝ Wi-Fi. ܩܐ ܩܪܝܐ ܒܠܚܘܕ، ܘܥܠ ܡܨܕܐ ܕܒܝܬܐ ܕܝܘܟ ܒܠܚܘܕ.",
+  "sPhoneWait": "ܒܘܚܪܢܐ ܕܡܨܕܐ…",
+  "updChecking": "ܒܘܚܪܢܐ ܕܚܘܕ̈ܬܐ…"
  }
 }

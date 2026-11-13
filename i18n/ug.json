@@ -447,7 +447,70 @@
   "Recent searches": "يېقىنقى ئىزدەشلەر",
   "Save the current search": "نۆۋەتتىكى ئىزدەشنى ساقلاش",
   "Clear history and recent files": "تارىخ ۋە يېقىنقى ھۆججەتلەرنى تازىلاش",
-  "Delete all saved searches": "ساقلانغان ئىزدەشلەرنىڭ ھەممىسىنى ئۆچۈرۈش"
+  "Delete all saved searches": "ساقلانغان ئىزدەشلەرنىڭ ھەممىسىنى ئۆچۈرۈش",
+  "(machine translation)": "(ماشىنا تەرجىمىسى)",
+  ", ": "، ",
+  "1 KB or more": "1 KB ۋە ئۇنىڭدىن چوڭ",
+  "1 MB or more": "1 MB ۋە ئۇنىڭدىن چوڭ",
+  "10 MB or more": "10 MB ۋە ئۇنىڭدىن چوڭ",
+  "100 KB or more": "100 KB ۋە ئۇنىڭدىن چوڭ",
+  "100 KB to 10 MB": "100 KB دىن 10 MB غىچە",
+  "100 MB or more": "100 MB ۋە ئۇنىڭدىن چوڭ",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "ئېلخەت پروگراممىڭىزدا {} غا بىر خەت ئېچىلدى (دوكلاتنى كۆچۈرگىلى بولمىدى: «كۆچۈرۈش» نى بېسىپ، ئاندىن ئۇنى خەتكە چاپلاڭ). تېخى ھېچنېمە ئەۋەتىلمىدى.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "ئېلخەت پروگراممىڭىزدا {} غا بىر خەت ئېچىلدى. تولۇق دوكلات كۆچۈرۈلدى: ئۇنى خەتكە چاپلاڭ (Ctrl+V)، ئاندىن «ئەۋەتىش» نى بېسىڭ. تېخى ھېچنېمە ئەۋەتىلمىدى.",
+  "All types": "بارلىق تىپلار",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space نى باشقا بىر پروگرامما ئىگىلىۋالغان، شۇڭا بۇ يەردە ئىشلەتكىلى بولمايدۇ. {} يەنىلا ئىشلەيدۇ.",
+  "Another program has {} too. Pick another one.": "{} نى باشقا بىر پروگراممىمۇ ئىشلىتىۋاتىدۇ. باشقىسىنى تاللاڭ.",
+  "Any size": "خالىغان چوڭلۇق",
+  "Any time": "خالىغان ۋاقىت",
+  "Archives": "پىرىسلانغان ھۆججەتلەر",
+  "Audio": "ئاۋاز",
+  "Documents": "پۈتۈكلەر",
+  "Downloading the update…": "يېڭىلانما چۈشۈرۈلۈۋاتىدۇ…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter ئېچىش · Ctrl+Enter قىسقۇچ · Tab تېخىمۇ كۆپ · Esc تاقاش",
+  "Folders": "قىسقۇچلار",
+  "GitHub page (public)": "GitHub بېتى (ئاممىۋى)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — نەشرى {}\nھۆججەتلەرنى ۋە پۈتۈكلەر ئىچىنى ئەرەبچە ۋە ئىنگلىزچە دەرھال ئىزدەش.\n\nئىزدەش ئۈچۈن خالىغان يەردە {hk} نى بېسىڭ.\n{}\n\nياردەم: {}\n{}\n\nئۇ ئىشلىتىدىغان ئۈچىنچى تەرەپ زاپچاسلىرىنىڭ ئىجازەتنامىلىرى THIRD-PARTY-NOTICES.txt دا. ئېچىلامدۇ؟",
+  "Last 30 days": "ئاخىرقى 30 كۈن",
+  "Last 7 days": "ئاخىرقى 7 كۈن",
+  "No files match your search. Try:": "ئىزدىشىڭىزغا ماس كېلىدىغان ھۆججەت يوق. سىناپ بېقىڭ:",
+  "No home network connection found; it works on this PC only.": "ئۆي تورىغا ئۇلىنىش تېپىلمىدى؛ پەقەت بۇ كومپيۇتېردىلا ئىشلەيدۇ.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "تېخى ئىندېكس يوق: ئۇنى قۇرۇش ئۈچۈن InstaFind نى بىر قېتىم ئېچىپ، ئاندىن قايتا سىناڭ.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "ھېچقانداق ئېلخەت پروگراممىسى ئېچىلمىدى. «كۆچۈرۈش» نى بېسىپ، دوكلاتنى {} غا ئەۋەتىڭ.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "ھېچقانداق ئېلخەت پروگراممىسى ئېچىلمىدى. دوكلات كۆچۈرۈلدى: ئۇنى ئۆز ئېلخېتىڭىزدىن (تېلېفوندا ياكى توركۆرگۈدە) {} غا يېزىلغان خەتكە چاپلاڭ.",
+  "No results yet — results may be incomplete while indexing.": "تېخى نەتىجە يوق — ئىندېكسلاش جەريانىدا نەتىجىلەر تولۇق بولماسلىقى مۇمكىن.",
+  "No results yet; they may be incomplete while indexing. Try:": "تېخى نەتىجە يوق؛ ئىندېكسلاش جەريانىدا ئۇلار تولۇق بولماسلىقى مۇمكىن. سىناپ بېقىڭ:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "ئەسكەرتىش: Windows نىڭ ئەرەبچە تىل بوغچىسى ئورنىتىلمىغاچقا، سۈرەتلەردىكى ئەرەبچە تېكىستنى ئوقۇغىلى بولمايدۇ.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "سىز بىرەر كۇنۇپكىنى باسمىغۇچە ھېچنېمە ئەۋەتىلمەيدۇ. ھۆججەت ناملىرى ۋە يوللىرى دوكلاتتىن ئۆچۈرۈلىدۇ. GitHub بېتى ئاممىۋى: ئۇنى ھەركىم ئوقۇيالايدۇ. ئېلخەتنى پەقەت بىزلا ئوقۇيمىز.",
+  "Older than a year": "بىر يىلدىن كونا",
+  "Open": "ئېچىش",
+  "Open quick search\t{}": "تېز ئىزدەشنى ئېچىش\t{}",
+  "Over 1 GB": "1 GB دىن چوڭ",
+  "Over 10 MB": "10 MB دىن چوڭ",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "بىخەتەرلىك ئۈچۈن، تېلېفوندىن ئىككى سائەت ھېچقانداق تەلەپ كەلمىگەچكە، تېلېفوندىن ئىزدەش ئۆزلۈكىدىن تاقالدى. قايتا ئېچىش ئۈچۈن يۇقىرىدىكى رامكىنى بەلگىلەڭ.",
+  "Pictures": "سۈرەتلەر",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "ھۆججەت تىزىملىكىڭىز تۇنجى قېتىم تەييارلىنىۋاتىدۇ (بىر نەچچە مىنۇت). ھازىرلا ئىزدەڭ؛ تاماملانغاندا نەتىجىلەر تولۇقلىنىدۇ.",
+  "Press {} in any program to open the quick search.": "تېز ئىزدەشنى ئېچىش ئۈچۈن خالىغان پروگراممىدا {} نى بېسىڭ.",
+  "Press {} in any program to show or hide InstaFind.": "InstaFind نى كۆرسىتىش ياكى يوشۇرۇش ئۈچۈن خالىغان پروگراممىدا {} نى بېسىڭ.",
+  "Programs": "پروگراممىلار",
+  "Results": "نەتىجىلەر",
+  "Results may be incomplete while indexing": "ئىندېكسلاش جەريانىدا نەتىجىلەر تولۇق بولماسلىقى مۇمكىن",
+  "Results may be incomplete while indexing — try": "ئىندېكسلاش جەريانىدا نەتىجىلەر تولۇق بولماسلىقى مۇمكىن — سىناپ بېقىڭ",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Windows نىڭ WebView2 زاپچىسى ئورنىتىلمىغاچقا ئاددىي كۆرۈنۈشتە ئىشلەۋاتىدۇ. ئۇنى Microsoft تىن ھەقسىز چۈشۈرۈش ئۈچۈن بۇ يەرنى چېكىڭ.",
+  "Send by email": "ئېلخەت ئارقىلىق ئەۋەتىش",
+  "Share": "ئۈلۈش",
+  "Show the program from anywhere\t{}": "پروگراممىنى خالىغان يەردىن كۆرسىتىش\t{}",
+  "Size": "چوڭلۇقى",
+  "The list just changed, so nothing was done. Try again.": "تىزىملىك ھازىرلا ئۆزگەردى، شۇڭا ھېچنېمە قىلىنمىدى. قايتا سىناڭ.",
+  "The name did not change.": "نامى ئۆزگەرمىدى.",
+  "The program will run in the background when Windows starts; show it with {}.": "پروگرامما Windows قوزغالغاندا ئارقا سۇپىدا ئىشلەيدۇ؛ ئۇنى {} ئارقىلىق كۆرسىتىڭ.",
+  "This year": "بۇ يىل",
+  "Today": "بۈگۈن",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "بىر ھۆججەت، ئەپ ياكى تەڭشەكنىڭ نامىنى يېزىڭ. ئۈستى ۋە ئاستى يا ئوقلىرى نەتىجىلەر ئارىسىدا يۆتكىلىدۇ؛ Enter تاللانغىنىنى ئاچىدۇ.",
+  "Under 100 KB": "100 KB دىن كىچىك",
+  "Video": "سىن",
+  "drive not connected": "دىسكا ئۇلانمىغان",
+  "{} opens the quick search (otherwise the full window)": "{} تېز ئىزدەشنى ئاچىدۇ (بولمىسا تولۇق كۆزنەكنى)"
  },
  "js": {
   "ph": "ھۆججەت نامى بويىچە ئىزدەش…",
@@ -658,6 +721,102 @@
   "sStartup": "قوزغىلىش",
   "sAutostart": "Windows بىلەن قوزغىلىش (ئارقا سۇپىدا)",
   "sAbout": "ھەققىدە",
-  "version": "FN:(v) => `InstaFind — نەشرى ${v}`"
+  "version": "FN:(v) => `InstaFind — نەشرى ${v}`",
+  "fDetails": "ھۆججەت تەپسىلاتى",
+  "helpEx": [
+   [
+    "سېتىش دوكلاتى",
+    "ھەر ئىككى سۆز بار ناملار"
+   ],
+   [
+    "\"ئىجارە توختامى\"",
+    "ئېنىق ئىبارە"
+   ],
+   [
+    "دوكلات .pdf",
+    "پەقەت PDF ھۆججەتلىرى (ياكى ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "بىر نەچچە تىپ"
+   ],
+   [
+    "سۈرەت|سىن",
+    "ئىككى سۆزنىڭ بىرى"
+   ],
+   [
+    "توختام -كونا",
+    "«كونا» سىز (ياكى !كونا)"
+   ],
+   [
+    "size:>10mb",
+    "10 MB دىن چوڭ"
+   ],
+   [
+    "dm:thisweek",
+    "بۇ ھەپتە ئۆزگەرتىلگەن"
+   ],
+   [
+    "dm:2026-05",
+    "2026-يىل ماي ئېيىدا ئۆزگەرتىلگەن"
+   ],
+   [
+    "ww:توختام",
+    "پەقەت پۈتۈن سۆز"
+   ],
+   [
+    "\"ئىجارە توختامى\"~5",
+    "ئىككى سۆز ئارىلىقى ئەڭ كۆپ 5 سۆز"
+   ],
+   [
+    "folder: سۈرەتلەر",
+    "پەقەت قىسقۇچلار"
+   ],
+   [
+    "root: كتاب",
+    "ئوخشاش ئەرەبچە يىلتىز: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: دوكالت",
+    "بىر ئىملا خاتالىقىغا يول قويىدۇ"
+   ],
+   [
+    "حجم:>1ج",
+    "ئەرەبچىمۇ بولىدۇ: 1 GB دىن چوڭ"
+   ],
+   [
+    "احمد",
+    "«أحمد» نىمۇ تاپىدۇ"
+   ]
+  ],
+  "helpH": "قانداق ئىزدەش",
+  "helpInside": "پۈتۈكلەر ئىچىدىن (PDF، Word، Excel، سۈرەتلەر) ئىزدەش ئۈچۈن: «ھۆججەتلەر ئىچىدە» نى، ئاندىن Enter نى بېسىڭ.",
+  "helpKey": "قانداق ئىزدەش (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"خالىغان پروگراممىدىن كىچىك ئىزدەش رامكىسى\"], [\"Ctrl+Alt+G\", \"ساقلاش/ئېچىش كۆزنىكىدە: نەتىجىنىڭ قىسقۇچىغا بېرىش\"], [\"Enter\", \"ھۆججەتنى ئېچىش\"], [\"Ctrl+Enter\", \"ئۇنىڭ قىسقۇچىنى ئېچىش\"], [\"↓\", \"نەتىجىلەرگە (بوش رامكىدا: تارىخ)\"],\n        [\"Ctrl+C\", \"ھۆججەتنى كۆچۈرۈش\"], [\"Ctrl+Shift+C\", \"يولنى كۆچۈرۈش\"], [\"F2\", \"نامىنى ئۆزگەرتىش\"], [\"Delete\", \"ئەخلەت ساندۇقىغا\"], [\"F4\", \"ھۆججەتتىكى بارلىق ماسلىقلار\"], [\"Ctrl+H\", \"تارىخ\"], [\"Ctrl+T\", \"كىچىك سۈرەتلەر\"], [\"Ctrl+,\", \"تەڭشەكلەر\"], [\"F1\", \"بۇ كارتا\"]]",
+  "helpKeysH": "كۇنۇپكا تاختىسى",
+  "helpMore": "ئىزدەشنىڭ بارلىق ئۇسۇللىرى…",
+  "helpSub": "ئىزدەش رامكىسىغا قويۇش ئۈچۈن بىر مىسالنى چېكىڭ. ھەر بىر سۈزگۈچنىڭ ئەرەبچە يېزىلىشىمۇ بار.",
+  "kLabel": "كۇنۇپكا تاختىسى تېزلەتمىلىرى",
+  "offline": "دىسكا ئۇلانمىغان",
+  "qsNone": "كۆزنەكنى قىسقۇچىغا يۆتكەيدىغان نەتىجە يوق. ئىزدەشنى ئۆزگەرتىڭ، ياكى بىكار قىلىش ئۈچۈن Esc نى بېسىڭ.",
+  "sHotkeyKeys": "ئىزدەشنى ئاچىدىغان تېزلەتمە",
+  "sHotkeyKeysSub": "خالىغان پروگراممىدا ئىشلەيدۇ. ئەگەر باشقا پروگرامما ئىشلەتسە، باشقىسىنى تاللاڭ.",
+  "sHotkeyTaken": "FN:(k) => `${k} نى باشقا بىر پروگرامما ئىشلىتىۋاتىدۇ، شۇڭا ئۇ ھازىر ھېچنېمە قىلمايدۇ. باشقا تېزلەتمە تاللاڭ:`",
+  "sLangHelp": "بۇ تەرجىمىنى ياخشىلاشقا ياردەم بېرىڭ",
+  "sLangMachine": "(ماشىنا تەرجىمىسى)",
+  "sPhone": "تېلېفوندىن ئىزدەش",
+  "sPhoneAllow": "بۇ تورغا ئىجازەت بېرىش",
+  "sPhoneIdle": "بىخەتەرلىك ئۈچۈن، تېلېفوندىن ئىككى سائەت ھېچقانداق تەلەپ كەلمىگەچكە ئۆزلۈكىدىن تاقالدى. كېرەك بولغاندا قايتا ئېچىڭ.",
+  "sPhoneMore": "باشقا تەڭشەكلەر…",
+  "sPhoneMoreSub": "پورت، ھۆججەت چۈشۈرۈش، يېڭى PIN ۋە ئۇلانما",
+  "sPhoneOff": "تاقاق. ئادرېس ۋە PIN نى كۆرۈش ئۈچۈن ئېچىڭ.",
+  "sPhoneOpen": "تېلېفوننىڭ توركۆرگۈسىدە ئېچىڭ:",
+  "sPhonePin": "ۋە PIN نى يېزىڭ:",
+  "sPhoneQr": "ياكى ئىزدەشنى PIN سىز ئېچىش ئۈچۈن بۇ كودنى تېلېفون كامېراسى بىلەن سايىلەڭ. ئۇنى ھېچكىمگە كۆرسەتمەڭ.",
+  "sPhoneQrLabel": "تېلېفوندىن ئىزدەشنى ئاچىدىغان QR كودى",
+  "sPhoneRow": "تېلېفوندىن ئىزدەش (ئۆي تورى)",
+  "sPhoneSub": "ئوخشاش Wi-Fi دىكى تېلېفونىڭىزنىڭ توركۆرگۈسىدىن بۇ كومپيۇتېرنىڭ ھۆججەتلىرىنى ئىزدەڭ. پەقەت ئوقۇشقىلا بولىدۇ، پەقەت ئۆي تورىڭىزدىلا.",
+  "sPhoneWait": "تور تەكشۈرۈلۈۋاتىدۇ…",
+  "updChecking": "يېڭىلانمىلار تەكشۈرۈلۈۋاتىدۇ…"
  }
 }

@@ -447,7 +447,70 @@
   "Recent searches": "हाल की खोजें",
   "Save the current search": "वर्तमान खोज सहेजें",
   "Clear history and recent files": "इतिहास और हाल की फ़ाइलें साफ़ करें",
-  "Delete all saved searches": "सभी सहेजी गई खोजें हटाएँ"
+  "Delete all saved searches": "सभी सहेजी गई खोजें हटाएँ",
+  "(machine translation)": "(मशीनी अनुवाद)",
+  ", ": ", ",
+  "1 KB or more": "1 KB या अधिक",
+  "1 MB or more": "1 MB या अधिक",
+  "10 MB or more": "10 MB या अधिक",
+  "100 KB or more": "100 KB या अधिक",
+  "100 KB to 10 MB": "100 KB से 10 MB तक",
+  "100 MB or more": "100 MB या अधिक",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "आपके मेल प्रोग्राम में {} के लिए एक संदेश खुल गया है (रिपोर्ट कॉपी नहीं की जा सकी: “कॉपी करें” दबाएँ, फिर उसे वहाँ पेस्ट करें)। अभी तक कुछ नहीं भेजा गया है।",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "आपके मेल प्रोग्राम में {} के लिए एक संदेश खुल गया है। पूरी रिपोर्ट कॉपी हो गई है: इसे संदेश में पेस्ट करें (Ctrl+V), फिर “भेजें” दबाएँ। अभी तक कुछ नहीं भेजा गया है।",
+  "All types": "सभी प्रकार",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space पहले से किसी दूसरे प्रोग्राम ने ले रखा है, इसलिए यहाँ इसका उपयोग नहीं हो सकता। {} अब भी काम करता है।",
+  "Another program has {} too. Pick another one.": "{} का उपयोग कोई दूसरा प्रोग्राम भी कर रहा है। कोई दूसरा चुनें।",
+  "Any size": "कोई भी आकार",
+  "Any time": "कोई भी समय",
+  "Archives": "संपीड़ित फ़ाइलें",
+  "Audio": "ऑडियो",
+  "Documents": "दस्तावेज़",
+  "Downloading the update…": "अपडेट डाउनलोड हो रहा है…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter खोलें · Ctrl+Enter फ़ोल्डर · Tab और · Esc बंद करें",
+  "Folders": "फ़ोल्डर",
+  "GitHub page (public)": "GitHub पेज (सार्वजनिक)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — संस्करण {}\nफ़ाइलों और दस्तावेज़ों के अंदर तुरंत खोज, अरबी और अंग्रेज़ी में।\n\nखोजने के लिए कहीं भी {hk} दबाएँ।\n{}\n\nसहायता: {}\n{}\n\nइसमें उपयोग किए गए तृतीय-पक्ष घटकों के लाइसेंस THIRD-PARTY-NOTICES.txt में हैं। क्या इसे खोलें?",
+  "Last 30 days": "पिछले 30 दिन",
+  "Last 7 days": "पिछले 7 दिन",
+  "No files match your search. Try:": "आपकी खोज से कोई फ़ाइल मेल नहीं खाती। आज़माएँ:",
+  "No home network connection found; it works on this PC only.": "कोई होम नेटवर्क कनेक्शन नहीं मिला; यह केवल इसी PC पर काम करता है।",
+  "No index yet: open InstaFind once to build it, then try again.\n": "अभी कोई इंडेक्स नहीं है: इसे बनाने के लिए InstaFind को एक बार खोलें, फिर से प्रयास करें।\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "कोई मेल प्रोग्राम नहीं खुला। “कॉपी करें” दबाएँ और रिपोर्ट {} को भेजें।",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "कोई मेल प्रोग्राम नहीं खुला। रिपोर्ट कॉपी हो गई है: इसे अपने मेल से (फ़ोन पर या ब्राउज़र में) {} को भेजे जाने वाले संदेश में पेस्ट करें।",
+  "No results yet — results may be incomplete while indexing.": "अभी तक कोई परिणाम नहीं — इंडेक्सिंग के दौरान परिणाम अधूरे हो सकते हैं।",
+  "No results yet; they may be incomplete while indexing. Try:": "अभी तक कोई परिणाम नहीं; इंडेक्सिंग के दौरान वे अधूरे हो सकते हैं। आज़माएँ:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "ध्यान दें: छवियों में अरबी टेक्स्ट नहीं पढ़ा जा सकता: Windows का अरबी भाषा पैक इंस्टॉल नहीं है।",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "जब तक आप कोई बटन नहीं दबाते, कुछ नहीं भेजा जाता। रिपोर्ट से फ़ाइल नाम और पथ हटा दिए जाते हैं। GitHub पेज सार्वजनिक है: इसे कोई भी पढ़ सकता है। ईमेल केवल हम पढ़ते हैं।",
+  "Older than a year": "एक साल से पुरानी",
+  "Open": "खोलें",
+  "Open quick search\t{}": "त्वरित खोज खोलें\t{}",
+  "Over 1 GB": "1 GB से बड़ी",
+  "Over 10 MB": "10 MB से बड़ी",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "सुरक्षा के लिए, फ़ोन से दो घंटे तक कोई अनुरोध न आने पर फ़ोन से खोज अपने आप बंद हो गई। इसे फिर से चालू करने के लिए ऊपर वाले बॉक्स पर टिक करें।",
+  "Pictures": "चित्र",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "पहली बार आपकी फ़ाइलों की सूची तैयार की जा रही है (कुछ मिनट)। अभी खोजें; पूरा होने पर परिणाम भरते जाएँगे।",
+  "Press {} in any program to open the quick search.": "त्वरित खोज खोलने के लिए किसी भी प्रोग्राम में {} दबाएँ।",
+  "Press {} in any program to show or hide InstaFind.": "InstaFind को दिखाने या छिपाने के लिए किसी भी प्रोग्राम में {} दबाएँ।",
+  "Programs": "प्रोग्राम",
+  "Results": "परिणाम",
+  "Results may be incomplete while indexing": "इंडेक्सिंग के दौरान परिणाम अधूरे हो सकते हैं",
+  "Results may be incomplete while indexing — try": "इंडेक्सिंग के दौरान परिणाम अधूरे हो सकते हैं — आज़माएँ",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "Windows का WebView2 घटक इंस्टॉल नहीं है, इसलिए सरल रूप में चल रहा है। इसे Microsoft से मुफ़्त डाउनलोड करने के लिए यहाँ क्लिक करें।",
+  "Send by email": "ईमेल से भेजें",
+  "Share": "हिस्सा",
+  "Show the program from anywhere\t{}": "कहीं से भी प्रोग्राम दिखाएँ\t{}",
+  "Size": "आकार",
+  "The list just changed, so nothing was done. Try again.": "सूची अभी-अभी बदली है, इसलिए कुछ नहीं किया गया। फिर से प्रयास करें।",
+  "The name did not change.": "नाम नहीं बदला।",
+  "The program will run in the background when Windows starts; show it with {}.": "Windows शुरू होने पर प्रोग्राम पृष्ठभूमि में चलेगा; इसे {} से दिखाएँ।",
+  "This year": "इस साल",
+  "Today": "आज",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "किसी फ़ाइल, ऐप या सेटिंग का नाम टाइप करें। ऊपर और नीचे तीर परिणामों में ले जाते हैं; Enter चुने गए परिणाम को खोलता है।",
+  "Under 100 KB": "100 KB से छोटी",
+  "Video": "वीडियो",
+  "drive not connected": "ड्राइव कनेक्ट नहीं है",
+  "{} opens the quick search (otherwise the full window)": "{} त्वरित खोज खोलता है (अन्यथा पूरी विंडो)"
  },
  "js": {
   "ph": "फ़ाइल नाम खोजें…",
@@ -658,6 +721,102 @@
   "sStartup": "स्टार्टअप",
   "sAutostart": "Windows के साथ शुरू करें (पृष्ठभूमि में)",
   "sAbout": "परिचय",
-  "version": "FN:(v) => `InstaFind — संस्करण ${v}`"
+  "version": "FN:(v) => `InstaFind — संस्करण ${v}`",
+  "fDetails": "फ़ाइल विवरण",
+  "helpEx": [
+   [
+    "सेल्स रिपोर्ट",
+    "दोनों शब्दों वाले नाम"
+   ],
+   [
+    "\"किराया अनुबंध\"",
+    "सटीक वाक्यांश"
+   ],
+   [
+    "रिपोर्ट .pdf",
+    "केवल PDF फ़ाइलें (या ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "कई प्रकार"
+   ],
+   [
+    "फ़ोटो|वीडियो",
+    "दोनों में से कोई एक शब्द"
+   ],
+   [
+    "अनुबंध -पुराना",
+    "“पुराना” के बिना (या !पुराना)"
+   ],
+   [
+    "size:>10mb",
+    "10 MB से बड़ी"
+   ],
+   [
+    "dm:thisweek",
+    "इस सप्ताह बदली गईं"
+   ],
+   [
+    "dm:2026-05",
+    "मई 2026 में बदली गईं"
+   ],
+   [
+    "ww:अनुबंध",
+    "केवल पूरा शब्द"
+   ],
+   [
+    "\"किराया अनुबंध\"~5",
+    "दोनों शब्द 5 शब्दों के भीतर"
+   ],
+   [
+    "folder: फ़ोटो",
+    "केवल फ़ोल्डर"
+   ],
+   [
+    "root: كتاب",
+    "वही अरबी मूल शब्द: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: reprot",
+    "टाइपिंग की गलती सह लेता है (“report” ढूँढ़ता है)"
+   ],
+   [
+    "حجم:>1ج",
+    "अरबी में भी: 1 GB से बड़ी"
+   ],
+   [
+    "احمد",
+    "«أحمد» भी ढूँढ़ता है"
+   ]
+  ],
+  "helpH": "कैसे खोजें",
+  "helpInside": "दस्तावेज़ों (PDF, Word, Excel, चित्र) के अंदर खोजने के लिए: “दस्तावेज़ों के अंदर” दबाएँ, फिर Enter।",
+  "helpKey": "कैसे खोजें (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"किसी भी प्रोग्राम से छोटा खोज बॉक्स\"], [\"Ctrl+Alt+G\", \"सहेजें/खोलें डायलॉग में: परिणाम के फ़ोल्डर पर जाएँ\"], [\"Enter\", \"फ़ाइल खोलें\"], [\"Ctrl+Enter\", \"उसका फ़ोल्डर खोलें\"], [\"↓\", \"परिणामों पर (खाली बॉक्स में: इतिहास)\"], [\"Ctrl+C\", \"फ़ाइल कॉपी करें\"], [\"Ctrl+Shift+C\", \"पथ कॉपी करें\"], [\"F2\", \"नाम बदलें\"], [\"Delete\", \"रीसायकल बिन में\"], [\"F4\", \"फ़ाइल में सभी मिलान\"], [\"Ctrl+H\", \"इतिहास\"], [\"Ctrl+T\", \"थंबनेल\"], [\"Ctrl+,\", \"सेटिंग्स\"], [\"F1\", \"यह कार्ड\"]]",
+  "helpKeysH": "कीबोर्ड",
+  "helpMore": "खोजने के सभी तरीके…",
+  "helpSub": "किसी उदाहरण को खोज बॉक्स में डालने के लिए उस पर क्लिक करें। हर फ़िल्टर की एक अरबी वर्तनी भी है।",
+  "kLabel": "कीबोर्ड शॉर्टकट",
+  "offline": "ड्राइव कनेक्ट नहीं है",
+  "qsNone": "डायलॉग को ले जाने के लिए कोई परिणाम नहीं है। खोज बदलें, या रद्द करने के लिए Esc दबाएँ।",
+  "sHotkeyKeys": "खोज खोलने का शॉर्टकट",
+  "sHotkeyKeysSub": "किसी भी प्रोग्राम में काम करता है। अगर कोई दूसरा प्रोग्राम इसका उपयोग करता है, तो दूसरा चुनें।",
+  "sHotkeyTaken": "FN:(k) => `${k} का उपयोग कोई दूसरा प्रोग्राम कर रहा है, इसलिए यह अभी कुछ नहीं करता। कोई दूसरा शॉर्टकट चुनें:`",
+  "sLangHelp": "इस अनुवाद को बेहतर बनाने में मदद करें",
+  "sLangMachine": "(मशीनी अनुवाद)",
+  "sPhone": "फ़ोन से खोजें",
+  "sPhoneAllow": "इस नेटवर्क को अनुमति दें",
+  "sPhoneIdle": "सुरक्षा के लिए, फ़ोन से दो घंटे तक कोई अनुरोध न आने पर यह अपने आप बंद हो गई। ज़रूरत होने पर इसे फिर से चालू करें।",
+  "sPhoneMore": "और सेटिंग्स…",
+  "sPhoneMoreSub": "पोर्ट, फ़ाइलें डाउनलोड करना, और नया PIN और लिंक",
+  "sPhoneOff": "बंद है। पता और PIN देखने के लिए इसे चालू करें।",
+  "sPhoneOpen": "फ़ोन के ब्राउज़र में खोलें:",
+  "sPhonePin": "और PIN टाइप करें:",
+  "sPhoneQr": "या PIN के बिना खोज खोलने के लिए फ़ोन के कैमरे से यह कोड स्कैन करें। इसे किसी को न दिखाएँ।",
+  "sPhoneQrLabel": "फ़ोन से खोज खोलने वाला QR कोड",
+  "sPhoneRow": "फ़ोन से खोजें (होम नेटवर्क)",
+  "sPhoneSub": "उसी Wi-Fi पर अपने फ़ोन के ब्राउज़र से इस PC की फ़ाइलें खोजें। केवल पढ़ने के लिए, और केवल आपके होम नेटवर्क पर।",
+  "sPhoneWait": "नेटवर्क की जाँच की जा रही है…",
+  "updChecking": "अपडेट की जाँच की जा रही है…"
  }
 }

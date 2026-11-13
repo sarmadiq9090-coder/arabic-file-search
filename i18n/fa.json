@@ -447,7 +447,70 @@
   "Recent searches": "جستجوهای اخیر",
   "Save the current search": "ذخیره جستجوی فعلی",
   "Clear history and recent files": "پاک کردن سابقه و فایل‌های اخیر",
-  "Delete all saved searches": "حذف همه جستجوهای ذخیره‌شده"
+  "Delete all saved searches": "حذف همه جستجوهای ذخیره‌شده",
+  "(machine translation)": "(ترجمه ماشینی)",
+  ", ": "، ",
+  "1 KB or more": "1 KB یا بیشتر",
+  "1 MB or more": "1 MB یا بیشتر",
+  "10 MB or more": "10 MB یا بیشتر",
+  "100 KB or more": "100 KB یا بیشتر",
+  "100 KB to 10 MB": "از 100 KB تا 10 MB",
+  "100 MB or more": "100 MB یا بیشتر",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "پیامی به {} در برنامه ایمیل شما باز شد (گزارش کپی نشد: «کپی» را فشار دهید، سپس آن را در پیام جای‌گذاری کنید). هنوز چیزی ارسال نشده است.",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "پیامی به {} در برنامه ایمیل شما باز شد. گزارش کامل کپی شده است: آن را در پیام جای‌گذاری کنید (Ctrl+V)، سپس «ارسال» را فشار دهید. هنوز چیزی ارسال نشده است.",
+  "All types": "همه انواع",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space از قبل در اختیار برنامه دیگری است، پس اینجا قابل استفاده نیست. {} همچنان کار می‌کند.",
+  "Another program has {} too. Pick another one.": "برنامه دیگری هم از {} استفاده می‌کند. میان‌بر دیگری انتخاب کنید.",
+  "Any size": "هر اندازه‌ای",
+  "Any time": "هر زمانی",
+  "Archives": "فایل‌های فشرده",
+  "Audio": "صوتی",
+  "Documents": "اسناد",
+  "Downloading the update…": "در حال دانلود به‌روزرسانی…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter باز کردن · Ctrl+Enter پوشه · Tab بیشتر · Esc بستن",
+  "Folders": "پوشه‌ها",
+  "GitHub page (public)": "صفحه GitHub (عمومی)",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — نسخه {}\nجستجوی فوری فایل‌ها و درون اسناد، به عربی و انگلیسی.\n\nبرای جستجو در هر جایی {hk} را فشار دهید.\n{}\n\nپشتیبانی: {}\n{}\n\nمجوزهای اجزای شخص ثالثی که استفاده می‌کند در THIRD-PARTY-NOTICES.txt است. باز شود؟",
+  "Last 30 days": "30 روز گذشته",
+  "Last 7 days": "7 روز گذشته",
+  "No files match your search. Try:": "هیچ فایلی با جستجوی شما مطابقت ندارد. این‌ها را امتحان کنید:",
+  "No home network connection found; it works on this PC only.": "اتصالی به شبکه خانگی پیدا نشد؛ فقط روی همین رایانه کار می‌کند.",
+  "No index yet: open InstaFind once to build it, then try again.\n": "هنوز نمایه‌ای وجود ندارد: InstaFind را یک بار باز کنید تا ساخته شود، سپس دوباره امتحان کنید.\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "هیچ برنامه ایمیلی باز نشد. «کپی» را فشار دهید و گزارش را به {} بفرستید.",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "هیچ برنامه ایمیلی باز نشد. گزارش کپی شده است: آن را از ایمیل خودتان (در تلفن یا مرورگر) در پیامی به {} جای‌گذاری کنید.",
+  "No results yet — results may be incomplete while indexing.": "هنوز نتیجه‌ای نیست — در حین نمایه‌سازی ممکن است نتایج ناقص باشند.",
+  "No results yet; they may be incomplete while indexing. Try:": "هنوز نتیجه‌ای نیست؛ در حین نمایه‌سازی ممکن است ناقص باشند. این‌ها را امتحان کنید:",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "توجه: متن عربی داخل تصاویر خوانده نمی‌شود، چون بسته زبان عربی Windows نصب نیست.",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "تا دکمه‌ای را فشار ندهید چیزی ارسال نمی‌شود. نام و مسیر فایل‌ها از گزارش حذف می‌شود. صفحه GitHub عمومی است: هر کسی می‌تواند آن را بخواند. ایمیل را فقط ما می‌خوانیم.",
+  "Older than a year": "قدیمی‌تر از یک سال",
+  "Open": "باز کردن",
+  "Open quick search\t{}": "باز کردن جستجوی سریع\t{}",
+  "Over 1 GB": "بیش از 1 GB",
+  "Over 10 MB": "بیش از 10 MB",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "جستجو از تلفن برای امنیت، پس از دو ساعت بدون هیچ درخواستی از تلفن، خودبه‌خود خاموش شد. برای روشن کردن دوباره، کادر بالا را علامت بزنید.",
+  "Pictures": "تصاویر",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "فهرست فایل‌های شما برای اولین بار آماده می‌شود (چند دقیقه). همین حالا جستجو کنید؛ نتایج با پایان کار کامل می‌شوند.",
+  "Press {} in any program to open the quick search.": "در هر برنامه‌ای {} را فشار دهید تا جستجوی سریع باز شود.",
+  "Press {} in any program to show or hide InstaFind.": "در هر برنامه‌ای {} را فشار دهید تا InstaFind نمایش داده یا پنهان شود.",
+  "Programs": "برنامه‌ها",
+  "Results": "نتایج",
+  "Results may be incomplete while indexing": "در حین نمایه‌سازی ممکن است نتایج ناقص باشند",
+  "Results may be incomplete while indexing — try": "در حین نمایه‌سازی ممکن است نتایج ناقص باشند — امتحان کنید",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "ظاهر ساده اجرا شده است، چون مؤلفه WebView2 در Windows نصب نیست. برای دانلود رایگان آن از Microsoft اینجا کلیک کنید.",
+  "Send by email": "ارسال با ایمیل",
+  "Share": "سهم",
+  "Show the program from anywhere\t{}": "نمایش برنامه از هر جا\t{}",
+  "Size": "اندازه",
+  "The list just changed, so nothing was done. Try again.": "فهرست همین الان تغییر کرد، پس کاری انجام نشد. دوباره امتحان کنید.",
+  "The name did not change.": "نام تغییر نکرد.",
+  "The program will run in the background when Windows starts; show it with {}.": "برنامه هنگام شروع Windows در پس‌زمینه اجرا می‌شود؛ با {} آن را نمایش دهید.",
+  "This year": "امسال",
+  "Today": "امروز",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "نام یک فایل، برنامه یا تنظیم را تایپ کنید. کلیدهای جهت‌نمای بالا و پایین میان نتایج حرکت می‌کنند؛ Enter نتیجه انتخاب‌شده را باز می‌کند.",
+  "Under 100 KB": "کمتر از 100 KB",
+  "Video": "ویدیو",
+  "drive not connected": "درایو متصل نیست",
+  "{} opens the quick search (otherwise the full window)": "{} جستجوی سریع را باز می‌کند (وگرنه پنجره کامل را)"
  },
  "js": {
   "ph": "جستجوی نام فایل‌ها…",
@@ -658,6 +721,102 @@
   "sStartup": "راه‌اندازی",
   "sAutostart": "شروع همراه با Windows (در پس‌زمینه)",
   "sAbout": "درباره",
-  "version": "FN:(v) => `InstaFind — نسخه ${v}`"
+  "version": "FN:(v) => `InstaFind — نسخه ${v}`",
+  "fDetails": "جزئیات فایل",
+  "helpEx": [
+   [
+    "گزارش فروش",
+    "نام‌هایی که هر دو کلمه را دارند"
+   ],
+   [
+    "\"قرارداد اجاره\"",
+    "عبارت دقیق"
+   ],
+   [
+    "گزارش .pdf",
+    "فقط فایل‌های PDF (یا ext:pdf)"
+   ],
+   [
+    "ext:docx,xlsx",
+    "چند نوع"
+   ],
+   [
+    "عکس|ویدیو",
+    "یکی از دو کلمه"
+   ],
+   [
+    "قرارداد -قدیمی",
+    "بدون «قدیمی» (یا !قدیمی)"
+   ],
+   [
+    "size:>10mb",
+    "بزرگ‌تر از 10 MB"
+   ],
+   [
+    "dm:thisweek",
+    "تغییرکرده در این هفته"
+   ],
+   [
+    "dm:2026-05",
+    "تغییرکرده در مه 2026"
+   ],
+   [
+    "ww:قرارداد",
+    "فقط کلمه کامل"
+   ],
+   [
+    "\"قرارداد اجاره\"~5",
+    "هر دو کلمه با حداکثر 5 کلمه فاصله"
+   ],
+   [
+    "folder: عکس‌ها",
+    "فقط پوشه‌ها"
+   ],
+   [
+    "root: كتاب",
+    "همان ریشه عربی: مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: گذارش",
+    "یک غلط تایپی را می‌پذیرد"
+   ],
+   [
+    "حجم:>1ج",
+    "به عربی هم: بزرگ‌تر از 1 GB"
+   ],
+   [
+    "احمد",
+    "«أحمد» را هم پیدا می‌کند"
+   ]
+  ],
+  "helpH": "چگونه جستجو کنیم",
+  "helpInside": "برای جستجو درون اسناد (PDF، Word، Excel، تصاویر): «داخل اسناد» را فشار دهید، سپس Enter.",
+  "helpKey": "چگونه جستجو کنیم (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"کادر جستجوی کوچک از هر برنامه‌ای\"], [\"Ctrl+Alt+G\", \"در پنجره ذخیره/باز کردن: رفتن به پوشه یک نتیجه\"], [\"Enter\", \"باز کردن فایل\"], [\"Ctrl+Enter\", \"باز کردن پوشه آن\"], [\"↓\", \"به نتایج (در کادر خالی: سابقه)\"],\n        [\"Ctrl+C\", \"کپی فایل\"], [\"Ctrl+Shift+C\", \"کپی مسیر\"], [\"F2\", \"تغییر نام\"], [\"Delete\", \"به سطل بازیافت\"], [\"F4\", \"همه موارد منطبق در فایل\"], [\"Ctrl+H\", \"سابقه\"], [\"Ctrl+T\", \"تصاویر کوچک\"], [\"Ctrl+,\", \"تنظیمات\"], [\"F1\", \"همین کارت\"]]",
+  "helpKeysH": "صفحه‌کلید",
+  "helpMore": "همه روش‌های جستجو…",
+  "helpSub": "روی یک مثال کلیک کنید تا در کادر جستجو نوشته شود. هر فیلتر نگارش عربی هم دارد.",
+  "kLabel": "میان‌برهای صفحه‌کلید",
+  "offline": "درایو متصل نیست",
+  "qsNone": "نتیجه‌ای نیست که پنجره به پوشه‌اش منتقل شود. جستجو را تغییر دهید یا برای لغو Esc را فشار دهید.",
+  "sHotkeyKeys": "میان‌بر باز کردن جستجو",
+  "sHotkeyKeysSub": "در هر برنامه‌ای کار می‌کند. اگر برنامه دیگری از آن استفاده می‌کند، میان‌بر دیگری انتخاب کنید.",
+  "sHotkeyTaken": "FN:(k) => `برنامه دیگری از ${k} استفاده می‌کند، پس اکنون کاری نمی‌کند. میان‌بر دیگری انتخاب کنید:`",
+  "sLangHelp": "به بهبود این ترجمه کمک کنید",
+  "sLangMachine": "(ترجمه ماشینی)",
+  "sPhone": "جستجو از تلفن",
+  "sPhoneAllow": "اجازه به این شبکه",
+  "sPhoneIdle": "برای امنیت، پس از دو ساعت بدون هیچ درخواستی از تلفن، خودبه‌خود خاموش شد. هر وقت لازم داشتید دوباره روشنش کنید.",
+  "sPhoneMore": "تنظیمات بیشتر…",
+  "sPhoneMoreSub": "درگاه، دانلود فایل‌ها، و کد PIN و پیوند جدید",
+  "sPhoneOff": "خاموش. روشنش کنید تا نشانی و کد PIN را ببینید.",
+  "sPhoneOpen": "در مرورگر تلفن باز کنید:",
+  "sPhonePin": "و کد PIN را تایپ کنید:",
+  "sPhoneQr": "یا این کد را با دوربین تلفن اسکن کنید تا جستجو بدون کد PIN باز شود. آن را به کسی نشان ندهید.",
+  "sPhoneQrLabel": "کد QR که جستجو از تلفن را باز می‌کند",
+  "sPhoneRow": "جستجو از تلفن (شبکه خانگی)",
+  "sPhoneSub": "فایل‌های این رایانه را از مرورگر تلفن خود در همان Wi-Fi جستجو کنید. فقط‌خواندنی است و فقط در شبکه خانگی شما.",
+  "sPhoneWait": "در حال بررسی شبکه…",
+  "updChecking": "در حال بررسی به‌روزرسانی…"
  }
 }

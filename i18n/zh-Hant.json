@@ -447,7 +447,70 @@
   "Recent searches": "最近的搜尋",
   "Save the current search": "儲存目前的搜尋",
   "Clear history and recent files": "清除歷程記錄和最近的檔案",
-  "Delete all saved searches": "刪除所有已儲存的搜尋"
+  "Delete all saved searches": "刪除所有已儲存的搜尋",
+  "(machine translation)": "（機器翻譯）",
+  ", ": "，",
+  "1 KB or more": "1 KB 以上",
+  "1 MB or more": "1 MB 以上",
+  "10 MB or more": "10 MB 以上",
+  "100 KB or more": "100 KB 以上",
+  "100 KB to 10 MB": "100 KB 到 10 MB",
+  "100 MB or more": "100 MB 以上",
+  "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "已在您的郵件程式中開啟一封寄給 {} 的郵件（無法複製報告：請按「複製」，然後貼到郵件中）。尚未傳送任何內容。",
+  "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "已在您的郵件程式中開啟一封寄給 {} 的郵件。完整報告已複製：請將其貼到郵件中（Ctrl+V），然後按「傳送」。尚未傳送任何內容。",
+  "All types": "所有類型",
+  "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "Alt+Space 已被另一個程式占用，因此無法在此使用。{} 仍可使用。",
+  "Another program has {} too. Pick another one.": "另一個程式也在使用 {}。請改選其他組合。",
+  "Any size": "任何大小",
+  "Any time": "任何時間",
+  "Archives": "壓縮檔",
+  "Audio": "音訊",
+  "Documents": "文件",
+  "Downloading the update…": "正在下載更新…",
+  "Enter open · Ctrl+Enter folder · Tab more · Esc close": "Enter 開啟 · Ctrl+Enter 資料夾 · Tab 更多 · Esc 關閉",
+  "Folders": "資料夾",
+  "GitHub page (public)": "GitHub 頁面（公開）",
+  "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "InstaFind — 版本 {}\n即時搜尋檔案與文件內部內容，支援阿拉伯文和英文。\n\n在任何地方按 {hk} 即可搜尋。\n{}\n\n支援：{}\n{}\n\n所用第三方元件的授權條款位於 THIRD-PARTY-NOTICES.txt 中。要開啟嗎？",
+  "Last 30 days": "過去 30 天",
+  "Last 7 days": "過去 7 天",
+  "No files match your search. Try:": "沒有符合搜尋的檔案。試試看：",
+  "No home network connection found; it works on this PC only.": "找不到家用網路連線；僅能在這台電腦上使用。",
+  "No index yet: open InstaFind once to build it, then try again.\n": "尚無索引：請先開啟一次 InstaFind 以建立索引，然後再試一次。\nNo index yet: open InstaFind once to build it, then try again.\n",
+  "No mail program opened. Press “Copy” and send the report to {}.": "沒有開啟任何郵件程式。請按「複製」，然後將報告寄至 {}。",
+  "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "沒有開啟任何郵件程式。報告已複製：請用您自己的電子郵件（在手機或瀏覽器中）將其貼到寄給 {} 的郵件中。",
+  "No results yet — results may be incomplete while indexing.": "目前沒有結果 — 建立索引期間結果可能不完整。",
+  "No results yet; they may be incomplete while indexing. Try:": "目前沒有結果；建立索引期間結果可能不完整。試試看：",
+  "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "注意：無法讀取圖片中的阿拉伯文字：未安裝 Windows 阿拉伯文語言套件。",
+  "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "除非您按下按鈕，否則不會傳送任何內容。報告中的檔案名稱和路徑會被移除。GitHub 頁面是公開的：任何人都能閱讀。電子郵件只有我們會讀。",
+  "Older than a year": "一年以前",
+  "Open": "開啟",
+  "Open quick search\t{}": "開啟快速搜尋\t{}",
+  "Over 1 GB": "大於 1 GB",
+  "Over 10 MB": "大於 10 MB",
+  "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "為了安全，從手機搜尋在兩小時內沒有收到手機的任何要求後已自動關閉。勾選上方的方塊即可重新開啟。",
+  "Pictures": "圖片",
+  "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "正在首次準備您的檔案清單（幾分鐘）。現在就能搜尋；完成後結果會自動補齊。",
+  "Press {} in any program to open the quick search.": "在任何程式中按 {} 即可開啟快速搜尋。",
+  "Press {} in any program to show or hide InstaFind.": "在任何程式中按 {} 即可顯示或隱藏 InstaFind。",
+  "Programs": "程式",
+  "Results": "結果",
+  "Results may be incomplete while indexing": "建立索引期間結果可能不完整",
+  "Results may be incomplete while indexing — try": "建立索引期間結果可能不完整 — 試試看",
+  "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "由於未安裝 Windows 的 WebView2 元件，目前以簡易介面執行。按一下這裡即可從 Microsoft 免費下載。",
+  "Send by email": "以電子郵件傳送",
+  "Share": "比例",
+  "Show the program from anywhere\t{}": "隨處顯示程式\t{}",
+  "Size": "大小",
+  "The list just changed, so nothing was done. Try again.": "清單剛剛有變動，因此未執行任何動作。請再試一次。",
+  "The name did not change.": "名稱沒有變更。",
+  "The program will run in the background when Windows starts; show it with {}.": "Windows 啟動時程式會在背景執行；按 {} 即可顯示。",
+  "This year": "今年",
+  "Today": "今天",
+  "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "輸入檔案、應用程式或設定的名稱。使用上下方向鍵在結果之間移動；按 Enter 開啟選取的項目。",
+  "Under 100 KB": "小於 100 KB",
+  "Video": "影片",
+  "drive not connected": "磁碟機未連線",
+  "{} opens the quick search (otherwise the full window)": "{} 開啟快速搜尋（否則開啟完整視窗）"
  },
  "js": {
   "ph": "搜尋檔案名稱…",
@@ -658,6 +721,102 @@
   "sStartup": "啟動",
   "sAutostart": "隨 Windows 啟動（在背景執行）",
   "sAbout": "關於",
-  "version": "FN:(v) => `InstaFind — 版本 ${v}`"
+  "version": "FN:(v) => `InstaFind — 版本 ${v}`",
+  "fDetails": "檔案詳細資料",
+  "helpEx": [
+   [
+    "銷售 報告",
+    "名稱同時包含這兩個詞"
+   ],
+   [
+    "\"租賃合約\"",
+    "完全相符的片語"
+   ],
+   [
+    "報告 .pdf",
+    "僅限 PDF 檔案（或 ext:pdf）"
+   ],
+   [
+    "ext:docx,xlsx",
+    "多種類型"
+   ],
+   [
+    "照片|影片",
+    "任一個詞"
+   ],
+   [
+    "合約 -舊",
+    "不含「舊」（或 !舊）"
+   ],
+   [
+    "size:>10mb",
+    "大於 10 MB"
+   ],
+   [
+    "dm:thisweek",
+    "本週修改過"
+   ],
+   [
+    "dm:2026-05",
+    "2026 年 5 月修改過"
+   ],
+   [
+    "ww:contract",
+    "僅限完整單字（contract，不含 contracts）"
+   ],
+   [
+    "\"租賃 合約\"~5",
+    "兩個詞相隔不超過 5 個詞"
+   ],
+   [
+    "folder: 照片",
+    "僅限資料夾"
+   ],
+   [
+    "root: كتاب",
+    "相同的阿拉伯文字根：مكتبة، الكاتب"
+   ],
+   [
+    "fuzzy: reprot",
+    "容許拼字錯誤（可找到 report）"
+   ],
+   [
+    "حجم:>1ج",
+    "也能用阿拉伯文：大於 1 GB"
+   ],
+   [
+    "احمد",
+    "也能找到 «أحمد»"
+   ]
+  ],
+  "helpH": "如何搜尋",
+  "helpInside": "要在文件（PDF、Word、Excel、圖片）內部搜尋：按「文件內部」，然後按 Enter。",
+  "helpKey": "如何搜尋 (F1)",
+  "helpKeys": "FN:(hk) => [[hk, \"從任何程式開啟小型搜尋方塊\"], [\"Ctrl+Alt+G\", \"在「儲存/開啟」對話方塊中：移至結果所在的資料夾\"], [\"Enter\", \"開啟檔案\"], [\"Ctrl+Enter\", \"開啟所在資料夾\"], [\"↓\", \"移至結果（搜尋方塊空白時：歷程記錄）\"], [\"Ctrl+C\", \"複製檔案\"], [\"Ctrl+Shift+C\", \"複製路徑\"], [\"F2\", \"重新命名\"], [\"Delete\", \"移至資源回收筒\"], [\"F4\", \"檔案中的所有相符項目\"], [\"Ctrl+H\", \"歷程記錄\"], [\"Ctrl+T\", \"縮圖\"], [\"Ctrl+,\", \"設定\"], [\"F1\", \"這張卡片\"]]",
+  "helpKeysH": "鍵盤",
+  "helpMore": "所有搜尋方式…",
+  "helpSub": "按一下範例即可將其填入搜尋方塊。每個篩選條件也都有阿拉伯文寫法。",
+  "kLabel": "鍵盤快速鍵",
+  "offline": "磁碟機未連線",
+  "qsNone": "沒有可讓對話方塊移過去的結果。請變更搜尋，或按 Esc 取消。",
+  "sHotkeyKeys": "開啟搜尋的快速鍵",
+  "sHotkeyKeysSub": "在任何程式中都能使用。如果其他程式已使用它，請改選其他組合。",
+  "sHotkeyTaken": "FN:(k) => `另一個程式已使用 ${k}，因此它目前沒有作用。請改選其他快速鍵：`",
+  "sLangHelp": "協助改善此翻譯",
+  "sLangMachine": "（機器翻譯）",
+  "sPhone": "從手機搜尋",
+  "sPhoneAllow": "允許此網路",
+  "sPhoneIdle": "為了安全，兩小時內沒有收到手機的任何要求後已自動關閉。需要時再重新開啟。",
+  "sPhoneMore": "更多設定…",
+  "sPhoneMoreSub": "連接埠、下載檔案，以及新的 PIN 碼和連結",
+  "sPhoneOff": "已關閉。開啟後即可看到網址和 PIN 碼。",
+  "sPhoneOpen": "在手機的瀏覽器中開啟：",
+  "sPhonePin": "並輸入 PIN 碼：",
+  "sPhoneQr": "或用手機相機掃描此條碼，不需 PIN 碼即可開啟搜尋。請勿讓任何人看到。",
+  "sPhoneQrLabel": "開啟從手機搜尋的 QR 碼",
+  "sPhoneRow": "從手機搜尋（家用網路）",
+  "sPhoneSub": "在同一個 Wi-Fi 下，從手機瀏覽器搜尋這台電腦的檔案。唯讀，且僅限您的家用網路。",
+  "sPhoneWait": "正在檢查網路…",
+  "updChecking": "正在檢查更新…"
  }
 }
