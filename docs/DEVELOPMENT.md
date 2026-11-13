@@ -74,6 +74,7 @@ Installing an update hands over to the new copy (`src/handover.rs`, tested on Li
 | `src/layout.rs`, `src/franco.rs`, `src/fuzzy.rs`, `src/root.rs` | Wrong keyboard layout (Arabic, and Persian, Central Kurdish, Russian, Ukrainian, Turkish Q, French AZERTY when installed), Arabizi, typo tolerance and the fallback chain, triliteral roots |
 | `src/extract.rs`, `src/extract/` | Text from documents; mail (eml, msg), epub, reversed-Arabic PDF fix, archives with zip-bomb limits, images of scanned PDF pages |
 | `src/content_cache.rs` | Persistent content index (lz4) in `%LOCALAPPDATA%\BahthSari\content\` |
+| `src/content_words.rs` | The content index's word index (`words-*.seg`, `words.man` next to `content.dat`): which documents hold which normalised words, so a search inside documents reads only the documents that can match; only a filter, every candidate is matched by the same matcher (`search::word_plan` turns a query into the shapes its words can take). Kept in step with the store, rebuilt from the stored texts when missing or damaged; tests in `content_words/tests.rs` and `search/word_index.rs` (the 300k-document bench: `cargo test --release bench_word_index -- --ignored --nocapture`) |
 | `src/ocr.rs` | Text in images and scanned PDFs via Windows.Media.Ocr |
 | `src/dupes.rs`, `src/ui/dupes_window.rs` | Duplicate finder (size, then file ends, then SHA-256) |
 | `src/folder_sizes.rs`, `src/ui/disk_usage.rs` | Folder sizes from the index and the disk-usage window |

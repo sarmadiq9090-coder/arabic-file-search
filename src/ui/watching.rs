@@ -106,6 +106,24 @@ impl App {
         log(&format!("watch: {}", roots.join(" ")));
     }
 
+    /// True when the index shows every file as it is on disk, give or take
+    /// the watcher's last moments: the drives are watched, and no change,
+    /// folder walk or rescan waits. A search inside documents then trusts
+    /// the index's sizes and times (`search::search_content`); otherwise it
+    /// asks the disk about every document its word index rules out.
+    pub(super) fn index_current(&self) -> bool {
+        let st = self.state.borrow();
+        let current = st.watcher.is_some()
+            && st.scan.is_none()
+            && st.loading.is_none()
+            && st.changes.is_empty()
+            && st.subtree_scans.is_empty()
+            && st.live.walks.is_empty()
+            && !st.live.rescans.has_deferred();
+        drop(st);
+        current && self.watch_inbox.lock().is_ok_and(|q| q.is_empty())
+    }
+
     /// Stops the watcher and drops whatever it reported but was not applied.
     pub(super) fn stop_watching(&self) {
         let mut st = self.state.borrow_mut();

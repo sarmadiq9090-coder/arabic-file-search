@@ -387,6 +387,15 @@ fn push_norm(out: &mut String, c: char, mode: Mode) -> usize {
     out.len() - before
 }
 
+/// Pushes the [`normalize`]d form of the one character `c` onto `out`
+/// (`normalize` of a text is these pieces one after another). It may
+/// replace the last character it pushed before (a composition), so the
+/// caller keeps building in the same buffer.
+#[inline]
+pub fn push_normalized(out: &mut String, c: char) {
+    push_norm(out, c, Mode::Plain);
+}
+
 fn normalize_mode(s: &str, mode: Mode) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -394,6 +403,12 @@ fn normalize_mode(s: &str, mode: Mode) -> String {
     }
     out
 }
+
+/// Bumped whenever what [`normalize`] gives for some text changes (a new
+/// fold, a letter mapped differently): the content index's word index holds
+/// normalised words and is then built again from the stored texts. A test
+/// in `content_words` notices a change that forgot to bump it.
+pub const VERSION: u32 = 1;
 
 /// Normalises a string for matching.
 pub fn normalize(s: &str) -> String {

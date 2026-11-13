@@ -17,6 +17,8 @@ mod members;
 mod regressions;
 #[cfg(test)]
 mod robustness;
+#[cfg(test)]
+mod word_index;
 
 /// Most match positions collected for each alternative (or regex, or
 /// proximity search) when counting the matches in one text: a one-letter
@@ -154,7 +156,7 @@ fn merge_spans(mut spans: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
 /// Letters, digits and the marks on them (Indic and Thai vowel signs) make
 /// up words; anything else (spaces, punctuation, `_`, `-`, `.`) separates
 /// them. Unicode-aware, so Arabic works.
-fn is_word_char(c: char) -> bool {
+pub(crate) fn is_word_char(c: char) -> bool {
     c.is_alphanumeric() || !c.is_ascii() && unicode_normalization::char::is_combining_mark(c)
 }
 
@@ -162,7 +164,7 @@ fn is_word_char(c: char) -> bool {
 /// Thai, Lao, Khmer and Myanmar. Each of their characters may start or end
 /// a word ([`joined`]), so whole-word matching (`ww:`) finds a word inside
 /// a sentence of them.
-fn is_unspaced(c: char) -> bool {
+pub(crate) fn is_unspaced(c: char) -> bool {
     matches!(
         c,
         '\u{0E00}'..='\u{0EFF}' | '\u{1000}'..='\u{109F}' | '\u{1780}'..='\u{17FF}' | '\u{3040}'..='\u{30FF}' | '\u{31F0}'..='\u{31FF}'
@@ -1497,12 +1499,38 @@ pub struct ContentProgress {
     /// The search stopped at [`MAX_CONTENT_HITS`] results: more documents
     /// match than are listed.
     pub capped: AtomicBool,
+    /// The content index's word index chose the documents read.
+    pub narrowed: AtomicBool,
+    /// Documents it ruled out (counted in `checked` too).
+    pub ruled_out: AtomicUsize,
+    /// Documents read in full because the word index doesn't hold them yet
+    /// (not indexed yet, changed since, or the word index is being rebuilt).
+    pub unindexed: AtomicUsize,
+}
+
+/// For the log line of a search inside documents: how the word index
+/// helped (empty when it was not asked).
+#[cfg_attr(not(windows), allow(dead_code))] // the Windows UI's log
+pub fn word_index_note(p: &ContentProgress) -> String {
+    if !p.narrowed.load(Ordering::Relaxed) {
+        return String::new();
+    }
+    format!(
+        "; word index: {} ruled out, {} not indexed yet",
+        p.ruled_out.load(Ordering::Relaxed),
+        p.unindexed.load(Ordering::Relaxed)
+    )
 }
 
 /// Searches inside every supported document in scope. Hits are pushed into
 /// `hits` as they are found so the UI can show them while the search runs.
 /// With a `cache`, stored texts are used instead of re-reading unchanged
-/// documents, and newly extracted ones are added to it.
+/// documents, and newly extracted ones are added to it, and its word index
+/// reads only the documents that can match. That trusts the size and time
+/// in `entries` when `current` (the drives are watched and no change waits:
+/// a document whose entry matches its stored text has not changed since);
+/// otherwise each document it rules out is checked on disk (without being
+/// opened), and read after all when it changed.
 pub fn search_content(
     entries: &[Entry],
     q: &Query,
@@ -1510,12 +1538,15 @@ pub fn search_content(
     progress: &ContentProgress,
     hits: &Mutex<Vec<ContentHit>>,
     cache: Option<&ContentCache>,
+    current: bool,
 ) {
     // The background warm-up pauses while this runs.
     let _searching = cache.map(ContentCache::begin_search);
     // Keyed by the file on disk, not the index entry, which may be stale.
     let text_of = |e: &Entry| content_cache::text_of(cache, &e.path);
-    search_documents(entries, q, scope, progress, hits, HitLimits::DEFAULT, &text_of);
+    let recheck = |path: &str| content_cache::stamp(std::path::Path::new(path));
+    let index = cache.map(|c| WordFilter { cache: c, recheck: (!current).then_some(&recheck as &StampOf) });
+    search_documents(entries, q, scope, progress, hits, HitLimits::DEFAULT, &text_of, index);
     if let Some(c) = cache.filter(|_| q.has_text_criteria()) {
         let _ = c.flush();
     }
@@ -1525,7 +1556,10 @@ pub fn search_content(
 /// [`search_content`] over the texts `text_of` gives (a document's text, and
 /// whether it came from the content index), within `limits`: the first
 /// `limits.lined` results keep their matching lines, and the search stops
-/// at `limits.hits` results. Leaves `progress.done` to the caller.
+/// at `limits.hits` results. With `index`, the word index rules out the
+/// documents whose words can't match ([`word_plan`]); the others are read
+/// and matched as without it. Leaves `progress.done` to the caller.
+#[allow(clippy::too_many_arguments)]
 fn search_documents(
     entries: &[Entry],
     q: &Query,
@@ -1534,6 +1568,7 @@ fn search_documents(
     hits: &Mutex<Vec<ContentHit>>,
     limits: HitLimits,
     text_of: &(dyn Fn(&Entry) -> (Option<String>, bool) + Sync),
+    index: Option<WordFilter>,
 ) {
     let scope_lower = scope.to_lowercase();
     let q = &q.for_documents();
@@ -1550,11 +1585,44 @@ fn search_documents(
         return;
     }
 
-    // Results found so far, to hand out the places within `limits`.
-    let found = AtomicUsize::new(0);
     // A dedicated pool keeps the global one free for instant filename search.
     let threads = std::thread::available_parallelism().map_or(2, |n| n.get().saturating_sub(1).max(1));
     let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).thread_name(|i| format!("content-{i}")).build();
+    let in_pool = |f: &(dyn Fn() -> Vec<u32> + Sync)| match &pool {
+        Ok(pool) => pool.install(f),
+        Err(_) => f(),
+    };
+    let candidates = match index.as_ref().and_then(|w| w.cache.narrow(entries, &candidates, &word_plan(q)).map(|n| (w, n))) {
+        Some((w, mut n)) => {
+            if let Some(recheck) = w.recheck {
+                // The entries may be stale: a ruled-out document that
+                // changed on disk since its text was stored is read.
+                let changed = in_pool(&|| {
+                    n.ruled_out
+                        .par_iter()
+                        .copied()
+                        .filter(|&i| {
+                            let e = &entries[i as usize];
+                            recheck(&e.path).is_some_and(|st| st != (e.size, e.mtime))
+                        })
+                        .collect()
+                });
+                n.ruled_out.retain(|i| changed.binary_search(i).is_err());
+                n.unindexed += changed.len();
+                n.keep.extend(changed);
+            }
+            // Ruled out counts as checked: the progress still ends at the total.
+            progress.checked.fetch_add(n.ruled_out.len(), Ordering::Relaxed);
+            progress.unindexed.store(n.unindexed, Ordering::Relaxed);
+            progress.ruled_out.store(n.ruled_out.len(), Ordering::Relaxed);
+            progress.narrowed.store(true, Ordering::Relaxed);
+            n.keep
+        }
+        None => candidates,
+    };
+
+    // Results found so far, to hand out the places within `limits`.
+    let found = AtomicUsize::new(0);
     let run = || {
         candidates.par_iter().for_each(|&i| {
             if progress.cancel.load(Ordering::Relaxed) || progress.capped.load(Ordering::Relaxed) {
@@ -1592,6 +1660,104 @@ fn search_documents(
         Ok(pool) => pool.install(run),
         Err(_) => run(),
     }
+}
+
+/// A file's size and modification time on disk ([`content_cache::stamp`]).
+type StampOf = dyn Fn(&str) -> Option<(u64, i64)> + Sync;
+
+/// The word index for [`search_documents`]: the store it is part of, and
+/// how to ask the disk for a document's size and time when the entries may
+/// be stale (`None`: they are current).
+#[derive(Clone, Copy)]
+struct WordFilter<'a> {
+    cache: &'a ContentCache,
+    recheck: Option<&'a StampOf>,
+}
+
+/// How an alternative of a term matches a text (see [`text_matches`]).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AltMatch {
+    /// Anywhere (`str::contains`).
+    Inside,
+    /// As whole words (`ww:`, [`word_matches`]).
+    Whole,
+    /// A word alternative ([`lossy_matches`]): to the end of a word, from its
+    /// start or after one of [`WORD_ALT_PREFIXES`].
+    Lossy,
+}
+
+/// What a document's words must hold for `q` (a query [`Query::for_documents`]
+/// gave) to match its text, for the content index's word index: each term
+/// (also `ww:` and each proximity word) is a condition met by one of its
+/// alternatives, each alternative a list of pieces (its words), each piece
+/// the shapes of a document word it can be in. A document lacking them
+/// can't match [`text_matches`], so the filter never loses a result.
+/// Regular expressions and excluded words narrow nothing (the matcher still
+/// applies them), nor does an alternative with no letter or digit.
+pub(crate) fn word_plan(q: &Query) -> crate::content_words::Plan {
+    let mut plan = crate::content_words::Plan::default();
+    let near = q.near.iter().flat_map(|n| &n.words).map(|t| (t, false));
+    let terms = q.terms.iter().map(|t| (t, false)).chain(q.words.iter().map(|t| (t, true))).chain(near);
+    'terms: for (t, whole) in terms {
+        let how = if whole { AltMatch::Whole } else { AltMatch::Inside };
+        let alts = t.alts.iter().map(|a| (a, how)).chain(t.word_alts.iter().map(|a| (a, AltMatch::Lossy)));
+        let mut cond = Vec::new();
+        for (a, how) in alts {
+            match alt_pieces(&mut plan, a, how) {
+                Some(pieces) => cond.push(pieces),
+                // This alternative may match any text: so may the term.
+                None => continue 'terms,
+            }
+        }
+        if !cond.is_empty() {
+            plan.conds.push(cond);
+        }
+    }
+    plan
+}
+
+/// The pieces of the alternative `alt` matched `how`: one per word of it,
+/// with the patterns (see [`crate::content_words::Plan`]) of the document
+/// words an occurrence of it puts that word in. `None` when it has no word.
+fn alt_pieces(plan: &mut crate::content_words::Plan, alt: &str, how: AltMatch) -> Option<Vec<usize>> {
+    let pattern = |start: bool, w: &str, end: bool| {
+        let mut p = Vec::with_capacity(w.len() + 2);
+        if start {
+            p.push(b'\n');
+        }
+        p.extend_from_slice(w.as_bytes());
+        if end {
+            p.push(b'\n');
+        }
+        p
+    };
+    let words: Vec<(usize, &str)> = split_words(alt).collect();
+    if words.is_empty() {
+        return None;
+    }
+    let pieces = words
+        .into_iter()
+        .map(|(off, w)| {
+            // Something not a letter or digit before or after it in the
+            // alternative: the document word starts or ends there too.
+            let (first, last) = (off == 0, off + w.len() == alt.len());
+            let start = !first || how == AltMatch::Whole;
+            let end = !last || how != AltMatch::Inside;
+            // A start or end that is only a whole-word edge: in a script
+            // written without spaces it may be inside a word of the index
+            // (such documents pass these pieces, see `content_words::Plan`).
+            let edge = how != AltMatch::Inside && (first || last);
+            let mut pats = Vec::new();
+            if first && how == AltMatch::Lossy {
+                pats.push(pattern(true, w, end));
+                pats.extend(WORD_ALT_PREFIXES.iter().map(|p| pattern(true, &format!("{p}{w}"), end)));
+            } else {
+                pats.push(pattern(start, w, end));
+            }
+            plan.piece(pats, edge)
+        })
+        .collect();
+    Some(pieces)
 }
 
 /// The matches of `q` in the document at `path`, read again now: how many,
@@ -2315,7 +2481,7 @@ mod tests {
             let progress = ContentProgress::default();
             progress.cancel.store(cancel, Ordering::Relaxed);
             let hits = Mutex::new(Vec::new());
-            search_content(&entries, &temp_query(q), "", &progress, &hits, None);
+            search_content(&entries, &temp_query(q), "", &progress, &hits, None, false);
             assert!(progress.done.load(Ordering::Relaxed));
             let hits: Vec<(u32, String)> = hits.into_inner().unwrap().into_iter().map(|h| (h.index, h.snippet)).collect();
             (progress.total.load(Ordering::Relaxed), progress.checked.load(Ordering::Relaxed), hits)
@@ -2362,7 +2528,8 @@ mod tests {
         let run = |entries: &[Entry], q: &str| {
             let progress = ContentProgress::default();
             let hits = Mutex::new(Vec::new());
-            search_content(entries, &temp_query(q), "", &progress, &hits, Some(&cache));
+            // Not current: the entries below go stale.
+            search_content(entries, &temp_query(q), "", &progress, &hits, Some(&cache), false);
             assert!(!cache.searching());
             let mut hits: Vec<(u32, u32, usize)> =
                 hits.into_inner().unwrap().into_iter().map(|h| (h.index, h.count, h.lines.len())).collect();
@@ -2372,12 +2539,16 @@ mod tests {
         // First run extracts every document (the empty one is stored as "no text").
         assert_eq!(run(&entries, "المبيعات"), (0, 3, vec![(0, 2, 2)]));
         assert_eq!(cache.stats().documents, 3);
-        assert_eq!(run(&entries, "المبيعات"), (3, 3, vec![(0, 2, 2)]));
+        // Then from the store, and its word index rules out the two others
+        // (checked: all three).
+        assert_eq!(run(&entries, "المبيعات"), (1, 3, vec![(0, 2, 2)]));
         // The store was saved at the end of the search.
         assert_eq!(ContentCache::open(&dir.join("store")).unwrap().stats().documents, 3);
         // The files change on disk but their index entries don't (auto-index
         // off, a missed event): the cache is keyed by the disk, so they are
-        // read again and the new text is found.
+        // read again and the new text is found, also those the word index
+        // ruled out by their old words (asked on disk: the index is not
+        // current).
         for (name, _) in &files {
             std::fs::write(dir.join(name), "المبيعات في كل مكان").unwrap();
             set_mtime(name, 2000);
@@ -2802,7 +2973,7 @@ mod tests {
         let docs = [entry(r"C:\Windows\a.txt", false), entry(r"C:\Users\a\Desktop\b.txt", false)];
         let total = |q: &Query| {
             let progress = ContentProgress::default();
-            search_content(&docs, q, "", &progress, &Mutex::new(Vec::new()), None);
+            search_content(&docs, q, "", &progress, &Mutex::new(Vec::new()), None, true);
             progress.total.load(Ordering::Relaxed)
         };
         assert_eq!(total(&Query::parse("x")), 1);

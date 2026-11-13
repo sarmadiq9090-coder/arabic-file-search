@@ -120,6 +120,13 @@ impl RescanPace {
         self.last.get(root).map_or(self.gap, |w| w.gap)
     }
 
+    /// Whether a walk was asked for and is still postponed: until it runs,
+    /// the index may not show what changed under that root.
+    #[cfg_attr(not(windows), allow(dead_code))] // the Windows UI
+    pub fn has_deferred(&self) -> bool {
+        !self.deferred.is_empty()
+    }
+
     /// Postponed roots whose turn has come; the others stay postponed.
     pub fn due(&mut self, now: Instant, busy: impl Fn(&str) -> bool) -> Vec<String> {
         if self.deferred.is_empty() {
@@ -442,6 +449,12 @@ impl WalkQueue {
 
     pub fn clear(&mut self) {
         self.waiting.clear();
+    }
+
+    /// No folder waits for its walk.
+    #[cfg_attr(not(windows), allow(dead_code))] // the Windows UI
+    pub fn is_empty(&self) -> bool {
+        self.waiting.is_empty()
     }
 
     #[cfg(test)]
