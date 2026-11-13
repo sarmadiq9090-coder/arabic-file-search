@@ -297,6 +297,8 @@ pub struct App {
     menu_hotkey: nwg::MenuItem,
     menu_digits: nwg::MenuItem,
     menu_content_index: nwg::MenuItem,
+    /// Read cloud-only files too (downloads them); off by default.
+    menu_read_cloud: nwg::MenuItem,
     menu_auto_index: nwg::MenuItem,
     menu_hide_system: nwg::MenuItem,
     menu_update: nwg::MenuItem,

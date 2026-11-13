@@ -173,8 +173,10 @@ pub fn extract_text(path: &Path) -> Option<String> {
     if !is_supported(&ext) {
         return None;
     }
-    let meta = std::fs::metadata(path).ok()?;
-    if !meta.is_file() || meta.len() > MAX_FILE_SIZE {
+    // Read without opening the file. A cloud-only one (OneDrive Files
+    // On-Demand) is not read unless the user allowed it: that downloads it.
+    let meta = crate::cloud::probe(path)?;
+    if meta.size > MAX_FILE_SIZE || !meta.readable() {
         return None;
     }
 
@@ -230,11 +232,11 @@ fn read_capped(r: impl Read, cap: u64) -> Option<Vec<u8>> {
 /// The whole file, but never more than [`MAX_FILE_SIZE`]: the size checked
 /// before may be stale (a file still being written, or replaced meanwhile).
 fn read_file_capped(path: &Path) -> Option<Vec<u8>> {
-    read_capped(File::open(path).ok()?, MAX_FILE_SIZE)
+    read_capped(crate::cloud::open(path).ok()?, MAX_FILE_SIZE)
 }
 
 fn read_text_file(path: &Path) -> Option<String> {
-    Some(decode_bytes(&read_capped(File::open(path).ok()?, MAX_TEXT_READ)?))
+    Some(decode_bytes(&read_capped(crate::cloud::open(path).ok()?, MAX_TEXT_READ)?))
 }
 
 /// Decode bytes of unknown encoding: BOMs first, then a BOM-less UTF-16
@@ -376,7 +378,7 @@ fn decode_html_entities(s: &str, out: &mut String) {
 type Zip = zip::ZipArchive<File>;
 
 fn open_zip(path: &Path) -> Option<Zip> {
-    zip::ZipArchive::new(File::open(path).ok()?).ok()
+    zip::ZipArchive::new(crate::cloud::open(path).ok()?).ok()
 }
 
 /// Reads one zip member as text (size-capped). Missing members yield None.
@@ -575,7 +577,7 @@ fn odf_text<R: Read + Seek>(mut zip: zip::ZipArchive<R>) -> Option<String> {
 // ---------------------------------------------------------------------------
 
 fn extract_spreadsheet(path: &Path, ext: &str) -> Option<String> {
-    spreadsheet_text(std::io::BufReader::new(File::open(path).ok()?), ext)
+    spreadsheet_text(std::io::BufReader::new(crate::cloud::open(path).ok()?), ext)
 }
 
 /// Text of a spreadsheet (`ext` lowercase: xlsx, xlsm, xlsb, xls or ods).

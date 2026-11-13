@@ -15,7 +15,6 @@
 //! copy that stays is still there and still the same.
 
 use std::collections::{HashMap, HashSet};
-use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -77,7 +76,8 @@ pub fn file_id(path: &str) -> Option<FileId> {
     {
         use std::os::windows::io::AsRawHandle;
         use winapi::um::fileapi::{BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle};
-        let f = File::open(path).ok()?;
+        // Opened, never read: no download either way.
+        let f = crate::cloud::open(std::path::Path::new(path)).ok()?;
         // SAFETY: an all-zero BY_HANDLE_FILE_INFORMATION is valid; the
         // handle stays open for the call and `info` is a valid out pointer.
         let mut info: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
@@ -202,8 +202,13 @@ pub fn size_groups(entries: &[Entry], ids: impl Iterator<Item = usize>, min_size
 }
 
 /// SHA-256 of the first and last 64 KB (the whole file when it is small).
+/// A cloud-only file is not read (that would download it) unless the user
+/// allowed it: it counts as unreadable.
 fn partial_hash(path: &str, size: u64, progress: &Progress) -> Option<[u8; 32]> {
-    let mut f = File::open(path).ok()?;
+    if !crate::cloud::readable(std::path::Path::new(path)) {
+        return None;
+    }
+    let mut f = crate::cloud::open(std::path::Path::new(path)).ok()?;
     if f.metadata().ok()?.len() != size {
         return None;
     }
@@ -233,7 +238,10 @@ fn partial_hash(path: &str, size: u64, progress: &Progress) -> Option<[u8; 32]> 
 fn full_hash(path: &str, size: u64, progress: &Progress) -> Option<[u8; 32]> {
     // A file that keeps growing (a log being written, a device) would
     // otherwise be read for as long as it grows: stop one byte past `size`.
-    let mut f = File::open(path).ok()?.take(size.saturating_add(1));
+    if !crate::cloud::readable(std::path::Path::new(path)) {
+        return None;
+    }
+    let mut f = crate::cloud::open(std::path::Path::new(path)).ok()?.take(size.saturating_add(1));
     let mut h = Sha256::new();
     let mut buf = vec![0u8; 1 << 20];
     let mut total = 0u64;

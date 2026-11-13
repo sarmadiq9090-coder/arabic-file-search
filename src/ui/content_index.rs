@@ -153,11 +153,12 @@ impl App {
             }
             let s = cache.stats();
             log(&format!(
-                "content index warm: {} of {} new documents in {} ms on {threads} threads{}; stored {} ({} with text), {} KB{}",
+                "content index warm: {} of {} new documents in {} ms on {threads} threads{}; {} cloud-only not read; stored {} ({} with text), {} KB{}",
                 progress.added.load(Ordering::Relaxed),
                 progress.total.load(Ordering::Relaxed),
                 started.elapsed().as_millis(),
                 if cancel.load(Ordering::Relaxed) { " (stopped)" } else { "" },
+                progress.cloud.load(Ordering::Relaxed),
                 s.documents,
                 s.texts,
                 s.bytes / 1024,
@@ -170,6 +171,22 @@ impl App {
     pub(super) fn stop_warm(&self) {
         if let Some(job) = self.state.borrow_mut().warm.take() {
             job.cancel.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// The Options menu switch «قراءة محتوى الملفات الموجودة على السحابة
+    /// فقط»: on, content reading opens cloud-only files too, so Windows
+    /// downloads them, and the content index reads the ones it skipped
+    /// (they were never marked, so a new warm-up finds them). Off: none is
+    /// read any more; what was read stays in the content index.
+    pub(super) fn toggle_read_cloud(&self) {
+        let on = !self.menu_read_cloud.checked();
+        self.menu_read_cloud.set_checked(on);
+        self.state.borrow_mut().settings.read_cloud_files = on;
+        crate::cloud::set_read_cloud(on);
+        log(&format!("cloud-only files: {}", if on { "read (downloaded)" } else { "not read" }));
+        if on {
+            self.start_warm();
         }
     }
 

@@ -60,6 +60,18 @@ const IID_IMAGE_LIST: GUID =
 const MIN_THUMB: i32 = 16;
 /// `SIIGBF_THUMBNAILONLY`: a real thumbnail or nothing (icons are ours).
 const SIIGBF_THUMBNAILONLY: i32 = 0x8;
+/// `SIIGBF_INCACHEONLY`: only a thumbnail Windows already has; the file is
+/// not read to make one.
+const SIIGBF_INCACHEONLY: i32 = 0x10;
+
+/// The `GetImage` flags for the file at `path`: for a cloud-only file (or
+/// one whose attributes can't be read) only a thumbnail Windows already
+/// keeps, since making one reads the file and so downloads it (whatever
+/// "Read contents of cloud-only files" says: a picture is not worth that).
+fn image_flags(path: &str) -> i32 {
+    let local = crate::cloud::probe(std::path::Path::new(path)).is_some_and(|s| !crate::cloud::contents_elsewhere(s.attrs));
+    if local { SIIGBF_THUMBNAILONLY } else { SIIGBF_THUMBNAILONLY | SIIGBF_INCACHEONLY }
+}
 
 #[repr(C)]
 struct ImageFactory {
@@ -280,12 +292,14 @@ fn type_icon_handle(ext: &str) -> HICON {
 }
 
 /// The shell's thumbnail of a file as an `n`×`n` tile, or null when it has
-/// none (or the shell can't make thumbnails, as under Wine).
+/// none (or the shell can't make thumbnails, as under Wine). A cloud-only
+/// file is never downloaded for it (`image_flags`).
 pub(super) fn shell_thumbnail(path: &str, n: i32) -> HBITMAP {
     unsafe extern "system" {
         fn SHCreateItemFromParsingName(path: *const u16, bc: *mut c_void, riid: *const GUID, out: *mut *mut c_void) -> HRESULT;
     }
     let wpath = wide(path);
+    let flags = image_flags(path);
     unsafe {
         let mut f: *mut ImageFactory = std::ptr::null_mut();
         let hr = SHCreateItemFromParsingName(
@@ -298,7 +312,7 @@ pub(super) fn shell_thumbnail(path: &str, n: i32) -> HBITMAP {
             return std::ptr::null_mut();
         }
         let mut hbm: HBITMAP = std::ptr::null_mut();
-        let hr = ((*(*f).vtbl).get_image)(f, SIZE { cx: n, cy: n }, SIIGBF_THUMBNAILONLY, &mut hbm);
+        let hr = ((*(*f).vtbl).get_image)(f, SIZE { cx: n, cy: n }, flags, &mut hbm);
         ((*(*f).vtbl).release)(f);
         if hr < 0 || hbm.is_null() {
             return std::ptr::null_mut();

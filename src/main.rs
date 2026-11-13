@@ -33,6 +33,8 @@ mod cli;
 #[cfg(any(windows, test))]
 mod bidi_layout;
 #[cfg(any(windows, test))]
+mod cloud;
+#[cfg(any(windows, test))]
 mod content_cache;
 #[cfg(any(windows, test))]
 mod crash_log;

@@ -127,6 +127,8 @@ pub enum Setting {
     Autostart,
     /// Index document contents in the background.
     ContentIndex,
+    /// Read cloud-only files too, which downloads them.
+    ReadCloudFiles,
     /// Update the index when files change.
     AutoIndex,
     /// Leave Windows' own files out of the results.
@@ -400,6 +402,7 @@ pub struct SettingsOut {
     pub digits: bool,
     pub autostart: bool,
     pub content_index: bool,
+    pub read_cloud_files: bool,
     pub auto_index: bool,
     pub hide_system: bool,
     pub hotkey_quick: bool,
@@ -1428,6 +1431,7 @@ mod tests {
         assert_eq!(req(r#""op":"save_search","q":"a","scope":"D:\\""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"clear_recent""#), Ok(Request::ClearRecent {}));
         assert_eq!(req(r#""op":"set","key":"hide_system","on":false"#), Ok(Request::Set { key: Setting::HideSystem, on: false }));
+        assert_eq!(req(r#""op":"set","key":"read_cloud_files","on":true"#), Ok(Request::Set { key: Setting::ReadCloudFiles, on: true }));
         assert_eq!(req(r#""op":"set","key":"run_command","on":true"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"set","key":"digits""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"lang","lang":"en""#), Ok(Request::Lang { lang: LangCode::En }));
@@ -1826,6 +1830,7 @@ mod tests {
             digits: false,
             autostart: true,
             content_index: true,
+            read_cloud_files: false,
             auto_index: true,
             hide_system: true,
             hotkey_quick: true,

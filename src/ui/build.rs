@@ -343,6 +343,11 @@ impl NativeUi<AppUi> for App {
             .parent(&app.options_menu)
             .build(&mut app.menu_content_index)?;
         nwg::MenuItem::builder()
+            .text(tr!("قراءة محتوى الملفات الموجودة على السحابة فقط (يُنزّلها من الإنترنت)", "Read contents of cloud-only files (downloads them)"))
+            .check(settings.read_cloud_files)
+            .parent(&app.options_menu)
+            .build(&mut app.menu_read_cloud)?;
+        nwg::MenuItem::builder()
             .text(tr!("إخفاء ملفات النظام", "Hide system files"))
             .check(settings.hide_system)
             .parent(&app.options_menu)
@@ -384,6 +389,7 @@ impl NativeUi<AppUi> for App {
         nwg::MenuSeparator::builder().parent(&app.menu).build(&mut app.menu_properties_sep)?;
         nwg::MenuItem::builder().text(tr!("خصائص", "Properties")).parent(&app.menu).build(&mut app.menu_properties)?;
         app.build_suggest_bar()?;
+        crate::cloud::set_read_cloud(settings.read_cloud_files);
         app.state.get_mut().settings = settings.clone();
         app.state.get_mut().history = History::load();
         let ui = AppUi { inner: Rc::new(app), handlers: Default::default(), raw_handlers: Default::default() };
@@ -519,6 +525,8 @@ impl NativeUi<AppUi> for App {
                         app.toggle_digits();
                     } else if handle == app.menu_content_index {
                         app.toggle_content_index();
+                    } else if handle == app.menu_read_cloud {
+                        app.toggle_read_cloud();
                     } else if handle == app.menu_auto_index {
                         app.toggle_auto_index();
                     } else if handle == app.menu_hide_system {

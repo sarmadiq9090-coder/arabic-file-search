@@ -765,6 +765,7 @@ mod imp {
                     digits: s.arabic_digits,
                     autostart: autostart::is_enabled(),
                     content_index: s.content_index,
+                    read_cloud_files: s.read_cloud_files,
                     auto_index: s.auto_index,
                     hide_system: s.hide_system,
                     hotkey_quick: s.hotkey_opens == HotkeyOpens::Quick,
@@ -1388,6 +1389,11 @@ mod imp {
                 Setting::ContentIndex => {
                     if self.menu_content_index.checked() != on {
                         self.toggle_content_index();
+                    }
+                }
+                Setting::ReadCloudFiles => {
+                    if self.menu_read_cloud.checked() != on {
+                        self.toggle_read_cloud();
                     }
                 }
                 Setting::AutoIndex => {

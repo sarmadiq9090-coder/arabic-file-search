@@ -110,7 +110,7 @@ pub fn archive_texts(path: &Path) -> Vec<(String, String)> {
 
 fn archive_texts_with(path: &Path, lim: &Limits) -> Vec<(String, String)> {
     let Some(kind) = kind_of(path) else { return Vec::new() };
-    let Ok(file) = File::open(path) else { return Vec::new() };
+    let Ok(file) = crate::cloud::open(path) else { return Vec::new() };
     let len = file.metadata().map_or(0, |m| m.len());
     let mut col = Collector::new(lim, len);
     // Third-party decoders on hostile input: contain any panic, keep what

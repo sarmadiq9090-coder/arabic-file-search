@@ -5,7 +5,6 @@
 //! message body (text/plain parts, text/html as a fallback). Non-text
 //! attachments are skipped.
 
-use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
@@ -26,7 +25,7 @@ const MAX_PARTS: usize = 4096;
 // ---------------------------------------------------------------------------
 
 pub(super) fn extract_eml(path: &Path) -> Option<String> {
-    eml_to_text(&read_capped(File::open(path).ok()?, MAX_FILE_SIZE)?)
+    eml_to_text(&read_capped(crate::cloud::open(path).ok()?, MAX_FILE_SIZE)?)
 }
 
 /// Appends `v` trimmed plus a newline, unless it is blank.
@@ -490,7 +489,7 @@ fn codepage_to_encoding(cp: u16) -> Option<&'static Encoding> {
 }
 
 pub(super) fn extract_msg(path: &Path) -> Option<String> {
-    let comp = cfb::CompoundFile::open(File::open(path).ok()?).ok()?;
+    let comp = cfb::CompoundFile::open(crate::cloud::open(path).ok()?).ok()?;
     msg_to_text(comp)
 }
 

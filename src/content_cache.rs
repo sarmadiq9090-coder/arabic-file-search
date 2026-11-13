@@ -42,6 +42,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use crate::cloud;
 use crate::extract;
 use crate::index::Entry;
 
@@ -390,11 +391,9 @@ fn decode_idx(bytes: &[u8]) -> Option<IdxFile> {
 
 /// A file's size and modification time as it is on disk now, in the units
 /// of [`Entry`] (bytes, whole seconds since 1970). `None` when it is gone or
-/// is not a file.
+/// is not a file. Read without opening the file ([`cloud::probe`]).
 pub fn stamp(path: &Path) -> Option<(u64, i64)> {
-    let m = fs::metadata(path).ok().filter(|m| m.is_file())?;
-    let mtime = m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs() as i64);
-    Some((m.len(), mtime))
+    cloud::probe(path).map(|s| (s.size, s.mtime))
 }
 
 fn now_secs() -> i64 {
@@ -414,15 +413,21 @@ const SETTLE_SECS: i64 = 2;
 /// changes. Not when the file changed meanwhile or was changed too recently;
 /// and "no text" only when the file can be opened now, so a document that
 /// was locked, denied or being written is tried again next time.
+///
+/// A cloud-only file (see [`crate::cloud`]) is never remembered as "no
+/// text": its read failed rather than found nothing (no download allowed, or
+/// the download failed). Once it is on this PC its attributes say so, and
+/// it is read like any other file.
 fn worth_storing(path: &Path, before: (u64, i64), has_text: bool, now: i64) -> bool {
-    if stamp(path) != Some(before) {
+    let Some(st) = cloud::probe(path) else { return false };
+    if (st.size, st.mtime) != before {
         return false;
     }
     let age = now - before.1;
     if age < SETTLE_SECS {
         return false;
     }
-    has_text || (age >= RECENT_SECS && File::open(path).is_ok())
+    has_text || (age >= RECENT_SECS && !cloud::contents_elsewhere(st.attrs) && cloud::open(path).is_ok())
 }
 
 /// Extracts the text of `path` and stores it in `cache` when it can be
@@ -443,14 +448,30 @@ fn extract_and_store(cache: &ContentCache, path: &str, before: (u64, i64)) -> (O
 /// result for the file as it is on disk now (whatever the index says),
 /// otherwise extracted, and stored when it can be trusted. The flag is true
 /// when the text came from the cache.
+///
+/// A cloud-only file is not read (that would download it) unless the user
+/// allowed it: its text comes from the cache if it was read while it was on
+/// this PC, otherwise there is none, and nothing is stored for it, so it is
+/// read once it is downloaded or the user allows it.
 pub fn text_of(cache: Option<&ContentCache>, path: &str) -> (Option<String>, bool) {
-    let (Some(cache), Some(st)) = (cache, stamp(Path::new(path))) else {
-        return (extract::extract_text(Path::new(path)), false);
-    };
-    if let Some(text) = cache.get(path, st.0, st.1) {
+    text_of_as(cache, path, cloud::probe(Path::new(path)), cloud::read_cloud())
+}
+
+/// [`text_of`] for the file as `now` finds it, with the user's choice
+/// `read_cloud` (see [`cloud::may_read`]).
+fn text_of_as(cache: Option<&ContentCache>, path: &str, now: Option<cloud::Stamp>, read_cloud: bool) -> (Option<String>, bool) {
+    // Gone, or not a file.
+    let Some(st) = now else { return (None, false) };
+    if let Some(text) = cache.and_then(|c| c.get(path, st.size, st.mtime)) {
         return (text, true);
     }
-    (extract_and_store(cache, path, st).0, false)
+    if !cloud::may_read(st.attrs, read_cloud) {
+        return (None, false);
+    }
+    match cache {
+        Some(cache) => (extract_and_store(cache, path, (st.size, st.mtime)).0, false),
+        None => (extract::extract_text(Path::new(path)), false),
+    }
 }
 
 /// A text or a document whose text is worth caching: supported and not
@@ -907,6 +928,10 @@ pub struct WarmProgress {
     pub checked: AtomicUsize,
     /// Documents this warm-up extracted and stored.
     pub added: AtomicUsize,
+    /// Cloud-only documents it left unread (reading them would download
+    /// them): checked, not pending; read by a later warm-up once they are
+    /// on this PC or the user allows downloads.
+    pub cloud: AtomicUsize,
 }
 
 /// How many threads [`warm`] should use on this machine: half the logical
@@ -1000,6 +1025,23 @@ pub fn warm(
     threads: usize,
     thread_init: &(dyn Fn() + Sync),
 ) {
+    warm_with(entries, cache, progress, cancel, threads, thread_init, &cloud::probe, &cloud::read_cloud);
+}
+
+/// [`warm`] with the files seen through `probe` and the user's choice to
+/// read cloud-only files asked from `read_cloud` before each one (it can be
+/// switched while the warm-up runs).
+#[allow(clippy::too_many_arguments)]
+fn warm_with(
+    entries: &[Entry],
+    cache: &ContentCache,
+    progress: &WarmProgress,
+    cancel: &AtomicBool,
+    threads: usize,
+    thread_init: &(dyn Fn() + Sync),
+    probe: &(dyn Fn(&Path) -> Option<cloud::Stamp> + Sync),
+    read_cloud: &(dyn Fn() -> bool + Sync),
+) {
     let mut todo: Vec<&Entry> =
         entries.iter().filter(|e| is_document(e) && !cache.is_fresh(&e.path, e.size, e.mtime)).collect();
     todo.sort_by_cached_key(|e| (warm_rank(e), Reverse(e.mtime)));
@@ -1022,11 +1064,14 @@ pub fn warm(
             let one_big = is_heavy(e).then(|| big.lock().unwrap_or_else(|e| e.into_inner()));
             // The file as it is now (the index may lag behind); a search may
             // also have stored it meanwhile.
-            if let Some(st) = stamp(Path::new(&*e.path))
-                && !cache.is_fresh(&e.path, st.0, st.1)
-                && extract_and_store(cache, &e.path, st).1
+            if let Some(st) = probe(Path::new(&*e.path))
+                && !cache.is_fresh(&e.path, st.size, st.mtime)
             {
-                progress.added.fetch_add(1, Ordering::Relaxed);
+                if !cloud::may_read(st.attrs, read_cloud()) {
+                    progress.cloud.fetch_add(1, Ordering::Relaxed);
+                } else if extract_and_store(cache, &e.path, (st.size, st.mtime)).1 {
+                    progress.added.fetch_add(1, Ordering::Relaxed);
+                }
             }
             drop(one_big);
             progress.checked.fetch_add(1, Ordering::Relaxed);
@@ -2010,6 +2055,99 @@ mod tests {
         }
         assert_eq!(c.evict_missing(&indexed, now + 3 * EVICT_EVERY), 1000);
         drop(c);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A probe that sees the files in `cloud` as online-only placeholders
+    /// (OneDrive Files On-Demand), the rest as they are.
+    fn cloud_probe(cloud: &[&str]) -> impl Fn(&Path) -> Option<cloud::Stamp> + Sync + use<> {
+        let cloud: Vec<String> = cloud.iter().map(|p| p.to_string()).collect();
+        move |p: &Path| {
+            let mut st = cloud::probe(p)?;
+            if cloud.iter().any(|c| Path::new(c) == p) {
+                st.attrs |= cloud::RECALL_ON_DATA_ACCESS | cloud::OFFLINE;
+            }
+            Some(st)
+        }
+    }
+
+    #[test]
+    fn cloud_only_files_are_not_read_unless_allowed() {
+        let dir = temp_dir("cloud_text");
+        fs::create_dir_all(&dir).unwrap();
+        let cache = ContentCache::open(&dir.join("store")).unwrap();
+        let doc = dir.join("سحابة.txt");
+        fs::write(&doc, "تقرير المبيعات").unwrap();
+        file_entry(&doc, 10_000);
+        let empty = dir.join("فارغ.txt");
+        fs::write(&empty, " ").unwrap();
+        file_entry(&empty, 10_000);
+        let (path, empty_path) = (doc.to_str().unwrap(), empty.to_str().unwrap());
+        let probe = cloud_probe(&[path, empty_path]);
+
+        // Off (the default): not read, and nothing stored, not even "no text".
+        for _ in 0..2 {
+            assert_eq!(text_of_as(Some(&cache), path, probe(&doc), false), (None, false));
+            assert_eq!(text_of_as(Some(&cache), empty_path, probe(&empty), false), (None, false));
+            assert_eq!(text_of_as(None, path, probe(&doc), false), (None, false));
+        }
+        assert_eq!(cache.stats().documents, 0);
+        // A local file is read as always.
+        assert_eq!(text_of_as(None, path, cloud::probe(&doc), false), (Some("تقرير المبيعات".into()), false));
+
+        // On: read (Windows downloads it) and stored.
+        assert_eq!(text_of_as(None, path, probe(&doc), true), (Some("تقرير المبيعات".into()), false));
+        assert_eq!(text_of_as(Some(&cache), path, probe(&doc), true), (Some("تقرير المبيعات".into()), false));
+        assert_eq!(cache.stats().documents, 1);
+        // Switched off again, or the file went back online-only: what was
+        // read stays and is used, without reading the file.
+        assert_eq!(text_of_as(Some(&cache), path, probe(&doc), false), (Some("تقرير المبيعات".into()), true));
+        // Gone.
+        assert_eq!(text_of_as(Some(&cache), path, None, true), (None, false));
+        drop(cache);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn warm_skips_cloud_only_files_until_they_are_local_or_allowed() {
+        let dir = temp_dir("cloud_warm");
+        fs::create_dir_all(&dir).unwrap();
+        let mut entries = Vec::new();
+        for name in ["محلي.txt", "سحابة.txt", "فارغ.txt"] {
+            let p = dir.join(name);
+            fs::write(&p, if name == "فارغ.txt" { " " } else { "نص" }).unwrap();
+            entries.push(file_entry(&p, 10_000));
+        }
+        let cache = ContentCache::open(&dir.join("store")).unwrap();
+        let cloud = cloud_probe(&[&entries[1].path, &entries[2].path]);
+        let run = |probe: &(dyn Fn(&Path) -> Option<cloud::Stamp> + Sync), allow: bool| {
+            let p = WarmProgress::default();
+            warm_with(&entries, &cache, &p, &AtomicBool::new(false), 2, &|| {}, probe, &move || allow);
+            let n = |a: &AtomicUsize| a.load(Ordering::Relaxed);
+            (n(&p.total), n(&p.checked), n(&p.added), n(&p.cloud))
+        };
+        // Off: the local file is read; the cloud-only ones are checked (the
+        // progress ends) but neither read nor stored.
+        assert_eq!(run(&cloud, false), (3, 3, 1, 2));
+        assert_eq!(cache.stats().documents, 1);
+        // Not marked anywhere: the next warm-up looks at them again (by
+        // their attributes only), and still leaves them.
+        assert_eq!(run(&cloud, false), (2, 2, 0, 2));
+        // Switched on: the files skipped before are read now.
+        assert_eq!(run(&cloud, true), (2, 2, 2, 0));
+        assert_eq!(cache.stats().documents, 3);
+        assert_eq!(run(&cloud, false), (0, 0, 0, 0));
+
+        // Downloaded by the user (attributes cleared; size and mtime as
+        // before): read by the next warm-up with the setting off.
+        let cache2 = ContentCache::open(&dir.join("store2")).unwrap();
+        let p = WarmProgress::default();
+        warm_with(&entries, &cache2, &p, &AtomicBool::new(false), 1, &|| {}, &cloud, &|| false);
+        assert_eq!(p.added.load(Ordering::Relaxed), 1);
+        let p = WarmProgress::default();
+        warm_with(&entries, &cache2, &p, &AtomicBool::new(false), 1, &|| {}, &cloud::probe, &|| false);
+        assert_eq!((p.added.load(Ordering::Relaxed), p.cloud.load(Ordering::Relaxed)), (2, 0));
+        drop((cache, cache2));
         fs::remove_dir_all(&dir).unwrap();
     }
 }

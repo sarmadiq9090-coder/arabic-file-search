@@ -1032,7 +1032,11 @@ impl App {
             return None;
         }
         let ext = lower.rsplit_once('.').map(|(_, e)| e).filter(|e| !e.contains(['\\', '/'])).unwrap_or("");
-        let own = matches!(ext, "exe" | "lnk" | "ico" | "url" | "msc" | "appref-ms");
+        // Its own icon is read from the file: not from a cloud-only one,
+        // which that would download (it gets its type's icon).
+        let own = matches!(ext, "exe" | "lnk" | "ico" | "url" | "msc" | "appref-ms")
+            && !*is_dir
+            && crate::cloud::probe(std::path::Path::new(path)).is_some_and(|s| !crate::cloud::contents_elsewhere(s.attrs));
         let key = if *is_dir {
             "<folder>".to_string()
         } else if own {
