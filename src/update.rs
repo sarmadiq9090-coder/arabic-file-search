@@ -580,7 +580,7 @@ fn sibling(exe: &std::path::Path, suffix: &str) -> std::path::PathBuf {
 /// current one as `old`. On any failure `exe` is a working program again:
 /// the original is renamed back, or copied back if even that fails.
 #[cfg_attr(not(windows), allow(dead_code))]
-fn swap_in(exe: &std::path::Path, new: &std::path::Path, old: &std::path::Path) -> Result<(), String> {
+pub(crate) fn swap_in(exe: &std::path::Path, new: &std::path::Path, old: &std::path::Path) -> Result<(), String> {
     use std::fs;
     if !new.is_file() {
         return Err("the downloaded update is missing".into());

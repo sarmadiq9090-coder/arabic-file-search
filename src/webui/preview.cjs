@@ -74,6 +74,9 @@ function fakeProgram(cfg) {
     ["D:\\Archive\\2024", "تقارير قديمة", 0, 400 * 86400, true],
     // A phone number and a date after Arabic words: each must read as typed.
     [`${U}\\Documents\\الفواتير 2026-11`, "فاتورة رقم 1234 بتاريخ 2026-11-12 من شركة Microsoft هاتف 0770-123-4567.txt", 3 * 1024, 30 * 86400],
+    // A range with an en dash (U+2013) and a date with the division slash
+    // (U+2215): 2024–2026, not 2026–2024.
+    [`${U}\\Documents\\الخطط 2024\u20132026`, "خطة الأعوام 2024\u20132026 حتى 12\u221511\u22152026.txt", 5 * 1024, 35 * 86400],
   ] : [
     [`${U}\\Documents\\Work\\Finance`, "Sales report 2026.xlsx", 48 * 1024, 7 * 60],
     [`${U}\\Documents\\Reports\\2026`, "Annual report final.pdf", 2.4 * 1048576, 26 * 3600],
@@ -358,6 +361,8 @@ const SHOTS = [
   // as typed, in the list, its folder, the preview and the status bar's
   // file count, a match inside the phone marked.
   ["digit-runs-ar-light", "ar", "light", [["type", "123-45"]], { expect: { rows: 1, marks: 1, runs: 7 } }],
+  // «خطة الأعوام 2024–2026 …»: a range with an en dash reads as typed too.
+  ["digit-range-ar-dark", "ar", "dark", [["type", "الأعوام"]], { expect: { rows: 1, marks: 1, runs: 7 } }],
   // Ctrl+Alt+G in a Save/Open dialog: a line says what Enter does; Enter moves the dialog to the
   // selected result's folder (not open it), Esc cancels; the result menu has the move first.
   ["qswitch-ar-light", "ar", "light", [["eval", QS_ON.ar], ["type", "تقرير"], ["key", "ArrowDown"]], { expect: { qswitch: true } }],

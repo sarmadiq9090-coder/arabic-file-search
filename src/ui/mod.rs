@@ -48,6 +48,7 @@ mod keys;
 mod launcher_shim; // thin glue to crate::launcher, see the file
 mod lazy;
 mod memory;
+mod older_copy;
 mod placement;
 mod quick;
 mod quickswitch;
@@ -366,6 +367,9 @@ pub struct App {
     /// The offer to move a copy out of Downloads or a temp folder was
     /// already considered this run (see `relocate`).
     move_checked: Cell<bool>,
+    /// The notice that this copy replaced an older one was shown (or there
+    /// was none: `older_copy::notice`).
+    replaced_told: Cell<bool>,
     state: RefCell<State>,
     /// Moving another program's Open / Save As dialog to a result's folder.
     quick: quickswitch::QuickSwitch,
@@ -783,6 +787,11 @@ pub fn run() {
     if activate_running_copy(updated || moved) {
         return;
     }
+    // No other copy runs: a newer download takes the place of the installed
+    // copy it is newer than, and the program starts from there.
+    if !updated && !moved && older_copy::replace_installed_elsewhere() {
+        return;
+    }
     // The new version is on trial until its first timer tick; a start that
     // finds an unfinished trial puts the previous version back and starts it.
     if crate::update::settle_trial(updated, &|l| startup::log(l)) {
@@ -810,7 +819,7 @@ pub fn run() {
     if crate::store::is_packaged() {
         autostart::apply_store_default();
     } else {
-        autostart::apply_default();
+        autostart::apply_default(updated || moved || older_copy::replaced_version().is_some());
     }
     if let Some(line) = crate::store::startup_log_line() {
         startup::log(&line);

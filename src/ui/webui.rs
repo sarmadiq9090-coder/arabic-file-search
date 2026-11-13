@@ -752,6 +752,11 @@ mod imp {
             self.webui.active.get() && self.webui.parts.window.visible()
         }
 
+        /// Whether the page has loaded and takes messages.
+        pub(in super::super) fn webui_ready(&self) -> bool {
+            self.webui.ready.get()
+        }
+
         /// Runs `f` with the window a message box of the program belongs to
         /// (the first-run offers, the crash report): the new main window
         /// when it is the one on screen, so the box comes over it and keeps
@@ -2198,6 +2203,10 @@ mod imp {
         }
 
         pub(in super::super) fn webui_visible(&self) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_ready(&self) -> bool {
             false
         }
 
