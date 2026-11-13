@@ -267,7 +267,7 @@ impl App {
             new_look: self.webui_in_use(),
             new_look_chosen: st.settings.new_ui,
             entries: st.index.entries.len(),
-            documents: super::content_index::opened().map(|c| c.documents()),
+            documents: super::content_index::opened().map(|c| c.documents_now()),
             index_bytes: std::fs::metadata(&data).ok().map(|m| m.len()),
             content_bytes: folder_bytes(&data.with_file_name("content")),
             private_bytes: private,

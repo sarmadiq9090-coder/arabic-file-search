@@ -7,6 +7,7 @@
 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
@@ -143,6 +144,116 @@ fn is_under(path: &str, dir: &str) -> bool {
     })
 }
 
+/// The prefixes every path below `path` starts with: `path` and a
+/// separator, or `path` itself when it ends in one (a drive root).
+fn descendant_prefixes(path: &str) -> Vec<String> {
+    if path.ends_with(['\\', '/']) { vec![path.to_string()] } else { vec![format!("{path}\\"), format!("{path}/")] }
+}
+
+/// Some folder that `path` is inside of is in `dirs`.
+fn has_ancestor_in(path: &str, dirs: &HashSet<String>) -> bool {
+    path.match_indices(['\\', '/']).any(|(i, _)| dirs.contains(&path[..i]))
+}
+
+/// The old and new path of a rename that may move a folder's contents
+/// along (see `apply_changes`), spelled as `apply_changes` uses them.
+fn moved_folder(c: &Change) -> Option<(&str, &str)> {
+    let Change::Renamed(old, new) = c else { return None };
+    let old = change_path(old).filter(|p| !skipped_path(p))?;
+    let new = change_path(new).filter(|p| !skipped_path(p))?;
+    (!skip_dir(file_name(new))).then_some((old, new))
+}
+
+/// Walks the positions 0, 1, 2, … of a list once, saying for each whether
+/// it lies in one of `ranges` (sorted by start; they may overlap).
+struct RangeCursor<'a> {
+    ranges: &'a [std::ops::Range<usize>],
+    at: usize,
+    i: usize,
+}
+
+impl<'a> RangeCursor<'a> {
+    fn new(ranges: &'a [std::ops::Range<usize>]) -> Self {
+        RangeCursor { ranges, at: 0, i: 0 }
+    }
+
+    /// Whether the next position is inside a range.
+    fn next(&mut self) -> bool {
+        while self.at < self.ranges.len() && self.ranges[self.at].end <= self.i {
+            self.at += 1;
+        }
+        let inside = self.at < self.ranges.len() && self.ranges[self.at].contains(&self.i);
+        self.i += 1;
+        inside
+    }
+}
+
+/// The entries a batch's folder renames can touch, out of the sorted list
+/// (see `Index::take_moving`) and kept by path, so that each rename costs
+/// what it moves rather than a pass over every entry.
+struct Moving {
+    map: BTreeMap<Box<str>, Entry>,
+}
+
+impl Moving {
+    /// The paths below `path` (not `path` itself).
+    fn below(&self, path: &str) -> Vec<Box<str>> {
+        let mut keys = Vec::new();
+        for p in descendant_prefixes(path) {
+            let from = self.map.range::<str, _>((std::ops::Bound::Included(p.as_str()), std::ops::Bound::Unbounded));
+            keys.extend(from.take_while(|(k, _)| k.starts_with(p.as_str())).map(|(k, _)| k.clone()));
+        }
+        keys
+    }
+
+    /// `path` and the paths below it (a drive root is no entry of its own).
+    fn at_or_below(&self, path: &str) -> Vec<Box<str>> {
+        let mut keys = self.below(path);
+        if !path.ends_with(['\\', '/']) && self.map.contains_key(path) {
+            keys.push(path.into());
+        }
+        keys
+    }
+
+    fn has_descendants(&self, path: &str) -> bool {
+        descendant_prefixes(path).iter().any(|p| {
+            self.map
+                .range::<str, _>((std::ops::Bound::Included(p.as_str()), std::ops::Bound::Unbounded))
+                .next()
+                .is_some_and(|(k, _)| k.starts_with(p.as_str()))
+        })
+    }
+
+    /// `Index::rename_path` on these entries.
+    fn rename(&mut self, old: &str, new: &str) -> bool {
+        if old == new {
+            return self.map.contains_key(old);
+        }
+        let keys = self.at_or_below(old);
+        if keys.is_empty() {
+            return false;
+        }
+        let moved: Vec<Entry> = keys.iter().filter_map(|k| self.map.remove(k)).collect();
+        for k in self.at_or_below(new) {
+            self.map.remove(&k);
+        }
+        for mut e in moved {
+            let renamed_self = e.path.len() == old.len();
+            e.path = format!("{new}{}", &e.path[old.len()..]).into();
+            if renamed_self {
+                e.norm_name = name_key(e.name()).into();
+            }
+            self.map.insert(e.path.clone(), e);
+        }
+        true
+    }
+
+    /// The entries, sorted by path.
+    fn into_entries(self) -> Vec<Entry> {
+        self.map.into_values().collect()
+    }
+}
+
 /// What `apply_changes` did.
 #[derive(Debug, Default, PartialEq)]
 pub struct Applied {
@@ -274,11 +385,8 @@ impl Index {
 
     /// Index ranges of everything below `path`, but not `path` itself.
     fn descendants(&self, path: &str) -> Vec<std::ops::Range<usize>> {
-        // A path ending in a separator (a drive root) is its own prefix.
-        let prefixes =
-            if path.ends_with(['\\', '/']) { vec![path.to_string()] } else { vec![format!("{path}\\"), format!("{path}/")] };
         let mut ranges = Vec::new();
-        for p in prefixes {
+        for p in descendant_prefixes(path) {
             let start = self.entries.partition_point(|e| *e.path < *p);
             let len = self.entries[start..].partition_point(|e| e.path.starts_with(&p));
             if len > 0 {
@@ -336,10 +444,15 @@ impl Index {
     /// indexed (a link). Disk is the truth, so a file created and deleted
     /// within one batch simply never appears.
     ///
-    /// Each path is reconciled once and all inserts and removals are done in
-    /// one pass each, so a big batch on millions of entries stays cheap. Only
-    /// a folder renamed with contents is moved on its own, so its contents
-    /// come along without a scan. Entry indices held elsewhere become stale.
+    /// Each path is reconciled once, and the whole batch costs a few passes
+    /// over the entries however many changes it holds: removals are dropped
+    /// in one pass, new entries merged in once, and the folders renamed with
+    /// contents are taken out once, moved among themselves ([`Moving`]) and
+    /// merged back once. (Until 1.0 each such rename, and each folder deleted
+    /// and made again, was a pass over all the entries of its own: a burst of
+    /// a few hundred on a drive of a million files kept the window from
+    /// answering for half a minute.) Runs on the window's thread. Entry
+    /// indices held elsewhere become stale.
     pub fn apply_changes(&mut self, changes: &[Change], stat: impl Fn(&str) -> Option<(u64, i64, bool)>) -> Applied {
         let mut out = Applied::default();
         // Paths whose entry must be made to match the disk.
@@ -347,6 +460,9 @@ impl Index {
         // Paths reported gone (deleted or renamed away): a folder found
         // there now is another one, whose contents are unknown.
         let mut removed: Vec<String> = Vec::new();
+        // Everything the batch's folder renames can touch, out of the list.
+        let renames: Vec<(&str, &str)> = changes.iter().filter_map(moved_folder).collect();
+        let mut moving = (!renames.is_empty()).then(|| self.take_moving(&renames));
         for c in changes {
             match c {
                 Change::Added(p) | Change::Modified(p) | Change::Removed(p) => {
@@ -368,7 +484,8 @@ impl Index {
                     // node_modules): the contents go, as if scanned.
                     if let (Some(old), Some(new)) = (old_seen, new_seen)
                         && !skip_dir(file_name(new))
-                        && !self.descendants(old).is_empty()
+                        && let Some(m) = moving.as_mut()
+                        && m.has_descendants(old)
                     {
                         // Paths noted earlier in the batch move along too.
                         for d in dirty.iter_mut().chain(&mut removed) {
@@ -376,7 +493,7 @@ impl Index {
                                 *d = format!("{new}{}", &d[old.len()..]);
                             }
                         }
-                        if self.rename_path(old, new) {
+                        if m.rename(old, new) {
                             out.changed += 1;
                         }
                     }
@@ -386,6 +503,10 @@ impl Index {
                 }
                 Change::Rescan(root) => out.scan.push(root.clone()),
             }
+        }
+        if let Some(m) = moving {
+            let rest = std::mem::take(&mut self.entries);
+            self.entries = merge_by_path(rest, m.into_entries());
         }
         dirty.sort_unstable();
         dirty.dedup();
@@ -401,27 +522,19 @@ impl Index {
         }
 
         // Removals: collect every range, then drop them all in one pass.
-        let mut ranges: Vec<std::ops::Range<usize>> = gone.iter().flat_map(|p| self.subtree(p)).collect();
-        if !ranges.is_empty() {
-            ranges.sort_unstable_by_key(|r| r.start);
-            let before = self.entries.len();
-            let (mut i, mut r) = (0, 0);
-            self.entries.retain(|_| {
-                while r < ranges.len() && ranges[r].end <= i {
-                    r += 1;
-                }
-                let keep = !(r < ranges.len() && ranges[r].contains(&i));
-                i += 1;
-                keep
-            });
-            out.changed += before - self.entries.len();
-        }
+        let ranges: Vec<std::ops::Range<usize>> = gone.iter().flat_map(|p| self.subtree(p)).collect();
+        out.changed += self.drop_ranges(ranges);
 
         // Updates in place; new entries are gathered (already in path order,
-        // since `dirty` was sorted) and merged in once.
+        // since `dirty` was sorted) and merged in once. What was inside a
+        // folder made again is dropped once, after the loop: until then the
+        // paths below such a folder count as new.
         let mut fresh = Vec::new();
+        let mut stale: Vec<std::ops::Range<usize>> = Vec::new();
+        let mut made_again: HashSet<String> = HashSet::new();
         for (p, size, mtime, is_dir) in upserts {
-            match self.find(&p) {
+            let found = if made_again.is_empty() || !has_ancestor_in(&p, &made_again) { self.find(&p) } else { None };
+            match found {
                 Some(i) => {
                     let e = &mut self.entries[i];
                     let was_dir = e.is_dir;
@@ -433,9 +546,10 @@ impl Index {
                     // (or the other way round): what was inside is stale.
                     let replaced = was_dir != is_dir || removed.binary_search(&p).is_ok();
                     if replaced && was_dir {
-                        for r in self.descendants(&p).into_iter().rev() {
-                            out.changed += r.len();
-                            self.entries.drain(r);
+                        let inside = self.descendants(&p);
+                        if !inside.is_empty() {
+                            stale.extend(inside);
+                            made_again.insert(p.clone());
                         }
                     }
                     if replaced && is_dir && !skip_dir(file_name(&p)) {
@@ -454,6 +568,7 @@ impl Index {
                 }
             }
         }
+        out.changed += self.drop_ranges(stale);
         if !fresh.is_empty() {
             out.changed += fresh.len();
             let rest = std::mem::take(&mut self.entries);
@@ -462,6 +577,34 @@ impl Index {
         out.scan.sort_unstable();
         out.scan.dedup();
         out
+    }
+
+    /// Drops every entry inside `ranges` (which may overlap) in one pass.
+    /// Returns how many were dropped.
+    fn drop_ranges(&mut self, mut ranges: Vec<std::ops::Range<usize>>) -> usize {
+        if ranges.is_empty() {
+            return 0;
+        }
+        ranges.sort_unstable_by_key(|r| r.start);
+        let before = self.entries.len();
+        let mut inside = RangeCursor::new(&ranges);
+        self.entries.retain(|_| !inside.next());
+        before - self.entries.len()
+    }
+
+    /// Takes out of the list every entry the folder renames `renames` can
+    /// touch: what is at or below each one's old and new path. An entry the
+    /// batch moves is at or below some rename's old path the first time it
+    /// is moved, and one a rename replaces is at or below its new path, so
+    /// the renames, done in order on what was taken out, give what doing
+    /// them on the whole list gives. One pass, whatever their number.
+    fn take_moving(&mut self, renames: &[(&str, &str)]) -> Moving {
+        let mut ranges: Vec<std::ops::Range<usize>> =
+            renames.iter().flat_map(|(old, new)| self.subtree(old).into_iter().chain(self.subtree(new))).collect();
+        ranges.sort_unstable_by_key(|r| r.start);
+        let mut inside = RangeCursor::new(&ranges);
+        let taken = self.entries.extract_if(.., |_| inside.next());
+        Moving { map: taken.map(|e| (e.path.clone(), e)).collect() }
     }
 
     /// Makes the drive `root` (`E:\`) a root of the index, after its first
@@ -500,6 +643,33 @@ impl Index {
         }
         self.roots.sort_by_key(|r| r.to_ascii_uppercase());
         n
+    }
+
+    /// [`replace_subtree`](Self::replace_subtree) for several finished
+    /// walks, in order, in one pass over the entries (until 1.0 each walk
+    /// cost a pass of its own, on the window's thread: hundreds of small
+    /// walks done at once kept it from answering for many seconds). A later
+    /// walk of a folder inside an earlier one's wins there, as it would one
+    /// after the other.
+    pub fn replace_subtrees(&mut self, walks: Vec<(String, Vec<Entry>)>) {
+        if walks.len() == 1 {
+            let (dir, found) = walks.into_iter().next().unwrap_or_default();
+            self.replace_subtree(&dir, found);
+            return;
+        }
+        let ranges: Vec<std::ops::Range<usize>> = walks.iter().flat_map(|(dir, _)| self.descendants(dir)).collect();
+        self.drop_ranges(ranges);
+        let mut all: Vec<Entry> = Vec::new();
+        for (dir, found) in walks {
+            if !all.is_empty() {
+                let prefixes = descendant_prefixes(&dir);
+                all.retain(|e| !prefixes.iter().any(|p| e.path.starts_with(p.as_str())));
+            }
+            all.extend(found);
+        }
+        sort_by_path(&mut all);
+        let rest = std::mem::take(&mut self.entries);
+        self.entries = merge_by_path(rest, all);
     }
 
     /// Replaces everything below `dir` with `found` (from `scan_subtree`,
@@ -629,6 +799,137 @@ pub fn list_drives() -> Vec<String> {
 mod tests {
     use super::*;
     use std::sync::atomic::Ordering;
+
+    impl Index {
+        /// `apply_changes` as it was until 1.0 (each folder rename and each
+        /// folder made again a pass over every entry): the reference the
+        /// batched one is checked against.
+        fn apply_changes_one_by_one(&mut self, changes: &[Change], stat: impl Fn(&str) -> Option<(u64, i64, bool)>) -> Applied {
+            let mut out = Applied::default();
+            // Paths whose entry must be made to match the disk.
+            let mut dirty: Vec<String> = Vec::with_capacity(changes.len());
+            // Paths reported gone (deleted or renamed away): a folder found
+            // there now is another one, whose contents are unknown.
+            let mut removed: Vec<String> = Vec::new();
+            for c in changes {
+                match c {
+                    Change::Added(p) | Change::Modified(p) | Change::Removed(p) => {
+                        if let Some(p) = change_path(p)
+                            && !skipped_path(p)
+                        {
+                            if let Change::Removed(_) = c {
+                                removed.push(p.to_string());
+                            }
+                            dirty.push(p.to_string());
+                        }
+                    }
+                    Change::Renamed(old, new) => {
+                        let (old_seen, new_seen) = (
+                            change_path(old).filter(|p| !skipped_path(p)),
+                            change_path(new).filter(|p| !skipped_path(p)),
+                        );
+                        // Into a folder name the walker never enters (renamed to
+                        // node_modules): the contents go, as if scanned.
+                        if let (Some(old), Some(new)) = (old_seen, new_seen)
+                            && !skip_dir(file_name(new))
+                            && !self.descendants(old).is_empty()
+                        {
+                            // Paths noted earlier in the batch move along too.
+                            for d in dirty.iter_mut().chain(&mut removed) {
+                                if is_under(d, old) {
+                                    *d = format!("{new}{}", &d[old.len()..]);
+                                }
+                            }
+                            if self.rename_path(old, new) {
+                                out.changed += 1;
+                            }
+                        }
+                        // Moved into the recycle bin and the like: just gone.
+                        removed.extend(old_seen.map(str::to_string));
+                        dirty.extend(old_seen.into_iter().chain(new_seen).map(str::to_string));
+                    }
+                    Change::Rescan(root) => out.scan.push(root.clone()),
+                }
+            }
+            dirty.sort_unstable();
+            dirty.dedup();
+            removed.sort_unstable();
+
+            let mut upserts = Vec::new();
+            let mut gone = Vec::new();
+            for p in dirty {
+                match stat(&p) {
+                    Some((size, mtime, is_dir)) => upserts.push((p, size, mtime, is_dir)),
+                    None => gone.push(p),
+                }
+            }
+
+            // Removals: collect every range, then drop them all in one pass.
+            let mut ranges: Vec<std::ops::Range<usize>> = gone.iter().flat_map(|p| self.subtree(p)).collect();
+            if !ranges.is_empty() {
+                ranges.sort_unstable_by_key(|r| r.start);
+                let before = self.entries.len();
+                let (mut i, mut r) = (0, 0);
+                self.entries.retain(|_| {
+                    while r < ranges.len() && ranges[r].end <= i {
+                        r += 1;
+                    }
+                    let keep = !(r < ranges.len() && ranges[r].contains(&i));
+                    i += 1;
+                    keep
+                });
+                out.changed += before - self.entries.len();
+            }
+
+            // Updates in place; new entries are gathered (already in path order,
+            // since `dirty` was sorted) and merged in once.
+            let mut fresh = Vec::new();
+            for (p, size, mtime, is_dir) in upserts {
+                match self.find(&p) {
+                    Some(i) => {
+                        let e = &mut self.entries[i];
+                        let was_dir = e.is_dir;
+                        if (e.size, e.mtime, e.is_dir) != (size, mtime, is_dir) {
+                            (e.size, e.mtime, e.is_dir) = (size, mtime, is_dir);
+                            out.changed += 1;
+                        }
+                        // Deleted and made again, or a file replaced by a folder
+                        // (or the other way round): what was inside is stale.
+                        let replaced = was_dir != is_dir || removed.binary_search(&p).is_ok();
+                        if replaced && was_dir {
+                            for r in self.descendants(&p).into_iter().rev() {
+                                out.changed += r.len();
+                                self.entries.drain(r);
+                            }
+                        }
+                        if replaced && is_dir && !skip_dir(file_name(&p)) {
+                            out.scan.push(p);
+                        }
+                    }
+                    None => {
+                        let norm_name = name_key(file_name(&p)).into();
+                        let e = Entry { path: p.into(), size, mtime, is_dir, norm_name };
+                        // A folder that just appeared may have been moved in
+                        // with contents; the walker would not enter skipped ones.
+                        if is_dir && !skip_dir(e.name()) {
+                            out.scan.push(e.path.to_string());
+                        }
+                        fresh.push(e);
+                    }
+                }
+            }
+            if !fresh.is_empty() {
+                out.changed += fresh.len();
+                let rest = std::mem::take(&mut self.entries);
+                self.entries = merge_by_path(rest, fresh);
+            }
+            out.scan.sort_unstable();
+            out.scan.dedup();
+            out
+        }
+
+
+    }
 
     #[test]
     fn skipped_dirs() {
@@ -1538,7 +1839,16 @@ mod tests {
                     assert!(taken.collapsed.is_empty() || taken.collapsed == [ROOT], "{:?}", taken.collapsed);
                     changes = taken.changes;
                 }
+                let mut one_by_one = Index { entries: idx.entries.clone(), roots: idx.roots.clone(), built_at: idx.built_at };
+                let want = one_by_one.apply_changes_one_by_one(&changes, |p| disk.get(p).copied());
                 let got = idx.apply_changes(&changes, |p| disk.get(p).copied());
+                assert_eq!(got, want, "round {round}: what the batch did, against one change at a time");
+                assert!(
+                    idx.entries.iter().zip(&one_by_one.entries).all(|(a, b)| (&a.path, a.size, a.mtime, a.is_dir, &a.norm_name)
+                        == (&b.path, b.size, b.mtime, b.is_dir, &b.norm_name))
+                        && idx.entries.len() == one_by_one.entries.len(),
+                    "round {round}: the entries differ from one change at a time, after {changes:#?}"
+                );
                 for dir in &got.scan {
                     idx.replace_subtree(dir, scan(&disk, dir));
                 }
@@ -1551,5 +1861,156 @@ mod tests {
             // The small queues did overflow, so the walk path was exercised.
             assert!(cap.is_none_or(|c| c > 6) || overflows > 0, "round {round}: a queue of {cap:?} never overflowed");
         }
+    }
+
+
+    /// Entries as comparable tuples (the normalised name included).
+    fn rows(idx: &Index) -> Vec<(String, u64, i64, bool, String)> {
+        idx.entries.iter().map(|e| (e.path.to_string(), e.size, e.mtime, e.is_dir, e.norm_name.to_string())).collect()
+    }
+
+    /// `n` folders `C:\d<i>` of `per` files each, plus a few look-alikes
+    /// (`C:\d1 x.txt`, `C:\d1-y`) that sort among them.
+    fn folders(n: usize, per: usize) -> Index {
+        let mut paths = Vec::new();
+        for i in 0..n {
+            paths.push(format!(r"C:\d{i}"));
+            paths.push(format!(r"C:\d{i} x.txt"));
+            paths.push(format!(r"C:\d{i}-y"));
+            for f in 0..per {
+                paths.push(format!(r"C:\d{i}\f{f}.txt"));
+            }
+        }
+        let refs: Vec<&str> = paths.iter().map(String::as_str).collect();
+        index_of(&refs)
+    }
+
+    /// Big batches of folder renames (chains, swaps, moves into each other,
+    /// onto existing folders, letter case only) and folders deleted and made
+    /// again: the batched `apply_changes` does what one change at a time did.
+    #[test]
+    fn many_folder_renames_in_one_batch_match_one_at_a_time() {
+        let mut rng = Rng(0x5EED_F01D);
+        for round in 0..40 {
+            let n = 30;
+            let mut idx = folders(n, 1 + round % 4);
+            let mut disk: Disk = idx.entries.iter().map(|e| (e.path.to_string(), (e.size, e.mtime, e.is_dir))).collect();
+            let mut changes = Vec::new();
+            for _ in 0..20 + rng.below(60) {
+                let dirs: Vec<String> = disk.iter().filter(|(_, v)| v.2).map(|(k, _)| k.clone()).collect();
+                if dirs.is_empty() {
+                    break;
+                }
+                let old = dirs[rng.below(dirs.len())].clone();
+                match rng.below(5) {
+                    // Deleted and made again (empty), reported as such.
+                    0 => {
+                        disk.retain(|k, _| !(k == &old || is_under(k, &old)));
+                        disk.insert(old.clone(), (0, 9, true));
+                        changes.push(Change::Removed(old.clone()));
+                        changes.push(Change::Added(old));
+                    }
+                    // Renamed: to a new name, into another folder, to the
+                    // letter case only, or onto a name that exists (a folder
+                    // that was deleted first, as Windows needs).
+                    k => {
+                        let new = match k {
+                            1 => format!(r"C:\n{}", rng.below(40)),
+                            2 => format!(r"{}\in{}", dirs[rng.below(dirs.len())], rng.below(3)),
+                            3 => old.to_uppercase(),
+                            _ => dirs[rng.below(dirs.len())].clone(),
+                        };
+                        if new == old || is_under(&new, &old) {
+                            continue;
+                        }
+                        if disk.contains_key(&new) {
+                            disk.retain(|p, _| !(p == &new || is_under(p, &new)));
+                            changes.push(Change::Removed(new.clone()));
+                        }
+                        let moved: Vec<String> = disk.keys().filter(|p| *p == &old || is_under(p, &old)).cloned().collect();
+                        for p in moved {
+                            let v = disk.remove(&p).unwrap();
+                            disk.insert(format!("{new}{}", &p[old.len()..]), v);
+                        }
+                        changes.push(Change::Renamed(old, new));
+                    }
+                }
+            }
+            let mut one_by_one = Index { entries: idx.entries.clone(), ..Index::default() };
+            let want = one_by_one.apply_changes_one_by_one(&changes, |p| disk.get(p).copied());
+            let got = idx.apply_changes(&changes, |p| disk.get(p).copied());
+            assert_eq!(got, want, "round {round}: {changes:#?}");
+            assert_eq!(rows(&idx), rows(&one_by_one), "round {round}: {changes:#?}");
+            assert!(is_sorted(&idx));
+        }
+    }
+
+    /// Several finished walks put in at once, nested ones and a whole drive
+    /// among them: the same entries as one walk after the other.
+    #[test]
+    fn walks_put_in_at_once_match_one_after_the_other() {
+        let walk = |dir: &str, names: &[&str]| -> (String, Vec<Entry>) {
+            let found: Vec<String> = names.iter().map(|n| format!(r"{dir}\{n}")).collect();
+            let refs: Vec<&str> = found.iter().map(String::as_str).collect();
+            (dir.to_string(), index_of(&refs).entries)
+        };
+        let cases: Vec<Vec<(String, Vec<Entry>)>> = vec![
+            vec![walk(r"C:\d1", &["a.txt", "s", r"s\b.txt"]), walk(r"C:\d3", &[]), walk(r"C:\d7", &["n.txt"])],
+            // A folder inside one walked just before, and the other way round.
+            vec![walk(r"C:\d2", &["s", r"s\x.txt", "t.txt"]), walk(r"C:\d2\s", &["y.txt"]), walk(r"C:\d4", &["q.txt"])],
+            vec![walk(r"C:\d5\in", &["z.txt"]), walk(r"C:\d5", &["in", r"in\w.txt"])],
+            // The whole drive, then a folder in it.
+            vec![(r"C:\".to_string(), index_of(&[r"C:\d1", r"C:\d1\a.txt", r"C:\e.txt"]).entries), walk(r"C:\d1", &["b.txt"])],
+        ];
+        for (i, walks) in cases.into_iter().enumerate() {
+            let mut one = folders(10, 3);
+            let mut all = folders(10, 3);
+            for (dir, found) in &walks {
+                one.replace_subtree(dir, found.clone());
+            }
+            all.replace_subtrees(walks);
+            assert_eq!(rows(&all), rows(&one), "case {i}");
+            assert!(is_sorted(&all), "case {i}");
+        }
+    }
+
+    /// The soak test's hang: hundreds of folder renames in one watcher
+    /// batch, or hundreds of finished folder walks put in at once, used to
+    /// cost a pass over every entry each, on the window's thread (on a
+    /// million entries, about a tenth of a second each). Now a batch costs a
+    /// few such passes whatever its size. Measured against one pass, so it
+    /// holds on slow and fast machines, debug or release.
+    #[test]
+    fn a_big_batch_costs_a_few_passes_not_one_per_folder() {
+        use std::time::{Duration, Instant};
+        const N: usize = 300;
+        let mut idx = folders(N, 300);
+        // One pass over the entries: what one rename used to cost.
+        let pass = (0..3)
+            .map(|i| {
+                let t = Instant::now();
+                assert!(idx.rename_path(&format!(r"C:\d{i}"), &format!(r"C:\d{i}")));
+                let moved = idx.entries.clone();
+                drop(moved);
+                t.elapsed()
+            })
+            .min()
+            .unwrap_or_default()
+            .max(Duration::from_micros(200));
+        let renames: Vec<Change> = (3..N).map(|i| Change::Renamed(format!(r"C:\d{i}"), format!(r"C:\e{i}"))).collect();
+        let t = Instant::now();
+        let got = idx.apply_changes(&renames, |p| p.starts_with(r"C:\e").then_some((0, 0, true)));
+        let batch = t.elapsed();
+        assert_eq!(got.changed, 2 * (N - 3), "the renames, and the new folders' sizes");
+        assert!(got.scan.is_empty(), "moved with their contents: nothing to walk");
+        assert!(batch < pass * 60, "{} folder renames took {batch:?}, one pass {pass:?}", N - 3);
+        let walks: Vec<(String, Vec<Entry>)> =
+            (3..N).map(|i| (format!(r"C:\e{i}"), index_of(&[&format!(r"C:\e{i}\w.txt")]).entries)).collect();
+        let t = Instant::now();
+        idx.replace_subtrees(walks);
+        let batch = t.elapsed();
+        assert!(batch < pass * 60, "{} walks took {batch:?}, one pass {pass:?}", N - 3);
+        assert_eq!(idx.find(r"C:\e7\w.txt").map(|i| &*idx.entries[i].path), Some(r"C:\e7\w.txt"));
+        assert!(idx.find(r"C:\e7\f0.txt").is_none() && idx.find(r"C:\d7\f0.txt").is_none());
     }
 }

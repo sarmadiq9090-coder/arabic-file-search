@@ -127,7 +127,7 @@ impl App {
             Sample {
                 private,
                 entries: st.index.entries.len(),
-                documents: super::content_index::opened().map_or(0, |c| c.documents()),
+                documents: super::content_index::opened().map_or(0, |c| c.documents_now()),
                 queue: st.changes.len(),
             }
         };
@@ -185,12 +185,24 @@ impl App {
                 st.rows_index = st.index.clone();
             }
         }
-        if let Some(c) = super::content_index::opened() {
-            c.shrink();
+        // The rest on a thread of its own: the content index's maps are
+        // shrunk under its lock, which a document search or a save of
+        // `content.idx` may hold, and the heap is compacted, which takes the
+        // heap's lock and walks it. Neither may keep the window from
+        // answering. (Until 1.0 all of the trim ran here.)
+        let (before, entries, documents) = (sample.private, sample.entries, sample.documents);
+        let started = Instant::now();
+        let spawned = crate::crash_log::spawn_named("idle-trim", move || {
+            if let Some(c) = super::content_index::opened() {
+                c.shrink();
+            }
+            release_free_heap();
+            let after = private_bytes().unwrap_or(before);
+            log(&format!("{} in {} ms", mem_guard::trim_line(before, after, entries, documents), started.elapsed().as_millis()));
+        });
+        if spawned.is_none() {
+            log(&mem_guard::trim_line(before, private_bytes().unwrap_or(before), entries, documents));
         }
-        release_free_heap();
-        let after = private_bytes().unwrap_or(sample.private);
-        log(&mem_guard::trim_line(sample.private, after, sample.entries, sample.documents));
     }
 
     /// Far more memory than the index explains: lets go of everything that
