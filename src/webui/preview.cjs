@@ -18,7 +18,12 @@
 // program refuses unknown fields), and that every request about a row names
 // the version of the list it is on (the fake numbers its lists as
 // bridge.rs `Lists` does, and answers a request about an older one as the
-// program does: "the list changed").
+// program does: "the list changed"). The thumbnail view is checked with
+// hundreds of results at the window sizes and display scales people use,
+// scrolled and resized: no tile over another, every name shown, and a
+// thumbnail asked for every tile in view (`tiles`).
+//
+// PREVIEW_ONLY=<regex> renders only the screens whose name matches.
 "use strict";
 const { chromium } = require("playwright");
 const fs = require("fs");
@@ -56,9 +61,11 @@ const LANG_FILES = Object.fromEntries(fs.readdirSync(I18N_DIR).filter((f) => f.e
 const LANGS = [{ code: "ar", native: "العربية", english: "Arabic", rtl: true, machine: false }, { code: "en", native: "English", english: "English", rtl: false, machine: false },
   ...Object.entries(LANG_FILES).map(([code, f]) => ({ code, native: f.meta.name_native, english: f.meta.name_en, rtl: !!f.meta.rtl, machine: true })).sort((a, b) => a.native.toLowerCase() < b.native.toLowerCase() ? -1 : 1)];
 const dirOf = (lang) => (LANGS.find((l) => l.code === lang) || {}).rtl ? "rtl" : "ltr";
+// The language's script (src/i18n.rs LOCALES): the page shows the Arabic examples only in Arabic script.
+const scriptOf = (lang) => lang === "ar" ? "Arab" : lang === "en" ? "Latn" : LANG_FILES[lang].meta.script;
 function page(lang) {
   if (lang !== "ar" && lang !== "en" && !LANG_FILES[lang]) throw new Error(`no i18n/${lang}.json`);
-  const data = { code: lang, rtl: dirOf(lang) === "rtl", js: (LANG_FILES[lang] || {}).js || {}, langs: LANGS };
+  const data = { code: lang, rtl: dirOf(lang) === "rtl", script: scriptOf(lang), js: (LANG_FILES[lang] || {}).js || {}, langs: LANGS };
   return fs.readFileSync(path.join(ASSETS, "index.html"), "utf8")
     .replace("{{LANG}}", lang).replace("{{DIR}}", dirOf(lang))
     .replace("{{CSP}}", CSP.replace("; frame-ancestors 'none'", "")).replace("{{TOKEN}}", "00112233445566778899aabbccddeeff")
@@ -71,7 +78,7 @@ function fakeProgram(cfg) {
   const U = "C:\\Users\\Sara";
   const ar = cfg.lang === "ar";
   window.__sent = []; window.__fakeErrors = []; window.__stale = [];
-  const files = (ar ? [
+  let files = (ar ? [
     [`${U}\\Documents\\العمل\\المالية`, "تقرير المبيعات ٢٠٢٦.xlsx", 48 * 1024, 7 * 60],
     [`${U}\\Documents\\التقارير\\2026`, "التقرير السنوي النهائي.pdf", 2.4 * 1048576, 26 * 3600],
     [`${U}\\Desktop`, "تقرير الاجتماع الأسبوعي.docx", 31 * 1024, 5 * 3600],
@@ -103,6 +110,14 @@ function fakeProgram(cfg) {
     // An Arabic name in the English interface (long: the preview wraps it).
     [`${U}\\Documents\\الفواتير`, "فاتورة الكهرباء الشهرية لشهر تشرين الثاني مع ملاحظات المحاسب والمدير.pdf", 120 * 1024, 40 * 86400],
   ]).map(([dir, name, size, age, folder]) => ({ dir, name, size: Math.round(size), mtime: now - age, folder: !!folder, ext: folder ? "" : name.split(".").pop().toLowerCase() }));
+  // Hundreds of results (the thumbnail view's checks): pictures, documents and folders mixed.
+  if (cfg.many) {
+    const EXTS = ["jpg", "png", "pdf", "docx", "txt", "", "heic", "xlsx"];
+    files = files.concat(Array.from({ length: cfg.many }, (_, i) => {
+      const ext = EXTS[i % EXTS.length];
+      return { dir: `${U}\\Pictures\\${ar ? "رحلة" : "Trip"} ${2019 + (i % 8)}`, name: `${ar ? "تقرير صورة" : "report photo"} ${i + 1}${ext ? "." + ext : ""}`, size: 2048 + i * 917, mtime: now - 3600 * (i + 1), folder: !ext, ext };
+    }));
+  }
   // Synthetic document texts for the search inside documents.
   const docs = ar ? [
     [`${U}\\Documents\\العقود`, "عقد إيجار الشقة 2026.docx", 88 * 1024, 2 * 86400, "…يلتزم المستأجر بدفع بدل عقد الإيجار في أول كل شهر، ويُجدَّد عقد الإيجار تلقائياً…", 6],
@@ -131,6 +146,9 @@ function fakeProgram(cfg) {
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
   const ROW_OPS = ["thumbs", "more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope", "drag", "folder_sizes", "switch_to", "open_with", "properties"];
   let lastVer = 0, recentVer = 0;
+  // The rows of the list on screen the page asked a thumbnail for.
+  const thumbAsked = new Set();
+  window.__thumbAsked = (id) => thumbAsked.has(`${shown.seq}:${shown.ver}:${id}`);
   const nextVer = () => ++lastVer;
   const send = (m) => setTimeout(() => window.__instafind.recv(m), 0);
   const mark = (text, term) => {
@@ -235,6 +253,7 @@ function fakeProgram(cfg) {
     } else if (m.op === "thumbs") {
       // One-time keys by row (even rows have a picture, odd ones none: 404).
       if (!Array.isArray(m.ids) || !m.ids.length || m.ids.length > 64) fail("bad thumbs ids");
+      for (const id of m.ids) thumbAsked.add(`${m.seq}:${m.ver}:${id}`);
       const hex = () => Array.from({ length: 31 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
       send({ type: "thumbs", seq: m.seq, ver: m.ver, keys: m.ids.map((id) => [id, (id % 2 ? "b" : "a") + hex()]) });
     } else if (m.op === "more") {
@@ -355,6 +374,17 @@ const SHOTS = [
   ["grid-keys-ar-light", "ar", "light", [["type", "تقرير"], ["key", "Control+t"], ["wait", 200], ["click", "#r0"], ["key", "ArrowLeft"]], { expect: { active: "r1" } }],
   ["grid-down-en-light", "en", "light", [["type", "report"], ["key", "Control+t"], ["wait", 200], ["click", "#r0"], ["key", "ArrowDown"]], { expect: { downByCols: true } }],
   ["grid-off-en-light", "en", "light", [["type", "report"], ["key", "Control+t"], ["key", "Control+t"]], { expect: { grid: false } }],
+  // Hundreds of results as tiles in the window sizes people use (the default
+  // 1008x680, laptops, small, maximised) at 100, 125 and 150 % display scale:
+  // no tile over another, every name shown, a thumbnail asked for every tile
+  // in view and none for tiles far below it (1.0.0: rows of tiles squeezed
+  // into the list's height in a window that is not maximised).
+  ...[[1008, 680], [1280, 720], [900, 600], [1938, 1038]].flatMap(([w, hh]) => [1, 1.25, 1.5].map((sc) =>
+    [`grid-many-${w}x${hh}-${sc * 100}-en-dark`, "en", "dark", [["type", "report"], ["key", "Control+t"], ["wait", 600]], { many: 400, width: w, height: hh, scale: sc, expect: { tiles: "ok", farAsked: 0 } }])),
+  ["grid-many-scroll-ar-light", "ar", "light", [["type", "تقرير"], ["key", "Control+t"], ["wait", 300], ["scroll", 0.5], ["scroll", 1], ["scroll", 1], ["wait", 300]], { many: 400, width: 1008, height: 680, scale: 1.25, expect: { tiles: "ok" } }],
+  ["grid-many-nopreview-en-light", "en", "light", [["type", "report"], ["key", "Control+t"], ["click", "#view-preview"], ["wait", 600]], { many: 400, width: 1008, height: 680, scale: 1.25, expect: { tiles: "ok", preview: false } }],
+  ["grid-many-narrow-ar-dark", "ar", "dark", [["type", "تقرير"], ["key", "Control+t"], ["wait", 600]], { many: 400, width: 820, height: 600, scale: 1.25, expect: { tiles: "ok", preview: false } }],
+  ["grid-many-resize-en-dark", "en", "dark", [["type", "report"], ["key", "Control+t"], ["wait", 300], ["resize", 1938, 1038], ["resize", 1008, 680], ["resize", 1280, 720]], { many: 400, width: 1008, height: 680, scale: 1.25, expect: { tiles: "ok" } }],
   // A Latin search in the Arabic interface stays at the right.
   ["latin-query-ar-light", "ar", "light", [["type", "report"]], { expect: { qAlign: "right" } }],
   ["filters-ar-light", "ar", "light", [["chip", "size", 2], ["chip", "date", 4], ["chip", "scope", 1], ["type", "تقرير"], ["wait", 100], ["click", '.colbtn[data-sort="size"]'], ["click", '.colbtn[data-sort="size"]'], ["key", "ArrowDown"]], { expect: { chipsOn: 3 } }],
@@ -445,10 +475,10 @@ const SHOTS = [
   ["pv-name-en-ui-ar-name-en-light", "en", "light", [["type", "فاتورة"]], { expect: { pvNameSide: "right" } }],
   ["pv-name-en-dark", "en", "dark", [["type", "report"]], { expect: { pvNameSide: "left" } }],
   // «كيف أبحث؟»: the ? button and F1 open the card; an example clicked goes in the box and searches.
-  ["help-ar-light", "ar", "light", [["click", "#help-btn"]], { expect: { dialog: true, helpEx: 16, helpKeys: true, a11y: true } }],
-  ["help-f1-en-dark", "en", "dark", [["key", "F1"]], { expect: { dialog: true, helpEx: 16, helpKeys: true, focus: "hx0" } }],
+  ["help-ar-light", "ar", "light", [["click", "#help-btn"]], { expect: { dialog: true, helpEx: 16, helpArab: true, helpKeys: true, a11y: true } }],
+  ["help-f1-en-dark", "en", "dark", [["key", "F1"]], { expect: { dialog: true, helpEx: 14, helpArab: false, helpKeys: true, focus: "hx0" } }],
   ["help-example-ar-dark", "ar", "dark", [["key", "F1"], ["click", "#hx6"], ["wait", 100]], { expect: { dialog: false, q: "حجم:>10م", lastSent: "search", focus: "q" } }],
-  ["help-more-en-light", "en", "light", [["click", "#help-more"]], { width: 900, height: 640, expect: { dialog: true, helpEx: 16 } }],
+  ["help-more-en-light", "en", "light", [["click", "#help-more"]], { width: 900, height: 640, expect: { dialog: true, helpEx: 14 } }],
   // Ctrl+Alt+F taken by another program: Settings says so and offers other keys; a pick is used at once.
   ["hotkey-taken-ar-light", "ar", "light", [["key", "Control+,"]], { hotkeyTaken: true, expect: { settings: true, hkTaken: true, hkKbd: "Ctrl+Alt+F", a11y: true } }],
   ["hotkey-pick-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#hk-ctrl_alt_space"], ["wait", 50]], { hotkeyTaken: true, expect: { settings: true, lastSent: "hotkey", hkTaken: false, hkKbd: "Ctrl+Alt+Space", hkOn: "hk-ctrl_alt_space" } }],
@@ -464,6 +494,14 @@ const SHOTS = [
   ["phone-store-en-light", "en", "light", [["key", "Control+,"]], { store: true, expect: { settings: true, phoneRow: false } }],
   // «جرّب هذه»: each example is a button in a named list; clicking one searches for it.
   ["tip-click-ar-light", "ar", "light", [["click", "#tips .tq"], ["wait", 100]], { expect: { q: "تقرير .pdf", view: "view-results", uia: true } }],
+  // The Arabic examples (root:, hamza and alef forms) only in an Arabic-script interface;
+  // English gets the accent fold instead («cafe» finds «café»). (Every screen also checks
+  // that a non-Arabic-script page shows no Arabic script in «Try these» or the help card.)
+  ["tips-ar-dark", "ar", "dark", [], { expect: { tipsArab: true, tipRoot: true, tips: 6 } }],
+  ["tips-en-light", "en", "light", [], { expect: { tipsArab: false, tipRoot: false, tips: 5, tipFold: true } }],
+  ["tips-fa-light", "fa", "light", [], { expect: { tipRoot: true, tips: 6, tipFold: false } }],
+  ["tips-hi-dark", "hi", "dark", [], { expect: { tipsArab: false, tips: 4 } }],
+  ["help-de-light", "de", "light", [["key", "F1"]], { expect: { dialog: true, helpEx: 14, helpArab: false } }],
   ["uia-settings-en-dark", "en", "dark", [["key", "Control+,"]], { phoneOn: true, expect: { settings: true, uia: true, a11y: true } }],
   // Translated languages (i18n/*.json): direction, fonts, the language list
   // (scrolling, each name in its own script, machine translations marked)
@@ -479,8 +517,10 @@ const SHOTS = [
 (async () => {
   const browser = await chromium.launch(exe ? { executablePath: exe } : {});
   const errors = [];
-  for (const [name, lang, theme, steps, opts = {}] of SHOTS) {
-    const ctx = await browser.newContext({ viewport: { width: opts.width || 1280, height: opts.height || 800 }, deviceScaleFactor: 2, colorScheme: theme, locale: lang === "en" ? "en-US" : lang });
+  const only = process.env.PREVIEW_ONLY ? new RegExp(process.env.PREVIEW_ONLY) : null;
+  const shots = only ? SHOTS.filter(([name]) => only.test(name)) : SHOTS;
+  for (const [name, lang, theme, steps, opts = {}] of shots) {
+    const ctx = await browser.newContext({ viewport: { width: opts.width || 1280, height: opts.height || 800 }, deviceScaleFactor: opts.scale || 2, colorScheme: theme, locale: lang === "en" ? "en-US" : lang });
     const pg = await ctx.newPage();
     const thumbAsks = [];
     pg.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
@@ -501,7 +541,7 @@ const SHOTS = [
       if (!file.startsWith(ASSETS) || !fs.existsSync(file)) return route.fulfill({ status: 404, headers, body: "" });
       route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || "application/octet-stream", headers, body: fs.readFileSync(file) });
     });
-    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches, store: !!opts.store, hotkeyTaken: !!opts.hotkeyTaken, phoneOn: !!opts.phoneOn, phoneRefused: !!opts.phoneRefused, phoneIdle: !!opts.phoneIdle });
+    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches, store: !!opts.store, hotkeyTaken: !!opts.hotkeyTaken, phoneOn: !!opts.phoneOn, phoneRefused: !!opts.phoneRefused, phoneIdle: !!opts.phoneIdle, many: opts.many || 0 });
     await pg.goto(ORIGIN + "/");
     await pg.waitForFunction(() => document.querySelector("#menu-kind") && document.querySelector("#menu-kind").children.length > 0);
     for (const [what, a, b] of steps) {
@@ -515,6 +555,8 @@ const SHOTS = [
       else if (what === "chip") { await pg.click(`#chip-${a}`); await pg.click(`#menu-${a} [data-k="${b}"]`); await pg.waitForTimeout(120); }
       else if (what === "wait") await pg.waitForTimeout(a);
       else if (what === "eval") await pg.evaluate(a);
+      else if (what === "resize") { await pg.setViewportSize({ width: a, height: b }); await pg.waitForTimeout(400); }
+      else if (what === "scroll") { await pg.evaluate((f) => { const l = document.getElementById("list"); l.scrollTop = (l.scrollHeight - l.clientHeight) * f; }, a); await pg.waitForTimeout(400); }
       else if (what === "drag") {
         const b = await pg.locator(a).boundingBox();
         await pg.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
@@ -533,6 +575,12 @@ const SHOTS = [
       // (A language whose script IBM Plex lacks starts with a Windows font instead.)
       if (getComputedStyle(document.body).fontFamily.startsWith('"IF Sans"') && [...document.fonts].filter((f) => f.status === "loaded").length < 2) bad.push("fonts not loaded");
       if (document.documentElement.dir !== wantDir) bad.push("page direction");
+      // «Try these» and the help card: no Arabic script unless the language is written in it.
+      const ARABIC = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+      const pageScript = (() => { try { return JSON.parse(document.getElementById("i18n").textContent).script; } catch (e) { return null; } })();
+      if (!pageScript) bad.push("no script in the page data");
+      if (pageScript !== "Arab") for (const el of document.querySelectorAll("#tips, .dlg.help .hx-list, .dlg.help .sub"))
+        if (ARABIC.test(el.textContent)) bad.push(`Arabic script in a ${pageScript} page: ${el.textContent.slice(0, 80)}`);
       if (getComputedStyle(document.body).direction !== wantDir) bad.push("body direction");
       // Every path: left to right, its folder names placed left to right in order.
       for (const p of document.querySelectorAll(".path")) {
@@ -626,6 +674,31 @@ const SHOTS = [
         compact: document.body.classList.contains("compact"),
         grid: document.querySelectorAll("#list .row.tile").length > 0,
         pics: document.querySelectorAll("#list .row.tile.pic").length > 0,
+        // The thumbnail view: no tile over another; every tile in view shows
+        // its name under its picture, a full-size badge, and has asked for
+        // its thumbnail (a drive not connected asks none); a picture shows.
+        tiles: (() => {
+          const l = document.getElementById("list"), tiles = [...l.querySelectorAll(".row.tile")];
+          if (!tiles.length) return "no tiles";
+          const out = [], box = tiles.map((t) => t.getBoundingClientRect());
+          for (let i = 0; i < box.length && out.length < 3; i++) for (let j = i + 1; j < box.length; j++) {
+            const a = box[i], b = box[j];
+            if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5) { out.push(`tiles ${i} and ${j} overlap`); break; }
+          }
+          const lr = l.getBoundingClientRect();
+          const seen = tiles.filter((t, i) => box[i].bottom > lr.top && box[i].top < lr.bottom);
+          if (!seen.length) out.push("no tile in view");
+          for (const t of seen) {
+            const r = t.getBoundingClientRect(), nr = t.querySelector(".tname").getBoundingClientRect(), pr = t.querySelector(".tpic").getBoundingClientRect();
+            if (nr.height < 12 || nr.bottom > r.bottom + 0.5 || pr.bottom > nr.top + 0.5 || pr.top < r.top - 0.5) out.push(`tile ${t.dataset.i}: name or picture outside the tile`);
+            if (t.querySelector(".tpic .ft").getBoundingClientRect().width < 40) out.push(`tile ${t.dataset.i}: small badge`);
+            if (!t.classList.contains("gone") && !t.querySelector(".off") && !window.__thumbAsked(+t.dataset.i)) out.push(`tile ${t.dataset.i}: no thumbnail asked`);
+          }
+          if (!seen.some((t) => t.classList.contains("pic"))) out.push("no picture in view");
+          return out.length ? out.slice(0, 6).join("; ") : "ok";
+        })(),
+        // Thumbnails asked for tiles far below the view (more than the observer's margin and a row).
+        farAsked: (() => { const lr = document.getElementById("list").getBoundingClientRect(); return [...document.querySelectorAll("#list .row.tile")].filter((t) => t.getBoundingClientRect().top > lr.bottom + 480 && window.__thumbAsked(+t.dataset.i)).length; })(),
         downByCols: (() => { const l = document.getElementById("list"); const cols = getComputedStyle(l).gridTemplateColumns.split(" ").length; return cols > 1 && l.getAttribute("aria-activedescendant") === "r" + cols; })(),
         tagline: visible(document.querySelector("#view-nores .tagline")),
         dateW: document.body.style.getPropertyValue("--w-date"),
@@ -674,6 +747,11 @@ const SHOTS = [
         hkKbd: document.getElementById("hk-kbd").textContent,
         hkOn: (document.querySelector('.hkrow [aria-checked="true"]') || {}).id || null,
         helpEx: document.querySelectorAll(".dlg.help .hx").length || null,
+        helpArab: /[\u0600-\u06FF]/.test((document.querySelector(".dlg.help .hx-list") || {}).textContent || ""),
+        tips: document.querySelectorAll("#tips .tq").length,
+        tipsArab: /[\u0600-\u06FF]/.test(document.getElementById("tips").textContent),
+        tipRoot: [...document.querySelectorAll("#tips .tq")].some((b) => /^(root|جذر):/.test(b.textContent)),
+        tipFold: [...document.querySelectorAll("#tips .tq")].some((b) => ["cafe", "strasse", "елка", "かめら"].includes(b.textContent)),
         helpKeys: [...document.querySelectorAll(".dlg.help .hk-list kbd")].some((k) => k.textContent === "F1"),
         reportSays: (() => { const l = document.getElementById("report-problem-d"); if (!l || !visible(l)) return null; const t = l.textContent; return [/email|البريد/.test(t) ? "email" : "", /public|عامة/.test(t) ? "public" : ""].filter(Boolean).join("+"); })(),
         updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent + (b.getAttribute("aria-disabled") === "true" ? "|busy" : "|ready") : null; })(),
@@ -728,5 +806,5 @@ const SHOTS = [
   }
   await browser.close();
   if (errors.length) { console.error(errors.join("\n")); process.exit(1); }
-  console.log(`rendered ${SHOTS.length} screens to ${out}`);
+  console.log(`rendered ${shots.length} screens to ${out}`);
 })();

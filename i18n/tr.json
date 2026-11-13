@@ -837,7 +837,9 @@
    [
     "\"kira sözleşmesi\"",
     "Tam ifade"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Arapça kök: مكتبة، الكاتب"
@@ -846,6 +848,10 @@
     "احمد",
     "«أحمد» sözcüğünü de bulur"
    ]
+  ],
+  "tipFold": [
+   "sirket",
+   "«şirket» de bulunur"
   ],
   "kNav": "Gezin",
   "kOpen": "Aç",
@@ -1049,12 +1055,14 @@
     "yalnızca klasörler"
    ],
    [
-    "root: كتاب",
-    "aynı Arapça kök: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: rapro",
     "bir yazım hatasını tolere eder"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "aynı Arapça kök: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1079,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"herhangi bir programdan küçük arama kutusu\"], [\"Ctrl+Alt+G\", \"Kaydet/Aç penceresinde: bir sonucun klasörüne git\"], [\"Enter\", \"dosyayı aç\"], [\"Ctrl+Enter\", \"klasörünü aç\"], [\"↓\", \"sonuçlara (boş kutuda: geçmiş)\"],\n        [\"Ctrl+C\", \"dosyayı kopyala\"], [\"Ctrl+Shift+C\", \"yolu kopyala\"], [\"F2\", \"yeniden adlandır\"], [\"Delete\", \"Geri Dönüşüm Kutusu'na\"], [\"F4\", \"dosyadaki tüm eşleşmeler\"], [\"Ctrl+H\", \"geçmiş\"], [\"Ctrl+T\", \"küçük resimler\"], [\"Ctrl+,\", \"ayarlar\"], [\"F1\", \"bu kart\"]]",
   "helpKeysH": "Klavye",
   "helpMore": "Tüm arama yolları…",
-  "helpSub": "Arama kutusuna yazmak için bir örneğe tıklayın. Her filtrenin Arapça yazılışı da vardır.",
+  "helpSub": "Arama kutusuna yazmak için bir örneğe tıklayın.",
+  "helpSubArab": "Her filtrenin Arapça yazılışı da vardır.",
   "kLabel": "Klavye kısayolları",
   "offline": "sürücü bağlı değil",
   "qsNone": "Pencerenin taşınacağı bir sonuç yok. Aramayı değiştirin veya iptal etmek için Esc tuşuna basın.",

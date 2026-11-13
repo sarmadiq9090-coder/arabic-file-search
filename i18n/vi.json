@@ -837,7 +837,9 @@
    [
     "\"hợp đồng thuê\"",
     "Đúng cụm từ"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Gốc từ tiếng Ả Rập: مكتبة، الكاتب"
@@ -846,6 +848,10 @@
     "احمد",
     "Cũng tìm thấy «أحمد»"
    ]
+  ],
+  "tipFold": [
+   "tieng viet",
+   "Cũng tìm thấy “tiếng Việt”"
   ],
   "kNav": "Di chuyển",
   "kOpen": "Mở",
@@ -1049,12 +1055,14 @@
     "chỉ thư mục"
    ],
    [
-    "root: كتاب",
-    "cùng gốc từ tiếng Ả Rập: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: reprot",
     "chấp nhận lỗi gõ (tìm thấy “report”)"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "cùng gốc từ tiếng Ả Rập: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1079,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"hộp tìm kiếm nhỏ từ mọi chương trình\"], [\"Ctrl+Alt+G\", \"trong hộp thoại Lưu/Mở: đi tới thư mục của kết quả\"], [\"Enter\", \"mở tệp\"], [\"Ctrl+Enter\", \"mở thư mục chứa tệp\"], [\"↓\", \"tới kết quả (khi ô trống: lịch sử)\"], [\"Ctrl+C\", \"sao chép tệp\"], [\"Ctrl+Shift+C\", \"sao chép đường dẫn\"], [\"F2\", \"đổi tên\"], [\"Delete\", \"vào Thùng rác\"], [\"F4\", \"mọi chỗ khớp trong tệp\"], [\"Ctrl+H\", \"lịch sử\"], [\"Ctrl+T\", \"hình thu nhỏ\"], [\"Ctrl+,\", \"cài đặt\"], [\"F1\", \"thẻ này\"]]",
   "helpKeysH": "Bàn phím",
   "helpMore": "Mọi cách tìm kiếm…",
-  "helpSub": "Nhấp vào một ví dụ để đưa nó vào ô tìm kiếm. Mỗi bộ lọc cũng có cách viết bằng tiếng Ả Rập.",
+  "helpSub": "Nhấp vào một ví dụ để đưa nó vào ô tìm kiếm.",
+  "helpSubArab": "Mỗi bộ lọc cũng có cách viết bằng tiếng Ả Rập.",
   "kLabel": "Phím tắt",
   "offline": "ổ đĩa chưa kết nối",
   "qsNone": "Không có kết quả nào để chuyển hộp thoại tới. Hãy đổi tìm kiếm, hoặc nhấn Esc để hủy.",

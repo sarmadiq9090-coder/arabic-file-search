@@ -837,7 +837,9 @@
    [
     "\"peymana kirê\"",
     "Hevoka tam"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Koka erebî: مكتبة، الكاتب"
@@ -846,6 +848,10 @@
     "احمد",
     "“أحمد” jî dibîne"
    ]
+  ],
+  "tipFold": [
+   "sev",
+   "«şêv» jî dibîne"
   ],
   "kNav": "Tevgerîn",
   "kOpen": "Veke",
@@ -1049,12 +1055,14 @@
     "tenê peldank"
    ],
    [
-    "root: كتاب",
-    "heman koka erebî: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: rapro",
     "xeletiyeke nivîsînê qebûl dike"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "heman koka erebî: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1079,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"qutiya lêgerînê ya biçûk ji her bernameyê\"], [\"Ctrl+Alt+G\", \"di pencereya Tomar bike/Veke de: biçe peldanka encamekê\"], [\"Enter\", \"pelê veke\"], [\"Ctrl+Enter\", \"peldanka wê veke\"], [\"↓\", \"ber bi encaman (di qutiya vala de: dîrok)\"],\n        [\"Ctrl+C\", \"pelê kopî bike\"], [\"Ctrl+Shift+C\", \"riyê kopî bike\"], [\"F2\", \"navê biguherîne\"], [\"Delete\", \"bo Selika Çopê\"], [\"F4\", \"hemû lihevhatin di pelê de\"], [\"Ctrl+H\", \"dîrok\"], [\"Ctrl+T\", \"wêneyên biçûk\"], [\"Ctrl+,\", \"mîheng\"], [\"F1\", \"ev kart\"]]",
   "helpKeysH": "Klavye",
   "helpMore": "Hemû awayên lêgerînê…",
-  "helpSub": "Li mînakekê bitikîne da ku bikeve qutiya lêgerînê. Her parzûnek bi erebî jî tê nivîsîn.",
+  "helpSub": "Li mînakekê bitikîne da ku bikeve qutiya lêgerînê.",
+  "helpSubArab": "Her parzûnek bi erebî jî tê nivîsîn.",
   "kLabel": "Kurterêyên klavyeyê",
   "offline": "dîsk ne girêdayî ye",
   "qsNone": "Encamek tune ku pencere biçe peldanka wê. Lêgerînê biguherîne, an ji bo betalkirinê pêl Esc bike.",

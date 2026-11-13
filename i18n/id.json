@@ -837,7 +837,9 @@
    [
     "\"perjanjian sewa\"",
     "Frasa persis"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Akar kata Arab: مكتبة، الكاتب"
@@ -846,6 +848,10 @@
     "احمد",
     "Juga menemukan «أحمد»"
    ]
+  ],
+  "tipFold": [
+   "cafe",
+   "Juga menemukan “café”"
   ],
   "kNav": "Pindah",
   "kOpen": "Buka",
@@ -1049,12 +1055,14 @@
     "hanya folder"
    ],
    [
-    "root: كتاب",
-    "akar kata Arab yang sama: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: lapoarn",
     "menoleransi salah ketik"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "akar kata Arab yang sama: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1079,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"kotak pencarian kecil dari program apa pun\"], [\"Ctrl+Alt+G\", \"di dialog Simpan/Buka: buka folder hasil\"], [\"Enter\", \"buka file\"], [\"Ctrl+Enter\", \"buka foldernya\"], [\"↓\", \"ke hasil (di kotak kosong: riwayat)\"], [\"Ctrl+C\", \"salin file\"], [\"Ctrl+Shift+C\", \"salin jalur\"], [\"F2\", \"ganti nama\"], [\"Delete\", \"ke Tempat Sampah\"], [\"F4\", \"semua kecocokan di file\"], [\"Ctrl+H\", \"riwayat\"], [\"Ctrl+T\", \"gambar mini\"], [\"Ctrl+,\", \"pengaturan\"], [\"F1\", \"kartu ini\"]]",
   "helpKeysH": "Keyboard",
   "helpMore": "Semua cara mencari…",
-  "helpSub": "Klik contoh untuk memasukkannya ke kotak pencarian. Setiap filter juga punya ejaan Arab.",
+  "helpSub": "Klik contoh untuk memasukkannya ke kotak pencarian.",
+  "helpSubArab": "Setiap filter juga punya ejaan Arab.",
   "kLabel": "Pintasan keyboard",
   "offline": "drive tidak tersambung",
   "qsNone": "Tidak ada hasil untuk memindahkan dialog. Ubah pencarian, atau tekan Esc untuk membatalkan.",

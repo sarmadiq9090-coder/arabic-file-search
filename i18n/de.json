@@ -837,7 +837,9 @@
    [
     "\"Vertrag Wohnung\"",
     "Genaue Wortfolge"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Arabische Wurzel: مكتبة، الكاتب"
@@ -846,6 +848,10 @@
     "احمد",
     "Findet auch „أحمد“"
    ]
+  ],
+  "tipFold": [
+   "strasse",
+   "Findet auch „Straße“"
   ],
   "kNav": "Bewegen",
   "kOpen": "Öffnen",
@@ -1049,12 +1055,14 @@
     "nur Ordner"
    ],
    [
-    "root: كتاب",
-    "gleiche arabische Wurzel: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: bericth",
     "verzeiht einen Tippfehler"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "gleiche arabische Wurzel: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1079,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"das kleine Suchfeld aus jedem Programm\"], [\"Ctrl+Alt+G\", \"in einem Speichern/Öffnen-Dialog: zum Ordner eines Ergebnisses wechseln\"], [\"Enter\", \"die Datei öffnen\"], [\"Ctrl+Enter\", \"ihren Ordner öffnen\"], [\"↓\", \"zu den Ergebnissen (bei leerem Feld: Verlauf)\"],\n        [\"Ctrl+C\", \"die Datei kopieren\"], [\"Ctrl+Shift+C\", \"den Pfad kopieren\"], [\"F2\", \"umbenennen\"], [\"Delete\", \"in den Papierkorb\"], [\"F4\", \"alle Treffer in der Datei\"], [\"Ctrl+H\", \"Verlauf\"], [\"Ctrl+T\", \"Miniaturansichten\"], [\"Ctrl+,\", \"Einstellungen\"], [\"F1\", \"diese Übersicht\"]]",
   "helpKeysH": "Tastatur",
   "helpMore": "Alle Suchmöglichkeiten…",
-  "helpSub": "Klicken Sie auf ein Beispiel, um es ins Suchfeld zu übernehmen. Jeder Filter hat auch eine arabische Schreibweise.",
+  "helpSub": "Klicken Sie auf ein Beispiel, um es ins Suchfeld zu übernehmen.",
+  "helpSubArab": "Jeder Filter hat auch eine arabische Schreibweise.",
   "kLabel": "Tastenkombinationen",
   "offline": "Laufwerk nicht verbunden",
   "qsNone": "Kein Ergebnis, zu dessen Ordner der Dialog wechseln könnte. Ändern Sie die Suche, oder drücken Sie Esc zum Abbrechen.",

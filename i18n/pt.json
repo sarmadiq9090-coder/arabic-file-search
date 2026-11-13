@@ -837,7 +837,9 @@
    [
     "\"contrato de aluguel\"",
     "Frase exata"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Raiz árabe: مكتبة، الكاتب"
@@ -846,6 +848,10 @@
     "احمد",
     "Também encontra “أحمد”"
    ]
+  ],
+  "tipFold": [
+   "acao",
+   "Também encontra «ação»"
   ],
   "kNav": "Mover",
   "kOpen": "Abrir",
@@ -1049,12 +1055,14 @@
     "somente pastas"
    ],
    [
-    "root: كتاب",
-    "mesma raiz árabe: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: relatrio",
     "tolera um erro de digitação"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "mesma raiz árabe: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1079,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"a caixa de pesquisa pequena em qualquer programa\"], [\"Ctrl+Alt+G\", \"em uma caixa Salvar/Abrir: ir para a pasta de um resultado\"], [\"Enter\", \"abrir o arquivo\"], [\"Ctrl+Enter\", \"abrir a pasta dele\"], [\"↓\", \"para os resultados (com a caixa vazia: histórico)\"],\n        [\"Ctrl+C\", \"copiar o arquivo\"], [\"Ctrl+Shift+C\", \"copiar o caminho\"], [\"F2\", \"renomear\"], [\"Delete\", \"para a Lixeira\"], [\"F4\", \"todas as correspondências no arquivo\"], [\"Ctrl+H\", \"histórico\"], [\"Ctrl+T\", \"miniaturas\"], [\"Ctrl+,\", \"configurações\"], [\"F1\", \"este cartão\"]]",
   "helpKeysH": "Teclado",
   "helpMore": "Todas as formas de pesquisar…",
-  "helpSub": "Clique em um exemplo para colocá-lo na caixa de pesquisa. Cada filtro também tem uma grafia em árabe.",
+  "helpSub": "Clique em um exemplo para colocá-lo na caixa de pesquisa.",
+  "helpSubArab": "Cada filtro também tem uma grafia em árabe.",
   "kLabel": "Atalhos de teclado",
   "offline": "unidade não conectada",
   "qsNone": "Não há resultado para cuja pasta levar a caixa de diálogo. Mude a pesquisa ou pressione Esc para cancelar.",

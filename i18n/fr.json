@@ -837,7 +837,9 @@
    [
     "\"contrat de bail\"",
     "Expression exacte"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Racine arabe : مكتبة، الكاتب"
@@ -846,6 +848,10 @@
     "احمد",
     "Trouve aussi « أحمد »"
    ]
+  ],
+  "tipFold": [
+   "ecole",
+   "Trouve aussi « école »"
   ],
   "kNav": "Naviguer",
   "kOpen": "Ouvrir",
@@ -1049,12 +1055,14 @@
     "dossiers uniquement"
    ],
    [
-    "root: كتاب",
-    "même racine arabe : مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: rapprot",
     "tolère une faute de frappe"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "même racine arabe : مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1079,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"la petite zone de recherche depuis n'importe quel programme\"], [\"Ctrl+Alt+G\", \"dans une boîte Enregistrer/Ouvrir : aller au dossier d'un résultat\"], [\"Enter\", \"ouvrir le fichier\"], [\"Ctrl+Enter\", \"ouvrir son dossier\"], [\"↓\", \"vers les résultats (dans une zone vide : l'historique)\"],\n        [\"Ctrl+C\", \"copier le fichier\"], [\"Ctrl+Shift+C\", \"copier le chemin d'accès\"], [\"F2\", \"renommer\"], [\"Delete\", \"vers la Corbeille\"], [\"F4\", \"toutes les correspondances dans le fichier\"], [\"Ctrl+H\", \"historique\"], [\"Ctrl+T\", \"miniatures\"], [\"Ctrl+,\", \"paramètres\"], [\"F1\", \"cette fiche\"]]",
   "helpKeysH": "Clavier",
   "helpMore": "Toutes les façons de rechercher…",
-  "helpSub": "Cliquez sur un exemple pour le placer dans la zone de recherche. Chaque filtre s'écrit aussi en arabe.",
+  "helpSub": "Cliquez sur un exemple pour le placer dans la zone de recherche.",
+  "helpSubArab": "Chaque filtre s'écrit aussi en arabe.",
   "kLabel": "Raccourcis clavier",
   "offline": "lecteur non connecté",
   "qsNone": "Aucun résultat vers le dossier duquel déplacer la boîte de dialogue. Modifiez la recherche ou appuyez sur Esc pour annuler.",
