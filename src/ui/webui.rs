@@ -7,7 +7,9 @@
 //! window is replaced: the classic window stays hidden and a window holding
 //! the page (`crate::webui::host`) takes its place and its title, so a second
 //! launch brings it to the front. Without WebView2, in a mingw build, or when
-//! the page can't be created (tried twice) or fails twice, the classic window
+//! the page can't be created (tried twice) or fails twice, or when it never
+//! said hello at the last two starts (a hard crash, which nothing else
+//! remembers: `crate::webui::start_look`), the classic window
 //! takes over for this run only, with a line saying why: the next start
 //! tries the new look again (quickly giving up if it still fails,
 //! `crate::webui::start_tolerance`), and «جرّب الشكل الجديد» in its Options
@@ -140,6 +142,9 @@ mod imp {
         /// The new look failed at the last start: WebView2 is created at
         /// one try, not two (`crate::webui::start_tolerance`).
         one_try: Cell<bool>,
+        /// This run saved `new_ui_trying` before creating its first page
+        /// (`crate::webui::start_look`); the page's hello clears it.
+        trying_saved: Cell<bool>,
         /// The classic window is in use because the new look can't run
         /// (no WebView2, or it failed): the line saying so above its
         /// buttons (`place_webui_note`).
@@ -183,9 +188,9 @@ mod imp {
         /// classic one (built hidden then). Returns its event handlers;
         /// `None` when the classic window is used from the start.
         pub(in super::super) fn setup_webui(self: &Rc<Self>) -> Option<(nwg::EventHandler, nwg::RawEventHandler)> {
-            let (new_ui, failed_last_time) = {
+            let (new_ui, failed_last_time, trying) = {
                 let s = &self.state.borrow().settings;
-                (s.new_ui, s.new_ui_failed)
+                (s.new_ui, s.new_ui_failed, s.new_ui_trying)
             };
             if crate::webui::classic_requested() {
                 log("webui: the classic window was asked for (--classic or BAHTH_CLASSIC)");
@@ -198,13 +203,27 @@ mod imp {
                 }
                 return None;
             }
+            // The page never said hello at the last two starts: most likely
+            // a hard crash, which no fallback remembered. The classic window
+            // for this run; the next start tries the new look again.
+            let careful = match crate::webui::start_look(trying, failed_last_time) {
+                crate::webui::StartLook::Classic => {
+                    log(&format!("webui: the page did not say hello at the last {trying} starts (the program ended first); using the classic window for this run"));
+                    self.state.borrow_mut().settings.new_ui_trying = crate::webui::TRYING_AFTER_CLASSIC;
+                    self.webui_simple_look();
+                    return None;
+                }
+                crate::webui::StartLook::New { careful } => careful,
+            };
             // After a fallback at the last start: tried again, but giving
             // up quickly if it still fails.
-            let (attempts, counted) = crate::webui::start_tolerance(failed_last_time);
+            let (attempts, counted) = crate::webui::start_tolerance(careful);
             self.webui.one_try.set(attempts < 2);
             self.webui.failures.set(counted);
             if failed_last_time {
                 log("webui: the new look failed at the last start; trying it again, once");
+            } else if careful {
+                log("webui: the page did not say hello at the last start (the program ended first); trying the new look again, once");
             }
             let handlers = match self.build_webui_window() {
                 Ok(handlers) => handlers,
@@ -248,7 +267,14 @@ mod imp {
         /// up quickly if it still fails (`Settings::note_fallback`; the new
         /// look is never turned off).
         fn webui_simple_look(&self) {
-            self.state.borrow_mut().settings.note_fallback();
+            {
+                let s = &mut self.state.borrow_mut().settings;
+                s.note_fallback();
+                // An orderly fallback: this run's page did not crash the program.
+                if self.webui.trying_saved.get() {
+                    s.new_ui_trying = 0;
+                }
+            }
             self.save_settings();
             self.webui_note(true);
         }
@@ -434,6 +460,14 @@ mod imp {
                 let broker = self.webui.thumbs.clone();
                 Host::create(hwnd as isize, crate::i18n::current(), &token, dark, on_message, on_failed, move |key: &str, reply| broker.serve(key, reply))
             };
+            // On disk before WebView2 is created (once per run): a hard crash
+            // from here to the page's hello is then seen by the next start.
+            if !self.webui.trying_saved.replace(true) {
+                let mut st = self.state.borrow_mut();
+                st.settings.new_ui_trying = crate::webui::trying_before_page(st.settings.new_ui_trying);
+                drop(st);
+                self.save_settings();
+            }
             // A WebView2 that fails to start once (its browser process
             // crashed, a busy profile) often starts the second time; not
             // after a fallback at the last start (`one_try`).
@@ -887,6 +921,11 @@ mod imp {
                     self.webui.parts.opening.set_visible(false);
                     self.webui.loading_since.set(None);
                     self.webui.ready_since.set(Some(Instant::now()));
+                    // The page works: this start did not crash on the way.
+                    let trying = std::mem::take(&mut self.state.borrow_mut().settings.new_ui_trying);
+                    if trying != 0 {
+                        self.save_settings();
+                    }
                     self.webui.last_status.replace(String::new());
                     let hello = {
                         let s = &self.state.borrow().settings;

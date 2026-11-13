@@ -66,6 +66,11 @@ pub struct Settings {
     /// new look again, without the second chances
     /// (`crate::webui::start_tolerance`). Cleared by a page that works a while.
     pub new_ui_failed: bool,
+    /// Starts in a row that began creating the new look's page and never
+    /// heard its hello (a hard crash leaves no fallback behind): saved right
+    /// before the page is created, cleared by its hello. From 2 the next
+    /// start uses the classic window for that run (`crate::webui::start_look`).
+    pub new_ui_trying: u32,
     /// 0.10.1's one-time switch to the new look was made. Kept and written:
     /// `crate::i18n` takes a file with it as written by a version with English.
     pub new_ui_default: bool,
@@ -160,7 +165,7 @@ impl FloatPos {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Fade, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_default: false, new_ui_only: false }
+        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Fade, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_trying: 0, new_ui_default: false, new_ui_only: false }
     }
 }
 
@@ -235,6 +240,7 @@ impl Settings {
                 "rating_asked" => s.rating_asked = value == "1",
                 "new_ui" => s.new_ui = value == "1",
                 "new_ui_failed" => s.new_ui_failed = value == "1",
+                "new_ui_trying" => s.new_ui_trying = value.parse().unwrap_or(0).min(crate::webui::MAX_TRYING),
                 "new_ui_default" => s.new_ui_default = value == "1",
                 "new_ui_only" => s.new_ui_only = value == "1",
                 _ => {}
@@ -246,7 +252,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let cols: Vec<String> = self.columns.iter().map(i32::to_string).collect();
         format!(
-            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\nnew_ui_failed={}\nnew_ui_default={}\nread_cloud_files={}\nnew_ui_only={}\n",
+            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\nnew_ui_failed={}\nnew_ui_default={}\nread_cloud_files={}\nnew_ui_only={}\nnew_ui_trying={}\n",
             self.width,
             self.height,
             self.maximized as u8,
@@ -273,7 +279,8 @@ impl Settings {
             self.new_ui_failed as u8,
             self.new_ui_default as u8,
             self.read_cloud_files as u8,
-            self.new_ui_only as u8
+            self.new_ui_only as u8,
+            self.new_ui_trying
         )
     }
 
@@ -323,7 +330,7 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, read_cloud_files: true, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, file_opens: 7, rating_asked: true, new_ui: true, new_ui_failed: true, new_ui_default: true, new_ui_only: true };
+        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, read_cloud_files: true, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, file_opens: 7, rating_asked: true, new_ui: true, new_ui_failed: true, new_ui_trying: 2, new_ui_default: true, new_ui_only: true };
         assert_eq!(Settings::parse(&s.to_text()), s);
         for mode in [FloatingMode::Fade, FloatingMode::Hidden, FloatingMode::Off] {
             let s = Settings { floating_mode: mode, ..Settings::default() };
@@ -396,6 +403,11 @@ mod tests {
         assert!(!d.new_ui && !Settings::parse("width=900").new_ui && !Settings::parse("new_ui=yes").new_ui && Settings::parse("new_ui=1").new_ui);
         assert!(!Settings::parse("new_ui=1\nnew_ui=0").new_ui);
         assert!(!d.new_ui_failed && Settings::parse("new_ui_failed=1").new_ui_failed && !Settings::parse("new_ui=1").new_ui_failed);
+        assert_eq!(d.new_ui_trying, 0);
+        assert_eq!(Settings::parse("new_ui_trying=1").new_ui_trying, 1);
+        // A damaged or hand-edited count means "crashed twice" at most.
+        assert_eq!(Settings::parse("new_ui_trying=999").new_ui_trying, crate::webui::MAX_TRYING);
+        assert_eq!(Settings::parse("new_ui_trying=-1").new_ui_trying, 0);
         assert!(!d.new_ui_default && Settings::parse("new_ui_default=1").new_ui_default && !Settings::parse("new_ui_default=yes").new_ui_default);
         assert!(!d.new_ui_only && Settings::parse("new_ui_only=1").new_ui_only && !Settings::parse("new_ui_only=yes").new_ui_only);
         // Positions: six numbers and a real monitor rectangle, else the default place.

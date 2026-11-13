@@ -146,6 +146,48 @@ pub fn start_tolerance(failed_last_time: bool) -> (u32, u32) {
     if failed_last_time { (1, 1) } else { (2, 0) }
 }
 
+/// How a start that may create the new look's page goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StartLook {
+    /// The new look; `careful`: as after a fallback ([`start_tolerance`]).
+    New { careful: bool },
+    /// The classic window for this run, saying why, as after a fallback.
+    Classic,
+}
+
+/// A hard crash (an access violation in WebView2's loader or in the page
+/// path, a stack overflow) leaves no fallback behind: `new_ui_failed` is
+/// set only when the classic window takes over in an orderly way. So a
+/// start saves `new_ui_trying` ([`trying_before_page`]) right before it
+/// creates the page, and the page's hello clears it: a start that finds it
+/// set knows the page never said hello at the last starts. `trying` is that
+/// count, `failed_last_time` is `new_ui_failed`:
+/// - none: as usual (careful after a fallback);
+/// - one: the new look, careful, as after a fallback;
+/// - two or more: the classic window for this run; the count goes back to
+///   [`TRYING_AFTER_CLASSIC`], so the next start tries the new look again
+///   (carefully), and one more crash gives the classic window again. Never
+///   a loop of crashes, and the new look is never turned off for good.
+pub fn start_look(trying: u32, failed_last_time: bool) -> StartLook {
+    match trying {
+        0 => StartLook::New { careful: failed_last_time },
+        1 => StartLook::New { careful: true },
+        _ => StartLook::Classic,
+    }
+}
+
+/// `new_ui_trying` to save right before the page is created (once per run).
+pub fn trying_before_page(trying: u32) -> u32 {
+    trying.saturating_add(1).min(MAX_TRYING)
+}
+
+/// `new_ui_trying` once the classic window took over after crashed starts:
+/// one unclean start still remembered.
+pub const TRYING_AFTER_CLASSIC: u32 = 1;
+
+/// The largest `new_ui_trying` kept (anything from 2 means the same).
+pub const MAX_TRYING: u32 = 2;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,6 +219,57 @@ mod tests {
         // The classic window took over last time: still tried (never off
         // for good), but one attempt, and the first failure gives up.
         assert_eq!(start_tolerance(true), (1, 1));
+    }
+
+    #[test]
+    fn crashed_starts_give_the_classic_window_for_one_run() {
+        assert_eq!(start_look(0, false), StartLook::New { careful: false });
+        assert_eq!(start_look(0, true), StartLook::New { careful: true });
+        assert_eq!(start_look(1, false), StartLook::New { careful: true });
+        assert_eq!(start_look(2, false), StartLook::Classic);
+        assert_eq!(start_look(u32::MAX, true), StartLook::Classic);
+        assert_eq!(trying_before_page(0), 1);
+        assert_eq!(trying_before_page(1), 2);
+        assert_eq!(trying_before_page(MAX_TRYING), MAX_TRYING);
+        assert_eq!(trying_before_page(u32::MAX), MAX_TRYING);
+
+        // Starts in a row, the way the window saves the marker: `crash`
+        // says whether this start dies before the page says hello.
+        let run = |crashes: &[bool]| {
+            let (mut trying, mut failed) = (0u32, false);
+            let mut looks = Vec::new();
+            for &crash in crashes {
+                let look = start_look(trying, failed);
+                looks.push(look);
+                match look {
+                    StartLook::Classic => {
+                        trying = TRYING_AFTER_CLASSIC;
+                        failed = true; // Settings::note_fallback
+                    }
+                    StartLook::New { .. } => {
+                        trying = trying_before_page(trying);
+                        if !crash {
+                            trying = 0; // the page said hello
+                            failed = false; // and worked a while (webui_forgive)
+                        }
+                    }
+                }
+            }
+            looks
+        };
+        use StartLook::{Classic, New};
+        let careful = New { careful: true };
+        // A page that always crashes: two crashes, then the classic window
+        // every other start; the new look is still tried every other start.
+        let looks = run(&[true; 9]);
+        assert_eq!(looks, [New { careful: false }, careful, Classic, careful, Classic, careful, Classic, careful, Classic]);
+        assert!(looks.windows(2).all(|w| w != [Classic, Classic]));
+        // One crash: the next start is careful, and once the page works, normal again.
+        assert_eq!(run(&[true, false, false]), [New { careful: false }, careful, New { careful: false }]);
+        // Fixed after the classic run: the new look is back for good.
+        assert_eq!(run(&[true, true, false, false, false]), [New { careful: false }, careful, Classic, careful, New { careful: false }]);
+        // Never crashing: never the classic window.
+        assert!(run(&[false; 5]).iter().all(|&l| l == New { careful: false }));
     }
 
     #[test]
