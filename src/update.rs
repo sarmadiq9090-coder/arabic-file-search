@@ -512,9 +512,9 @@ pub fn download_host_ok(url: &str) -> bool {
             || host.ends_with(".githubusercontent.com"))
 }
 
-/// Checks that `head` (the first bytes of a file) is a PE image for this
-/// architecture: "MZ", a sane e_lfanew, "PE\0\0" and a matching machine type.
-pub fn validate_pe(head: &[u8]) -> Result<(), String> {
+/// The machine type of the PE image whose first bytes are `head`: "MZ", a
+/// sane e_lfanew and "PE\0\0" checked.
+pub fn pe_machine(head: &[u8]) -> Result<u16, String> {
     if head.len() < 0x40 || &head[..2] != b"MZ" {
         return Err("downloaded file is not a Windows program (no MZ)".into());
     }
@@ -526,8 +526,12 @@ pub fn validate_pe(head: &[u8]) -> Result<(), String> {
     if &head[lfanew..lfanew + 4] != b"PE\0\0" {
         return Err("downloaded file has no PE signature".into());
     }
-    let machine = u16::from_le_bytes([head[lfanew + 4], head[lfanew + 5]]);
-    let expected: Option<u16> = if cfg!(target_arch = "x86_64") {
+    Ok(u16::from_le_bytes([head[lfanew + 4], head[lfanew + 5]]))
+}
+
+/// The machine type this program is built for (`None` on another target).
+pub fn this_machine() -> Option<u16> {
+    if cfg!(target_arch = "x86_64") {
         Some(0x8664)
     } else if cfg!(target_arch = "x86") {
         Some(0x014c)
@@ -535,8 +539,23 @@ pub fn validate_pe(head: &[u8]) -> Result<(), String> {
         Some(0xaa64)
     } else {
         None
-    };
-    if let Some(m) = expected
+    }
+}
+
+/// The machine type of the program file at `path`, from its first 4 KB.
+#[cfg_attr(not(windows), allow(dead_code))] // older_copy (Windows)
+pub fn file_machine(path: &std::path::Path) -> Option<u16> {
+    use std::io::Read;
+    let mut head = Vec::with_capacity(4096);
+    std::fs::File::open(path).ok()?.take(4096).read_to_end(&mut head).ok()?;
+    pe_machine(&head).ok()
+}
+
+/// Checks that `head` (the first bytes of a file) is a PE image for this
+/// architecture: "MZ", a sane e_lfanew, "PE\0\0" and a matching machine type.
+pub fn validate_pe(head: &[u8]) -> Result<(), String> {
+    let machine = pe_machine(head)?;
+    if let Some(m) = this_machine()
         && machine != m
     {
         return Err(format!("downloaded program is for another CPU (machine {machine:#06x})"));

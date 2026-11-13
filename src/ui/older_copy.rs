@@ -129,6 +129,67 @@ pub(super) fn file_version(path: &str) -> Option<String> {
     })
 }
 
+/// The names in the version resource of the exe at `path` (ProductName,
+/// InternalName, OriginalFilename, for each language it lists).
+fn resource_names(path: &str) -> Vec<String> {
+    use winapi::um::winver::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
+    // A value's bytes (`unit`: bytes per counted unit), kept inside `data`.
+    fn query<'a>(data: &'a [u8], sub: &str, unit: usize) -> Option<&'a [u8]> {
+        let w = wide(sub);
+        let mut ptr: *mut winapi::ctypes::c_void = std::ptr::null_mut();
+        let mut len: UINT = 0;
+        let ok = unsafe { VerQueryValueW(data.as_ptr().cast(), w.as_ptr(), &mut ptr, &mut len) } != 0;
+        let at = (ptr as usize).checked_sub(data.as_ptr() as usize)?;
+        if !ok || len == 0 || at >= data.len() {
+            return None;
+        }
+        let n = (len as usize).saturating_mul(unit).min(data.len() - at);
+        Some(&data[at..at + n])
+    }
+    let p = wide(path);
+    let mut handle: DWORD = 0;
+    let size = unsafe { GetFileVersionInfoSizeW(p.as_ptr(), &mut handle) };
+    if size == 0 {
+        return Vec::new();
+    }
+    let mut data = vec![0u8; size as usize];
+    if unsafe { GetFileVersionInfoW(p.as_ptr(), 0, size, data.as_mut_ptr().cast()) } == 0 {
+        return Vec::new();
+    }
+    let mut langs = Vec::new();
+    if let Some(bytes) = query(&data, "\\VarFileInfo\\Translation", 1) {
+        // Pairs of u16: language, code page.
+        for pair in bytes.as_chunks::<4>().0.iter().take(8) {
+            langs.push(format!("{:04x}{:04x}", u16::from_le_bytes([pair[0], pair[1]]), u16::from_le_bytes([pair[2], pair[3]])));
+        }
+    }
+    let mut names = Vec::new();
+    for lang in langs {
+        for key in ["ProductName", "InternalName", "OriginalFilename"] {
+            if let Some(bytes) = query(&data, &format!("\\StringFileInfo\\{lang}\\{key}"), 2) {
+                // UTF-16 units, read as bytes (`data` has no u16 alignment).
+                let units: Vec<u16> = bytes.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).take_while(|&c| c != 0).collect();
+                names.push(String::from_utf16_lossy(&units));
+            }
+        }
+    }
+    names
+}
+
+/// Before the copy at `exe` (`answered`: it answered the identify
+/// message) is ended or its file replaced: `None` when it may be, else why
+/// it is only brought to the front (`handover::replace_refused`).
+fn replace_refused(answered: bool, exe: Option<&str>) -> Option<&'static str> {
+    let names = match exe {
+        Some(e) if !answered => resource_names(e),
+        _ => Vec::new(),
+    };
+    let ours = handover::is_this_program(answered, exe, &names);
+    let theirs = exe.and_then(|e| crate::update::file_machine(Path::new(e)));
+    let mine = own_exe().and_then(|p| crate::update::file_machine(&p)).or_else(crate::update::this_machine);
+    handover::replace_refused(ours, theirs, mine)
+}
+
 /// Whether the process `h` runs from an MSIX package (the Store copy):
 /// `GetPackageFullName`, looked up at run time (not before Windows 8).
 fn process_packaged(h: HANDLE) -> bool {
@@ -341,6 +402,12 @@ pub(super) fn on_running_copy(hwnd: HWND) -> Outcome {
         if r.answered { "answered" } else { "from its file" },
         if this.packaged { " (Store)" } else { "" },
     ));
+    if !matches!(decision, SecondStart::Front(_))
+        && let Some(why) = replace_refused(r.answered, r.info.exe.as_deref())
+    {
+        log(&format!("replace: not replacing the running copy: {why}"));
+        return Outcome::Front;
+    }
     match decision {
         SecondStart::Front(_) => Outcome::Front,
         SecondStart::ReplaceProcess(why) => {
@@ -405,6 +472,10 @@ pub(super) fn replace_installed_elsewhere() -> bool {
         let installed = CopyInfo { version: file_version(&exe), exe: Some(exe.clone()), packaged: false };
         let folder = folder_of(&exe);
         if !handover::replaces_installed(&this, true, &installed, folder) {
+            continue;
+        }
+        if let Some(why) = replace_refused(false, Some(&exe)) {
+            log(&format!("replace: the installed copy at {exe} is left as it is: {why}"));
             continue;
         }
         let old_version = installed.version.clone().unwrap_or_default();

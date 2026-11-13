@@ -404,3 +404,33 @@ fn scripts_without_spaces_pass_whole_word_pieces() {
     // A piece from a real separator stays exact.
     assert_eq!(found_keys(&index, &plan(&[&[&["\nabc\n"]]]), &keys), [1]);
 }
+
+#[test]
+fn a_write_from_before_a_reset_leaves_the_newer_batch_alone() {
+    let dir = temp_dir("reset_race");
+    let index = Index::open(&dir, std::iter::empty());
+    let _ = fill(&index);
+    // A write starts, the index is reset (after damage), the documents are
+    // indexed again and a second write starts, then the first one ends.
+    let first = index.take_pending(true).unwrap();
+    let written = write_pending_segment(&index.dir, first.serial, first.min, first.end, &first.docs, &first.live);
+    for f in index.reset() {
+        let _ = fs::remove_file(f);
+    }
+    let keys = fill(&index);
+    let second = index.take_pending(true).unwrap();
+    let stale = written.as_ref().unwrap().as_ref().unwrap().path.clone();
+    assert!(!index.finish_pending(first, written).unwrap());
+    // The second batch is still answered from memory; the stale segment
+    // is neither used nor kept.
+    assert!(index.lock().writing.is_some());
+    assert_eq!(index.segments(), 0);
+    assert!(!stale.exists());
+    check_lookups(&index, &keys);
+    // The second write finishes as usual.
+    let written = write_pending_segment(&index.dir, second.serial, second.min, second.end, &second.docs, &second.live);
+    assert!(index.finish_pending(second, written).unwrap());
+    assert!(index.lock().writing.is_none());
+    assert_eq!(index.segments(), 1);
+    check_lookups(&index, &keys);
+}

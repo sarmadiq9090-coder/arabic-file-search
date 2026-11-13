@@ -990,6 +990,17 @@ struct PendingDoc {
     unspaced: bool,
 }
 
+/// Documents taken from memory to be written as one segment.
+struct Batch {
+    docs: Arc<Vec<PendingDoc>>,
+    min: u32,
+    end: u32,
+    serial: u64,
+    live: Vec<u64>,
+    /// [`State::generation`] when it was taken.
+    generation: u64,
+}
+
 #[derive(Default)]
 struct State {
     /// Documents indexed for their current stored text: key → id.
@@ -1005,6 +1016,9 @@ struct State {
     next_serial: u64,
     /// A damaged segment was found: answer nothing until [`Index::reset`].
     broken: bool,
+    /// Counts [`Index::reset`]s: a segment write that started before one
+    /// does not touch what came after it.
+    generation: u64,
 }
 
 /// How big the word index is, for logs and the bench.
@@ -1154,31 +1168,53 @@ impl Index {
     /// (searches read them in full). One write at a time: false while
     /// another runs.
     pub fn write_pending(&self, force: bool) -> io::Result<bool> {
-        let (docs, min, end, serial, live) = {
-            let mut st = self.lock();
-            let full = st.pending.len() >= PENDING_DOCS || st.pending_bytes >= PENDING_BYTES;
-            if st.writing.is_some() || st.pending.is_empty() || !(force || full) {
-                return Ok(false);
-            }
-            let docs = Arc::new(std::mem::take(&mut st.pending));
-            st.pending_bytes = 0;
-            st.writing = Some(docs.clone());
-            let serial = st.next_serial;
-            st.next_serial += 1;
-            let live = live_bits(&st.ids, st.next_id);
-            (docs, st.pending_from, st.next_id, serial, live)
-        };
-        let written = write_pending_segment(&self.dir, serial, min, end, &docs, &live);
+        let Some(batch) = self.take_pending(force) else { return Ok(false) };
+        let written = write_pending_segment(&self.dir, batch.serial, batch.min, batch.end, &batch.docs, &batch.live);
+        self.finish_pending(batch, written)
+    }
+
+    /// The first half of [`Index::write_pending`]: the waiting documents,
+    /// still answered from memory while they are written.
+    fn take_pending(&self, force: bool) -> Option<Batch> {
         let mut st = self.lock();
-        st.writing = None;
-        // (After a reset meanwhile it is past `end` already.)
-        st.pending_from = st.pending_from.max(end);
+        let full = st.pending.len() >= PENDING_DOCS || st.pending_bytes >= PENDING_BYTES;
+        if st.writing.is_some() || st.pending.is_empty() || !(force || full) {
+            return None;
+        }
+        let docs = Arc::new(std::mem::take(&mut st.pending));
+        st.pending_bytes = 0;
+        st.writing = Some(docs.clone());
+        let serial = st.next_serial;
+        st.next_serial += 1;
+        let live = live_bits(&st.ids, st.next_id);
+        Some(Batch { docs, min: st.pending_from, end: st.next_id, serial, live, generation: st.generation })
+    }
+
+    /// The second half of [`Index::write_pending`], once the segment of
+    /// `batch` is written (or failed).
+    fn finish_pending(&self, batch: Batch, written: io::Result<Option<Segment>>) -> io::Result<bool> {
+        let mut st = self.lock();
+        if st.generation != batch.generation {
+            // The index was reset meanwhile: these documents are indexed
+            // again by the next warm-up, and a write started since then
+            // keeps its own batch.
+            drop(st);
+            if let Ok(Some(seg)) = written {
+                let _ = fs::remove_file(&seg.path);
+            }
+            return Ok(false);
+        }
+        if st.writing.as_ref().is_some_and(|w| Arc::ptr_eq(w, &batch.docs)) {
+            st.writing = None;
+        }
+        st.pending_from = st.pending_from.max(batch.end);
         match written {
             Ok(seg) => {
                 st.segments.extend(seg.map(Arc::new));
                 Ok(true)
             }
             Err(e) => {
+                let (min, end) = (batch.min, batch.end);
                 st.ids.retain(|_, id| !(min..end).contains(id));
                 Err(e)
             }
@@ -1291,6 +1327,7 @@ impl Index {
         st.writing = None;
         st.pending_from = st.next_id;
         st.broken = false;
+        st.generation += 1;
         old
     }
 

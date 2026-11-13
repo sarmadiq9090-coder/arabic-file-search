@@ -204,6 +204,19 @@ pub(crate) fn this_copy_arg() -> String {
     crate::handover::prev_pid_arg(std::process::id(), created)
 }
 
+/// Takes a handle to the single-instance lock (`name`, wide) for the rest
+/// of this process, with a few tries: false if Windows keeps refusing.
+fn hold_lock(name: &[u16]) -> bool {
+    for _ in 0..10 {
+        let h = unsafe { winapi::um::synchapi::CreateMutexW(std::ptr::null_mut(), 0, name.as_ptr()) };
+        if !h.is_null() {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    false
+}
+
 /// If the program is already running, brings its window forward and returns
 /// true; a newer copy replaces an older one instead (`older_copy`: true when
 /// the program now runs from the old copy's place, false when this copy
@@ -216,6 +229,8 @@ pub(super) fn activate_running_copy(updated: bool) -> bool {
     use winapi::um::winuser::SW_SHOW;
 
     use winapi::um::handleapi::CloseHandle;
+    use winapi::um::synchapi::OpenMutexW;
+    use winapi::um::winnt::SYNCHRONIZE;
 
     let name = shell::wide(crate::update::SINGLE_INSTANCE_MUTEX);
     // The mutex lives as long as this process; Windows frees it on exit.
@@ -235,6 +250,11 @@ pub(super) fn activate_running_copy(updated: bool) -> bool {
     // that was just ended and has not finished exiting (its handle keeps the
     // lock alive for a moment): look again whether the lock is still held,
     // and run if it was let go.
+    //
+    // While it waits this copy lets go of its own handle (another copy
+    // starting at the same moment must not see the lock kept alive by it)
+    // and only looks whether the lock still exists (`OpenMutexW`, a handle
+    // held for an instant), taking it when it does not.
     let mut hwnd = None;
     for i in 0..100 {
         hwnd = other_copy_window();
@@ -242,11 +262,23 @@ pub(super) fn activate_running_copy(updated: bool) -> bool {
             break;
         }
         if i % 5 == 4 {
-            unsafe { CloseHandle(mutex) };
-            mutex = unsafe { CreateMutexW(std::ptr::null_mut(), 0, name.as_ptr()) };
-            if !mutex.is_null() && unsafe { GetLastError() } != ERROR_ALREADY_EXISTS {
-                log("start: the other copy let go of the lock; starting");
-                return false;
+            if !mutex.is_null() {
+                unsafe { CloseHandle(mutex) };
+                mutex = std::ptr::null_mut();
+            }
+            let open = unsafe { OpenMutexW(SYNCHRONIZE, 0, name.as_ptr()) };
+            if open.is_null() {
+                let h = unsafe { CreateMutexW(std::ptr::null_mut(), 0, name.as_ptr()) };
+                if !h.is_null() && unsafe { GetLastError() } != ERROR_ALREADY_EXISTS {
+                    log("start: the other copy let go of the lock; starting");
+                    return false;
+                }
+                if !h.is_null() {
+                    // Another copy took it at the same moment: wait for its window.
+                    unsafe { CloseHandle(h) };
+                }
+            } else {
+                unsafe { CloseHandle(open) };
             }
         }
         std::thread::sleep(Duration::from_millis(100));
@@ -259,7 +291,14 @@ pub(super) fn activate_running_copy(updated: bool) -> bool {
     // the running copy comes to the front, as before.
     match super::older_copy::on_running_copy(hwnd) {
         super::older_copy::Outcome::Leave => return true,
-        super::older_copy::Outcome::Run => return false,
+        super::older_copy::Outcome::Run => {
+            // The older copy is gone: this copy runs, holding the lock
+            // (taken again if it was let go while waiting).
+            if mutex.is_null() && !hold_lock(&name) {
+                log("start: the lock cannot be taken after the older copy left; starting anyway");
+            }
+            return false;
+        }
         super::older_copy::Outcome::Front => {}
     }
     log("start: another copy is running; brought it to the front");
