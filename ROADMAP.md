@@ -45,8 +45,7 @@ The cross-app plan and the definition of "mature" are in the [profile roadmap](h
 1. **CI ناجح:** كل فحوص `build.yml` خضراء على `main` (Linux وWindows والتجربة السريعة (smoke) واختبار الواجهة واختبار الشكل الجديد (newlook)).
 2. **رقم الإصدار وCHANGELOG في يوم القطار فقط:** يُدمج رفع `version` و`CHANGELOG.md` (يصبح «غير منشور» «X.Y.Z — التاريخ») و`releases/vX.Y.Z-notes.md` في قطار InstaFind (السبت، بعد «موافق» من المالك)، ولا يصدر أكثر من إصدار في الأسبوع.
 3. **التجربة بلا نشر:** لا يوجد تشغيل تجريبي منفصل. فحوص طلب الدمج تبني الملفات نفسها وتجرّبها على ويندوز حقيقي، فلا يُدمج رفع الإصدار قبل أن تنجح.
-4. **قائمة الملفات:** الإصدار يحوي بالضبط 4 ملفات: `bahth.exe` و`bahth-x86.exe` و`bahth-arm64.exe` و`SHA256SUMS.txt`، وهو «Latest»، وليس مسودة ولا إصدارًا تجريبيًا (pre-release). لا تغيّر أسماء الملفات أبدًا.
-   <!-- pending: + bahth.exe.minisig و bahth-x86.exe.minisig و bahth-arm64.exe.minisig بعد إنشاء مفاتيح التوقيع (التحديثات الموقّعة، R8). -->
+4. **قائمة الملفات:** الإصدار يحوي بالضبط 4 ملفات: `bahth.exe` و`bahth-x86.exe` و`bahth-arm64.exe` و`SHA256SUMS.txt`، وهو «Latest»، وليس مسودة ولا إصدارًا تجريبيًا (pre-release). لا تغيّر أسماء الملفات أبدًا. ملفات التوقيع `.minisig` تُضاف بعد إنشاء مفاتيح التوقيع (ابتداءً من 1.0.1).
 5. **رقم الإصدار في الموقع:** في `site/index.html` و`site/en/index.html` غيّر `softwareVersion` وسطر «الإصدار X.Y.Z» و«الإصدار الحالي» وزر «تنزيل InstaFind X.Y.Z» إلى الرقم الجديد، في طلب الدمج نفسه (`pages.yml` ينشر الموقع عند الدمج).
 6. **نسخة محدَّثة واحدة:** على جهاز فيه الإصدار السابق: **الإعدادات ← المزيد ← فتح قائمة الخيارات… ← التحقق من التحديثات** (أو «خيارات…» من أيقونة الساعة)، ثم تأكّد أن البرنامج يعمل بالرقم الجديد.
 
@@ -62,8 +61,7 @@ Releasing here means pushing a new `version` in `Cargo.toml` to `main`. The `rel
 1. **CI green:** every `build.yml` job (Linux, Windows, smoke, UI test, new-look test) passes on `main`.
 2. **Version bump and CHANGELOG on the train day only:** the `version`, `CHANGELOG.md` ("Unreleased" becomes "X.Y.Z — date") and `releases/vX.Y.Z-notes.md` change merges on InstaFind's train (Saturday, after the owner's «موافق»). At most one release a week.
 3. **Dry run:** no separate dry run exists. The pull request's checks build and smoke-test the same exes on real Windows, so the bump merges only once they pass.
-4. **Asset list:** exactly 4 assets: `bahth.exe`, `bahth-x86.exe`, `bahth-arm64.exe` and `SHA256SUMS.txt`. The release is marked Latest and is not a draft or pre-release. Never rename the assets.
-   <!-- pending: + bahth.exe.minisig, bahth-x86.exe.minisig and bahth-arm64.exe.minisig once the signing keys exist (signed updates, R8). -->
+4. **Asset list:** exactly 4 assets: `bahth.exe`, `bahth-x86.exe`, `bahth-arm64.exe` and `SHA256SUMS.txt`. The release is marked Latest and is not a draft or pre-release. Never rename the assets. The `.minisig` signature files are added once the signing keys exist (from 1.0.1).
 5. **Site version:** in `site/index.html` and `site/en/index.html` set `softwareVersion`, the "Version X.Y.Z" line, "The current version is" and the "Download InstaFind X.Y.Z" button to the new number, in the same pull request (`pages.yml` publishes the site on merge).
 6. **One updated install:** on a PC with the previous version, run **Settings → More → Open the Options menu… → Check for updates** (or **Options…** from the tray icon), and confirm the new version starts.
 
