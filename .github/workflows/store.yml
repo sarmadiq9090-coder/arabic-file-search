@@ -31,16 +31,8 @@ on:
         default: ""
   release:
     types: [published]
-  pull_request:
-    paths:
-      - "packaging/msix/**"
-      - ".github/workflows/store.yml"
-      - "src/store.rs"
-      - "ci/store-shots.ps1"
-      - "packaging/make_notices.py"
-      - "THIRD-PARTY-NOTICES.txt"
-      - "Cargo.lock"
-      - "src/webui/assets/fonts/**"
+  # No pull_request trigger (owner, 2026-11-13): the Store package is built only
+  # for a published release, or by hand (workflow_dispatch) for a test build.
 
 permissions:
   contents: read
