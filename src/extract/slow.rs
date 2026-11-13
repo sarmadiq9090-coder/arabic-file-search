@@ -128,6 +128,7 @@ fn a_file_over_its_time_budget_gives_no_text() {
     }
     rtf.push('}');
     let p = std::env::temp_dir().join(format!("bahth_slow_{}.rtf", std::process::id()));
+    let _tmp = crate::test_temp::TempPath::at(p.clone());
     std::fs::write(&p, &rtf).unwrap();
     assert!(extract_text(&p).is_some(), "fits the normal budget");
     let q = p.clone();
@@ -163,6 +164,7 @@ fn nested_documents_share_one_inflation_budget() {
     eprintln!("docx with headers: {} bytes", docx.len());
     assert!(docx.len() < 16 << 20, "{}", docx.len());
     let p = std::env::temp_dir().join(format!("bahth_slow_{}.docx", std::process::id()));
+    let _tmp = crate::test_temp::TempPath::at(p.clone());
     std::fs::write(&p, &docx).unwrap();
     let q = p.clone();
     let t = within("docx headers", Duration::from_secs(40), move || extract_text(&q));
@@ -186,6 +188,7 @@ fn inflation_budget_spans_archive_members() {
     }
     let zip = zw.finish().unwrap().into_inner();
     let p = std::env::temp_dir().join(format!("bahth_slow_{}.zip", std::process::id()));
+    let _tmp = crate::test_temp::TempPath::at(p.clone());
     std::fs::write(&p, &zip).unwrap();
     drop(zip);
     let _b = budget::start();

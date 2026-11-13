@@ -1579,22 +1579,21 @@ fn normalize_arabic_forms(s: &str) -> Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_temp::TempPath;
     use std::io::{Cursor, Write};
-    use std::path::PathBuf;
 
-    fn temp_path(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("bahth_extract_tests_{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir.join(name)
+    /// `name` in a folder of its own, removed when the guard is dropped.
+    fn temp_path(name: &str) -> TempPath {
+        TempPath::in_own_dir("bahth_extract_tests", name)
     }
 
-    fn write_file(name: &str, bytes: &[u8]) -> PathBuf {
+    fn write_file(name: &str, bytes: &[u8]) -> TempPath {
         let p = temp_path(name);
         std::fs::write(&p, bytes).unwrap();
         p
     }
 
-    fn write_zip(name: &str, entries: &[(&str, &str)]) -> PathBuf {
+    fn write_zip(name: &str, entries: &[(&str, &str)]) -> TempPath {
         let p = temp_path(name);
         let mut zw = zip::ZipWriter::new(File::create(&p).unwrap());
         for (n, content) in entries {
@@ -1745,7 +1744,7 @@ mod tests {
     }
 
     /// A one-sheet xlsx whose worksheet XML is `sheet`.
-    fn write_xlsx(name: &str, sheet: &str) -> PathBuf {
+    fn write_xlsx(name: &str, sheet: &str) -> TempPath {
         let ct = r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>"#;
         let rels = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#;
         let wb = r#"<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="ورقة1" sheetId="1" r:id="rId1"/></sheets></workbook>"#;

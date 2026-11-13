@@ -565,6 +565,7 @@ mod tests {
     fn writing_a_report_where_it_cannot_go_is_harmless() {
         let _serial = serial();
         let dir = std::env::temp_dir().join(format!("bahth_crash_nowhere_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("log.txt")).unwrap();
         std::fs::write(dir.join("file"), "x").unwrap();
@@ -604,6 +605,7 @@ mod tests {
     fn hook_writes_the_report() {
         let _serial = serial();
         let dir = std::env::temp_dir().join(format!("bahth_crash_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let _ = std::fs::remove_dir_all(&dir);
         let log = dir.join("log.txt");
         install(log.clone());

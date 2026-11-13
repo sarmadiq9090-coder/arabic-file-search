@@ -1117,10 +1117,11 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    fn temp_dir(name: &str) -> PathBuf {
+    /// A folder not there yet, removed when the guard is dropped.
+    fn temp_dir(name: &str) -> crate::test_temp::TempPath {
         let dir = std::env::temp_dir().join(format!("bahth_cc_{name}_{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
-        dir
+        crate::test_temp::TempPath::at(dir)
     }
 
     const AR: &str = "تقرير المبيعات السنوي للعام ٢٠٢٤\nإجمالي الإيرادات: ١٢٣٤٥ ريال";

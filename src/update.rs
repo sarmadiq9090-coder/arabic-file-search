@@ -1382,6 +1382,7 @@ mod tests {
     #[test]
     fn a_folder_that_cannot_be_written_to_is_seen() {
         let dir = std::env::temp_dir().join(format!("bahth_writable_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         assert!(folder_writable(&dir));

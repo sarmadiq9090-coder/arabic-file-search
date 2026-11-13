@@ -279,6 +279,7 @@ mod tests {
     #[test]
     fn only_data_from_before_english_keeps_arabic() {
         let dir = std::env::temp_dir().join(format!("bahth-i18n-{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         // A new user: nothing there yet.

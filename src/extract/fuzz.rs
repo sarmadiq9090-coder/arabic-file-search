@@ -14,7 +14,6 @@
 use std::cell::RefCell;
 use std::io::{Cursor, Write};
 use std::panic::{self, AssertUnwindSafe};
-use std::path::PathBuf;
 use std::sync::Once;
 
 use super::*;
@@ -166,10 +165,9 @@ fn variants(sample: &[u8], rng: &mut Rng, flips: usize) -> Vec<Vec<u8>> {
     v
 }
 
-fn temp_dir() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("bahth_fuzz_tests_{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
+/// `name` in a folder of its own, removed when the guard is dropped.
+fn temp_path(name: &str) -> crate::test_temp::TempPath {
+    crate::test_temp::TempPath::in_own_dir("bahth_fuzz_tests", name)
 }
 
 /// Feeds `data` to the extractors for `ext`: the byte-level dispatcher with
@@ -184,7 +182,7 @@ fn check(ext: &str, data: &[u8], tally: &mut Tally, file_name: &str) {
         let _ = archive::member_text_inner(ext, data.to_vec());
     });
     // From disk, the way the search calls it.
-    let path = temp_dir().join(file_name);
+    let path = temp_path(file_name);
     std::fs::write(&path, data).unwrap();
     let disk = run(|| {
         let _ = extract_text(&path);
@@ -622,7 +620,7 @@ fn hostile_pdfs_do_not_crash() {
     cases.push(tests::tiny_pdf(&"(".repeat(50_000)));
     cases.push(tests::tiny_pdf("x").replace_all(b"/Length ", b"/Length 99999999999"));
     for (i, pdf) in cases.into_iter().enumerate() {
-        let path = temp_dir().join(format!("hostile{i}.pdf"));
+        let path = temp_path(&format!("hostile{i}.pdf"));
         std::fs::write(&path, &pdf).unwrap();
         let handle = std::thread::Builder::new()
             .stack_size(2 * 1024 * 1024)
@@ -697,7 +695,7 @@ fn fuzz_tar_archives() {
 #[test]
 fn fuzz_7z_archive() {
     let docx = archive_docx();
-    let path = temp_dir().join("sample.7z");
+    let path = temp_path("sample.7z");
     {
         use sevenz_rust2::{ArchiveEntry, ArchiveWriter};
         let mut w = ArchiveWriter::create(&path).unwrap();
@@ -710,10 +708,10 @@ fn fuzz_7z_archive() {
 
 #[test]
 fn files_that_vanish_or_are_not_files() {
-    let dir = temp_dir().join("a_dir.txt");
+    let dir = temp_path("a_dir.txt");
     std::fs::create_dir_all(&dir).unwrap();
     assert!(extract_text(&dir).is_none());
-    assert!(extract_text(&temp_dir().join("missing.docx")).is_none());
+    assert!(extract_text(&temp_path("missing.docx")).is_none());
     assert!(extract_text(Path::new("")).is_none());
     assert!(extract_text(Path::new(".txt")).is_none());
 }

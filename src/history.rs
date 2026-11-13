@@ -584,6 +584,7 @@ mod tests {
     #[test]
     fn clearing_activity_forgets_searches_opens_and_launches() {
         let dir = std::env::temp_dir().join(format!("bahth_hist_clear_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let file = dir.join("history.json");
         let _ = fs::remove_dir_all(&dir);
         let web = "uri:https://www.google.com/search?q=عقد الإيجار";
@@ -629,6 +630,7 @@ mod tests {
         assert_eq!(h.pinned[0].args, "printers");
         // An older history.json: no "args", read as none.
         let dir = std::env::temp_dir().join(format!("bahth_hist_args_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let file = dir.join("history.json");
         fs::create_dir_all(&dir).unwrap();
         fs::write(&file, r#"{"pinned":[{"title":"Chrome","target":"C:\\Chrome.lnk","app":true,"dir":false}]}"#).unwrap();
@@ -643,6 +645,7 @@ mod tests {
     #[test]
     fn save_and_load() {
         let dir = std::env::temp_dir().join(format!("bahth_hist_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let file = dir.join("history.json");
         let _ = fs::remove_dir_all(&dir);
         assert!(History::load_from(&file).recent.is_empty());
@@ -684,6 +687,7 @@ mod tests {
     #[test]
     fn corrupt_values_and_oversized_lists() {
         let dir = std::env::temp_dir().join(format!("bahth_hist_bad_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let file = dir.join("history.json");
         fs::create_dir_all(&dir).unwrap();
         // Extreme times used to overflow `now - last` (a panic in debug builds).
@@ -721,6 +725,7 @@ mod tests {
     #[test]
     fn saved_search_kinds_out_of_range_mean_all_types() {
         let dir = std::env::temp_dir().join(format!("bahth_hist_kind_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let file = dir.join("history.json");
         fs::create_dir_all(&dir).unwrap();
         let folders = crate::search::KIND_FOLDERS;

@@ -232,6 +232,7 @@ mod tests {
     #[test]
     fn probe_and_open_a_local_file() {
         let dir = std::env::temp_dir().join(format!("bahth_cloud_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         std::fs::create_dir_all(&dir).unwrap();
         let f = dir.join("a.txt");
         std::fs::write(&f, b"hello").unwrap();

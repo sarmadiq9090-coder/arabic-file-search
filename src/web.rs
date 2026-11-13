@@ -1568,6 +1568,7 @@ mod tests {
     #[test]
     fn downloads_only_indexed_files_when_allowed() {
         let dir = std::env::temp_dir().join(format!("bahth-web-{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("ملف.txt");
         std::fs::write(&file, b"hello").unwrap();
@@ -1825,6 +1826,7 @@ mod tests {
     #[test]
     fn download_headers_stay_on_one_line() {
         let dir = std::env::temp_dir().join(format!("bahth-web-hdr-{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         std::fs::create_dir_all(&dir).unwrap();
         // `"` cannot be in a Windows file name; `;`, `=` and Arabic can.
         let (name, want) = if cfg!(windows) { ("a'b;c=d ف.txt", "a'b;c=d _.txt") } else { ("a\"b;c=d ف.txt", "a_b;c=d _.txt") };

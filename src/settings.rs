@@ -531,6 +531,7 @@ mod tests {
     #[test]
     fn unreadable_file_gives_defaults() {
         let dir = std::env::temp_dir().join(format!("bahth_settings_bad_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("folder.txt")).unwrap();
         let file = dir.join("settings.txt");
@@ -547,6 +548,7 @@ mod tests {
     #[test]
     fn save_and_load_file() {
         let dir = std::env::temp_dir().join(format!("bahth_settings_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let file = dir.join("sub").join("settings.txt");
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(Settings::load_from(&file), Settings::default());

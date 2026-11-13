@@ -1010,6 +1010,7 @@ mod tests {
     #[test]
     fn at_rest_the_file_holds_what_memory_holds() {
         let dir = std::env::temp_dir().join(format!("bahth_save_rest_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let _ = std::fs::remove_dir_all(&dir);
         let file = dir.join("index.bin");
         let f = file.clone();
@@ -1165,6 +1166,7 @@ mod tests {
     #[test]
     fn the_marker_follows_unsaved_changes() {
         let dir = std::env::temp_dir().join(format!("bahth_save_marker_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("index.bin");

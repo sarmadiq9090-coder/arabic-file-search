@@ -238,6 +238,7 @@ fn document_search_caps_results_and_reads_lines_again() {
 
     // What "Show all matches" gets for a result without its lines.
     let dir = std::env::temp_dir().join(format!("bahth_rereads_{}", std::process::id()));
+    let _tmp = crate::test_temp::TempPath::at(dir.clone());
     std::fs::create_dir_all(&dir).unwrap();
     let p = dir.join("عقد.txt");
     std::fs::write(&p, text).unwrap();

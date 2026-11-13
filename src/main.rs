@@ -96,6 +96,8 @@ mod suggest;
 mod system_files;
 #[cfg(any(windows, test))]
 mod settings;
+#[cfg(test)]
+mod test_temp;
 #[cfg(any(windows, test))]
 mod thumb_cache;
 #[cfg(any(windows, test))]

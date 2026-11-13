@@ -2242,6 +2242,7 @@ mod tests {
     #[test]
     fn content_search_in_files() {
         let dir = std::env::temp_dir().join(format!("bahth_content_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let files = [("تقرير.txt", "هذا التقرير السنوي"), ("اخر.txt", "لا شيء هنا"), ("صورة.png", "التقرير")];
@@ -2282,6 +2283,7 @@ mod tests {
     #[test]
     fn content_search_uses_the_cache() {
         let dir = std::env::temp_dir().join(format!("bahth_content_cache_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(dir.clone());
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let files = [("تقرير.txt", "تقرير المبيعات السنوي\nالمبيعات ارتفعت"), ("اخر.txt", "لا شيء هنا"), ("فارغ.txt", "  ")];

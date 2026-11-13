@@ -478,16 +478,15 @@ pub(super) fn member_text_inner(ext: &str, mut data: Vec<u8>) -> Option<String> 
 mod tests {
     use super::*;
     use std::io::Write;
-    use std::path::PathBuf;
+    use crate::test_temp::TempPath;
     use zip::write::SimpleFileOptions;
 
-    fn temp_path(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("bahth_archive_tests_{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir.join(name)
+    /// `name` in a folder of its own, removed when the guard is dropped.
+    fn temp_path(name: &str) -> TempPath {
+        TempPath::in_own_dir("bahth_archive_tests", name)
     }
 
-    fn write(name: &str, bytes: &[u8]) -> PathBuf {
+    fn write(name: &str, bytes: &[u8]) -> TempPath {
         let p = temp_path(name);
         std::fs::write(&p, bytes).unwrap();
         p

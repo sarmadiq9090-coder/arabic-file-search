@@ -189,10 +189,10 @@ fn child_entry() {
     writeln!(out, "CHILD-PEAK {peak}").unwrap();
 }
 
-fn temp_file(name: &str, bytes: &[u8]) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("bahth_hostile_tests_{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let p = dir.join(name);
+/// `bytes` saved as `name` in a folder of its own, removed when the guard
+/// is dropped (some of these files are tens of MB).
+fn temp_file(name: &str, bytes: &[u8]) -> crate::test_temp::TempPath {
+    let p = crate::test_temp::TempPath::in_own_dir("bahth_hostile_tests", name);
     std::fs::write(&p, bytes).unwrap();
     p
 }
@@ -399,6 +399,7 @@ fn crash_loop_guard_skips_the_file_the_last_run_died_in() {
     // parser bug: the first run dies inside it, the second skips it.
     let pdf = temp_file("loop-start.pdf", &pdf_form_calling_itself());
     let store = std::env::temp_dir().join(format!("bahth_hostile_store_{}", std::process::id()));
+    let _tmp = crate::test_temp::TempPath::at(store.clone());
     let _ = std::fs::remove_dir_all(&store);
     let env = [UNCHECKED_PDF, ("BAHTH_TEST_CACHE_DIR", store.to_str().unwrap())];
     let run = || extract_in_child(&pdf, 512 * MB, Duration::from_secs(60), &env);

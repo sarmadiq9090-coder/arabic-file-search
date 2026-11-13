@@ -636,6 +636,7 @@ mod tests {
     #[test]
     fn build_save_load_roundtrip() {
         let root = std::env::temp_dir().join(format!("bahth_idx_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(root.clone());
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("مستندات/فرعي")).unwrap();
         fs::write(root.join("مستندات/تقرير المبيعات.txt"), "x").unwrap();
@@ -986,6 +987,7 @@ mod tests {
     #[test]
     fn scan_subtree_walks_one_folder() {
         let root = std::env::temp_dir().join(format!("bahth_sub_{}", std::process::id()));
+        let _tmp = crate::test_temp::TempPath::at(root.clone());
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("نقل/داخلي/node_modules/x")).unwrap();
         fs::write(root.join("نقل/داخلي/ملف.txt"), "abc").unwrap();
@@ -1074,11 +1076,12 @@ mod tests {
         }
     }
 
-    fn temp(name: &str) -> PathBuf {
+    /// A fresh folder, removed when the guard is dropped.
+    fn temp(name: &str) -> crate::test_temp::TempPath {
         let d = std::env::temp_dir().join(format!("bahth_idx_{name}_{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
         fs::create_dir_all(&d).unwrap();
-        d
+        crate::test_temp::TempPath::at(d)
     }
 
     /// The bytes `save` writes for `paths`.
