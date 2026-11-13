@@ -822,16 +822,16 @@ mod imp {
             self.webui_send(&Outbound::QuickSwitch { on: text.is_some(), text: text.unwrap_or_default() });
         }
 
+        /// Hides the window by the clock (Esc, its close button, "Hide next
+        /// to the clock"), as the classic window: what was changed up to
+        /// here (size, sort, type, settings) is saved first, since the
+        /// program may now run for days and end with Windows itself; the
+        /// first time, the balloon says how to open it again and how to exit.
         fn webui_hide(&self) {
+            // (Measured while still on screen.)
+            self.save_settings();
             self.webui_put_away();
-            if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
-                self.tray.show(
-                    tr!("البرنامج ما زال يعمل هنا. انقر الأيقونة أو شغّل البرنامج مرة أخرى لإظهاره فوراً.", "The program is still running here. Click the icon or start the program again to show it at once."),
-                    Some(title()),
-                    None,
-                    None,
-                );
-            }
+            self.hidden_balloon();
         }
 
         /// Called when the program closes: the page goes before its window.

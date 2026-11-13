@@ -567,6 +567,13 @@ impl App {
         // what was changed up to here (size, columns, options) is kept.
         self.save_settings();
         self.window.set_visible(false);
+        self.hidden_balloon();
+    }
+
+    /// The first time the main window (either look) hides by the clock this
+    /// session: a balloon on the tray icon saying how to open it again and
+    /// how to exit (`crate::quick::hidden_hint`).
+    fn hidden_balloon(&self) {
         if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
             // The hotkey, unless another program has it (its menu item is
             // greyed then).
