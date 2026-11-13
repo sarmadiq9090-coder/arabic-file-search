@@ -132,6 +132,38 @@ pub fn report_issue_url(info: &SystemInfo, what: &str, details: &str) -> (String
     (url, cut)
 }
 
+/// Mail programs and `ShellExecute` take a `mailto:` link of about 2,000
+/// characters at most (Arabic letters take 6 each once encoded), so the mail
+/// carries the user's words in short and the full report goes on the clipboard.
+const MAX_MAILTO: usize = 1800;
+
+/// Options ▸ "Report a problem…" ▸ "Send by email": a new mail to
+/// [`SUPPORT_EMAIL`] in the user's own mail program, with a short subject
+/// and the user's words (cut to fit), the version and Windows version, and a
+/// line asking to paste the full report, which the window has put on the
+/// clipboard. The mail program opens; nothing is sent until the user does.
+pub fn report_mailto(info: &SystemInfo, what: &str, english: bool) -> String {
+    let subject = if english {
+        format!("InstaFind {}: problem report", info.version)
+    } else {
+        format!("InstaFind {}: إبلاغ عن مشكلة", info.version)
+    };
+    let paste = if english {
+        "The full report is on the clipboard: paste it below (Ctrl+V)."
+    } else {
+        "التقرير الكامل منسوخ: الصقه هنا (Ctrl+V)."
+    };
+    let tail = format!("\n\nInstaFind {}, {}, {}\n\n{paste}\n\n", info.version, info.os, info.arch);
+    let enc = |s: &str| crate::web::percent_encode(&s.replace('\n', "\r\n"));
+    let mut url = format!("mailto:{SUPPORT_EMAIL}?subject={}&body=", enc(&subject));
+    let what: String = what.trim().chars().take(crate::report::MAX_WHAT).collect();
+    // (Line breaks are counted as two bytes more each: they go out as CRLF.)
+    let budget = MAX_MAILTO.saturating_sub(url.len() + enc(&tail).len() + 3 * what.matches('\n').count());
+    let what = fit_encoded_with(&what, budget, "…");
+    url.push_str(&enc(&format!("{what}{tail}")));
+    url
+}
+
 /// The longest start of `text` (whole lines where possible) whose
 /// percent-encoding fits in `budget` bytes, with a note when cut.
 fn fit_encoded(text: &str, budget: usize) -> String {
@@ -429,6 +461,33 @@ mod tests {
         assert!(url.len() <= MAX_URL);
         let small = fit_encoded("abc\ndef", 4);
         assert!(small.len() < 200);
+    }
+
+    #[test]
+    fn report_mail_is_short_and_asks_to_paste() {
+        let url = report_mailto(&info(), "البحث لا يجد ملفاتي\nعلى القرص D", false);
+        let (to, q) = url.split_once('?').unwrap();
+        assert_eq!(to, "mailto:support@fastkiwi.app");
+        let q = crate::web::parse_form(q);
+        assert_eq!(q[0], ("subject".into(), "InstaFind 0.7.0: إبلاغ عن مشكلة".into()));
+        let body = &q.iter().find(|(k, _)| k == "body").unwrap().1;
+        assert!(body.starts_with("البحث لا يجد ملفاتي\r\nعلى القرص D\r\n\r\nInstaFind 0.7.0, Windows 11"), "{body}");
+        assert!(body.contains("الصقه هنا (Ctrl+V)"));
+        // Spaces as %20 (a mail program would show "+" as is), never a raw space or "&".
+        assert!(!url.contains(' ') && !url.contains('+') && url.matches('&').count() == 1, "{url}");
+        let en = report_mailto(&info(), "", true);
+        assert!(en.contains("subject=InstaFind%200.7.0%3A%20problem%20report&body=%0D%0A%0D%0AInstaFind%200.7.0"), "{en}");
+        assert!(en.contains("paste%20it%20below"));
+        // Long words (Arabic: 6 bytes a letter once encoded) are cut to fit a mail link.
+        for what in ["ب".repeat(crate::report::MAX_WHAT), "سطر\n".repeat(200)] {
+            let url = report_mailto(&info(), &what, false);
+            assert!(url.len() <= MAX_MAILTO, "{}", url.len());
+            let body = &crate::web::parse_form(url.split_once('?').unwrap().1).into_iter().find(|(k, _)| k == "body").unwrap().1;
+            assert!(body.contains("…\r\n\r\nInstaFind 0.7.0") && body.contains("Ctrl+V"), "{body}");
+        }
+        // As the report itself, at most MAX_WHAT characters of the user's words.
+        let url = report_mailto(&info(), &"a".repeat(5000), true);
+        assert!(url.len() <= MAX_MAILTO && url.contains(&format!("body={}%0D%0A", "a".repeat(crate::report::MAX_WHAT))), "{url}");
     }
 
     #[test]

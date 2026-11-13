@@ -348,7 +348,9 @@ const SHOTS = [
   // «فتح قائمة الخيارات…»: the program's Options menu (tools, support, updates).
   ["options-menu-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#options-menu"], ["wait", 50]], { expect: { settings: true, lastSent: "options_menu" } }],
   // «الإبلاغ عن مشكلة…»: the program's report window (it shows what would be shared first).
-  ["report-problem-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#report-problem"], ["wait", 50]], { expect: { settings: true, lastSent: "report_problem" } }],
+  ["report-problem-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#report-problem"], ["wait", 50]], { expect: { settings: true, lastSent: "report_problem", reportSays: "email+public" } }],
+  // "Report a problem" says it goes by email or on GitHub's page, and that the page is public.
+  ["report-email-en-dark", "en", "dark", [["key", "Control+,"], ["eval", "document.getElementById('report-problem').scrollIntoView()"]], { expect: { settings: true, reportSays: "email+public" } }],
   // A name split into base and extension keeps its matches marked, in the extension too.
   ["names-split-ar-light", "ar", "light", [["type", "xlsx"]], { expect: { marks: 2, fnames: 2 } }],
   // «…بتاريخ 2026-11-12 … هاتف 0770-123-4567.txt»: the date and the phone read
@@ -565,6 +567,7 @@ const SHOTS = [
           if (bad.length) window.__fakeErrors.push("no accessible name: " + bad.map((el) => el.id || el.className).join(", "));
           return !bad.length;
         })(),
+        reportSays: (() => { const l = document.querySelector('label[for="report-problem"] small'); if (!l || !visible(l)) return null; const t = l.textContent; return [/email|البريد/.test(t) ? "email" : "", /public|عامة/.test(t) ? "public" : ""].filter(Boolean).join("+"); })(),
         updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent : null; })(),
         trustStore: [...document.querySelectorAll('[data-i18n="trust"], .settings .muted')].filter(visible).every((el) => el.textContent.includes("Microsoft Store") && !el.textContent.includes("GitHub") && !/phone|الهاتف/.test(el.textContent)),
         clearItem: (() => { const it = document.getElementById("hist-clear"); return it ? `${it.textContent}|${it.getAttribute("aria-disabled") === "true" ? "off" : "on"}` : null; })(),
