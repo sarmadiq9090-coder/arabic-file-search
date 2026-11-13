@@ -342,6 +342,18 @@ function Diagnostics([string]$When) {
 function Stop-Program {
     Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     if ($script:proc) { [void]$script:proc.WaitForExit(10000) }
+    # Every copy, not only $script:proc: one still ending (or a copy started
+    # by the last part) holds the single-instance lock, and the fresh copy
+    # of the next part then only brings it to the front and leaves. On a CI
+    # runner that made part T fail once.
+    $gone = Wait-Until {
+        Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        -not (Get-Process bahth* -ErrorAction SilentlyContinue)
+    } 15
+    if (-not $gone) {
+        $left = @(Get-Process bahth* -ErrorAction SilentlyContinue | ForEach-Object { "$($_.Id) $($_.ProcessName)" }) -join ', '
+        Say "Stop-Program: bahth processes still running after 15 s: $left"
+    }
     # Its WebView2 processes follow it; give them a moment.
     [void](Wait-Until { -not (Get-Process msedgewebview2 -ErrorAction SilentlyContinue) } 10)
     Start-Sleep -Seconds 1
