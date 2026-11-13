@@ -85,6 +85,10 @@
       sHotkeyTaken: (k) => `الاختصار ${k} يستخدمه برنامج آخر، فلا يعمل الآن. اختر اختصاراً غيره:`,
       sFloating: "خانة بحث شفافة فوق الساعة", sTray: "أيقونة بجانب الساعة",
       sStartup: "التشغيل", sAutostart: "التشغيل مع ويندوز (في الخلفية)",
+      sPhone: "البحث من الهاتف", sPhoneRow: "البحث من الهاتف (شبكة البيت)", sPhoneSub: "ابحث في ملفات هذا الحاسوب من متصفح هاتفك المتصل بشبكة Wi-Fi نفسها. للقراءة فقط، ويعمل في شبكة البيت فقط.",
+      sPhoneOpen: "افتح في متصفح الهاتف:", sPhonePin: "واكتب الرمز السري:", sPhoneQr: "أو امسح هذا الرمز بكاميرا الهاتف ليفتح البحث مباشرة دون الرمز السري. لا تُطلع عليه أحداً.",
+      sPhoneQrLabel: "رمز QR يفتح البحث من الهاتف", sPhoneOff: "متوقف. شغّله لترى العنوان والرمز.", sPhoneWait: "جارٍ التحقق من الشبكة…",
+      sPhoneAllow: "السماح بهذه الشبكة", sPhoneMore: "إعدادات أخرى…", sPhoneMoreSub: "المنفذ، والسماح بتنزيل الملفات، ورمز ورابط جديدان",
       sAbout: "حول البرنامج", version: (v) => `بحث سريع (InstaFind) — الإصدار ${v}`,
       // «كيف أبحث؟» (the ? button and F1): examples to click, and the keys.
       helpH: "كيف أبحث؟", helpKey: "كيف أبحث؟ (F1)", helpMore: "كل طرق البحث…", helpSub: "انقر مثالاً ليُكتب في خانة البحث. تعمل الأمثلة بالعربية والإنجليزية، والأرقام العربية مقبولة.",
@@ -163,6 +167,10 @@
       sHotkeyTaken: (k) => `Another program has ${k}, so it does nothing now. Pick another shortcut:`,
       sFloating: "Search box above the clock", sTray: "Icon in the notification area",
       sStartup: "Startup", sAutostart: "Start with Windows (in the background)",
+      sPhone: "Search from phone", sPhoneRow: "Search from phone (home network)", sPhoneSub: "Search this PC's files from your phone's browser on the same Wi-Fi. Read-only, and only on your home network.",
+      sPhoneOpen: "Open in the phone's browser:", sPhonePin: "and type the PIN:", sPhoneQr: "Or scan this code with the phone's camera to open the search without the PIN. Don't show it to anyone.",
+      sPhoneQrLabel: "QR code that opens phone search", sPhoneOff: "Off. Turn it on to see the address and the PIN.", sPhoneWait: "Checking the network…",
+      sPhoneAllow: "Allow this network", sPhoneMore: "More settings…", sPhoneMoreSub: "The port, downloading files, and a new PIN and link",
       sAbout: "About", version: (v) => `InstaFind — version ${v}`,
       helpH: "How to search", helpKey: "How to search (F1)", helpMore: "All the ways to search…", helpSub: "Click an example to put it in the search box. Every filter also has an Arabic spelling.",
       helpEx: [["sales report", "names with both words"], ['"lease agreement"', "the exact phrase"], ["report .pdf", "PDF files only (or ext:pdf)"], ["ext:docx,xlsx", "several types"],
@@ -1310,6 +1318,7 @@
         })()),
       section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("read_cloud_files", T.sReadCloud), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
       section(T.sAnywhere, sw("hotkey_quick", T.sHotkey(hotkeyText())), hotkeyRow(st), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
+      ...[phoneSection(st, section)].filter(Boolean),
       section(T.sStartup, sw("autostart", T.sAutostart)),
       // "Check for updates" and "Report a problem", each with its own button
       // in view (the release standard), before the Options menu's rest.
@@ -1321,6 +1330,153 @@
       section(T.sAbout, h("p", { class: "num" }, digits(T.version(st.version))), h("p", { class: "muted" }, trustText())),
     );
   }
+  // Search from phone (not in the Store edition, which has none): the
+  // switch, then the address, the PIN and a QR code of the direct link.
+  function phoneSection(st, section) {
+    const ph = st.phone;
+    if (!ph) return null;
+    const b = h("button", { class: "sw", type: "button", role: "switch", "aria-checked": String(!!ph.on), id: "set-phone", "aria-label": T.sPhoneRow }, h("span", { class: "knob" }));
+    b.addEventListener("click", () => send({ op: "set", key: "phone", on: !ph.on }));
+    const rows = [h("div", { class: "srow" }, h("label", { for: "set-phone" }, h("span", null, T.sPhoneRow), h("small", null, T.sPhoneSub)), b)];
+    if (ph.running && ph.url) {
+      const qr = qrSvg(ph.link || ph.url);
+      rows.push(h("div", { class: "phone" }, qr,
+        h("div", { class: "ptext" }, h("small", null, T.sPhoneOpen), h("bdi", { class: "purl", dir: "ltr", id: "phone-url" }, ph.url),
+          h("small", null, T.sPhonePin), h("bdi", { class: "ppin", dir: "ltr", id: "phone-pin" }, ph.pin), qr ? h("small", null, T.sPhoneQr) : null)));
+    } else if (ph.on) rows.push(h("p", { class: "pnote", id: "phone-note" }, ph.note || T.sPhoneWait));
+    else rows.push(h("p", { class: "muted", id: "phone-note" }, T.sPhoneOff));
+    if (ph.running && ph.note) rows.push(h("p", { class: "pnote" }, ph.note));
+    const btns = h("div", { class: "srow pbtns" });
+    if (ph.on && !ph.running && ph.allow) btns.append(btn("primary", I.globe, T.sPhoneAllow, () => send({ op: "phone_allow" }), { id: "phone-allow" }));
+    btns.append(h("small", null, T.sPhoneMoreSub), btn("", I.dots, T.sPhoneMore, () => send({ op: "phone_window" }), { id: "phone-more" }));
+    rows.push(btns);
+    return section(T.sPhone, ...rows);
+  }
+  // The QR code of `text` as an SVG (dark on white whatever the theme, with
+  // its quiet zone), or null when it does not fit.
+  function qrSvg(text) {
+    const m = qrMatrix(text);
+    if (!m) return null;
+    const n = m.length + 8, svg = document.createElementNS(SVG_NS, "svg");
+    for (const [k, v] of Object.entries({ class: "qr", viewBox: `0 0 ${n} ${n}`, role: "img", "aria-label": T.sPhoneQrLabel, "shape-rendering": "crispEdges", id: "phone-qr" })) svg.setAttribute(k, v);
+    const bg = document.createElementNS(SVG_NS, "rect");
+    for (const [k, v] of Object.entries({ width: n, height: n, fill: "#fff" })) bg.setAttribute(k, v);
+    let d = "";
+    m.forEach((row, y) => row.forEach((dark, x) => { if (dark) d += `M${x + 4} ${y + 4}h1v1h-1z`; }));
+    const p = document.createElementNS(SVG_NS, "path");
+    p.setAttribute("d", d); p.setAttribute("fill", "#000");
+    svg.append(bg, p);
+    return svg;
+  }
+
+  // ---------- QR code (the phone-search link) ----------
+  // A tiny QR encoder: byte mode, error correction M, versions 1–10 (up to
+  // 213 bytes; the link is under 70), drawn on this PC with no network. The
+  // module matrix follows ISO/IEC 18004 (as Nayuki's reference encoder);
+  // null when the text does not fit.
+  function qrMatrix(text) {
+    const data = [...new TextEncoder().encode(text)];
+    const ECC = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26], BLOCKS = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5];
+    const rawModules = (v) => { let r = (16 * v + 128) * v + 64; if (v >= 2) { const n = Math.floor(v / 7) + 2; r -= (25 * n - 10) * n - 55; if (v >= 7) r -= 36; } return r; };
+    let ver = 0, cap = 0;
+    for (let v = 1; v <= 10 && !ver; v++) {
+      cap = Math.floor(rawModules(v) / 8) - ECC[v] * BLOCKS[v];
+      if (4 + (v < 10 ? 8 : 16) + data.length * 8 <= cap * 8) ver = v;
+    }
+    if (!ver) return null;
+    // The bit stream: mode, count, bytes, terminator, padding.
+    const bits = [];
+    const put = (val, n) => { for (let i = n - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+    put(4, 4); put(data.length, ver < 10 ? 8 : 16); for (const b of data) put(b, 8);
+    put(0, Math.min(4, cap * 8 - bits.length)); put(0, (8 - bits.length % 8) % 8);
+    const words = [];
+    for (let i = 0; i < bits.length; i += 8) words.push(bits.slice(i, i + 8).reduce((a, b) => (a << 1) | b, 0));
+    for (let pad = 0xEC; words.length < cap; pad ^= 0xEC ^ 0x11) words.push(pad);
+    // Reed–Solomon over GF(256), blocks interleaved.
+    const mul = (x, y) => { let z = 0; for (let i = 7; i >= 0; i--) { z = (z << 1) ^ ((z >>> 7) * 0x11D); z ^= ((y >>> i) & 1) * x; } return z & 0xFF; };
+    const deg = ECC[ver], div = new Array(deg).fill(0); div[deg - 1] = 1;
+    for (let i = 0, root = 1; i < deg; i++, root = mul(root, 2)) for (let j = 0; j < deg; j++) { div[j] = mul(div[j], root); if (j + 1 < deg) div[j] ^= div[j + 1]; }
+    const rem = (block) => { const r = new Array(deg).fill(0); for (const b of block) { const f = b ^ r.shift(); r.push(0); div.forEach((c, i) => { r[i] ^= mul(c, f); }); } return r; };
+    const nb = BLOCKS[ver], raw = Math.floor(rawModules(ver) / 8), short = nb - raw % nb, shortLen = Math.floor(raw / nb), blocks = [];
+    for (let i = 0, k = 0; i < nb; i++) {
+      const d = words.slice(k, k + shortLen - deg + (i < short ? 0 : 1)); k += d.length;
+      const e = rem(d); if (i < short) d.push(0); blocks.push(d.concat(e));
+    }
+    const all = [];
+    for (let i = 0; i < blocks[0].length; i++) for (let j = 0; j < nb; j++) if (i !== shortLen - deg || j >= short) all.push(blocks[j][i]);
+    // The function patterns.
+    const size = ver * 4 + 17, m = [], fn = [];
+    for (let y = 0; y < size; y++) { m.push(new Array(size).fill(false)); fn.push(new Array(size).fill(false)); }
+    const set = (x, y, dark) => { m[y][x] = dark; fn[y][x] = true; };
+    for (let i = 0; i < size; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+    for (const [cx, cy] of [[3, 3], [size - 4, 3], [3, size - 4]]) for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+      const x = cx + dx, y = cy + dy, d = Math.max(Math.abs(dx), Math.abs(dy));
+      if (x >= 0 && x < size && y >= 0 && y < size) set(x, y, d !== 2 && d !== 4);
+    }
+    if (ver > 1) {
+      const n = Math.floor(ver / 7) + 2, step = Math.ceil((ver * 4 + 4) / (n * 2 - 2)) * 2, pos = [6];
+      for (let p = size - 7; pos.length < n; p -= step) pos.splice(1, 0, p);
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        if ((i === 0 && j === 0) || (i === 0 && j === n - 1) || (i === n - 1 && j === 0)) continue;
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) set(pos[i] + dx, pos[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+      }
+    }
+    const format = (mask) => {
+      const d = mask; let r = d; // level M is 00
+      for (let i = 0; i < 10; i++) r = (r << 1) ^ ((r >>> 9) * 0x537);
+      const b = ((d << 10) | r) ^ 0x5412, bit = (i) => ((b >>> i) & 1) === 1;
+      for (let i = 0; i <= 5; i++) set(8, i, bit(i));
+      set(8, 7, bit(6)); set(8, 8, bit(7)); set(7, 8, bit(8));
+      for (let i = 9; i < 15; i++) set(14 - i, 8, bit(i));
+      for (let i = 0; i < 8; i++) set(size - 1 - i, 8, bit(i));
+      for (let i = 8; i < 15; i++) set(8, size - 15 + i, bit(i));
+      set(8, size - 8, true);
+    };
+    format(0);
+    if (ver >= 7) {
+      let r = ver; for (let i = 0; i < 12; i++) r = (r << 1) ^ ((r >>> 11) * 0x1F25);
+      const b = (ver << 12) | r;
+      for (let i = 0; i < 18; i++) { const dark = ((b >>> i) & 1) === 1, a = size - 11 + i % 3, c = Math.floor(i / 3); set(a, c, dark); set(c, a, dark); }
+    }
+    // The data, in the zigzag order.
+    for (let right = size - 1, i = 0; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) {
+        const x = right - j, y = ((right + 1) & 2) === 0 ? size - 1 - vert : vert;
+        if (!fn[y][x] && i < all.length * 8) { m[y][x] = ((all[i >>> 3] >>> (7 - (i & 7))) & 1) === 1; i++; }
+      }
+    }
+    // The mask with the lowest penalty.
+    const MASKS = [(x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x) => x % 3 === 0, (x, y) => (x + y) % 3 === 0,
+      (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0, (x, y) => (x * y) % 2 + (x * y) % 3 === 0,
+      (x, y) => ((x * y) % 2 + (x * y) % 3) % 2 === 0, (x, y) => ((x + y) % 2 + (x * y) % 3) % 2 === 0];
+    const apply = (k) => { for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!fn[y][x] && MASKS[k](x, y)) m[y][x] = !m[y][x]; };
+    const penalty = () => {
+      let p = 0, dark = 0;
+      const line = (get) => {
+        for (let a = 0; a < size; a++) {
+          let run = 1, s = "";
+          for (let b = 0; b < size; b++) {
+            const v = get(a, b); s += v ? "1" : "0";
+            if (b > 0 && v === get(a, b - 1)) { run++; if (run === 5) p += 3; else if (run > 5) p++; } else run = 1;
+          }
+          for (let k = s.indexOf("1011101"); k >= 0; k = s.indexOf("1011101", k + 1)) {
+            if (s.slice(Math.max(0, k - 4), k) === "0000" || (k < 4 && /^0*$/.test(s.slice(0, k)))) p += 40;
+            else if (s.slice(k + 7, k + 11) === "0000" || (k + 11 > size && /^0*$/.test(s.slice(k + 7)))) p += 40;
+          }
+        }
+      };
+      line((a, b) => m[a][b]); line((a, b) => m[b][a]);
+      for (let y = 0; y < size - 1; y++) for (let x = 0; x < size - 1; x++) { const c = m[y][x]; if (c === m[y][x + 1] && c === m[y + 1][x] && c === m[y + 1][x + 1]) p += 3; }
+      for (const row of m) for (const v of row) if (v) dark++;
+      return p + Math.max(0, Math.ceil(Math.abs(dark * 20 - size * size * 10) / (size * size)) - 1) * 10;
+    };
+    let best = 0, low = Infinity;
+    for (let k = 0; k < 8; k++) { apply(k); format(k); const pk = penalty(); if (pk < low) { low = pk; best = k; } apply(k); }
+    apply(best); format(best);
+    return m;
+  }
+
   // The global hotkey: the keys in use, and the others to pick from; a
   // line when another program has it (registering it failed).
   function hotkeyRow(st) {

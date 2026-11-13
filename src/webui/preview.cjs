@@ -111,7 +111,7 @@ function fakeProgram(cfg) {
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id", "name"],
     save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], options_menu: [], report_problem: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], thumbs: ["seq", "ver", "ids"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
-    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], rating: ["rate"], check_updates: [], hotkey: ["key"], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
+    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], rating: ["rate"], check_updates: [], hotkey: ["key"], phone_allow: [], phone_window: [], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
@@ -135,7 +135,12 @@ function fakeProgram(cfg) {
     ? { type: "status", state: "names", files: 36000, text: ar ? "جارٍ الفهرسة… عدد الملفات حتى الآن: 36,000" : "Indexing… 36,000 files so far" }
     : { type: "status", state: "ready", files: 1204331, text: null };
   const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1", store: !!cfg.store,
-    hotkey: "ctrl_alt_f", hotkey_taken: !!cfg.hotkeyTaken, hotkeys: [["ctrl_alt_f", "Ctrl+Alt+F"], ["ctrl_alt_space", "Ctrl+Alt+Space"], ["ctrl_shift_f", "Ctrl+Shift+F"], ["win_alt_f", "Win+Alt+F"]] };
+    hotkey: "ctrl_alt_f", hotkey_taken: !!cfg.hotkeyTaken, hotkeys: [["ctrl_alt_f", "Ctrl+Alt+F"], ["ctrl_alt_space", "Ctrl+Alt+Space"], ["ctrl_shift_f", "Ctrl+Shift+F"], ["win_alt_f", "Win+Alt+F"]],
+    phone: cfg.store ? null : { on: !!(cfg.phoneOn || cfg.phoneRefused), running: false, url: "", pin: "", link: "", note: "", allow: false } };
+  // As web_server.rs `phone_settings`: running on the home network, or on but refused by the network.
+  const phoneUp = () => Object.assign(settings.phone, { on: true, running: true, url: "http://192.168.1.20:8765/", pin: "4821 0937", link: "http://192.168.1.20:8765/?t=00112233445566778899aabbccddeeff", note: "", allow: false });
+  if (cfg.phoneOn) phoneUp();
+  if (cfg.phoneRefused) Object.assign(settings.phone, { note: ar ? "لم يبدأ البحث من الهاتف: ويندوز لا يعدّ هذه الشبكة خاصة (منزلية).\nالشبكة الحالية: Cafe-WiFi" : "Phone search did not start: Windows does not mark this network as private (home).\nThis network: Cafe-WiFi", allow: true });
   const history = {
     type: "history",
     recent: ar ? ["تقرير المبيعات", "عقد الإيجار", "فاتورة الكهرباء .pdf", "صور العيد"] : ["sales report", "lease agreement", "electricity bill .pdf", "holiday photos"],
@@ -233,6 +238,12 @@ function fakeProgram(cfg) {
       cfg.scope = m.id === 0 ? `${U}\\Documents\\${ar ? "العقود" : "Contracts"}\\` : "";
       send({ type: "scope", path: cfg.scope, search: false });
       send({ type: "apply", q: ar ? "عقد العمل" : "employment contract", kind: 1, content: m.id === 0 });
+    } else if (m.op === "set" && m.key === "phone") {
+      if (!settings.phone) window.__fakeErrors.push("phone switch in the Store edition");
+      else if (m.on) phoneUp(); else Object.assign(settings.phone, { on: false, running: false, url: "", pin: "", link: "", note: "", allow: false });
+      send({ ...settings });
+    } else if (m.op === "phone_allow") {
+      phoneUp(); send({ ...settings });
     } else if (m.op === "set") {
       settings[m.key] = m.on; send({ ...settings });
     } else if (m.op === "hotkey") {
@@ -410,6 +421,13 @@ const SHOTS = [
   ["hotkey-taken-ar-light", "ar", "light", [["key", "Control+,"]], { hotkeyTaken: true, expect: { settings: true, hkTaken: true, hkKbd: "Ctrl+Alt+F", a11y: true } }],
   ["hotkey-pick-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#hk-ctrl_alt_space"], ["wait", 50]], { hotkeyTaken: true, expect: { settings: true, lastSent: "hotkey", hkTaken: false, hkKbd: "Ctrl+Alt+Space", hkOn: "hk-ctrl_alt_space" } }],
   ["hotkey-refused-ar-dark", "ar", "dark", [["key", "Control+,"], ["click", "#hk-ctrl_shift_f"], ["wait", 50]], { hotkeyTaken: true, expect: { settings: true, hkTaken: true, warn: true, hkOn: "hk-ctrl_alt_f" } }],
+  // Search from phone in Settings: the switch, the address, the PIN and a QR code of the link; none in the Store edition.
+  ["phone-on-ar-light", "ar", "light", [["key", "Control+,"], ["eval", "document.getElementById('set-phone').scrollIntoView()"]], { phoneOn: true, expect: { settings: true, phoneQr: true, phonePin: "4821 0937", a11y: true } }],
+  ["phone-turn-on-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#set-phone"], ["wait", 50], ["eval", "document.getElementById('phone-qr').scrollIntoView()"]], { expect: { settings: true, lastSent: "set", phoneQr: true } }],
+  ["phone-refused-ar-dark", "ar", "dark", [["key", "Control+,"], ["eval", "document.getElementById('phone-allow').scrollIntoView()"]], { phoneRefused: true, expect: { settings: true, phoneQr: false, phoneAllow: true } }],
+  ["phone-allow-en-light", "en", "light", [["key", "Control+,"], ["click", "#phone-allow"], ["wait", 50]], { phoneRefused: true, expect: { settings: true, lastSent: "phone_allow", phoneQr: true } }],
+  ["phone-more-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#phone-more"], ["wait", 50]], { expect: { settings: true, lastSent: "phone_window", phoneQr: false } }],
+  ["phone-store-en-light", "en", "light", [["key", "Control+,"]], { store: true, expect: { settings: true, phoneRow: false } }],
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
@@ -438,7 +456,7 @@ const SHOTS = [
       if (!file.startsWith(ASSETS) || !fs.existsSync(file)) return route.fulfill({ status: 404, headers, body: "" });
       route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || "application/octet-stream", headers, body: fs.readFileSync(file) });
     });
-    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches, store: !!opts.store, hotkeyTaken: !!opts.hotkeyTaken });
+    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches, store: !!opts.store, hotkeyTaken: !!opts.hotkeyTaken, phoneOn: !!opts.phoneOn, phoneRefused: !!opts.phoneRefused });
     await pg.goto(ORIGIN + "/");
     await pg.waitForFunction(() => document.querySelector("#menu-kind") && document.querySelector("#menu-kind").children.length > 0);
     for (const [what, a, b] of steps) {
@@ -583,6 +601,10 @@ const SHOTS = [
           if (bad.length) window.__fakeErrors.push("no accessible name: " + bad.map((el) => el.id || el.className).join(", "));
           return !bad.length;
         })(),
+        phoneQr: !!visible(document.querySelector("#phone-qr path")) && document.querySelector("#phone-qr path").getAttribute("d").length > 1000,
+        phonePin: (document.getElementById("phone-pin") || {}).textContent || null,
+        phoneAllow: !!visible(document.getElementById("phone-allow")),
+        phoneRow: !!document.getElementById("set-phone"),
         hkTaken: !!visible(document.getElementById("hk-taken")),
         hkKbd: document.getElementById("hk-kbd").textContent,
         hkOn: (document.querySelector('.hkrow [aria-checked="true"]') || {}).id || null,
@@ -612,7 +634,8 @@ const SHOTS = [
       if (!ok) errors.push(`${name}: expected ${k} = ${JSON.stringify(v)}, got ${JSON.stringify(k === "renamed" ? check.names : check[k])}`);
     }
     console.log(name, JSON.stringify({ view: check.view, dir: check.dir, rows: check.rows, active: check.active, menu: check.menu, dialog: check.dialog, chipsOn: check.chipsOn }));
-    await pg.screenshot({ path: path.join(out, `${name}.png`) });
+    // (Headless Chromium now and then fails a capture of a tall page: tried again.)
+    for (let t = 0; ; t++) { try { await pg.screenshot({ path: path.join(out, `${name}.png`) }); break; } catch (e) { if (t > 3) throw e; await pg.waitForTimeout(500); } }
     await ctx.close();
   }
   await browser.close();

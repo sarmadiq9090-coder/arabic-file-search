@@ -734,6 +734,12 @@ mod imp {
 
         /// Called at start when the one-time switch to the new look changed
         /// a classic user's setting (`Settings::make_new_look_only`).
+        /// Something the settings page shows changed outside it (search
+        /// from phone started or stopped): sent again on the next tick.
+        pub(in super::super) fn webui_settings_changed(&self) {
+            self.webui.settings_stale.set(true);
+        }
+
         pub(in super::super) fn webui_tell_switch(&self) {
             self.webui.tell_switch.set(true);
         }
@@ -1022,6 +1028,7 @@ mod imp {
                     hotkey: s.hotkey.code(),
                     hotkey_taken: super::super::keys::hotkey_taken(),
                     hotkeys: bridge::hotkeys(),
+                    phone: self.phone_settings(),
                 })
             };
             self.webui_send(&msg);
@@ -1344,6 +1351,12 @@ mod imp {
                 Request::ReportProblem {} => {
                     if let Some(app) = self.webui.me.borrow().upgrade() {
                         app.show_report();
+                    }
+                }
+                Request::PhoneAllow {} => self.web_allow_now(),
+                Request::PhoneWindow {} => {
+                    if let Some(app) = self.webui.me.borrow().upgrade() {
+                        app.open_web_window();
                     }
                 }
                 Request::Hotkey { key } => {
@@ -1741,6 +1754,7 @@ mod imp {
                 Setting::HotkeyQuick => self.set_hotkey_quick(on),
                 Setting::Floating => self.set_floating_mode(if on { FloatingMode::Fade } else { FloatingMode::Off }),
                 Setting::TrayIcon => self.set_tray_icon(on),
+                Setting::Phone => self.set_web_on(on),
             }
             self.save_settings();
             self.webui_send_settings();
@@ -2125,6 +2139,8 @@ mod imp {
         }
 
         pub(in super::super) fn webui_tell_switch(&self) {}
+
+        pub(in super::super) fn webui_settings_changed(&self) {}
 
         pub(in super::super) fn webui_shed_thumbs(&self) {}
 

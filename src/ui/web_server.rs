@@ -484,6 +484,9 @@ impl App {
         if changed && self.web.ui.is_built() && self.web.window.visible() {
             self.refresh_web_window();
         }
+        if changed {
+            self.webui_settings_changed();
+        }
     }
 
     /// The user turned it on or pressed "Allow this network": this network
@@ -512,10 +515,19 @@ impl App {
         let base = format!("{} ({})", title(), hotkey_text());
         let tip = if on { format!("{base} — {}", tr!("البحث من الهاتف يعمل", "Phone search is on")) } else { base };
         self.tray.set_tip(&tip);
+        self.webui_settings_changed();
     }
 
     fn on_web_switch(&self) {
-        let on = self.web.on_chk.check_state() == nwg::CheckBoxState::Checked;
+        self.set_web_on(self.web.on_chk.check_state() == nwg::CheckBoxState::Checked);
+    }
+
+    /// Turns search from phone on or off (the window's box, or the new
+    /// look's Settings switch). Never in the Microsoft Store version.
+    pub(super) fn set_web_on(&self, on: bool) {
+        if crate::store::is_packaged() {
+            return; // see build_web_ui
+        }
         if on {
             self.web.wanted.set(true);
             set_dword(REG_ON, 1);
@@ -536,6 +548,64 @@ impl App {
             *self.web.error.borrow_mut() = None;
         }
         self.refresh_web_window();
+        self.webui_settings_changed();
+    }
+
+    /// The new look's «السماح بهذه الشبكة» / "Allow this network".
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))] // only the new look (MSVC) shows it
+    pub(super) fn web_allow_now(&self) {
+        if !self.web.wanted.get() {
+            return;
+        }
+        self.allow_web_network();
+        self.refresh_web_window();
+        self.webui_settings_changed();
+    }
+
+    /// The new look's "More phone settings…": the window with the port,
+    /// downloads and a new PIN.
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))] // only the new look (MSVC) shows it
+    pub(super) fn open_web_window(self: &Rc<Self>) {
+        if !crate::store::is_packaged() && self.ensure_web_window() {
+            self.show_web_window();
+        }
+    }
+
+    /// Search from phone as the new look's Settings shows it; `None` in the
+    /// Microsoft Store version, which has none.
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))] // only the new look (MSVC) shows it
+    pub(super) fn phone_settings(&self) -> Option<crate::webui::bridge::PhoneOut> {
+        if crate::store::is_packaged() {
+            return None;
+        }
+        let w = &self.web;
+        let server = w.server.borrow();
+        let wanted = w.wanted.get();
+        let mut out = crate::webui::bridge::PhoneOut { on: wanted, running: server.is_some(), ..Default::default() };
+        // What the server checks (see refresh_web_window).
+        let secrets = if server.is_some() { w.shared.borrow().as_ref().map(|s| s.current_secrets()) } else { None };
+        if let (Some(s), Some((token, pin))) = (server.as_ref(), secrets) {
+            let lan = s.lan_addrs().next();
+            if let Some(a) = lan.or(s.addrs.first()) {
+                out.url = format!("http://{a}/");
+                out.link = format!("http://{a}/?t={token}");
+            }
+            out.pin = web::pin_display(&pin);
+            if lan.is_none() {
+                out.note = tr!(
+                    "لم يُعثر على اتصال بشبكة منزلية، يعمل على هذا الحاسوب فقط.",
+                    "No home network connection found; it works on this PC only."
+                )
+                .into();
+            }
+        } else if wanted {
+            let refusal = w.refusal.get();
+            let mut note = w.error.borrow().clone().map(|e| e + "\n").unwrap_or_default();
+            note.push_str(&off_reason(refusal, &w.seen.borrow(), w.error.borrow().is_some()).replace("\r\n", "\n"));
+            out.note = note.trim().to_string();
+            out.allow = matches!(refusal, Some(Refusal::NotHome | Refusal::NotPrivate | Refusal::Unknown));
+        }
+        Some(out)
     }
 
     fn on_web_download_switch(&self) {
@@ -564,6 +634,7 @@ impl App {
             *self.web.error.borrow_mut() = Some(tr!("تعذر إنشاء رمز سري آمن.", "Could not create a secure PIN.").into());
         }
         self.refresh_web_window();
+        self.webui_settings_changed();
     }
 
     /// Keeps the server on the index the window shows (it is replaced, not
@@ -579,6 +650,9 @@ impl App {
     }
 
     fn refresh_web_window(&self) {
+        if !self.web.ui.is_built() {
+            return; // (the new look's Settings switch, before the window was ever opened)
+        }
         let w = &self.web;
         let server = w.server.borrow();
         let running = server.is_some();

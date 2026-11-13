@@ -139,6 +139,8 @@ pub enum Setting {
     Floating,
     /// The icon in the notification area.
     TrayIcon,
+    /// Search from phone (home network); not in the Microsoft Store version.
+    Phone,
 }
 
 /// The interface language the page can choose.
@@ -286,6 +288,11 @@ pub enum Request {
     /// [`crate::settings::Hotkey::ALL`]; refused by Windows when another
     /// program has it, then the old one stays).
     Hotkey { key: crate::settings::Hotkey },
+    /// Search from phone: allow the network this PC is on now (Windows
+    /// does not mark it private, or it is not the home network).
+    PhoneAllow {},
+    /// The "Search from phone" window, with the port, downloads and a new PIN.
+    PhoneWindow {},
 }
 
 /// Why a message was refused.
@@ -432,6 +439,26 @@ pub struct SettingsOut {
     pub hotkey: &'static str,
     pub hotkey_taken: bool,
     pub hotkeys: Vec<[&'static str; 2]>,
+    /// Search from phone; `None` in the Microsoft Store version (it has none).
+    pub phone: Option<PhoneOut>,
+}
+
+/// Search from phone, as the settings page shows it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct PhoneOut {
+    /// The switch is on (it runs whenever the network allows).
+    pub on: bool,
+    /// The server runs now.
+    pub running: bool,
+    /// While running: the address to open on the phone, the PIN
+    /// (`1234 5678`) and the direct link with the secret (for the QR code).
+    pub url: String,
+    pub pin: String,
+    pub link: String,
+    /// Why it is not running although on, or that it works on this PC only.
+    pub note: String,
+    /// "Allow this network" would start it.
+    pub allow: bool,
 }
 
 /// The hotkey choices for [`SettingsOut::hotkeys`].
@@ -1502,6 +1529,11 @@ mod tests {
         assert_eq!(req(r#""op":"hotkey","key":"win_alt_f""#), Ok(Request::Hotkey { key: crate::settings::Hotkey::WinAltF }));
         assert_eq!(req(r#""op":"hotkey","key":"alt_f4""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"hotkey""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"set","key":"phone","on":true"#), Ok(Request::Set { key: Setting::Phone, on: true }));
+        assert_eq!(req(r#""op":"phone_allow""#), Ok(Request::PhoneAllow {}));
+        assert_eq!(req(r#""op":"phone_window""#), Ok(Request::PhoneWindow {}));
+        // The page never names a port, a network or a PIN.
+        assert_eq!(req(r#""op":"phone_allow","network":"x""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"report_problem","text":"x""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"export""#), Ok(Request::Export {}));
         assert_eq!(req(r#""op":"export","path":"C:\\x.csv""#), Err(Rejected::Malformed));
@@ -1919,10 +1951,12 @@ mod tests {
             hotkey: "ctrl_alt_f",
             hotkey_taken: true,
             hotkeys: hotkeys(),
+            phone: None,
         });
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.starts_with(r#"{"type":"settings","lang":"ar","next_lang":"en""#), "{json}");
         assert!(json.contains(r#""version":"1.0.0","store":true,"hotkey":"ctrl_alt_f","hotkey_taken":true,"hotkeys":[["ctrl_alt_f","Ctrl+Alt+F"],["ctrl_alt_space","Ctrl+Alt+Space"],"#), "{json}");
+        assert!(json.ends_with(r#""phone":null}"#), "{json}");
         let json = serde_json::to_string(&Outbound::Renamed { list: List::Recent, seq: 0, ver: 3, id: 1, name: "a".into() }).unwrap();
         assert_eq!(json, r#"{"type":"renamed","list":"recent","seq":0,"ver":3,"id":1,"name":"a"}"#);
     }

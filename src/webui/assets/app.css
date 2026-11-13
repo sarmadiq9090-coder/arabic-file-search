@@ -381,6 +381,15 @@ ol.lines .lt { text-align: start; overflow-wrap: anywhere; }
 .hkrow .lbl { display: flex; flex-direction: column; }
 .hkrow .segs { display: flex; flex-wrap: wrap; gap: 6px; }
 .hkrow .seg { height: 30px; padding-inline: 10px; font-size: 12.5px; }
+/* search from phone: the QR code beside the address and the PIN */
+.phone { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; padding: 6px 0; }
+.phone .qr { width: 150px; height: 150px; flex: none; border-radius: 8px; border: 1px solid var(--line-2); }
+.phone .ptext { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 210px; }
+.phone small, .pbtns small { color: var(--muted); font-size: 12px; }
+.phone .purl { font: 600 14px/1.4 var(--font); unicode-bidi: isolate; user-select: text; overflow-wrap: anywhere; text-align: start; }
+.phone .ppin { font: 600 20px/1.4 var(--font); letter-spacing: .06em; unicode-bidi: isolate; user-select: text; text-align: start; }
+.pnote { margin: 0; color: var(--muted); font-size: 12.5px; white-space: pre-line; }
+.pbtns { justify-content: flex-end; flex-wrap: wrap; }
 .snote.warn { color: var(--warn); background: var(--warn-soft); border-radius: 8px; padding: 6px 10px; margin: 4px 0; }
 
 @media (forced-colors: active) {
