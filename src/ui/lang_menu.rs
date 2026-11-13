@@ -15,6 +15,16 @@ use crate::i18n::{self, Lang, Locale};
 /// Items per column of the submenu.
 const COLUMN: usize = 14;
 
+/// The questions after choosing a translated language, worded in it
+/// (`i18n::format_in`; `{}` is its own name): (Arabic for the translators,
+/// English template).
+const RESTART_ASK: (&str, &str) = (
+    "ستظهر الواجهة بلغة {} بعد إعادة تشغيل البرنامج.\n\nهل تريد إعادة التشغيل الآن؟",
+    "The interface will be in {} after the program restarts.\n\nRestart now?",
+);
+const NEXT_START: (&str, &str) =
+    ("ستظهر الواجهة بلغة {} عند تشغيل البرنامج في المرة القادمة.", "The interface will be in {} the next time the program starts.");
+
 /// "(machine translation)" after a translated language's name, in the
 /// current interface language.
 fn label(l: &Locale) -> String {
@@ -70,18 +80,18 @@ impl App {
             return true;
         }
         // Worded in the language just chosen: that is the one the user
-        // reads. A translated language has no texts of its own here (they
-        // come with its file at the next start), so it reads English with
-        // the language's own name.
+        // reads. A translated language is read from its own file
+        // (`i18n::format_in`), with the language's own name; without a
+        // translation it reads English.
         let (restart_q, next_time) = match chosen.base {
             Lang::Ar => (
                 "ستظهر الواجهة بالعربية بعد إعادة تشغيل البرنامج.\n\nهل تريد إعادة التشغيل الآن؟".to_string(),
                 "ستظهر الواجهة بالعربية عند تشغيل البرنامج في المرة القادمة.".to_string(),
             ),
-            Lang::En => (
-                format!("The interface will be in {} after the program restarts.\n\nRestart now?", chosen.native),
-                format!("The interface will be in {} the next time the program starts.", chosen.native),
-            ),
+            Lang::En => {
+                let name = [chosen.native.to_string()];
+                (i18n::format_in(chosen, RESTART_ASK.1, &name), i18n::format_in(chosen, NEXT_START.1, &name))
+            }
         };
         let params = nwg::MessageParams { title: title(), content: &restart_q, buttons: nwg::MessageButtons::YesNo, icons: nwg::MessageIcons::Question };
         if self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) != nwg::MessageChoice::Yes {

@@ -12,6 +12,7 @@ use std::sync::OnceLock;
 
 use super::calc;
 use super::units::norm;
+use crate::i18n::Lang;
 
 const UQ_FIRST_YEAR: i32 = 1365;
 /// Julian day number of 1 Muharram 1365 (5 December 1945).
@@ -456,30 +457,22 @@ fn parse_ask(query: &str, today_hijri_year: i32) -> Option<Ask> {
 }
 
 fn fmt_hijri(y: i32, m: u32, d: u32, english: bool) -> String {
-    if english {
-        format!("{d} {} {y} AH", HIJRI_EN[(m - 1) as usize])
-    } else {
-        format!("{d} {} {y} هـ", HIJRI_AR[(m - 1) as usize])
-    }
+    let lang = Lang::from_english(english);
+    let i = (m - 1) as usize;
+    trf!(in lang; "{d} {} {y} هـ", "{d} {} {y} AH", lang.pick(HIJRI_AR[i], HIJRI_EN[i]))
 }
 
 fn fmt_gregorian(j: i64, english: bool) -> String {
+    let lang = Lang::from_english(english);
     let (y, m, d) = jdn_to_gregorian(j);
     let wd = weekday(j);
-    if english {
-        format!("{}, {d} {} {y}", DAYS_EN[wd], GREG_EN[(m - 1) as usize])
-    } else {
-        format!("{} {d} {} {y} م", DAYS_AR[wd], GREG_AR[(m - 1) as usize])
-    }
+    let (day, month) = (lang.pick(DAYS_AR[wd], DAYS_EN[wd]), lang.pick(GREG_AR[(m - 1) as usize], GREG_EN[(m - 1) as usize]));
+    trf!(in lang; "{} {d} {} {y} م", "{}, {d} {} {y}", day, month)
 }
 
 fn label(exact: bool, english: bool) -> &'static str {
-    match (exact, english) {
-        (true, false) => "تقويم أم القرى",
-        (true, true) => "Umm al-Qura calendar",
-        (false, false) => "تقريبي (±1 يوم)",
-        (false, true) => "approximate (±1 day)",
-    }
+    let lang = Lang::from_english(english);
+    if exact { lang.pick("تقويم أم القرى", "Umm al-Qura calendar") } else { lang.pick("تقريبي (±1 يوم)", "approximate (±1 day)") }
 }
 
 /// A date answer: (title, text to copy, note for the subtitle).

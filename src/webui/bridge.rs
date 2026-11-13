@@ -1396,15 +1396,17 @@ pub struct ContentState {
 pub fn content_text(s: &ContentState, lang: Lang) -> String {
     let n = indexing_status::group_digits;
     if s.done {
-        let cached = match (s.cached, lang) {
-            (0, _) => String::new(),
-            (c, Lang::Ar) => format!(" (من الفهرس: {})", n(c)),
-            (c, Lang::En) => format!(" ({} from the index)", n(c)),
+        let cached = match s.cached {
+            0 => String::new(),
+            c => trf!(in lang; " (من الفهرس: {})", " ({} from the index)", n(c)),
         };
-        let mut t = match lang {
-            Lang::Ar => format!("انتهى البحث. المستندات المفحوصة: {}، عدد النتائج: {}.{cached}", n(s.total), n(s.found)),
-            Lang::En => format!("Searched {} documents: found {} files.{cached}", n(s.total), n(s.found)),
-        };
+        let mut t = trf!(
+            in lang;
+            "انتهى البحث. المستندات المفحوصة: {}، عدد النتائج: {}.{cached}",
+            "Searched {} documents: found {} files.{cached}",
+            n(s.total),
+            n(s.found)
+        );
         // Documents not in the index yet were not searched.
         if s.found == 0 && s.indexing.names_incomplete() {
             t = format!("{t} {}.", indexing_status::incomplete_text(lang));
@@ -1420,10 +1422,11 @@ pub fn content_text(s: &ContentState, lang: Lang) -> String {
         return t;
     }
     let (checked, total, found) = (n(s.checked.min(s.total)), n(s.total), n(s.found));
-    match lang {
-        Lang::Ar => format!("جارٍ البحث داخل المستندات… تم فحص {checked} من {total} — عدد النتائج: {found}"),
-        Lang::En => format!("Searching inside documents… checked {checked} of {total} — found {found}"),
-    }
+    trf!(
+        in lang;
+        "جارٍ البحث داخل المستندات… تم فحص {checked} من {total} — عدد النتائج: {found}",
+        "Searching inside documents… checked {checked} of {total} — found {found}"
+    )
 }
 
 #[cfg(test)]

@@ -11,7 +11,10 @@
 //!
 //! Called by `trf!` in `src/i18n.rs` as
 //! `trf_impl!(("ar") ("en") (arg0) (arg1) …)`: each part in its own
-//! parentheses, so commas inside an argument need no parsing here.
+//! parentheses, so commas inside an argument need no parsing here. With a
+//! language given (`trf!(in lang; …)`) it is
+//! `trf_impl!(lang (lang) ("ar") ("en") …)`, and that value, not the
+//! process's language, picks the template.
 //!
 //! No dependencies (no syn/quote): the code is written as text with marker
 //! identifiers, parsed, and the markers are replaced by the caller's own
@@ -22,8 +25,20 @@ use proc_macro::{Delimiter, Group, Literal, TokenStream, TokenTree};
 
 #[proc_macro]
 pub fn trf_impl(input: TokenStream) -> TokenStream {
-    let parts: Vec<TokenStream> = input
-        .into_iter()
+    let mut tokens = input.into_iter().peekable();
+    // `lang (expr)` first: the language is that value instead of the
+    // process's (`trf!(in lang; …)`).
+    let lang = match tokens.peek() {
+        Some(TokenTree::Ident(i)) if i.to_string() == "lang" => {
+            tokens.next();
+            match tokens.next() {
+                Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Parenthesis => Some(g.stream()),
+                _ => return error("trf!: expected lang (expr)"),
+            }
+        }
+        _ => None,
+    };
+    let parts: Vec<TokenStream> = tokens
         .filter_map(|t| match t {
             TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => Some(g.stream()),
             _ => None,
@@ -38,12 +53,16 @@ pub fn trf_impl(input: TokenStream) -> TokenStream {
     let args = &parts[2..];
     let places = literal_text(&en.to_string()).and_then(|t| placeholders(&t));
 
-    // The arguments, each evaluated once and borrowed (`&T` formats as `T`).
+    // The arguments, each evaluated once and borrowed (`&T` formats as `T`);
+    // a given language first, evaluated once too.
     let n = args.len();
+    let lang_bind = if lang.is_some() { "__trf_lang," } else { "" };
+    let lang_ref = if lang.is_some() { "(__TRF_LANG__)," } else { "" };
     let binds: String = (0..n).map(|i| format!("__trf_a{i},")).collect();
     let refs: String = (0..n).map(|i| format!("&(__TRF_ARG_{i}__),")).collect();
+    let is_en = if lang.is_some() { "__trf_lang == crate::i18n::Lang::En" } else { "crate::i18n::is_en()" };
     let plain = format!(
-        "if crate::i18n::is_en() {{ ::std::format!(__TRF_EN__, {binds}) }} else {{ ::std::format!(__TRF_AR__, {binds}) }}"
+        "if {is_en} {{ ::std::format!(__TRF_EN__, {binds}) }} else {{ ::std::format!(__TRF_AR__, {binds}) }}"
     );
     let body = match places {
         // A template this file can't take apart ({:1$}, {:.*}…): never translated.
@@ -58,13 +77,19 @@ pub fn trf_impl(input: TokenStream) -> TokenStream {
                     Arg::Named => format!("::std::format!(__TRF_LIT_{k}__),"),
                 })
                 .collect();
+            // With a given language, only its English side is translated.
+            let template = if lang.is_some() {
+                "if __trf_lang == crate::i18n::Lang::En { crate::i18n::template(__TRF_EN__) } else { ::std::option::Option::None }"
+            } else {
+                "crate::i18n::template(__TRF_EN__)"
+            };
             format!(
-                "if let ::std::option::Option::Some(__trf_t) = crate::i18n::template(__TRF_EN__) {{ \
+                "if let ::std::option::Option::Some(__trf_t) = {template} {{ \
                  crate::i18n::fill(__trf_t, __TRF_EN__, &[{values}]) }} else {{ {plain} }}"
             )
         }
     };
-    let code = format!("match ({refs}) {{ ({binds}) => {{ {body} }} }}");
+    let code = format!("match ({lang_ref}{refs}) {{ ({lang_bind}{binds}) => {{ {body} }} }}");
     let Ok(stream) = code.parse::<TokenStream>() else { return error("trf!: internal error") };
 
     // The per-placeholder templates, spanned like the English one (so a
@@ -83,6 +108,7 @@ pub fn trf_impl(input: TokenStream) -> TokenStream {
         Some(match name {
             "__TRF_EN__" => TokenTree::Literal(en.clone()).into(),
             "__TRF_AR__" => TokenTree::Literal(ar.clone()).into(),
+            "__TRF_LANG__" => lang.clone()?,
             _ => {
                 if let Some(i) = name.strip_prefix("__TRF_ARG_").and_then(|s| s.strip_suffix("__")) {
                     args.get(i.parse::<usize>().ok()?)?.clone()

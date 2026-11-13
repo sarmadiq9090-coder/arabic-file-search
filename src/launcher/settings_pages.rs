@@ -2,6 +2,8 @@
 //! plus the classic tools (Control Panel applets, `.msc` consoles) that the
 //! shell opens by name.
 
+use crate::i18n::Lang;
+
 /// One settings page.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Page {
@@ -22,14 +24,16 @@ pub struct Page {
 }
 
 impl Page {
-    /// The title in the interface language.
+    /// The title in the interface language (a translated one translates
+    /// the English title). Matching uses `title_ar`, `title_en` and the
+    /// keywords as they are.
     pub fn title(&self, english: bool) -> &'static str {
-        if english { self.title_en } else { self.title_ar }
+        Lang::from_english(english).pick(self.title_ar, self.title_en)
     }
 
     /// The section in the interface language.
     pub fn section(&self, english: bool) -> &'static str {
-        if english { self.section_en } else { self.section_ar }
+        Lang::from_english(english).pick(self.section_ar, self.section_en)
     }
 
     /// Whether the page exists on Windows build `build` (0 = unknown: yes).

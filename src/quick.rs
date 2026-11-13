@@ -1085,12 +1085,18 @@ pub fn has_round_corners(build: u32) -> bool {
 /// it. It used to say "still running here", about an icon Windows usually
 /// tucks away.
 pub fn hidden_hint(lang: crate::i18n::Lang, hotkey: Option<&str>) -> String {
-    use crate::i18n::Lang;
-    match (lang, hotkey) {
-        (Lang::Ar, Some(key)) => format!("بحث سريع ما زال يعمل. افتحه بـ {key}. للإغلاق نهائياً: خيارات ← خروج من البرنامج."),
-        (Lang::Ar, None) => "بحث سريع ما زال يعمل. افتحه من أيقونته بجانب الساعة. للإغلاق نهائياً: خيارات ← خروج من البرنامج.".to_string(),
-        (Lang::En, Some(key)) => format!("InstaFind is still running. Open it with {key}. To close it completely: Options ▸ Exit the program."),
-        (Lang::En, None) => "InstaFind is still running. Open it from its icon next to the clock. To close it completely: Options ▸ Exit the program.".to_string(),
+    match hotkey {
+        Some(key) => trf!(
+            in lang;
+            "بحث سريع ما زال يعمل. افتحه بـ {key}. للإغلاق نهائياً: خيارات ← خروج من البرنامج.",
+            "InstaFind is still running. Open it with {key}. To close it completely: Options ▸ Exit the program."
+        ),
+        None => lang
+            .pick(
+                "بحث سريع ما زال يعمل. افتحه من أيقونته بجانب الساعة. للإغلاق نهائياً: خيارات ← خروج من البرنامج.",
+                "InstaFind is still running. Open it from its icon next to the clock. To close it completely: Options ▸ Exit the program.",
+            )
+            .to_string(),
     }
 }
 
