@@ -80,7 +80,9 @@
       sContentIndex: "فهرسة محتوى المستندات في الخلفية", sContentIndexSub: "بحث أسرع داخل الملفات، ويشمل النص في الصور والملفات الممسوحة",
       sReadCloud: "قراءة محتوى الملفات الموجودة على السحابة فقط (يُنزّلها من الإنترنت)",
       sAutoIndex: "تحديث الفهرس تلقائياً عند تغيّر الملفات", reindex: "تحديث الفهرس الآن",
-      sAnywhere: "البحث من أي مكان", sHotkey: "Ctrl+Alt+F يفتح خانة البحث الصغيرة؛ عند إيقافه يفتح هذه النافذة",
+      sAnywhere: "البحث من أي مكان", sHotkey: (k) => `${k} يفتح خانة البحث الصغيرة؛ عند إيقافه يفتح هذه النافذة`,
+      sHotkeyKeys: "اختصار فتح البحث", sHotkeyKeysSub: "يعمل من أي برنامج. اختر غيره إن كان برنامج آخر يستعمله.",
+      sHotkeyTaken: (k) => `الاختصار ${k} يستخدمه برنامج آخر، فلا يعمل الآن. اختر اختصاراً غيره:`,
       sFloating: "خانة بحث شفافة فوق الساعة", sTray: "أيقونة بجانب الساعة",
       sStartup: "التشغيل", sAutostart: "التشغيل مع ويندوز (في الخلفية)",
       sAbout: "حول البرنامج", version: (v) => `بحث سريع (InstaFind) — الإصدار ${v}`,
@@ -156,7 +158,9 @@
       sContentIndex: "Index document contents in the background", sContentIndexSub: "Faster search inside files, text in pictures and scans included",
       sReadCloud: "Read contents of cloud-only files (downloads them)",
       sAutoIndex: "Update the index automatically when files change", reindex: "Update the index now",
-      sAnywhere: "Search from anywhere", sHotkey: "Ctrl+Alt+F opens the small search box; when off, it opens this window.",
+      sAnywhere: "Search from anywhere", sHotkey: (k) => `${k} opens the small search box; when off, it opens this window.`,
+      sHotkeyKeys: "Shortcut to open the search", sHotkeyKeysSub: "Works in any program. Pick another if another program uses it.",
+      sHotkeyTaken: (k) => `Another program has ${k}, so it does nothing now. Pick another shortcut:`,
       sFloating: "Search box above the clock", sTray: "Icon in the notification area",
       sStartup: "Startup", sAutostart: "Start with Windows (in the background)",
       sAbout: "About", version: (v) => `InstaFind — version ${v}`,
@@ -488,6 +492,7 @@
     settings(m) {
       const hide = S.settings && S.settings.hide_system !== m.hide_system;
       S.settings = m;
+      $("hk-kbd").textContent = hotkeyText();
       if (S.digits !== !!m.digits) { S.digits = !!m.digits; render(true); renderRecent(); }
       if (S.view === "settings") renderSettings();
       if (hide && S.q.trim() && !S.content) runSearch();
@@ -1178,8 +1183,11 @@
     $("dlg").classList.add("help");
     $("hx0").focus();
   }
-  // The global hotkey's name (Settings can change it).
-  function hotkeyText() { return "Ctrl+Alt+F"; }
+  // The global hotkey's keys (Settings can change them).
+  function hotkeyText() {
+    const st = S.settings, hk = st && (st.hotkeys || []).find(([code]) => code === st.hotkey);
+    return hk ? hk[1] : "Ctrl+Alt+F";
+  }
   $("help-btn").addEventListener("click", helpCard);
 
   // The dialogs name the list their row was in when they opened (`at`).
@@ -1301,7 +1309,7 @@
           return h("div", { class: "srow" }, h("label", { for: "set-compact" }, h("span", null, T.compact), h("small", null, T.compactSub)), b);
         })()),
       section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("read_cloud_files", T.sReadCloud), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
-      section(T.sAnywhere, sw("hotkey_quick", T.sHotkey), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
+      section(T.sAnywhere, sw("hotkey_quick", T.sHotkey(hotkeyText())), hotkeyRow(st), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
       section(T.sStartup, sw("autostart", T.sAutostart)),
       // "Check for updates" and "Report a problem", each with its own button
       // in view (the release standard), before the Options menu's rest.
@@ -1312,6 +1320,22 @@
       section(T.sMore, h("div", { class: "srow" }, h("label", { for: "options-menu" }, h("span", null, T.sMoreRow), h("small", null, T.sMoreSub)), btn("", I.dots, T.moreBtn, () => send({ op: "options_menu" }), { id: "options-menu" }))),
       section(T.sAbout, h("p", { class: "num" }, digits(T.version(st.version))), h("p", { class: "muted" }, trustText())),
     );
+  }
+  // The global hotkey: the keys in use, and the others to pick from; a
+  // line when another program has it (registering it failed).
+  function hotkeyRow(st) {
+    const choices = st.hotkeys || [];
+    if (!choices.length) return null;
+    const seg = ([code, keys]) => {
+      const on = code === st.hotkey;
+      const b = h("button", { class: "seg" + (on ? " on" : ""), type: "button", role: "radio", "aria-checked": String(on), id: "hk-" + code, dir: "ltr" }, keys);
+      b.addEventListener("click", () => send({ op: "hotkey", key: code }));
+      return b;
+    };
+    const row = h("div", { class: "srow hkrow" }, h("span", { class: "lbl", id: "hk-label" }, h("span", null, T.sHotkeyKeys), h("small", null, T.sHotkeyKeysSub)),
+      h("div", { class: "segs", role: "radiogroup", "aria-labelledby": "hk-label" }, ...choices.map(seg)));
+    if (!st.hotkey_taken) return row;
+    return h("div", null, h("div", { class: "snote warn", id: "hk-taken", role: "alert" }, T.sHotkeyTaken(hotkeyText())), row);
   }
   $("set-btn").addEventListener("click", () => (S.view === "settings" ? closeSettings() : openSettings()));
 

@@ -1019,6 +1019,9 @@ mod imp {
                     tray_icon: s.tray_icon,
                     version: env!("CARGO_PKG_VERSION"),
                     store: crate::store::is_packaged(),
+                    hotkey: s.hotkey.code(),
+                    hotkey_taken: super::super::keys::hotkey_taken(),
+                    hotkeys: bridge::hotkeys(),
                 })
             };
             self.webui_send(&msg);
@@ -1342,6 +1345,16 @@ mod imp {
                     if let Some(app) = self.webui.me.borrow().upgrade() {
                         app.show_report();
                     }
+                }
+                Request::Hotkey { key } => {
+                    if !self.change_hotkey(key) {
+                        self.webui_warn(trf!(
+                            "الاختصار {} يستخدمه برنامج آخر أيضاً. اختر غيره.",
+                            "Another program has {} too. Pick another one.",
+                            key.label()
+                        ));
+                    }
+                    self.webui_send_settings();
                 }
                 // The Save dialog runs inside this handler: the timer leaves the page alone meanwhile.
                 Request::Export {} => {

@@ -147,7 +147,7 @@ scoop install instafind
 
 | المفتاح | العمل |
 |---|---|
-| Ctrl+Alt+F | نافذة البحث الصغيرة من أي مكان (Tab للإجراءات، Esc للإغلاق) |
+| Ctrl+Alt+F | نافذة البحث الصغيرة من أي مكان (Tab للإجراءات، Esc للإغلاق). إن كان برنامج آخر يستعمله فاختر غيره من الإعدادات ← البحث من أي مكان |
 | Ctrl+Alt+G | في نافذة حفظ أو فتح: الانتقال إلى مجلد نتيجة |
 | Enter / Ctrl+Enter | فتح الملف / فتح مجلده مع تحديده |
 | السهم للأسفل | من خانة البحث إلى النتائج (وفي خانة فارغة: السجل) |
@@ -320,7 +320,7 @@ Every filter also has an Arabic spelling (`حجم:`, `تاريخ:`, `كلمة:`,
 
 | Key | Action |
 |---|---|
-| Ctrl+Alt+F | quick-search popup from anywhere (Tab for actions, Esc to close) |
+| Ctrl+Alt+F | quick-search popup from anywhere (Tab for actions, Esc to close); if another program has it, pick other keys in Settings ▸ Search from anywhere |
 | Ctrl+Alt+G | in a Save/Open dialog: jump to a result's folder |
 | Enter / Ctrl+Enter | open the file / open its folder with the file selected |
 | Down arrow | from the search box to the results (in an empty box: history) |

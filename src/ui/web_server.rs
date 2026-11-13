@@ -29,7 +29,7 @@ use winapi::um::winuser::{GWL_EXSTYLE, GetWindowLongW, SWP_FRAMECHANGED, SWP_NOM
 use super::lazy::Lazy;
 use super::shell::wide;
 use super::startup::log;
-use super::keys::HOTKEY_TEXT;
+use super::keys::hotkey_text;
 use super::{App, WS_EX_LAYOUTRTL, autostart, title};
 use crate::web;
 use crate::web::net::{self, Refusal};
@@ -503,13 +503,13 @@ impl App {
 
     /// The tray icon's tip and the Options item's check mark say whether
     /// the server runs.
-    fn update_web_indicator(&self) {
+    pub(super) fn update_web_indicator(&self) {
         let on = self.web.server.borrow().is_some();
         // Not built in the Microsoft Store version (`build_web_ui`).
         if !self.web.menu_item.handle.blank() {
             self.web.menu_item.set_checked(on);
         }
-        let base = format!("{} ({HOTKEY_TEXT})", title());
+        let base = format!("{} ({})", title(), hotkey_text());
         let tip = if on { format!("{base} — {}", tr!("البحث من الهاتف يعمل", "Phone search is on")) } else { base };
         self.tray.set_tip(&tip);
     }

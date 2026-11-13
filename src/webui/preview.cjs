@@ -111,7 +111,7 @@ function fakeProgram(cfg) {
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id", "name"],
     save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], options_menu: [], report_problem: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], thumbs: ["seq", "ver", "ids"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
-    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], rating: ["rate"], check_updates: [], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
+    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], rating: ["rate"], check_updates: [], hotkey: ["key"], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
@@ -134,7 +134,8 @@ function fakeProgram(cfg) {
   const status = cfg.indexing
     ? { type: "status", state: "names", files: 36000, text: ar ? "جارٍ الفهرسة… عدد الملفات حتى الآن: 36,000" : "Indexing… 36,000 files so far" }
     : { type: "status", state: "ready", files: 1204331, text: null };
-  const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1", store: !!cfg.store };
+  const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1", store: !!cfg.store,
+    hotkey: "ctrl_alt_f", hotkey_taken: !!cfg.hotkeyTaken, hotkeys: [["ctrl_alt_f", "Ctrl+Alt+F"], ["ctrl_alt_space", "Ctrl+Alt+Space"], ["ctrl_shift_f", "Ctrl+Shift+F"], ["win_alt_f", "Win+Alt+F"]] };
   const history = {
     type: "history",
     recent: ar ? ["تقرير المبيعات", "عقد الإيجار", "فاتورة الكهرباء .pdf", "صور العيد"] : ["sales report", "lease agreement", "electricity bill .pdf", "holiday photos"],
@@ -234,6 +235,12 @@ function fakeProgram(cfg) {
       send({ type: "apply", q: ar ? "عقد العمل" : "employment contract", kind: 1, content: m.id === 0 });
     } else if (m.op === "set") {
       settings[m.key] = m.on; send({ ...settings });
+    } else if (m.op === "hotkey") {
+      // As the program: Windows refuses keys another program has (here Ctrl+Shift+F); the old ones stay.
+      if (!settings.hotkeys.some(([code]) => code === m.key)) window.__fakeErrors.push("unknown hotkey " + m.key);
+      if (m.key === "ctrl_shift_f") send({ type: "notice", text: ar ? "الاختصار Ctrl+Shift+F يستخدمه برنامج آخر أيضاً. اختر غيره." : "Another program has Ctrl+Shift+F too. Pick another one.", warn: true });
+      else { settings.hotkey = m.key; settings.hotkey_taken = false; }
+      send({ ...settings });
     } else if (m.op === "lang") {
       settings.next_lang = m.lang; send({ ...settings });
     } else if (m.op === "switch_to" || m.op === "switch_cancel") {
@@ -399,6 +406,10 @@ const SHOTS = [
   ["help-f1-en-dark", "en", "dark", [["key", "F1"]], { expect: { dialog: true, helpEx: 16, helpKeys: true, focus: "hx0" } }],
   ["help-example-ar-dark", "ar", "dark", [["key", "F1"], ["click", "#hx6"], ["wait", 100]], { expect: { dialog: false, q: "حجم:>10م", lastSent: "search", focus: "q" } }],
   ["help-more-en-light", "en", "light", [["click", "#help-more"]], { width: 900, height: 640, expect: { dialog: true, helpEx: 16 } }],
+  // Ctrl+Alt+F taken by another program: Settings says so and offers other keys; a pick is used at once.
+  ["hotkey-taken-ar-light", "ar", "light", [["key", "Control+,"]], { hotkeyTaken: true, expect: { settings: true, hkTaken: true, hkKbd: "Ctrl+Alt+F", a11y: true } }],
+  ["hotkey-pick-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#hk-ctrl_alt_space"], ["wait", 50]], { hotkeyTaken: true, expect: { settings: true, lastSent: "hotkey", hkTaken: false, hkKbd: "Ctrl+Alt+Space", hkOn: "hk-ctrl_alt_space" } }],
+  ["hotkey-refused-ar-dark", "ar", "dark", [["key", "Control+,"], ["click", "#hk-ctrl_shift_f"], ["wait", 50]], { hotkeyTaken: true, expect: { settings: true, hkTaken: true, warn: true, hkOn: "hk-ctrl_alt_f" } }],
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
@@ -427,7 +438,7 @@ const SHOTS = [
       if (!file.startsWith(ASSETS) || !fs.existsSync(file)) return route.fulfill({ status: 404, headers, body: "" });
       route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || "application/octet-stream", headers, body: fs.readFileSync(file) });
     });
-    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches, store: !!opts.store });
+    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches, store: !!opts.store, hotkeyTaken: !!opts.hotkeyTaken });
     await pg.goto(ORIGIN + "/");
     await pg.waitForFunction(() => document.querySelector("#menu-kind") && document.querySelector("#menu-kind").children.length > 0);
     for (const [what, a, b] of steps) {
@@ -572,6 +583,9 @@ const SHOTS = [
           if (bad.length) window.__fakeErrors.push("no accessible name: " + bad.map((el) => el.id || el.className).join(", "));
           return !bad.length;
         })(),
+        hkTaken: !!visible(document.getElementById("hk-taken")),
+        hkKbd: document.getElementById("hk-kbd").textContent,
+        hkOn: (document.querySelector('.hkrow [aria-checked="true"]') || {}).id || null,
         helpEx: document.querySelectorAll(".dlg.help .hx").length || null,
         helpKeys: [...document.querySelectorAll(".dlg.help .hk-list kbd")].some((k) => k.textContent === "F1"),
         reportSays: (() => { const l = document.querySelector('label[for="report-problem"] small'); if (!l || !visible(l)) return null; const t = l.textContent; return [/email|البريد/.test(t) ? "email" : "", /public|عامة/.test(t) ? "public" : ""].filter(Boolean).join("+"); })(),

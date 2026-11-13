@@ -282,6 +282,10 @@ pub enum Request {
     /// The answer to the Store rating row ([`Outbound::Rating`]): rate now
     /// (`rate`, opens the Store's review page) or not now.
     Rating { rate: bool },
+    /// Use `key` as the global hotkey from now on (one of
+    /// [`crate::settings::Hotkey::ALL`]; refused by Windows when another
+    /// program has it, then the old one stays).
+    Hotkey { key: crate::settings::Hotkey },
 }
 
 /// Why a message was refused.
@@ -423,6 +427,16 @@ pub struct SettingsOut {
     pub version: &'static str,
     /// The Microsoft Store version: its updates come from the Store.
     pub store: bool,
+    /// The global hotkey (`Hotkey::code`), whether another program has it,
+    /// and the choices as `[code, keys]`.
+    pub hotkey: &'static str,
+    pub hotkey_taken: bool,
+    pub hotkeys: Vec<[&'static str; 2]>,
+}
+
+/// The hotkey choices for [`SettingsOut::hotkeys`].
+pub fn hotkeys() -> Vec<[&'static str; 2]> {
+    crate::settings::Hotkey::ALL.iter().map(|h| [h.code(), h.label()]).collect()
 }
 
 /// A message to the page.
@@ -1485,6 +1499,9 @@ mod tests {
         assert_eq!(req(r#""op":"thumbs","seq":3,"ids":[0]"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"thumbs","seq":3,"ver":4,"ids":[0],"path":"C:\\a.jpg""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"report_problem""#), Ok(Request::ReportProblem {}));
+        assert_eq!(req(r#""op":"hotkey","key":"win_alt_f""#), Ok(Request::Hotkey { key: crate::settings::Hotkey::WinAltF }));
+        assert_eq!(req(r#""op":"hotkey","key":"alt_f4""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"hotkey""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"report_problem","text":"x""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"export""#), Ok(Request::Export {}));
         assert_eq!(req(r#""op":"export","path":"C:\\x.csv""#), Err(Rejected::Malformed));
@@ -1899,10 +1916,13 @@ mod tests {
             tray_icon: true,
             version: "1.0.0",
             store: true,
+            hotkey: "ctrl_alt_f",
+            hotkey_taken: true,
+            hotkeys: hotkeys(),
         });
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.starts_with(r#"{"type":"settings","lang":"ar","next_lang":"en""#), "{json}");
-        assert!(json.ends_with(r#""version":"1.0.0","store":true}"#), "{json}");
+        assert!(json.contains(r#""version":"1.0.0","store":true,"hotkey":"ctrl_alt_f","hotkey_taken":true,"hotkeys":[["ctrl_alt_f","Ctrl+Alt+F"],["ctrl_alt_space","Ctrl+Alt+Space"],"#), "{json}");
         let json = serde_json::to_string(&Outbound::Renamed { list: List::Recent, seq: 0, ver: 3, id: 1, name: "a".into() }).unwrap();
         assert_eq!(json, r#"{"type":"renamed","list":"recent","seq":0,"ver":3,"id":1,"name":"a"}"#);
     }
