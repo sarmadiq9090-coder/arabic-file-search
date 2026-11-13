@@ -63,9 +63,16 @@ impl Shared {
     }
 }
 
+/// Starts the watch thread of one root.
+type SpawnRoot = Box<dyn Fn(&str) -> JoinHandle<()> + Send>;
+
 pub struct Watcher {
     stop: Shared,
     threads: Vec<JoinHandle<()>>,
+    /// The roots watched, as given.
+    roots: Vec<String>,
+    /// Starts the watch of one more root (with the same sink and stop event).
+    spawn: SpawnRoot,
 }
 
 impl Watcher {
@@ -77,14 +84,24 @@ impl Watcher {
     {
         let stop = unsafe { CreateEventW(null_mut(), TRUE, FALSE, null()) };
         let own = own_dirs();
-        let threads = roots
-            .iter()
-            .map(|root| {
-                let (root, sink, own, stop) = (root.clone(), sink.clone(), own.clone(), Shared(stop));
-                std::thread::spawn(move || watch_root(&root, stop.get(), &own, &sink))
-            })
-            .collect();
-        Watcher { stop: Shared(stop), threads }
+        let event = Shared(stop);
+        let spawn = Box::new(move |root: &str| {
+            let (root, sink, own, stop) = (root.to_string(), sink.clone(), own.clone(), Shared(event.get()));
+            std::thread::spawn(move || watch_root(&root, stop.get(), &own, &sink))
+        });
+        let threads = roots.iter().map(|root| spawn(root)).collect();
+        Watcher { stop: Shared(stop), threads, roots: roots.to_vec(), spawn }
+    }
+
+    /// Watches one more root (a drive plugged in after the start); false
+    /// when it is watched already.
+    pub fn add_root(&mut self, root: &str) -> bool {
+        if self.stop.0.is_null() || self.roots.iter().any(|r| r.eq_ignore_ascii_case(root)) {
+            return false;
+        }
+        self.threads.push((self.spawn)(root));
+        self.roots.push(root.to_string());
+        true
     }
 
     /// Ends all watches and waits for the threads (they wake at once).

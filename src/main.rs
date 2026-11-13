@@ -39,6 +39,8 @@ mod content_cache;
 #[cfg(any(windows, test))]
 mod crash_log;
 #[cfg(any(windows, test))]
+mod drives;
+#[cfg(any(windows, test))]
 mod dupes;
 #[cfg(any(windows, test))]
 mod extract;
@@ -102,6 +104,8 @@ mod test_temp;
 mod thumb_cache;
 #[cfg(any(windows, test))]
 mod update;
+#[cfg(any(windows, test))]
+mod walk;
 #[cfg(any(windows, test))]
 mod watch_pace;
 #[cfg(any(windows, test))]

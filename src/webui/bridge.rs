@@ -376,6 +376,10 @@ pub struct RowOut {
     /// Moved to the Recycle Bin since it was listed.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub gone: bool,
+    /// On a drive that is not connected now (its entry is kept until the
+    /// drive is back): the page adds «القرص غير متصل» / "drive not connected".
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub offline: bool,
 }
 
 fn is_zero(n: &u32) -> bool {
@@ -718,6 +722,7 @@ pub fn row(id: u32, e: &Entry, q: Option<&Query>) -> RowOut {
         snippet: None,
         matches: 0,
         gone: false,
+        offline: crate::drives::is_absent(&e.path),
     }
 }
 
