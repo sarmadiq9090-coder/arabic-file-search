@@ -272,6 +272,10 @@ pub enum Request {
     SwitchTo { list: List, seq: u64, ver: u64, id: u32 },
     /// Forget the Save/Open dialog waiting since Ctrl+Alt+G (Esc).
     SwitchCancel {},
+    /// Windows' "Open with" choice for the file of row `id`.
+    OpenWith { list: List, seq: u64, ver: u64, id: u32 },
+    /// Windows' Properties window for the file of row `id`.
+    Properties { list: List, seq: u64, ver: u64, id: u32 },
 }
 
 /// Why a message was refused.
@@ -1481,6 +1485,10 @@ mod tests {
         // A folder, never a path, from the page.
         assert_eq!(req(r#""op":"switch_to","path":"C:\\Windows""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"switch_cancel""#), Ok(Request::SwitchCancel {}));
+        assert_eq!(req(r#""op":"open_with","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::OpenWith { list: List::Results, seq: 2, ver: 3, id: 1 }));
+        assert_eq!(req(r#""op":"properties","list":"recent","seq":0,"ver":3,"id":1"#), Ok(Request::Properties { list: List::Recent, seq: 0, ver: 3, id: 1 }));
+        // Only Windows' own two verbs, never one the page names.
+        assert_eq!(req(r#""op":"properties","list":"results","seq":2,"ver":3,"id":1,"verb":"runas""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"reindex""#), Ok(Request::Reindex {}));
         assert_eq!(req(r#""op":"stop","seq":9"#), Ok(Request::Stop { seq: 9 }));
     }

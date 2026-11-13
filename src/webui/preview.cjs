@@ -109,11 +109,11 @@ function fakeProgram(cfg) {
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id", "name"],
     save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], options_menu: [], report_problem: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], thumbs: ["seq", "ver", "ids"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
-    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [],
+    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
-  const ROW_OPS = ["thumbs", "more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope", "drag", "folder_sizes", "switch_to"];
+  const ROW_OPS = ["thumbs", "more", "matches", "open", "reveal", "copy", "copy_file", "copy_all", "rename", "recycle", "scope", "drag", "folder_sizes", "switch_to", "open_with", "properties"];
   let lastVer = 0, recentVer = 0;
   const nextVer = () => ++lastVer;
   const send = (m) => setTimeout(() => window.__instafind.recv(m), 0);
@@ -284,7 +284,7 @@ const SHOTS = [
   // One-click actions: Export and Update index in the toolbar, labelled History/Settings, the
   // right-click menu's folder sizes and replace text, and the actions under the list in a narrow window.
   ["tools-en-light", "en", "light", [["type", "report"], ["click", "#tool-export"]], { expect: { lastSent: "export", labels: true } }],
-  ["ctx-sizes-ar-light", "ar", "light", [["type", "تقرير"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:nth-child(7)"], ["wait", 50]], { expect: { lastSent: "folder_sizes" } }],
+  ["ctx-sizes-ar-light", "ar", "light", [["type", "تقرير"], ["rclick", "#r1"], ["click", "#ctx [data-op=folder_sizes]"], ["wait", 50]], { expect: { lastSent: "folder_sizes" } }],
   ["narrow-ar-light", "ar", "light", [["type", "تقرير"], ["key", "ArrowDown"]], { width: 820, expect: { actbar: 4, labels: false } }],
   ["actbar-no-preview-en-light", "en", "light", [["type", "report"], ["click", "#view-preview"], ["click", "#actbar .btn:nth-child(3)"], ["wait", 50]], { expect: { actbar: 4, lastSent: "copy" } }],
   // The classic window's terms, and the date with its time in the preview.
@@ -316,7 +316,7 @@ const SHOTS = [
   ["rename-done-en-light", "en", "light", [["type", "report"], ["key", "F2"], ["fill", "#rename", "Sales report 2026 (final).xlsx"], ["key", "Enter"], ["wait", 50], ["key", "ArrowDown"], ["key", "Delete"], ["wait", 50], ["click", "#r1"], ["key", "Delete"], ["wait", 50], ["click", "#recycle-ok"], ["wait", 50]], { expect: { renamed: "Sales report 2026 (final).xlsx", gone: 1, recycles: 1, dialog: false } }],
   ["delete-in-box-en-dark", "en", "dark", [["type", "report"], ["key", "ArrowDown"], ["key", "Delete"], ["wait", 50]], { expect: { dialog: false, recycles: 0, q: "report" } }],
   ["recycle-ar-light", "ar", "light", [["type", "تقرير"], ["click", "#r1"], ["key", "Delete"], ["wait", 50]], { expect: { dialog: true, recycles: 0, focus: "recycle-ok" } }],
-  ["recycle-cancel-ar-dark", "ar", "dark", [["type", "تقرير"], ["rclick", "#r2"], ["click", "#ctx [role=menuitem]:last-child"], ["wait", 50], ["key", "Escape"], ["wait", 50]], { expect: { dialog: false, recycles: 0, gone: 0, focus: "list" } }],
+  ["recycle-cancel-ar-dark", "ar", "dark", [["type", "تقرير"], ["rclick", "#r2"], ["click", "#ctx [data-op=recycle]"], ["wait", 50], ["key", "Escape"], ["wait", 50]], { expect: { dialog: false, recycles: 0, gone: 0, focus: "list" } }],
   // Typing with the focus on the list goes on in the box.
   ["list-typing-en-light", "en", "light", [["type", "report"], ["click", "#r1"], ["key", "s"], ["wait", 200]], { expect: { q: "reports", focus: "q" } }],
   // The rename dialog names the list it was opened on: the list listed again
@@ -353,6 +353,10 @@ const SHOTS = [
   // The quick popup's suggestions carry over: inside documents runs a document search, all types clears the type.
   ["handover-content-ar-light", "ar", "light", [["eval", "window.__instafind.recv({ type: 'query', q: 'عقد الإيجار', content: true, all_kinds: false })"], ["wait", 300]], { expect: { content: true, rows: 3, inside: true } }],
   ["handover-kinds-en-light", "en", "light", [["chip", "kind", 1], ["eval", "window.__instafind.recv({ type: 'query', q: 'report', content: false, all_kinds: true })"], ["wait", 150]], { expect: { chipsOn: 0, inside: false } }],
+  // Windows' "Open with" and Properties in the result menu (Properties last, as in Explorer; Alt+Enter too).
+  ["ctx-open-with-ar-light", "ar", "light", [["type", "تقرير"], ["rclick", "#r1"], ["click", "#ctx [data-op=open_with]"], ["wait", 50]], { expect: { lastSent: "open_with" } }],
+  ["ctx-properties-en-dark", "en", "dark", [["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:last-child"], ["wait", 10], ["wait", 50]], { expect: { lastSent: "properties" } }],
+  ["alt-enter-en-light", "en", "light", [["type", "report"], ["key", "Alt+Enter"], ["wait", 50]], { expect: { lastSent: "properties", opens: 0 } }],
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 

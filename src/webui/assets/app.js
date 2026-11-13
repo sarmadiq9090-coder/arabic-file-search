@@ -50,7 +50,7 @@
       mOpen: "فتح الملف", mReveal: "فتح المجلد الذي يحتويه", mCopyFile: "نسخ الملف", mCopyPath: "نسخ المسار", mCopyAll: "نسخ مسارات كل النتائج",
       mSizes: "أحجام المجلدات هنا…", mReplace: "استبدال نص في الملفات…", exportBtn: "تصدير النتائج", reindexBtn: "تحديث الفهرس",
       mScope: "البحث في هذا المجلد", mRename: "تغيير الاسم", mRecycle: "نقل إلى سلة المحذوفات", mMatches: "عرض كل التطابقات داخل الملف",
-      mSwitch: "فتح مجلدها في نافذة الحفظ/الفتح", qsCancel: "إلغاء النقل",
+      mSwitch: "فتح مجلدها في نافذة الحفظ/الفتح", qsCancel: "إلغاء النقل", mOpenWith: "فتح باستخدام…", mProps: "خصائص",
       // dialogs
       renameH: "تغيير الاسم", renameLabel: "الاسم الجديد", renameOk: "تغيير الاسم", cancel: "إلغاء", close: "إغلاق",
       recycleH: "نقل إلى سلة المحذوفات", recycleQ: ["هل تريد نقل «", "» إلى سلة المحذوفات؟"], recycleQDir: ["هل تريد نقل المجلد «", "» وكل ما فيه إلى سلة المحذوفات؟"],
@@ -114,7 +114,7 @@
       mOpen: "Open file", mReveal: "Open containing folder", mCopyFile: "Copy file", mCopyPath: "Copy path", mCopyAll: "Copy paths of all results",
       mSizes: "Folder sizes here…", mReplace: "Replace text in files…", exportBtn: "Export results", reindexBtn: "Update index",
       mScope: "Search in this folder", mRename: "Rename", mRecycle: "Move to Recycle Bin", mMatches: "Show all matches in the file",
-      mSwitch: "Open its folder in the Save/Open dialog", qsCancel: "Cancel the move",
+      mSwitch: "Open its folder in the Save/Open dialog", qsCancel: "Cancel the move", mOpenWith: "Open with…", mProps: "Properties",
       renameH: "Rename", renameLabel: "New name", renameOk: "Rename", cancel: "Cancel", close: "Close",
       recycleH: "Move to the Recycle Bin", recycleQ: ["Move “", "” to the Recycle Bin?"], recycleQDir: ["Move the folder “", "” and everything in it to the Recycle Bin?"],
       recycleSub: "You can restore it from the Recycle Bin.", recycleOk: "Move to Recycle Bin",
@@ -239,6 +239,7 @@
     refresh: [["path", { d: "M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" }]],
     pane: [["rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }], ["path", { d: "M14 5v14" }]],
     flag: [["path", { d: "M5 21V4M5 4h11l-2 4 2 4H5" }]],
+    info: [["circle", { cx: "12", cy: "12", r: "9" }], ["path", { d: "M12 11v6M12 7.5v.5" }]],
   };
 
   // File-type badge: colour by family, the extension as its label.
@@ -999,18 +1000,23 @@
     ctxRow = { r, at: listAt(listName) };
     ctxBack = document.activeElement;
     const item = (label, key, op, ic) => {
-      const it = h("div", { role: "menuitem", tabindex: "-1" }, icon(ic), h("span", null, label), key ? h("kbd", null, key) : null);
+      const it = h("div", { role: "menuitem", tabindex: "-1", "data-op": op }, icon(ic), h("span", null, label), key ? h("kbd", null, key) : null);
       it.addEventListener("click", () => { closeMenus(); runCtx(op); });
       return it;
     };
     // While a Save/Open dialog waits (Ctrl+Alt+G), its move comes first and takes Enter.
     const items = S.qswitch ? [item(T.mSwitch, "Enter", "switch_to", I.folder), item(T.mOpen, null, "open", I.open)] : [item(T.mOpen, "Enter", "open", I.open)];
-    items.push(item(T.mReveal, "Ctrl+Enter", "reveal", I.folder), item(T.mCopyFile, "Ctrl+C", "copy_file", I.copy), item(T.mCopyPath, "Ctrl+Shift+C", "copy", I.copy));
+    items.push(item(T.mReveal, "Ctrl+Enter", "reveal", I.folder));
+    // Windows' own "Open with" choice (files only), as the classic menu.
+    if (!r.folder) items.push(item(T.mOpenWith, null, "open_with", I.open));
+    items.push(item(T.mCopyFile, "Ctrl+C", "copy_file", I.copy), item(T.mCopyPath, "Ctrl+Shift+C", "copy", I.copy));
     if (listName === "results") items.push(item(T.mCopyAll, null, "copy_all", I.copy));
     items.push(item(T.mScope, null, "scope", I.search), item(T.mSizes, null, "folder_sizes", I.scale));
     if (listName === "results") items.push(item(T.mReplace, null, "replace_text", I.pen));
     if (r.snippet) items.push(item(T.mMatches, "F4", "matches", I.text));
     items.push(h("div", { class: "sep", role: "separator" }), item(T.mRename, "F2", "rename", I.pen), item(T.mRecycle, "Delete", "recycle", I.trash));
+    // Last, as in Explorer: Windows' Properties window.
+    items.push(h("div", { class: "sep", role: "separator" }), item(T.mProps, "Alt+Enter", "properties", I.info));
     const menu = $("ctx");
     menu.replaceChildren(...items);
     closeMenus();
@@ -1284,6 +1290,8 @@
     }
     if (e.key in moves && (inBox || inList)) { select(Math.max(0, Math.min(S.rows.length - 1, S.sel + moves[e.key]))); e.preventDefault(); return; }
     if (ctrl && (e.key === "Home" || e.key === "End")) { select(e.key === "Home" ? 0 : S.rows.length - 1); e.preventDefault(); return; }
+    // Alt+Enter: Windows' Properties window, as in Explorer.
+    if (e.key === "Enter" && e.altKey && (inBox || inList)) { act("properties", row); e.preventDefault(); return; }
     // A Save/Open dialog waits (Ctrl+Alt+G): Enter moves it to the folder of
     // the selected result (the top one from the box), as in the classic window.
     if (e.key === "Enter" && S.qswitch && !ctrl && (inBox || inList)) { switchTo(row); e.preventDefault(); return; }

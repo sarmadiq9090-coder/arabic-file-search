@@ -1258,6 +1258,8 @@ mod imp {
                     }
                     self.webui_send_history();
                 }
+                Request::OpenWith { list, seq, ver, id } => self.webui_verb(list, seq, ver, id, "openas"),
+                Request::Properties { list, seq, ver, id } => self.webui_verb(list, seq, ver, id, "properties"),
                 Request::SwitchTo { list, seq, ver, id } => {
                     let Some(path) = self.webui_path(list, seq, ver, id) else { return };
                     let is_dir = self.webui_is_dir(list, seq, ver, id, &path);
@@ -1290,6 +1292,20 @@ mod imp {
         fn webui_path(&self, list: List, seq: u64, ver: u64, id: u32) -> Option<String> {
             let found = self.webui.lists.borrow().path(list, seq, ver, id).map(str::to_string);
             found.map_err(|miss| self.webui_missed(miss)).ok()
+        }
+
+        /// Windows' "Open with" ("openas") or Properties ("properties") for
+        /// row `id`, over the new window, as the classic result menu does.
+        fn webui_verb(&self, list: List, seq: u64, ver: u64, id: u32, verb: &str) {
+            let Some(path) = self.webui_path(list, seq, ver, id) else { return };
+            // (Whatever Windows shows may run a message loop: the timer
+            // leaves the page alone meanwhile.)
+            self.webui.in_page_call.set(true);
+            let ok = shell::invoke_verb(self.webui.parts.window.handle.hwnd(), &path, verb);
+            self.webui.in_page_call.set(false);
+            if !ok {
+                self.webui_warn(trf!("تعذّر تنفيذ ذلك على: {}", "Windows could not do that for: {}", super::super::format::ltr_path(&path)));
+            }
         }
 
         /// Whether row `id` (whose file is `path`) is a folder.
