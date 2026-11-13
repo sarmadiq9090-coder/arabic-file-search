@@ -95,6 +95,7 @@ dependencies = [
  "webview2-com",
  "winapi",
  "windows",
+ "windows-core",
  "wry",
  "zip",
 ]

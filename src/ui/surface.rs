@@ -41,6 +41,9 @@ pub(super) const WM_APP_FILES: UINT = winapi::um::winuser::WM_APP + 0x51;
 pub(super) const WM_APP_CATALOG: UINT = winapi::um::winuser::WM_APP + 0x52;
 /// Posted to the popup when a system command run in the background ended.
 pub(super) const WM_APP_SYSTEM: UINT = winapi::um::winuser::WM_APP + 0x53;
+/// Posted to the popup by a screen reader's "default action" on a result
+/// row (`ui/quick_access.rs`): wParam = the row, lParam = the rows' generation.
+pub(super) const WM_APP_ACC_OPEN: UINT = winapi::um::winuser::WM_APP + 0x54;
 
 /// Which window a message is for (kept in `GWLP_USERDATA`).
 pub(super) const KIND_POPUP: isize = 1;
