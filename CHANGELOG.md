@@ -2,6 +2,10 @@
 
 # سجل التغييرات
 
+## Unreleased
+
+- **أيقونة على سطح المكتب**: عند نقل البرنامج إلى مكانه الدائم تُضاف له أيقونة على سطح المكتب أيضاً، بجانب أيقونة قائمة «ابدأ». والنسخة التي نُقلت من قبل (بالإصدار 1.0.0) تأخذ الأيقونة مرة واحدة عند أول تشغيل بعد التحديث إن لم تكن موجودة، ولا تعود إن حذفتها. لا أيقونة لنسخ winget وScoop وChocolatey وProgram Files والمتجر، ولا للنسخة التي بقيت في «التنزيلات». / **A desktop shortcut:** moving the program to its permanent place now also adds a shortcut on the desktop, next to the Start-menu one. A copy moved earlier (by 1.0.0) gets it once at its first start after the update if there is none, and it does not come back once you delete it. Not for winget, Scoop, Chocolatey, Program Files or Store copies, nor for a copy left in Downloads.
+
 ## 1.0.0 — 2026-11-13
 
 الإصدار 1.0.0. كل سطر بالعربية أولاً ثم بالإنجليزية بعد «/». / InstaFind 1.0.0. Each line: Arabic first, then English after "/".
