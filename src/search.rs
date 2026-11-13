@@ -151,19 +151,42 @@ fn merge_spans(mut spans: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
     merged
 }
 
-/// Letters and digits make up words; anything else (spaces, punctuation,
-/// `_`, `-`, `.`) separates them. Unicode-aware, so Arabic works.
+/// Letters, digits and the marks on them (Indic and Thai vowel signs) make
+/// up words; anything else (spaces, punctuation, `_`, `-`, `.`) separates
+/// them. Unicode-aware, so Arabic works.
 fn is_word_char(c: char) -> bool {
-    c.is_alphanumeric()
+    c.is_alphanumeric() || !c.is_ascii() && unicode_normalization::char::is_combining_mark(c)
+}
+
+/// Scripts written without spaces between words: CJK ideographs, kana,
+/// Thai, Lao, Khmer and Myanmar. Each of their characters may start or end
+/// a word ([`joined`]), so whole-word matching (`ww:`) finds a word inside
+/// a sentence of them.
+fn is_unspaced(c: char) -> bool {
+    matches!(
+        c,
+        '\u{0E00}'..='\u{0EFF}' | '\u{1000}'..='\u{109F}' | '\u{1780}'..='\u{17FF}' | '\u{3040}'..='\u{30FF}' | '\u{31F0}'..='\u{31FF}'
+            | '\u{3400}'..='\u{4DBF}' | '\u{4E00}'..='\u{9FFF}' | '\u{F900}'..='\u{FAFF}' | '\u{20000}'..='\u{3FFFF}'
+    )
+}
+
+/// True when `a` and `b`, side by side, are in the same word: both word
+/// characters, neither of a script written without spaces.
+fn joined(a: char, b: char) -> bool {
+    is_word_char(a) && is_word_char(b) && !is_unspaced(a) && !is_unspaced(b)
+}
+
+/// True when the match `hay[s..e]` (not empty) neither continues the word
+/// before it nor goes on into the next.
+fn ends_at_word_edges(hay: &str, s: usize, e: usize) -> bool {
+    let (first, last) = (hay[s..].chars().next(), hay[..e].chars().next_back());
+    let glued = |a: Option<char>, b: Option<char>| a.zip(b).is_some_and(|(a, b)| joined(a, b));
+    !glued(hay[..s].chars().next_back(), first) && !glued(last, hay[e..].chars().next())
 }
 
 /// Start offsets of the occurrences of `w` in `hay` that are whole words.
 fn word_matches<'a>(hay: &'a str, w: &'a str) -> impl Iterator<Item = usize> + 'a {
-    hay.match_indices(w).map(|(s, _)| s).filter(move |&s| {
-        !w.is_empty()
-            && !hay[..s].chars().next_back().is_some_and(is_word_char)
-            && !hay[s + w.len()..].chars().next().is_some_and(is_word_char)
-    })
+    hay.match_indices(w).map(|(s, _)| s).filter(move |&s| !w.is_empty() && ends_at_word_edges(hay, s, s + w.len()))
 }
 
 /// What may come before a word alternative in the same word: an article
@@ -176,12 +199,16 @@ const WORD_ALT_PREFIXES: [&str; 7] = ["وال", "بال", "كال", "فال", "�
 /// word («باريس», «نهاية»).
 fn lossy_matches<'a>(hay: &'a str, w: &'a str) -> impl Iterator<Item = usize> + 'a {
     hay.match_indices(w).map(|(s, _)| s).filter(move |&s| {
-        if w.is_empty() || hay[s + w.len()..].chars().next().is_some_and(is_word_char) {
+        if w.is_empty() || ends_at_word_edges(hay, s, s + w.len()) {
+            return !w.is_empty();
+        }
+        let last = w.chars().next_back();
+        if last.zip(hay[s + w.len()..].chars().next()).is_some_and(|(a, b)| joined(a, b)) {
             return false;
         }
         let before = &hay[..s];
-        let word_start = before.char_indices().rev().take_while(|&(_, c)| is_word_char(c)).last().map_or(s, |(i, _)| i);
-        word_start == s || WORD_ALT_PREFIXES.contains(&&before[word_start..])
+        let word_start = before.char_indices().rev().take_while(|&(_, c)| is_word_char(c) && !is_unspaced(c)).last().map_or(s, |(i, _)| i);
+        WORD_ALT_PREFIXES.contains(&&before[word_start..])
     })
 }
 
@@ -390,13 +417,14 @@ pub struct Query {
     pub show_system: bool,
     /// Problems found while parsing (in Arabic), for the UI to show.
     pub warnings: Vec<String>,
-    /// The first term's alternatives with ؤ and ئ kept as typed
-    /// ([`normalize_spelling`]). A hamza seat matches its other spellings
+    /// The first term's alternatives as typed ([`normalize_spelling`]: ؤ, ئ,
+    /// گ, ş, é… kept). A hamza seat matches its other spellings
     /// (see [`crate::normalize`]: «مسئول», «مسؤول» and «مسوول» find each
     /// other); among equally good matches the names spelled as typed come first.
     pub spelled: Vec<String>,
-    /// True when the first term has a hamza seat or گ ([`Self::spelled`]
-    /// differs from its plain spelling or has other spellings).
+    /// True when the first term has a hamza seat or a letter the spelling as
+    /// typed keeps (گ, ş, é…): [`Self::spelled`] differs from its plain
+    /// spelling or has other spellings.
     pub spelled_seat: bool,
     /// A wildcard for any name was typed: `*` alone (or `**`), `*.*` or
     /// `ext:*`. It filters nothing, like Explorer's `*.*`, so a query of
@@ -1075,7 +1103,7 @@ impl Query {
                 _ => q.terms.push(term),
             }
         }
-        q.spelled_seat = q.spelled.iter().any(|a| a.contains(['ؤ', 'ئ', 'گ']) || !query_forms(a).is_empty());
+        q.spelled_seat = q.spelled.iter().any(|a| normalize(a) != *a || !query_forms(a).is_empty());
         if q.franco {
             for t in &mut q.terms {
                 let latin: Vec<String> = t.alts.iter().filter(|a| crate::franco::is_arabizi(a)).cloned().collect();

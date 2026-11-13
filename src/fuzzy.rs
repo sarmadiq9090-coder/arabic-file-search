@@ -240,13 +240,13 @@ impl Matcher {
     }
 }
 
-/// Same as `char::is_alphanumeric` (what [`split_words`] uses), much faster
-/// for Arabic letters, which are all alphanumeric.
+/// Same as what [`split_words`] uses (letters, digits and the marks on
+/// them), much faster for Arabic letters, which are all alphanumeric.
 fn is_word_char(c: char) -> bool {
     match c {
         _ if c.is_ascii() => c.is_ascii_alphanumeric(),
         '\u{0621}'..='\u{064A}' => true,
-        _ => c.is_alphanumeric(),
+        _ => c.is_alphanumeric() || unicode_normalization::char::is_combining_mark(c),
     }
 }
 
@@ -477,8 +477,9 @@ mod tests {
 
     #[test]
     fn word_chars_agree() {
-        for c in ('\u{0}'..='\u{07FF}').chain('\u{FB50}'..='\u{FEFF}') {
-            assert_eq!(is_word_char(c), c.is_alphanumeric(), "{c:?}");
+        for c in ('\u{0}'..='\u{0DFF}').chain('\u{FB50}'..='\u{FEFF}') {
+            let s = c.to_string();
+            assert_eq!(is_word_char(c), search::split_words(&s).next().is_some(), "{c:?}");
         }
     }
 

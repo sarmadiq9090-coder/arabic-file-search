@@ -1010,3 +1010,124 @@ fn arabic_number_separators_match_ascii_ones() {
     // A size filter still reads ٫ as the decimal point.
     assert_eq!(at("حجم:١٫٥م").size, Some((MB * 3 / 2, MB * 3 / 2)));
 }
+
+// ------------------------------------------- other languages: names and text
+
+/// A name in Latin with accents, Greek, Cyrillic, Japanese, Korean, an Indic
+/// script, or Urdu is found by the query typed with or without the accents,
+/// joiners, nukta or other letter forms, in names and inside documents; the
+/// spelling typed comes first.
+#[test]
+fn other_languages_find_their_spelling_variants() {
+    let groups: &[&[&str]] = &[
+        &["Café", "cafe", "CAFÉ", "Cafe\u{301}"],
+        &["Öğrenci", "ogrenci", "OGRENCI", "öğrenci"],
+        &["İstanbul", "istanbul", "ıstanbul", "ISTANBUL"],
+        &["Straße", "strasse", "STRASSE"],
+        &["Kurmancî", "kurmanci"],
+        &["Αθήνα", "αθηνα", "ΑΘΗΝΑ"],
+        &["Ёлка", "елка", "ёлка"],
+        &["ґанок", "ганок"],
+        &["コーヒー", "こーひー", "ｺｰﾋｰ"],
+        &["ガラス", "ｶﾞﾗｽ", "がらす"],
+        &["ＲＥＰＯＲＴ２０２４", "report2024"],
+        &["한국어", "\u{1112}\u{1161}\u{11AB}\u{1100}\u{116E}\u{11A8}\u{110B}\u{1165}"],
+        &["\u{0958}िला", "क\u{093C}िला", "किला"],
+        &["क्\u{200D}षेत्र", "क्षेत्र"],
+        &["অ\u{09A4}\u{09CD}\u{200D}", "অ\u{09CE}"],
+        &["\u{0995}\u{09CB}\u{09A8}", "\u{0995}\u{09C7}\u{09BE}\u{09A8}"],
+        &["\u{0A16}\u{0A3C}\u{0A2C}\u{0A30}", "\u{0A59}\u{0A2C}\u{0A30}", "\u{0A16}\u{0A2C}\u{0A30}"],
+        &["\u{0B95}\u{0BCA}\u{0B9F}\u{0BC1}", "\u{0B95}\u{0BC6}\u{0BBE}\u{0B9F}\u{0BC1}"],
+        &["\u{0C15}\u{0C48}", "\u{0C15}\u{0C46}\u{0C56}"],
+        &["\u{0C95}\u{0CCB}\u{0CB2}\u{0CBE}\u{0CB0}", "\u{0C95}\u{0CC6}\u{0CC2}\u{0CD5}\u{0CB2}\u{0CBE}\u{0CB0}"],
+        &["അവ\u{0D7B}", "അവ\u{0D28}\u{0D4D}\u{200D}", "അവ\u{0D28}\u{0D4D}"],
+        &["\u{0B15}\u{0B4B}\u{0B21}\u{0B3C}", "\u{0B15}\u{0B47}\u{0B3E}\u{0B5C}", "\u{0B15}\u{0B4B}\u{0B21}"],
+        &["ગ\u{0A9C}\u{0ABC}લ", "ગ\u{0A9C}લ"],
+        &["ٹوکری", "توكري", "ٹوكری"],
+        &["ډوډۍ", "دودي"],
+    ];
+    for group in groups {
+        for &name in group.iter() {
+            let entries = vec![entry(&format!(r"C:\a\{name}.txt"), false), entry(r"C:\a\تقرير.txt", false)];
+            for &q in group.iter() {
+                assert_eq!(search_names(&entries, &at(q), ""), vec![0], "{q} → {name}");
+                let doc = format!("قبل {name} بعد");
+                assert!(match_text(&doc, &at(q)).is_some(), "{q} in «{doc}»");
+                assert!(match_text(&doc, &at(&format!("ww:{q}"))).is_some(), "ww:{q} in «{doc}»");
+            }
+        }
+    }
+    // The spelling as typed first, both ways.
+    let entries = vec![entry(r"C:\a\cafe.txt", false), entry(r"C:\a\café.txt", false)];
+    assert_eq!(search_names(&entries, &at("café"), ""), vec![1, 0]);
+    assert_eq!(search_names(&entries, &at("cafe"), ""), vec![0, 1]);
+    let entries = vec![entry(r"C:\a\توكري.txt", false), entry(r"C:\a\ٹوکری.txt", false)];
+    assert_eq!(search_names(&entries, &at("ٹوکری"), ""), vec![1, 0]);
+    // Underlined: the name as written.
+    let marked = |name: &str, q: &str| match_ranges(name, &at(q)).into_iter().map(|(s, e)| name[s..e].to_string()).collect::<Vec<_>>();
+    assert_eq!(marked("Le Café.txt", "cafe"), ["Café"]);
+    assert_eq!(marked("ｺｰﾋｰ.txt", "コーヒー"), ["ｺｰﾋｰ"]);
+}
+
+/// Different letters stay different: no false matches among common Arabic
+/// and English words, and none across alphabets.
+#[test]
+fn other_language_folds_add_no_false_matches() {
+    let entries = vec![
+        entry(r"C:\a\report final.docx", false), // 0
+        entry(r"C:\a\resume.pdf", false),        // 1
+        entry(r"C:\a\قلم.txt", false),           // 2
+        entry(r"C:\a\كلم.txt", false),           // 3
+        entry(r"C:\a\мой.txt", false),           // 4
+        entry(r"C:\a\мои.txt", false),           // 5
+        entry(r"C:\a\بچے.txt", false),           // 6
+        entry(r"C:\a\بچی.txt", false),           // 7
+        entry(r"C:\a\東京.txt", false),          // 8
+        entry(r"C:\a\京都.txt", false),          // 9
+        entry(r"C:\a\ex.txt", false),            // 10
+    ];
+    let find = |s: &str| {
+        let mut r = search_names(&entries, &at(s), "");
+        r.sort_unstable();
+        r
+    };
+    assert_eq!(find("report"), vec![0]);
+    assert_eq!(find("résumé"), vec![1]);
+    assert_eq!(find("قلم"), vec![2]);
+    assert_eq!(find("كلم"), vec![3]);
+    assert_eq!(find("мой"), vec![4]);
+    assert_eq!(find("мои"), vec![5]);
+    assert_eq!(find("بچے"), vec![6]);
+    assert_eq!(find("بچی"), vec![7]);
+    assert_eq!(find("東京"), vec![8]);
+    assert_eq!(find("京"), vec![8, 9]);
+    // Latin e is not Cyrillic е, nor Greek ε.
+    assert_eq!(find("еx"), Vec::<u32>::new());
+    assert_eq!(find("εx"), Vec::<u32>::new());
+    assert_eq!(find("ex"), vec![10]);
+}
+
+/// Thai, Chinese and Japanese have no spaces between words: a word is found
+/// inside a sentence, also with `ww:` (each of their characters may start or
+/// end a word), while Latin and Arabic whole words are as before, and Indic
+/// vowel signs belong to their word.
+#[test]
+fn whole_words_in_scripts_without_spaces() {
+    let text = "東京都の天気は晴れ。ภาษาไทยดีมาก 한국어 사전";
+    for q in ["東京", "天気", "ww:東京", "ww:天気", "ww:晴れ", "ไทย", "ww:ไทย", "ww:한국어", "\"東京都の天気\""] {
+        assert!(match_text(text, &at(q)).is_some(), "{q}");
+    }
+    assert!(match_text(text, &at("ww:한국")).is_none()); // Korean has spaces
+    assert_eq!(all_matches("東京と東京", &at("ww:東京"), 9).0, 2);
+    assert!(match_text("abc東京", &at("ww:abc")).is_some());
+    assert!(match_text("abcd", &at("ww:abc")).is_none());
+    assert!(match_text("التقرير السنوي", &at("ww:تقرير")).is_none());
+    // A Hindi word is not cut at its vowel signs.
+    assert!(match_text("हिंदी भाषा", &at("ww:हि")).is_none());
+    assert!(match_text("हिंदी भाषा", &at("ww:हिंदी")).is_some());
+    assert!(match_text("हिंदी भाषा", &at("हि")).is_some());
+    let entries = vec![entry(r"C:\a\東京の写真.jpg", false), entry(r"C:\a\写真集.jpg", false)];
+    let mut r = search_names(&entries, &at("ww:写真"), "");
+    r.sort_unstable();
+    assert_eq!(r, vec![0, 1]);
+}
