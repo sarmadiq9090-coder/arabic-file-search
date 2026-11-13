@@ -204,8 +204,11 @@ pub(crate) fn this_copy_arg() -> String {
     crate::handover::prev_pid_arg(std::process::id(), created)
 }
 
-/// If the program is already running, brings its window forward and returns true.
-/// A copy started by the one that is leaving (`relaunched`) always runs.
+/// If the program is already running, brings its window forward and returns
+/// true; a newer copy replaces an older one instead (`older_copy`: true when
+/// the program now runs from the old copy's place, false when this copy
+/// goes on starting). A copy started by the one that is leaving
+/// (`relaunched`) always runs.
 pub(super) fn activate_running_copy(updated: bool) -> bool {
     use winapi::shared::winerror::ERROR_ALREADY_EXISTS;
     use winapi::um::errhandlingapi::GetLastError;
@@ -238,6 +241,13 @@ pub(super) fn activate_running_copy(updated: bool) -> bool {
         log("start: another copy holds the lock, no window found");
         return true;
     };
+    // A newer copy takes the older one's place (`older_copy`); otherwise
+    // the running copy comes to the front, as before.
+    match super::older_copy::on_running_copy(hwnd) {
+        super::older_copy::Outcome::Leave => return true,
+        super::older_copy::Outcome::Run => return false,
+        super::older_copy::Outcome::Front => {}
+    }
     log("start: another copy is running; brought it to the front");
     // Asynchronously: a copy that is busy or hung must not hang this one.
     unsafe {

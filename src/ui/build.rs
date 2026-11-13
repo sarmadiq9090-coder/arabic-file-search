@@ -596,6 +596,18 @@ impl NativeUi<AppUi> for App {
                 }
                 return Some(0);
             }
+            // A newer copy asks who this one is, or asks it to leave (`older_copy`).
+            if msg >= 0xC000 {
+                let leave = || {
+                    if let Some(app) = weak.upgrade() {
+                        app.close_for_restart();
+                        std::process::exit(0);
+                    }
+                };
+                if let Some(answer) = super::older_copy::on_message(msg, w, l, leave) {
+                    return Some(answer);
+                }
+            }
             if msg != WM_NOTIFY || l == 0 {
                 return None;
             }

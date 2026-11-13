@@ -107,7 +107,7 @@ fn get_string(key: &Key, name: &str) -> Option<String> {
 
 /// The folders `run_entry` tells Downloads and temp folders by. The same
 /// lookup as `ui/relocate.rs` (kept apart so the two files stay separate).
-fn folders() -> crate::relocate::Folders {
+pub(super) fn folders() -> crate::relocate::Folders {
     crate::relocate::Folders::from_env(&|name| std::env::var(name).ok(), downloads_folder())
 }
 
@@ -179,6 +179,13 @@ pub fn is_enabled() -> bool {
         return crate::store::startup_state().is_some_and(|s| s.is_on());
     }
     open(RUN_KEY, false).is_some_and(|k| has_value(&k, VALUE)) && !blocked_by_task_manager()
+}
+
+/// The exe our `Run` entry starts, if there is one with a full path.
+pub(super) fn entry_exe() -> Option<String> {
+    let key = open(RUN_KEY, false)?;
+    let command = get_string(&key, VALUE)?;
+    crate::run_entry::exe_of(&command).map(str::to_owned)
 }
 
 /// Turns starting with Windows on or off for the current user. The entry

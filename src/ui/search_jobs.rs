@@ -458,6 +458,9 @@ impl App {
                     log(&line);
                 }
             });
+            // The download a newer copy came from, when it took an older
+            // copy's place (`older_copy`).
+            super::older_copy::remove_download_later();
         }
         self.poll_load();
         self.poll_scan();
@@ -473,6 +476,15 @@ impl App {
         self.webui_tick(t);
         if t % 18_000 == 50 {
             self.maybe_check_for_update();
+        }
+        // «تم استبدال النسخة القديمة …», once, when the window (and the new
+        // look's page) is there to show it.
+        if t >= 4 && !self.replaced_told.get() && self.main_shown() && (!self.webui_in_use() || self.webui_ready()) {
+            self.replaced_told.set(true);
+            if let Some(text) = super::older_copy::notice() {
+                log(&format!("replace: notice shown: {text}"));
+                self.set_status(&text);
+            }
         }
         // Offer to report a crash of the last run once the window is up
         // (not while the program waits hidden in the tray).
