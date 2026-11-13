@@ -2,7 +2,7 @@
 # screen to 1920x1080 when the runner allows it, seeds sample files with
 # Arabic and English names in C:\Users\Public\Demo (so no runner user folder
 # shows in a path), lets the program index, and captures the full screen in
-# Arabic and in English:
+# Arabic and in English, in the new look (WebView2: the only one since 1.0):
 #   1 name search («تقرير» / "report")   2 search inside documents
 #   3 the Ctrl+Alt+F quick search        4 the duplicate finder
 # Everything goes to $Out with resolution.txt (the resolution really used).
@@ -24,7 +24,7 @@ $crash = Join-Path $data 'crash.txt'
 $script:warnings = @()
 function Warn([string]$msg) { Write-Host "::warning::$msg"; $script:warnings += $msg }
 
-Add-Type -AssemblyName System.Drawing, System.Windows.Forms
+Add-Type -AssemblyName System.Drawing, System.Windows.Forms, UIAutomationClient, UIAutomationTypes
 Add-Type -ReferencedAssemblies System.Drawing @'
 using System;
 using System.Collections.Generic;
@@ -186,7 +186,7 @@ public static class S {
 }
 '@
 [void][S]::SetProcessDPIAware()
-$VK = @{ CTRL = 0x11; ALT = 0x12; F = 0x46; ESC = 0x1B; ENTER = 0x0D }
+$VK = @{ CTRL = 0x11; ALT = 0x12; F = 0x46; ESC = 0x1B; ENTER = 0x0D; DOWN = 0x28; H = 0x48; COMMA = 0xBC }
 
 # ---------------------------------------------------------------- screen size
 Write-Host "display modes: $([S]::Modes() -join ', ')"
@@ -279,78 +279,89 @@ function Focus($h) {
     [void][S]::SetForegroundWindow($h)
     Start-Sleep -Milliseconds 400
 }
-function Controls {
-    foreach ($h in [S]::Children($script:hwnd)) { [pscustomobject]@{ H = $h; Class = [S]::Class($h); Text = [S]::Text($h) } }
+# The page's elements, as Windows UI Automation sees them (WebView2 exposes
+# the page to it): the first of type $Type whose name matches $Pattern.
+function Find-Uia($Type, [string]$Pattern) {
+    try {
+        $root = [Windows.Automation.AutomationElement]::FromHandle($script:hwnd)
+        $cond = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, $Type)
+        foreach ($e in $root.FindAll([Windows.Automation.TreeScope]::Descendants, $cond)) { if ($e.Current.Name -match $Pattern) { return $e } }
+    } catch { Write-Host "UI Automation: $_" }
+    return $null
 }
-function Query-Box {
-    $box = Controls | Where-Object Class -eq 'Edit' | Select-Object -First 1
-    if (-not $box) { Controls | ForEach-Object { Write-Host "  $($_.Class) | $($_.Text)" }; throw 'search box not found' }
-    return $box.H
+function Uia-Names($Type) {
+    try {
+        $root = [Windows.Automation.AutomationElement]::FromHandle($script:hwnd)
+        $cond = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, $Type)
+        return @($root.FindAll([Windows.Automation.TreeScope]::Descendants, $cond) | ForEach-Object { $_.Current.Name } | Select-Object -First 30)
+    } catch { return @("(UI Automation failed: $_)") }
 }
+function Click-Uia($El) {
+    $r = $El.Current.BoundingRectangle
+    [S]::ClickAt([int]($r.X + $r.Width / 2), [int]($r.Y + $r.Height / 2))
+}
+# The rows of the page's result list ("Results" / «النتائج»).
 function Result-Count {
-    $list = Controls | Where-Object Class -eq 'SysListView32' | Select-Object -First 1
-    if ($list) { [S]::ListCount($list.H) } else { 0 }
+    $list = Find-Uia ([Windows.Automation.ControlType]::List) '^(Results|النتائج)$'
+    if (-not $list) { return 0 }
+    try {
+        $cond = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::ListItem)
+        return $list.FindAll([Windows.Automation.TreeScope]::Children, $cond).Count
+    } catch { return 0 }
 }
-function Search([string]$Text, [switch]$Enter) {
-    Focus $script:hwnd
-    $box = Query-Box
-    [S]::SetText($box, '')
-    [S]::Click($box)
-    [S]::Type($Text)
-    if ($Enter) { [S]::Chord($VK.ENTER) }
-    for ($i = 0; $i -lt 20 -and (Result-Count) -eq 0; $i++) { Start-Sleep -Milliseconds 500 }
-    Start-Sleep -Seconds 2
-    $n = Result-Count
-    Write-Host "search '$Text': $n results"
-    if ($n -eq 0) { Warn "no results for '$Text'" }
-}
-function Set-Inside([bool]$On, [string[]]$Names) {
-    $cb = Controls | Where-Object { $_.Class -eq 'Button' -and $Names -contains $_.Text } | Select-Object -First 1
-    if (-not $cb) { Warn "checkbox not found: $($Names -join ' / ')"; return }
-    if ([S]::Checked($cb.H) -ne $On) { [S]::Click($cb.H); Start-Sleep -Milliseconds 500 }
-}
-# Limits the search to the demo folder through "Choose folder…". The
-# dialog ignores WM_SETTEXT (ci/demo.ps1 only gets away with it because its
-# folder is the dialog's default), so the path is typed as a person would:
-# a click in the Folder box, Ctrl+A, the path, Enter. Throws unless the
-# scope then shows the demo folder, so no runner folder can end up in a shot.
-function Scope-Text {
-    (Controls | ForEach-Object { $_.Text -replace "[\u200E\u2066\u2069]", '' }) -join ' | '
-}
-function Set-Scope([string[]]$Names) {
-    $b = Controls | Where-Object { $_.Class -eq 'Button' -and $Names -contains $_.Text } | Select-Object -First 1
-    if (-not $b) { throw 'folder button not found' }
-    for ($attempt = 1; $attempt -le 3; $attempt++) {
-        Focus $script:hwnd
-        [void][S]::PostMessage($b.H, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)   # BM_CLICK
-        $dlg = $null
-        for ($i = 0; $i -lt 20 -and -not $dlg; $i++) {
-            Start-Sleep -Milliseconds 500
-            $dlg = [S]::TopWindows($script:appPid) | Where-Object { [S]::Class($_) -eq '#32770' } | Select-Object -First 1
-        }
-        if (-not $dlg) { throw 'folder dialog did not open' }
-        Start-Sleep -Seconds 2   # it builds its controls after it appears
-        $edit = [S]::Children($dlg) | Where-Object { [S]::Class($_) -eq 'Edit' -and [S]::ParentClass($_) -eq 'ComboBox' } | Select-Object -First 1
-        Focus $dlg
-        if ($edit) { [S]::Click($edit) }
-        [S]::Chord($VK.CTRL, 0x41)   # Ctrl+A
-        [S]::Type($demo)
-        Start-Sleep -Milliseconds 300
-        [S]::Chord($VK.ENTER)
-        for ($i = 0; $i -lt 10 -and ([S]::TopWindows($script:appPid) -contains $dlg); $i++) { Start-Sleep -Milliseconds 500 }
-        if ([S]::TopWindows($script:appPid) -contains $dlg) {
-            # Enter navigated into the folder: "Select Folder" now picks it.
-            $ok = [S]::Children($dlg) | Where-Object { [S]::Class($_) -eq 'Button' -and [S]::Text($_) -eq 'Select Folder' } | Select-Object -First 1
-            if ($ok) { [void][S]::PostMessage($ok, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) }
-            for ($i = 0; $i -lt 10 -and ([S]::TopWindows($script:appPid) -contains $dlg); $i++) { Start-Sleep -Milliseconds 500 }
-        }
-        if ([S]::TopWindows($script:appPid) -contains $dlg) { [void][S]::PostMessage($dlg, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero); Start-Sleep -Seconds 1 }
-        Start-Sleep -Seconds 1
-        $text = Scope-Text
-        if ($text -match [regex]::Escape($demo)) { Write-Host "scope set to $demo"; return }
-        Write-Host "attempt ${attempt}: scope not set; controls: $text"
+# The page has loaded once its search box is there (the window shows
+# «جارٍ الفتح…» first).
+function Wait-Page {
+    for ($i = 0; $i -lt 60; $i++) {
+        if (Find-Uia ([Windows.Automation.ControlType]::ComboBox) '.') { Start-Sleep -Seconds 1; return }
+        Start-Sleep -Milliseconds 500
     }
-    throw "the search scope could not be set to $demo"
+    throw 'the page did not load'
+}
+# Keys go to the page: the window in front, the Alt tap's menu mode
+# cancelled, a click in the search box.
+function Focus-Page {
+    Focus $script:hwnd
+    [void][S]::PostMessage($script:hwnd, 0x001F, [IntPtr]::Zero, [IntPtr]::Zero)   # WM_CANCELMODE (the Alt tap)
+    Start-Sleep -Milliseconds 300
+    $box = Find-Uia ([Windows.Automation.ControlType]::ComboBox) '.'
+    if ($box) { Click-Uia $box; Start-Sleep -Milliseconds 300 }
+}
+# Runs saved search number $Index (0 first) of the page's History menu
+# (Ctrl+H, the arrows, Enter), as a person would. The saved searches are
+# seeded (Write-History) with the demo folder as their place, so no runner
+# folder can show in a shot. Throws unless results come.
+function Run-Saved([int]$Index, [string]$What) {
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        Focus-Page
+        [S]::Chord($VK.CTRL, $VK.H)
+        Start-Sleep -Milliseconds 700
+        for ($i = 0; $i -lt $Index; $i++) { [S]::Chord($VK.DOWN); Start-Sleep -Milliseconds 200 }
+        [S]::Chord($VK.ENTER)
+        for ($i = 0; $i -lt 30 -and (Result-Count) -eq 0; $i++) { Start-Sleep -Milliseconds 500 }
+        Start-Sleep -Seconds 2
+        $n = Result-Count
+        Write-Host "saved search $Index ($What): $n results"
+        if ($n -gt 0) {
+            $scope = Find-Uia ([Windows.Automation.ControlType]::Button) 'Public.*Demo'
+            if (-not $scope) { throw "the search is not limited to $demo; buttons: $((Uia-Names ([Windows.Automation.ControlType]::Button)) -join ' | ')" }
+            return
+        }
+        Write-Host "attempt ${attempt}: no results; menu items: $((Uia-Names ([Windows.Automation.ControlType]::MenuItem)) -join ' | ')"
+        [S]::Chord($VK.ESC)
+    }
+    Warn "no results for $What"
+}
+# The page's two saved searches for a language: the name search, then the
+# one inside documents, both in the demo folder.
+function Write-History([string]$Name, [string]$Content) {
+    $scope = "$demo\"
+    $saved = @(
+        [ordered]@{ name = $Name; query = $Name; kind = 0; scope = $scope; content = $false },
+        [ordered]@{ name = $Content; query = $Content; kind = 0; scope = $scope; content = $true }
+    )
+    $json = [ordered]@{ saved = $saved } | ConvertTo-Json -Depth 4 -Compress
+    [IO.File]::WriteAllText((Join-Path $data 'history.json'), $json, (New-Object Text.UTF8Encoding $false))
 }
 function Shot([string]$Name) {
     [S]::Park($W, $H)
@@ -360,12 +371,12 @@ function Shot([string]$Name) {
     Write-Host "shot $Name"
 }
 
-# The scenes drive the classic window (its search box, result list and
-# Options button). The new look (WebView2) is the default since 0.10.1, so
-# settings.txt says "classic, chosen" as ci/ui-test.ps1 does, and that the
-# one-time questions (the box above the clock, rating) were already asked.
+# The scenes drive the new look's page (UI Automation and the keyboard); the
+# one-time questions (the box above the clock, moving the program, rating)
+# count as asked, and the move to the new look as done (no "this is the
+# new look" line).
 New-Item -ItemType Directory -Force $data | Out-Null
-[IO.File]::WriteAllText((Join-Path $data 'settings.txt'), "new_ui=0`nnew_ui_default=1`nfloating_asked=1`nmove_asked=1`nrating_asked=1`n", (New-Object Text.ASCIIEncoding))
+[IO.File]::WriteAllText((Join-Path $data 'settings.txt'), "new_ui=1`nnew_ui_default=1`nnew_ui_only=1`nfloating_asked=1`nmove_asked=1`nrating_asked=1`n", (New-Object Text.ASCIIEncoding))
 
 # First start: index the drive (the demo folder with it), as ci/demo.ps1.
 Write-Host 'Indexing…'
@@ -386,35 +397,32 @@ if (Test-Path $settingsFile) {
 }
 
 $scenes = @(
-    @{ Lang = 'ar'; Folder = @('اختيار مجلد…'); Inside = @('البحث داخل المستندات أيضاً'); Name = 'تقرير'; Content = 'الميزانية'
-       Quick = 'تقرير'; Dupes = @('البحث عن الملفات المكررة'); Options = @('خيارات…', 'خيارات') },
-    @{ Lang = 'en'; Folder = @('Choose folder…'); Inside = @('Also search inside documents'); Name = 'report'; Content = 'budget'
-       Quick = 'quarterly report'; Dupes = @('Find duplicate files'); Options = @('Options…', 'Options') }
+    @{ Lang = 'ar'; Name = 'تقرير'; Content = 'الميزانية'; Quick = 'تقرير'; Dupes = @('البحث عن الملفات المكررة'); Options = '(فتح قائمة الخيارات)' },
+    @{ Lang = 'en'; Name = 'report'; Content = 'budget'; Quick = 'quarterly report'; Dupes = @('Find duplicate files'); Options = '(Open the Options menu)' }
 )
 foreach ($s in $scenes) {
     $lang = $s.Lang
+    Write-History $s.Name $s.Content
     $p = Start-App $lang
-    Start-Sleep -Seconds 4
-    Set-Scope $s.Folder
+    Wait-Page
     [void][S]::ShowWindow($script:hwnd, 3)
 
-    # 1. Name search.
-    Set-Inside $false $s.Inside
-    Search $s.Name
+    # 1. Name search (in the demo folder).
+    Run-Saved 0 $s.Name
     Shot "1-search-$lang.png"
 
-    # 4. Duplicate finder, on the current results (exact copies in the backup folder).
-    $opt = Controls | Where-Object { $_.Class -eq 'Button' -and $s.Options -contains $_.Text } | Select-Object -First 1
-    if (-not $opt) { Warn "Options button not found ($lang)"; Controls | ForEach-Object { Write-Host "  $($_.Class) | $($_.Text)" } }
+    # 4. Duplicate finder, on the current results (exact copies in the
+    # backup folder), from the Options menu that Settings opens.
+    Focus-Page
+    [S]::Chord($VK.CTRL, $VK.COMMA)
+    Start-Sleep -Seconds 1
+    $opt = Find-Uia ([Windows.Automation.ControlType]::Button) $s.Options
+    if (-not $opt) { Warn "Options button not found ($lang); buttons: $((Uia-Names ([Windows.Automation.ControlType]::Button)) -join ' | ')" }
     else {
-        # A real click, as a person: a posted BM_CLICK did not open the menu
-        # on the maximized window. A second try with BM_CLICK if it fails.
+        # A real click: the menu opens at the pointer.
         $menu = $null
-        for ($try = 0; $try -lt 2 -and -not $menu; $try++) {
-            Focus $script:hwnd
-            if ($try -eq 0) { [S]::Click($opt.H) } else { [void][S]::PostMessage($opt.H, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) }
-            for ($i = 0; $i -lt 17 -and -not $menu; $i++) { Start-Sleep -Milliseconds 300; $menu = [S]::TopWindows(0) | Where-Object { [S]::Class($_) -eq '#32768' } | Select-Object -First 1 }
-        }
+        Click-Uia $opt
+        for ($i = 0; $i -lt 17 -and -not $menu; $i++) { Start-Sleep -Milliseconds 300; $menu = [S]::TopWindows(0) | Where-Object { [S]::Class($_) -eq '#32768' } | Select-Object -First 1 }
         $item = $null
         if (-not $menu) { Warn "the Options menu did not open ($lang)" }
         else {
@@ -423,9 +431,8 @@ foreach ($s in $scenes) {
         }
         if ($menu) { [S]::Chord($VK.ESC); Start-Sleep -Milliseconds 400 }
         if ($item) {
+            # To the new window, which passes Options items to their handlers.
             [void][S]::PostMessage($script:hwnd, 0x0126, [IntPtr]$item[1], [IntPtr]$item[0])   # WM_MENUCOMMAND
-        }
-        if ($item) {
             $dupes = $null
             for ($i = 0; $i -lt 20 -and -not $dupes; $i++) {
                 Start-Sleep -Milliseconds 500
@@ -443,15 +450,17 @@ foreach ($s in $scenes) {
             }
         }
     }
+    # Back from Settings to the results.
+    Focus $script:hwnd
+    [void][S]::PostMessage($script:hwnd, 0x001F, [IntPtr]::Zero, [IntPtr]::Zero)
+    $back = Find-Uia ([Windows.Automation.ControlType]::Button) '^(Back to search|رجوع إلى البحث)'
+    if ($back) { Click-Uia $back; Start-Sleep -Milliseconds 500 }
     Check-Crash "duplicates $lang"
 
-    # 2. Inside documents.
-    Set-Inside $true $s.Inside
-    Search $s.Content -Enter
-    Start-Sleep -Seconds 2
+    # 2. Inside documents (the second saved search: its words are in the
+    # demo folder's .txt files).
+    Run-Saved 1 $s.Content
     Shot "2-inside-$lang.png"
-    Set-Inside $false $s.Inside
-    [S]::SetText((Query-Box), '')
 
     # 3. Quick search over File Explorer showing the demo folder, as a user
     # would call it (and not over the runner's bare desktop).
