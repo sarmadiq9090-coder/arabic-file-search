@@ -1,0 +1,153 @@
+name: ui-stress
+
+# UI stress test (ci/ui-stress.ps1): tries to break the program the way an
+# impatient person would, on a real Windows desktop, in both windows: the
+# WebView2 "new look" (since 1.0 the only one users get) and the classic
+# Win32 window (the one-run fallback; the test reaches it with
+# BAHTH_CLASSIC=1). Typing storms, pastes of 200,000 characters, the tray,
+# resizing, the popup, the menus and their switches, results deleted behind
+# the program's back, no way back to the classic look, WebView2 killed (the
+# fallback for one run, then "Try the new look"), five idle minutes at the
+# end. Not a release gate: the gates are the `ui` and `newlook` jobs of
+# build.yml.
+#
+# It only runs on the two test branches (and by hand), and only what
+# ci/test-plan.json on that branch asks for:
+#     { "ui-stress": { "looks": ["classic", "new"] } }
+# A look that is not listed is skipped; without the file, the key or any
+# look, a push runs nothing (the `plan` job alone, a few seconds). Started
+# by hand it runs both looks.
+#
+# Limits: a new push cancels the run before it; every job has a timeout and
+# the script ends itself before that (its own time budget and watchdog); no
+# secrets, read-only token; the test uses no network (the program's update
+# check and exchange-rate download are pre-seeded off) and deletes what it
+# created. Worst case of a full round: 5 + 25 + 2 x 45 job-minutes.
+
+on:
+  push:
+    branches:
+      - "claude/mem-test**"
+      - "claude/ui-stress**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-stress-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Which looks to test: from ci/test-plan.json of the pushed branch.
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      looks: ${{ steps.plan.outputs.looks }}
+      run: ${{ steps.plan.outputs.run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          sparse-checkout: ci
+      - name: Read ci/test-plan.json
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          allowed = ["classic", "new"]
+          looks = []
+          if os.environ["EVENT"] == "workflow_dispatch":
+              looks = allowed
+              why = "started by hand: both looks"
+          else:
+              try:
+                  with open("ci/test-plan.json", encoding="utf-8-sig") as f:
+                      plan = json.load(f)
+                  wanted = (plan.get("ui-stress") or {}).get("looks") or []
+                  looks = [look for look in allowed if look in wanted]
+                  why = "ci/test-plan.json asks for: " + (", ".join(looks) or "nothing")
+              except FileNotFoundError:
+                  why = "no ci/test-plan.json: nothing to run"
+              except Exception as e:  # a broken plan runs nothing
+                  looks = []
+                  why = "ci/test-plan.json could not be used (%s): nothing to run" % type(e).__name__
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write("looks=" + json.dumps(looks) + "\n")
+              out.write("run=" + ("true" if looks else "false") + "\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("UI stress plan: " + why + "\n")
+          print(why)
+          PY
+
+  # The x64 exe of this branch, built exactly as build.yml's `exe` job builds
+  # the published one: MSVC with a static C runtime (.cargo/config.toml), on
+  # Windows, without a build cache.
+  build:
+    name: build bahth.exe
+    needs: plan
+    if: needs.plan.outputs.run == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+      - name: Build bahth.exe
+        shell: bash
+        run: |
+          cargo build --release --target x86_64-pc-windows-msvc
+          cp target/x86_64-pc-windows-msvc/release/bahth.exe bahth.exe
+      - name: Check the imported DLLs
+        run: python ci/check_imports.py bahth.exe
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ui-stress-exe
+          path: bahth.exe
+          retention-days: 3
+
+  # One job per look, side by side. Core checks (a crash report, the program
+  # exiting, a hang over 10 s, a wrong result for a file that exists) fail
+  # the job; everything else is reported as a finding. The table goes to the
+  # job summary; screenshots, the logs, crash.txt and memory.csv to the
+  # artifact.
+  stress:
+    name: ui-stress (${{ matrix.look }})
+    needs: [plan, build]
+    if: needs.plan.outputs.run == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        look: ${{ fromJSON(needs.plan.outputs.looks) }}
+    runs-on: windows-latest
+    # The script stops itself after 37 minutes (41 at the latest).
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ui-stress-exe
+      - name: UI stress test
+        shell: powershell
+        env:
+          LOOK: ${{ matrix.look }}
+        run: ./ci/ui-stress.ps1 -Exe ./bahth.exe -Look $env:LOOK -Out "$env:RUNNER_TEMP/ui-stress-$env:LOOK"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ui-stress-${{ matrix.look }}
+          path: ${{ runner.temp }}/ui-stress-${{ matrix.look }}
+          retention-days: 7
+          if-no-files-found: warn

@@ -1,0 +1,14 @@
+{
+  "mem-test": {
+    "exes": ["0.9.1", "0.10.0", "branch"],
+    "scenarios": ["A", "B", "C", "D", "E", "F", "G", "H", "O", "K", "M", "S", "Q"],
+    "released_scenarios": ["D", "G"],
+    "save_delay_ms": 90000
+  },
+  "torture-test": {
+    "groups": ["soak", "names", "tree", "churn", "state", "instances", "content"]
+  },
+  "ui-stress": {
+    "looks": ["classic", "new"]
+  }
+}
