@@ -73,7 +73,7 @@
       grid: "عرض المصغرات (Ctrl+T)",
       compact: "عرض مضغوط", compactSub: "سطر واحد لكل نتيجة، فتظهر نتائج أكثر", showPreview: "إظهار المعاينة", hidePreview: "إخفاء المعاينة",
       sMore: "المزيد", sMoreRow: "خيارات أخرى", sMoreSub: "التحقق من التحديثات، الدعم والملاحظات، أدوات مثل الملفات المكررة وأحجام المجلدات، وإعدادات البحث من أي مكان", moreBtn: "فتح قائمة الخيارات…",
-      sHelp: "التحديثات والمساعدة", sUpdRow: "التحديثات", sUpdSub: (v) => `الإصدار المثبّت ${v}. يتحقق البرنامج من وجود إصدار أحدث ويعرض عليك تثبيته.`, updBtn: "التحقق من التحديثات…",
+      sHelp: "التحديثات والمساعدة", sUpdRow: "التحديثات", sUpdSub: (v) => `الإصدار المثبّت ${v}. يتحقق البرنامج من وجود إصدار أحدث ويعرض عليك تثبيته.`, updBtn: "التحقق من التحديثات…", updChecking: "جارٍ التحقق من التحديثات…",
       sUpdSubStore: (v) => `الإصدار المثبّت ${v}. تصل التحديثات من Microsoft Store.`, updBtnStore: "التحديثات من Microsoft Store…",
       sReportRow: "الإبلاغ عن مشكلة", sReportSub: "تعرض ما سيُشارَك قبل أي شيء: لن يُرسل شيء إلا إذا ضغطت أنت، وأسماء الملفات والمسارات تُحذف.", reportBtn: "الإبلاغ عن مشكلة…",
       sSearch: "البحث والفهرسة", sHideSystem: "إخفاء ملفات النظام", sHideSystemSub: "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
@@ -139,7 +139,7 @@
       grid: "Thumbnail view (Ctrl+T)",
       compact: "Compact rows", compactSub: "One line per result, so more of them fit", showPreview: "Show the preview", hidePreview: "Hide the preview",
       sMore: "More", sMoreRow: "More options", sMoreSub: "Check for updates, support and feedback, tools such as duplicate files and folder sizes, and search-from-anywhere settings", moreBtn: "Open the Options menu…",
-      sHelp: "Updates and help", sUpdRow: "Updates", sUpdSub: (v) => `Installed version ${v}. Looks for a newer version and offers to install it.`, updBtn: "Check for updates…",
+      sHelp: "Updates and help", sUpdRow: "Updates", sUpdSub: (v) => `Installed version ${v}. Looks for a newer version and offers to install it.`, updBtn: "Check for updates…", updChecking: "Checking for updates…",
       sUpdSubStore: (v) => `Installed version ${v}. Updates come from the Microsoft Store.`, updBtnStore: "Updates from Microsoft Store…",
       sReportRow: "Report a problem", sReportSub: "Shows what would be shared first: nothing is sent unless you press a button, and file names and paths are removed.", reportBtn: "Report a problem…",
       sSearch: "Search and indexing", sHideSystem: "Hide system files", sHideSystemSub: "The Windows folder, temporary and cache files",
@@ -1229,8 +1229,22 @@
     render(true);
     q.focus();
   }
+  // "Check for updates…": while a check runs it says so and waits (the
+  // answer comes as a message box); it stays focusable, so the keyboard
+  // and a screen reader keep their place.
+  function updButton(st) {
+    const busy = !st.store && !!st.checking_updates;
+    const b = btn("", I.refresh, busy ? T.updChecking : st.store ? T.updBtnStore : T.updBtn, () => {
+      if (S.settings.checking_updates) return;
+      // Said at once; the program confirms (or not) on its next tick.
+      if (!st.store) { S.settings.checking_updates = true; renderSettings(); }
+      send({ op: "check_updates" });
+    }, { id: "check-updates", "aria-disabled": busy ? "true" : null, "aria-busy": busy ? "true" : null });
+    return b;
+  }
   function renderSettings() {
     const st = S.settings;
+    const refocus = document.activeElement && document.activeElement.id === "check-updates";
     const box = $("settings");
     if (!st) { box.replaceChildren(); return; }
     const sw = (key, label, sub) => {
@@ -1267,11 +1281,12 @@
       // in view (the release standard), before the Options menu's rest.
       section(T.sHelp,
         h("div", { class: "srow" }, h("label", { for: "check-updates" }, h("span", null, T.sUpdRow), h("small", { class: "num" }, digits((st.store ? T.sUpdSubStore : T.sUpdSub)(st.version)))),
-          btn("", I.refresh, st.store ? T.updBtnStore : T.updBtn, () => send({ op: "check_updates" }), { id: "check-updates" })),
+          updButton(st)),
         h("div", { class: "srow" }, h("label", { for: "report-problem" }, h("span", null, T.sReportRow), h("small", null, T.sReportSub)), btn("", I.flag, T.reportBtn, () => send({ op: "report_problem" }), { id: "report-problem" }))),
       section(T.sMore, h("div", { class: "srow" }, h("label", { for: "options-menu" }, h("span", null, T.sMoreRow), h("small", null, T.sMoreSub)), btn("", I.dots, T.moreBtn, () => send({ op: "options_menu" }), { id: "options-menu" }))),
       section(T.sAbout, h("p", { class: "num" }, digits(T.version(st.version))), h("p", { class: "muted" }, trustText())),
     );
+    if (refocus) $("check-updates")?.focus({ preventScroll: true });
   }
   $("set-btn").addEventListener("click", () => (S.view === "settings" ? closeSettings() : openSettings()));
 

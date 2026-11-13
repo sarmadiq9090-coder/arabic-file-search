@@ -423,6 +423,9 @@ pub struct SettingsOut {
     pub version: &'static str,
     /// The Microsoft Store version: its updates come from the Store.
     pub store: bool,
+    /// A check for updates the user asked for is running: its button says
+    /// so and waits.
+    pub checking_updates: bool,
 }
 
 /// A message to the page.
@@ -1899,10 +1902,11 @@ mod tests {
             tray_icon: true,
             version: "1.0.0",
             store: true,
+            checking_updates: true,
         });
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.starts_with(r#"{"type":"settings","lang":"ar","next_lang":"en""#), "{json}");
-        assert!(json.ends_with(r#""version":"1.0.0","store":true}"#), "{json}");
+        assert!(json.ends_with(r#""version":"1.0.0","store":true,"checking_updates":true}"#), "{json}");
         let json = serde_json::to_string(&Outbound::Renamed { list: List::Recent, seq: 0, ver: 3, id: 1, name: "a".into() }).unwrap();
         assert_eq!(json, r#"{"type":"renamed","list":"recent","seq":0,"ver":3,"id":1,"name":"a"}"#);
     }
