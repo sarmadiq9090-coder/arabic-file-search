@@ -1,12 +1,15 @@
 name: ui-stress
 
 # UI stress test (ci/ui-stress.ps1): tries to break the program the way an
-# impatient person would, on a real Windows desktop, in both looks: the
-# classic Win32 window and the WebView2 "new look". Typing storms, pastes of
-# 200,000 characters, the tray, resizing, the popup, the menus and their
-# switches, results deleted behind the program's back, look switching,
-# WebView2 killed, five idle minutes at the end. Not a release gate: the
-# gates are the `ui` and `newlook` jobs of build.yml.
+# impatient person would, on a real Windows desktop, in both windows: the
+# WebView2 "new look" (since 1.0 the only one users get) and the classic
+# Win32 window (the one-run fallback; the test reaches it with
+# BAHTH_CLASSIC=1). Typing storms, pastes of 200,000 characters, the tray,
+# resizing, the popup, the menus and their switches, results deleted behind
+# the program's back, no way back to the classic look, WebView2 killed (the
+# fallback for one run, then "Try the new look"), five idle minutes at the
+# end. Not a release gate: the gates are the `ui` and `newlook` jobs of
+# build.yml.
 #
 # It only runs on the two test branches (and by hand), and only what
 # ci/test-plan.json on that branch asks for:

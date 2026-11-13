@@ -1,9 +1,13 @@
 ﻿# UI stress test of InstaFind on a real Windows desktop: tries to break the
 # program the way an impatient person would, in one of its two looks.
 #
-#   -Look classic   the Win32 window (new_ui=0)
-#   -Look new       the WebView2 "new look" (new_ui=1), plus switching between
-#                   the looks, killing WebView2 and a read-only profile folder
+#   -Look classic   the Win32 window (BAHTH_CLASSIC=1: since 1.0 users only
+#                   get the new look and new_ui=0 is ignored; the variable is
+#                   the program's own switch for the tests, and the copies
+#                   the program starts itself inherit it)
+#   -Look new       the WebView2 "new look" (new_ui=1), plus: no way back to
+#                   the classic look, WebView2 killed (the classic window for
+#                   one run, then "Try the new look"), a read-only profile
 #
 # What it does, in this order (ci/ui-stress.ps1 is not a release gate; the
 # gates are ci/ui-test.ps1 and ci/newlook-test.ps1, which it copies helpers
@@ -15,8 +19,9 @@
 #   C  waits for the first index (bounded)
 #   D  right results for files that exist; filters, sorting, search inside
 #      documents, stop
-#   F  (new look) look switching, WebView2 killed once and twice, read-only
-#      WebView2 folder
+#   F  (new look) no way back to the classic look in the menus; WebView2
+#      killed once and twice; the one-run fallback and back several times;
+#      read-only WebView2 folder
 #   E  language switched Arabic <-> English
 #   D2 typing while files are created, renamed and deleted in the background
 #   D3 actions on results that were deleted or renamed meanwhile, 30 files
@@ -639,6 +644,7 @@ $rx = @{
     Content   = 'inside documents|داخل المستندات'
     Stop      = 'Stop search|إيقاف البحث'
     TryNew    = 'Try the new look|جرّب الشكل الجديد'
+    # Gone in 1.0 (the new look is the only one): only checked to be absent.
     Classic   = 'Back to the classic look|العودة إلى الشكل القديم'
     Hide      = 'Hide to the taskbar tray|إخفاء إلى شريط المهام'
     Digits    = 'Arabic-Indic digits|عرض الأرقام بالعربية'
@@ -911,13 +917,17 @@ function Setting([string]$Key) {
     if ($m.Count) { $m[$m.Count - 1].Groups[1].Value } else { $null }
 }
 # settings.txt as the program reads it (key=value, ASCII, no BOM), written
-# only while the program is not running: no first-run question (box above
-# the clock, moving the exe, rating), the floating box on, and the daily
-# update check already "done" so the program does not ask GitHub.
+# only while the program is not running: no first-run question (moving the
+# exe, rating; 1.0 no longer asks about the box above the clock, which is
+# off unless turned on, so it is turned on here as a user would), the
+# floating box on, 1.0's one-time look markers (new_ui_default=1,
+# new_ui_only=1: nothing to move), and the daily update check already
+# "done" so the program does not ask GitHub. (new_ui=0 is ignored since
+# 1.0: the classic look comes from BAHTH_CLASSIC=1.)
 function Write-Settings([int]$NewUi, [int]$NewUiFailed = 0) {
     New-Item -ItemType Directory -Force $data | Out-Null
     $now = Now-Unix
-    $text = "floating_asked=1`nmove_asked=1`nrating_asked=1`nfloating_mode=fade`ntray_icon=1`nhotkey_opens=quick`nalt_space=0`nkind=0`nsort_col=-1`nsort_desc=0`nupdate_check=$now`ncrash_seen=$now`nnew_ui=$NewUi`nnew_ui_failed=$NewUiFailed`n"
+    $text = "floating_asked=1`nmove_asked=1`nrating_asked=1`nfloating_mode=fade`ntray_icon=1`nhotkey_opens=quick`nalt_space=0`nkind=0`nsort_col=-1`nsort_desc=0`nupdate_check=$now`ncrash_seen=$now`nnew_ui=$NewUi`nnew_ui_failed=$NewUiFailed`nnew_ui_default=1`nnew_ui_only=1`n"
     [IO.File]::WriteAllText($settingsFile, $text, (New-Object Text.ASCIIEncoding))
     Log "settings.txt written: $($text -replace "`n", ' ')"
 }
@@ -1877,7 +1887,13 @@ function Toggle-Storm {
 # Blind: the page cannot be read here, so the first switch (Arabic-Indic
 # digits, 3 Tabs from the "back" button) is checked through the classic
 # Options menu, which the program keeps in step; only if that works are the
-# others pressed. Never pressed: "update index" (8) and "classic look" (4).
+# others pressed. 1.0's page, in Tabs from "back" (src/webui/assets/app.js,
+# renderSettings): 1-2 language, 3 digits, 4 compact rows, 5 hide system
+# files, 6 document contents, 7 cloud-only files, 8 update automatically,
+# 9 "update index", 10 hotkey, 11 box above the clock, 12 tray icon,
+# 13 start with Windows, 14 "check for updates", 15 "report a problem",
+# 16 "more options". Never pressed: the language (a restart), 7 (it would
+# download cloud files where there are any), 9, 14 (the network), 15, 16.
 function Page-Switch([int]$Tabs) {
     if (-not (Focus-Query)) { return }
     [S]::Chord($VK.CTRL, $VK.COMMA)
@@ -1899,7 +1915,7 @@ function Page-Settings-Storm {
     Record 'page settings' 'probe' 'a switch on the settings page can be flipped with the keyboard (Ctrl+, then Tab, Space)' ([bool]$works) "digits before: $d0; after: $d1"
     if (-not $works) { return }
     Page-Switch 3
-    foreach ($tabs in @(5, 6, 7, 9, 10, 11, 12)) {
+    foreach ($tabs in @(4, 5, 6, 8, 10, 11, 12, 13)) {
         Page-Switch $tabs
         Health "page switch $tabs" -Quick
         Page-Switch $tabs
@@ -2247,79 +2263,81 @@ function Context-Storm([int]$Times) {
     Note 'menus' "the page's row menu (Shift+F10, Esc) $Times times" 'blind: see the screenshot page-right-click-menu; only crashes and hangs are checked'
 }
 
-# ---- look switching (new look only)
-function Switch-ToClassic([string]$Via) {
-    if ($Via -eq 'page') {
-        # The page's own button: settings (Ctrl+,), four Tabs from "back", Enter.
-        if (-not (Focus-Query)) { return $false }
-        [S]::Chord($VK.CTRL, $VK.COMMA)
-        Start-Sleep -Milliseconds 300
-        [S]::Tap($VK.TAB, 4, 50)
-        [S]::Chord($VK.ENTER)
-        if (Wait-Until { (Look-Now) -eq 'classic' } 4 100) { return $true }
-        # Not switched: leave the settings page.
-        if ((Look-Now) -eq 'new') { [S]::Chord($VK.CTRL, $VK.K) }
-        return $false
+# ---- the new look only (1.0)
+# There is no way back to the classic look: neither the Options menu over
+# the new look (the tray's "Settings…" opens it) nor the tray menu offers it.
+function No-Way-Back {
+    if ((Look-Now) -ne 'new') { if (-not (Reset-App 'the no-way-back check needs the new look')) { return } }
+    $m = Open-Options
+    $items = @(if ($m) { Menu-Items $m | Where-Object { -not $_.Separator } | ForEach-Object { [string]$_.Text } })
+    Close-Menus
+    $look = @($items | Where-Object { $_ -match $rx.Classic -or $_ -match $rx.TryNew })
+    Record 'one look' 'probe' 'the Options menu over the new look offers no other look' ($null -ne $m -and $look.Count -eq 0) $(if ($m) { "items: $($items -join ' / ')" } else { 'the Options menu did not open' })
+    $t = Open-TrayMenu
+    $titems = @(if ($t) { Menu-Items $t | Where-Object { -not $_.Separator } | ForEach-Object { [string]$_.Text } })
+    Close-Menus
+    $tlook = @($titems | Where-Object { $_ -match $rx.Classic -or $_ -match $rx.TryNew })
+    Record 'one look' 'probe' 'the tray menu offers no other look' ($null -ne $t -and $tlook.Count -eq 0) $(if ($t) { "items: $($titems -join ' / ')" } else { 'the tray menu did not open' })
+    if ((Look-Now) -eq 'none') { [void](Restore-Main) }
+}
+# The classic window is a fallback for one run: WebView2 killed twice in a
+# row gives it, with new_ui=1 kept (new_ui_failed=1: the next start tries
+# the new look again), and its Options menu's "Try the new look" brings the
+# new look back without a restart. `Times` rounds of that.
+function Fallback-Rounds([int]$Times) {
+    if ((Look-Now) -ne 'new') { if (-not (Reset-App 'the fallback rounds need the new look')) { return } }
+    # After a fallback the next start gives up at the first failure until its
+    # page has worked a minute (new_ui_failed=1, cleared then): wait for that,
+    # so that every round starts with the page's second chance.
+    if ((Setting 'new_ui_failed') -eq '1') {
+        $cleared = Wait-Until { (Setting 'new_ui_failed') -ne '1' } 90 1000
+        Record 'fallback' 'probe' 'a page that works a minute clears new_ui_failed (the next start gets its second chance back)' ([bool]$cleared) "new_ui_failed=$(Setting 'new_ui_failed')"
+        Health 'waiting for new_ui_failed to clear'
+        if ($script:abort) { return }
     }
-    [void](Options-Choose $rx.Classic)
-    return [bool](Wait-Until { (Look-Now) -eq 'classic' } 8 100)
-}
-function Switch-ToNew {
-    [void](Options-Choose $rx.TryNew)
-    return [bool](Wait-Until { (Look-Now) -eq 'new' } 30 100)
-}
-function Look-Switching([int]$Times) {
-    if ((Look-Now) -ne 'new') { Record 'look switch' 'probe' 'starts from the new look' $false "on screen: $(Look-Now)"; if (-not (Switch-ToNew)) { return } }
-    $mark = Log-Mark
-    $toClassic = 0; $toNew = 0; $pageTried = 0; $pageOk = 0; $both = 0; $n = 0
+    $fell = 0; $kept = 0; $back = 0; $both = 0; $n = 0; $painted = 0
     for ($i = 1; $i -le $Times; $i++) {
-        if (-not (Have-Time 1)) { Note 'budget' 'look switching' "stopped after $n of $Times round trips (time budget)"; break }
+        if (-not (Have-Time 1.5)) { Note 'budget' 'fallback rounds' "stopped after $n of $Times rounds (time budget)"; break }
+        if ((Look-Now) -ne 'new') { Log "fallback round ${i}: the new look is not on screen ($(Look-Now))"; break }
         $n++
-        $done = $false
-        if ($i % 3 -eq 0) {
-            # (The page must have loaded for its own button to be there.)
-            Start-Sleep -Milliseconds 1800
-            $pageTried++
-            $done = Switch-ToClassic 'page'
-            if ($done) { $pageOk++ }
-        }
-        if (-not $done) { $done = Switch-ToClassic 'menu' }
-        if ($done) { $toClassic++ } else { Shot "switch-$i-to-classic-failed"; Log ("switch ${i}: still '$(Look-Now)'; log: " + ((Log-Lines 'webui' $mark | Select-Object -Last 4) -join ' // ')) }
-        if ((Look-Now) -eq 'both') { $both++; Shot "two-windows-$i" }
-        Health "switch $i to the classic look"
+        # The page and its WebView2 processes must be there before they are killed.
+        if (-not (Wait-Until { @(WebView-Pids).Count -gt 0 } 30 300)) { Log "fallback round ${i}: no WebView2 process to kill"; break }
+        Start-Sleep -Seconds 3
+        $mark = Log-Mark
+        [void](Kill-WebViews)
+        [void](Wait-Until { Log-Lines 'webui: .*showing the page again' $mark | Select-Object -First 1 } 30 300)
+        [void](Wait-Until { @(WebView-Pids).Count -gt 0 } 30 300)
+        Health "fallback round $i, WebView2 killed once"
         if ($script:abort) { return }
-        # Impatient every other time: straight back.
-        if ($i % 2) { Start-Sleep -Milliseconds 1000 } else { Start-Sleep -Milliseconds 250 }
-        if ((Look-Now) -eq 'classic') {
-            if (Switch-ToNew) { $toNew++ } else { Shot "switch-$i-to-new-failed"; Log ("switch ${i}: the new look did not come; log: " + ((Log-Lines 'webui' $mark | Select-Object -Last 4) -join ' // ')) }
-        } elseif ((Look-Now) -eq 'new') { Log "switch ${i}: already on the new look" }
-        if ((Look-Now) -eq 'both') { $both++; Shot "two-windows-$i" }
-        Health "switch $i to the new look"
+        Start-Sleep -Seconds 2
+        [void](Kill-WebViews)
+        $line = Wait-Until { Log-Lines 'webui: .*using the classic window for this run' $mark | Select-Object -First 1 } 40 300
+        $onScreen = Wait-Until { if ((Look-Now) -eq 'classic') { 'classic' } } 10 200
+        Health "fallback round $i, WebView2 killed twice"
         if ($script:abort) { return }
-        if ($i % 2) { Start-Sleep -Milliseconds 1200 }
-        if ($i -eq 1) { Shot 'switched-to-new' }
+        if ((Look-Now) -eq 'both') { $both++; Shot "fallback-$i-two-windows" }
+        if ($line -and $onScreen -eq 'classic') { $fell++ } else { Shot "fallback-$i-no-classic"; Log ("fallback round ${i}: on screen '$(Look-Now)'; log: " + ((Log-Lines 'webui' $mark | Select-Object -Last 5) -join ' // ')) }
+        if ((Setting 'new_ui') -eq '1' -and (Setting 'new_ui_failed') -eq '1') { $kept++ } else { Log "fallback round ${i}: new_ui=$(Setting 'new_ui') new_ui_failed=$(Setting 'new_ui_failed')" }
+        if ((Look-Now) -ne 'classic') { break }
+        # Impatient every other time: "Try the new look" at once.
+        if ($i % 2) { Start-Sleep -Milliseconds 1500 } else { Start-Sleep -Milliseconds 300 }
+        $mark = Log-Mark
+        [void](Options-Choose $rx.TryNew)
+        if (Wait-Until { (Look-Now) -eq 'new' } 30 200) { $back++ } else { Shot "fallback-$i-not-back"; Log ("fallback round ${i}: still '$(Look-Now)' after Try the new look; log: " + ((Log-Lines 'webui' $mark | Select-Object -Last 4) -join ' // ')) }
+        Health "fallback round $i, back to the new look"
+        if ($script:abort) { return }
+        if ((Look-Now) -eq 'both') { $both++; Shot "fallback-$i-two-windows-back" }
+        Start-Sleep -Seconds 4
+        $w = Shown-Main
+        if ($w -and (Look-Now) -eq 'new') { $p = Painted $w; if ($p -and $p.Colours -ge 8 -and $p.Top -lt 0.97) { $painted++ } }
+        if ($i -eq 1) { Shot 'fallback-and-back' }
     }
-    Record 'look switch' 'probe' "classic -> new -> classic $Times times through the menu items" ($n -eq $Times -and $toClassic -eq $n -and $toNew -eq $n) "$n round trips: $toClassic to classic, $toNew to new"
-    Record 'look switch' 'probe' "the page's own «Back to the classic look» button works with the keyboard" ($pageTried -gt 0 -and $pageOk -eq $pageTried) "$pageOk of $pageTried tries (the others went through Options)"
-    Record 'look switch' 'probe' 'never both main windows on screen at once' ($both -eq 0) "$both times"
-    $bad = @(Log-Lines 'webui: .*(did not load|process failed|showing the page again|refused a message|could not|staying with the classic)' $mark)
-    Record 'look switch' 'probe' 'no WebView2 failure in the log while switching' ($bad.Count -eq 0) (($bad | Select-Object -First 4) -join ' // ')
-    # Back on the classic look, its WebView2 is freed.
-    if ((Look-Now) -eq 'new') {
-        $before = @(WebView-Pids).Count
-        if (Switch-ToClassic 'menu') {
-            $none = Wait-Until { @(WebView-Pids).Count -eq 0 } 15 300
-            Record 'look switch' 'probe' 'the WebView2 processes end after going back to the classic look' ([bool]$none) "$before before, $(@(WebView-Pids).Count) left after 15 s"
-            Record 'look switch' 'probe' 'new_ui=0 saved on the classic look' ((Setting 'new_ui') -eq '0') "new_ui=$(Setting 'new_ui')"
-            Mem-Note 'classic look after the switching' | Out-Null
-            [void](Switch-ToNew)
-        }
-    }
-    Start-Sleep -Seconds 3
-    Record 'look switch' 'probe' 'new_ui=1 saved on the new look' ((Setting 'new_ui') -eq '1') "new_ui=$(Setting 'new_ui'), on screen: $(Look-Now)"
-    $w = Shown-Main
-    if ($w) { $p = Painted $w; Record 'look switch' 'probe' 'the page is painted after the switching' ($p -and $p.Colours -ge 8 -and $p.Top -lt 0.97) $(if ($p) { "$($p.Colours) colours, most common $($p.Top)" } else { 'no screenshot' }) }
-    Shot 'after-look-switching'
+    Record 'fallback' 'probe' "WebView2 killed twice in a row gives the classic window for this run ($Times rounds)" ($n -eq $Times -and $fell -eq $n) "$fell of $n rounds"
+    Record 'fallback' 'probe' 'the fallback keeps the new look for the next start (new_ui=1, new_ui_failed=1)' ($n -gt 0 -and $kept -eq $n) "$kept of $n rounds; now new_ui=$(Setting 'new_ui') new_ui_failed=$(Setting 'new_ui_failed')"
+    Record 'fallback' 'probe' '"Try the new look" in the fallback''s Options menu brings the new look back without a restart' ($fell -gt 0 -and $back -eq $fell) "$back of $fell"
+    Record 'fallback' 'probe' 'the page is painted again after "Try the new look"' ($back -gt 0 -and $painted -eq $back) "$painted of $back"
+    Record 'fallback' 'probe' 'never both main windows on screen at once' ($both -eq 0) "$both times"
+    Shot 'after-fallback-rounds'
 }
 function Kill-WebViews {
     $ids = @(WebView-Pids)
@@ -2356,28 +2374,31 @@ function WebView-Kills {
     Shot 'webview-killed-once'
     if ($onScreen -ne 'new') { Note 'webview killed' 'twice in a row' "skipped: after the first kill the program is on '$onScreen' ($said)"; return }
     # Twice in a row (within the minute after which a failure is forgiven):
-    # back to the classic look, and remembered.
+    # the classic window for this run only (1.0: the new look is never
+    # turned off; new_ui_failed=1 makes the next start try it once more).
     $mark = Log-Mark
     [void](Kill-WebViews)
-    $line = Wait-Until { Log-Lines 'webui: .*back to the classic look' $mark | Select-Object -First 1 } 40 300
+    $line = Wait-Until { Log-Lines 'webui: .*using the classic window for this run' $mark | Select-Object -First 1 } 40 300
     Health 'WebView2 killed twice in a row'
     if ($script:abort) { return }
     $said = (Log-Lines 'webui' $mark) -join ' // '
     $onScreen = Wait-Until { if ((Look-Now) -eq 'classic') { 'classic' } } 10 200
-    Record 'webview killed' 'probe' 'twice: the log says back to the classic look' ($null -ne $line) $said
+    Record 'webview killed' 'probe' 'twice: the log says the classic window is used for this run' ($null -ne $line) $said
     Record 'webview killed' 'probe' 'twice: the classic window is on screen, alone (no zombie new-look window)' ($onScreen -eq 'classic') "on screen: $(Look-Now)"
     Start-Sleep -Seconds 1
-    Record 'webview killed' 'probe' 'twice: remembered (new_ui=0 in settings.txt)' ((Setting 'new_ui') -eq '0') "new_ui=$(Setting 'new_ui')"
+    Record 'webview killed' 'probe' 'twice: the new look is kept for the next start (new_ui=1, new_ui_failed=1)' ((Setting 'new_ui') -eq '1' -and (Setting 'new_ui_failed') -eq '1') "new_ui=$(Setting 'new_ui') new_ui_failed=$(Setting 'new_ui_failed')"
     Note 'webview killed' 'what the classic window says' (Status-Text)
     $left = Wait-Until { @(WebView-Pids).Count -eq 0 } 10 300
     Record 'webview killed' 'probe' 'twice: no WebView2 process left behind' ([bool]$left) "$(@(WebView-Pids).Count) left"
     Shot 'webview-killed-twice'
-    # The next start keeps the classic look.
+    # The next start tries the new look again.
     Keep-Log 'after the WebView2 kills'
     Stop-App 'restart after the WebView2 kills'
+    $mark = Log-Mark
     $w = Start-App 60
+    [void](Wait-Until { (Look-Now) -eq 'new' } 20 250)
     Start-Sleep -Seconds 2
-    Record 'webview killed' 'probe' 'the next start uses the classic look' ($w -and (Look-Now) -eq 'classic') "on screen: $(Look-Now)"
+    Record 'webview killed' 'probe' 'the next start opens the new look again (one more try)' ($w -and (Look-Now) -eq 'new') "on screen: $(Look-Now); log: $((Log-Lines 'webui' $mark | Select-Object -First 4) -join ' // ')"
     Health 'start after the WebView2 kills'
 }
 function Restore-Acl {
@@ -2423,7 +2444,7 @@ function ReadOnly-Profile {
             $onScreen2 = Look-Now
             $said = (Log-Lines 'webui' $mark) -join ' // '
             $flags = "new_ui=$(Setting 'new_ui') new_ui_failed=$(Setting 'new_ui_failed')"
-            if ($onScreen -ne 'new') { Record 'read-only profile' 'probe' 'second failed start in a row: classic window and the new look turned off (new_ui=0)' ($onScreen2 -eq 'classic' -and (Setting 'new_ui') -eq '0') "on screen: $onScreen2; $flags; log: $said" }
+            if ($onScreen -ne 'new') { Record 'read-only profile' 'probe' 'second failed start in a row: the classic window again, the new look still kept (new_ui=1, new_ui_failed=1)' ($onScreen2 -eq 'classic' -and (Setting 'new_ui') -eq '1' -and (Setting 'new_ui_failed') -eq '1') "on screen: $onScreen2; $flags; log: $said" }
             else { Note 'read-only profile' 'second start' "on screen: $onScreen2; $flags; log: $said" }
             Shot 'read-only-profile-second-start'
             Keep-Log 'read-only profile, second start'
@@ -2571,6 +2592,11 @@ try {
         $script:baseNotepads = @(Get-Process -Name notepad -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
 
         $env:BAHTH_UI_TEST = '1'
+        # The look (1.0 ignores new_ui=0): BAHTH_CLASSIC=1 for the classic
+        # window, for every start here and the program's own restarts
+        # (language), which inherit it; nothing else forces a look.
+        if ($Look -eq 'classic') { $env:BAHTH_CLASSIC = '1' } else { Remove-Item Env:BAHTH_CLASSIC -ErrorAction SilentlyContinue }
+        foreach ($v in 'BAHTH_WEBUI', 'BAHTH_WEBUI_FAIL') { Remove-Item "Env:$v" -ErrorAction SilentlyContinue }
         if (-not $AllowWebViewNetwork) {
             # WebView2's own background requests (component updates, pings) off.
             $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--disable-background-networking --disable-component-update --disable-sync --disable-domain-reliability --no-pings'
@@ -2604,7 +2630,7 @@ try {
                     if (Focus-Query) { Clear-Query }
                 }
             } else {
-                Record 'start' 'probe' 'starts in the classic look (new_ui=0)' ((Look-Now) -eq 'classic') "on screen: $(Look-Now)"
+                Record 'start' 'probe' 'starts in the classic look (BAHTH_CLASSIC=1)' ((Look-Now) -eq 'classic') "on screen: $(Look-Now); log: $((Log-Lines 'webui') -join ' // ')"
                 $ui = Find-Controls
                 Record 'start' 'probe' 'search box, result list and status bar found' ($ui -and $ui.Query -and $ui.List -and $ui.Status) ''
             }
@@ -2710,9 +2736,10 @@ try {
             [void](Search-Expect $k.Q $k.Path $script:resultKind 'right result after the sorting and the filters')
         }
     } else {
-        # ------------------------------------------------------ F: the two looks
-        Scenario 'F look switching 15 times' 2.5 { Look-Switching 15 }
+        # ------------------------------------------------------ F: the new look only
+        Scenario 'F no way back to the classic look' 0.5 { No-Way-Back }
         Scenario 'F WebView2 killed once and twice' 2 { WebView-Kills }
+        Scenario 'F the one-run fallback and back 4 times' 5 { Fallback-Rounds 4 }
         Scenario 'F read-only WebView2 folder' 2.5 { ReadOnly-Profile }
         Restore-Acl
         if (-not $script:abort -and (Look-Now) -ne 'new') { [void](Reset-App 'back to the new look after the look tests') }
