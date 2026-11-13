@@ -64,13 +64,14 @@ const SIIGBF_THUMBNAILONLY: i32 = 0x8;
 /// not read to make one.
 const SIIGBF_INCACHEONLY: i32 = 0x10;
 
-/// The `GetImage` flags for the file at `path`: for a cloud-only file (or
-/// one whose attributes can't be read) only a thumbnail Windows already
-/// keeps, since making one reads the file and so downloads it (whatever
-/// "Read contents of cloud-only files" says: a picture is not worth that).
-fn image_flags(path: &str) -> i32 {
+/// The `GetImage` flags for the file at `path`, and whether its contents are
+/// on this PC: for a cloud-only file (or one whose attributes can't be read)
+/// only a thumbnail Windows already keeps, since making one reads the file
+/// and so downloads it (whatever "Read contents of cloud-only files" says: a
+/// picture is not worth that).
+fn image_flags(path: &str) -> (i32, bool) {
     let local = crate::cloud::probe(std::path::Path::new(path)).is_some_and(|s| !crate::cloud::contents_elsewhere(s.attrs));
-    if local { SIIGBF_THUMBNAILONLY } else { SIIGBF_THUMBNAILONLY | SIIGBF_INCACHEONLY }
+    if local { (SIIGBF_THUMBNAILONLY, true) } else { (SIIGBF_THUMBNAILONLY | SIIGBF_INCACHEONLY, false) }
 }
 
 #[repr(C)]
@@ -98,8 +99,9 @@ struct Queue {
     waiting: Vec<Request>,
     /// Keys asked for and not yet taken back by the UI thread.
     pending: HashSet<String>,
-    /// Finished: key and tile bitmap (0 when the file has no thumbnail).
-    done: Vec<(String, usize)>,
+    /// Finished: key, tile bitmap (0 when the file has no thumbnail) and
+    /// whether the file was on this PC.
+    done: Vec<(String, usize, bool)>,
 }
 
 #[derive(Default)]
@@ -292,14 +294,19 @@ fn type_icon_handle(ext: &str) -> HICON {
 }
 
 /// The shell's thumbnail of a file as an `n`×`n` tile, or null when it has
-/// none (or the shell can't make thumbnails, as under Wine). A cloud-only
-/// file is never downloaded for it (`image_flags`).
-pub(super) fn shell_thumbnail(path: &str, n: i32) -> HBITMAP {
+/// none (or the shell can't make thumbnails, as under Wine), and whether the
+/// file was on this PC: a cloud-only file is never downloaded for it
+/// (`image_flags`), so its miss is only for now (`ThumbCache::insert_cloud_none`).
+pub(super) fn shell_thumbnail(path: &str, n: i32) -> (HBITMAP, bool) {
+    let wpath = wide(path);
+    let (flags, local) = image_flags(path);
+    (shell_image(&wpath, flags, n), local)
+}
+
+fn shell_image(wpath: &[u16], flags: i32, n: i32) -> HBITMAP {
     unsafe extern "system" {
         fn SHCreateItemFromParsingName(path: *const u16, bc: *mut c_void, riid: *const GUID, out: *mut *mut c_void) -> HRESULT;
     }
-    let wpath = wide(path);
-    let flags = image_flags(path);
     unsafe {
         let mut f: *mut ImageFactory = std::ptr::null_mut();
         let hr = SHCreateItemFromParsingName(
@@ -346,9 +353,9 @@ fn worker(shared: Arc<Shared>, notice: nwg::NoticeSender, n: i32) {
                 };
             }
         };
-        let tile = shell_thumbnail(&req.path, n) as usize;
+        let (tile, local) = shell_thumbnail(&req.path, n);
         let Ok(mut q) = shared.queue.lock() else { return };
-        q.done.push((req.key, tile));
+        q.done.push((req.key, tile as usize, local));
         drop(q);
         notice.notice();
     }
@@ -648,7 +655,7 @@ impl App {
         let done = match shared.queue.lock() {
             Ok(mut q) => {
                 let done = std::mem::take(&mut q.done);
-                for (key, _) in &done {
+                for (key, _, _) in &done {
                     q.pending.remove(key);
                 }
                 done
@@ -659,11 +666,12 @@ impl App {
             return;
         }
         let mut any = false;
-        for (key, tile) in done {
+        for (key, tile, local) in done {
             let tile = tile as HBITMAP;
             if tile.is_null() {
                 if let Some(c) = self.thumbs.cache.borrow_mut().as_mut() {
-                    c.insert_none(key);
+                    // A cloud-only file is asked for again later (it may be downloaded by then).
+                    if local { c.insert_none(key) } else { c.insert_cloud_none(key) }
                 }
                 continue;
             }

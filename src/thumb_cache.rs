@@ -7,9 +7,25 @@
 //! it): a slot is new exactly when it equals the image list's count. Pinned
 //! slots (the file-type icons) come from the same numbering and are never
 //! evicted. Files without a thumbnail are remembered too, so they are not
-//! asked for again; those entries hold no slot.
+//! asked for again; those entries hold no slot. A file that was cloud-only
+//! when it was asked for (whose picture is only taken from the shell's own
+//! cache, so as not to download it) is asked for again after
+//! [`CLOUD_MISS_RETRY`]: OneDrive may have brought it to this PC since.
 
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
+
+/// How long a thumbnail missed while the file's contents were online only
+/// counts as missing. Its key (path, size, date) does not change when the
+/// file is downloaded, so without this it would stay iconless until restart.
+pub const CLOUD_MISS_RETRY: Duration = Duration::from_secs(30);
+
+/// Whether a remembered miss still stands: `cloud_age` is how long ago it
+/// was missed while the file was cloud-only, `None` for a file that was on
+/// this PC (its miss stands until the file changes, which changes its key).
+pub fn miss_stands(cloud_age: Option<Duration>) -> bool {
+    cloud_age.is_none_or(|age| age < CLOUD_MISS_RETRY)
+}
 
 /// What the cache knows about one file.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,6 +46,8 @@ pub struct ThumbCache {
     next_slot: i32,
     /// Slots of thumbnails dropped from the cache, ready for reuse.
     free: Vec<i32>,
+    /// When each miss of a then cloud-only file was remembered.
+    cloud_misses: HashMap<String, Instant>,
 }
 
 impl ThumbCache {
@@ -43,6 +61,7 @@ impl ThumbCache {
             images: 0,
             next_slot: 0,
             free: Vec::new(),
+            cloud_misses: HashMap::new(),
         }
     }
 
@@ -53,6 +72,19 @@ impl ThumbCache {
 
     /// Looks a file up, marking it as just used.
     pub fn get(&mut self, key: &str) -> Option<Cached> {
+        self.get_at(key, Instant::now())
+    }
+
+    /// [`ThumbCache::get`] at time `now`: a cloud-only miss older than
+    /// [`CLOUD_MISS_RETRY`] is forgotten, so the file is asked for again.
+    fn get_at(&mut self, key: &str, now: Instant) -> Option<Cached> {
+        if let Some(&at) = self.cloud_misses.get(key)
+            && !miss_stands(Some(now.saturating_duration_since(at)))
+        {
+            self.cloud_misses.remove(key);
+            self.map.remove(key);
+            return None;
+        }
         self.tick += 1;
         let tick = self.tick;
         let (c, used) = self.map.get_mut(key)?;
@@ -76,6 +108,7 @@ impl ThumbCache {
             return *s;
         }
         self.map.remove(&key);
+        self.cloud_misses.remove(&key);
         let slot = if let Some(s) = self.free.pop() {
             s
         } else if self.images < self.max_images {
@@ -91,6 +124,25 @@ impl ThumbCache {
 
     /// Remembers that a file has no thumbnail.
     pub fn insert_none(&mut self, key: String) {
+        self.cloud_misses.remove(&key);
+        self.insert_miss(key);
+    }
+
+    /// Remembers that a file that was cloud-only had no thumbnail in the
+    /// shell's cache, for [`CLOUD_MISS_RETRY`].
+    #[cfg_attr(not(windows), allow(dead_code))] // the Windows UI
+    pub fn insert_cloud_none(&mut self, key: String) {
+        self.insert_cloud_none_at(key, Instant::now());
+    }
+
+    fn insert_cloud_none_at(&mut self, key: String, now: Instant) {
+        self.insert_miss(key.clone());
+        if self.map.contains_key(&key) {
+            self.cloud_misses.insert(key, now);
+        }
+    }
+
+    fn insert_miss(&mut self, key: String) {
         self.tick += 1;
         if let Some((Cached::Image(s), _)) = self.map.remove(&key) {
             self.images -= 1;
@@ -117,6 +169,7 @@ impl ThumbCache {
             .filter(|(_, (c, _))| !images_only || matches!(c, Cached::Image(_)))
             .min_by_key(|(_, (_, used))| *used)
             .map(|(k, _)| k.clone())?;
+        self.cloud_misses.remove(&key);
         match self.map.remove(&key)?.0 {
             Cached::Image(s) => {
                 self.images -= 1;
@@ -257,6 +310,36 @@ mod tests {
         // Losing its thumbnail frees the slot for the next one.
         c.insert_none("a".into());
         assert_eq!(c.insert_image("b".into()), s);
+    }
+
+    /// A file missed while it was cloud-only is asked for again once OneDrive
+    /// may have downloaded it; a local file's miss stands.
+    #[test]
+    fn cloud_only_misses_are_retried() {
+        assert!(miss_stands(None));
+        assert!(miss_stands(Some(Duration::ZERO)));
+        assert!(!miss_stands(Some(CLOUD_MISS_RETRY)));
+        let t0 = Instant::now();
+        let later = t0 + CLOUD_MISS_RETRY;
+        let mut c = ThumbCache::new(2, 4);
+        c.insert_cloud_none_at("cloud".into(), t0);
+        c.insert_none("local".into());
+        assert_eq!(c.get_at("cloud", t0 + Duration::from_secs(1)), Some(Cached::NoThumb));
+        assert_eq!(c.get_at("local", later), Some(Cached::NoThumb));
+        assert_eq!(c.get_at("cloud", later), None);
+        assert_eq!(c.len(), 1);
+        // Asked again: now on this PC, it gets its picture.
+        assert_eq!(c.insert_image("cloud".into()), 0);
+        assert_eq!(c.get_at("cloud", later + CLOUD_MISS_RETRY), Some(Cached::Image(0)));
+        // Missed again while local: it stands.
+        c.insert_cloud_none_at("x".into(), t0);
+        c.insert_none("x".into());
+        assert_eq!(c.get_at("x", later), Some(Cached::NoThumb));
+        // Evicted entries leave nothing behind.
+        for i in 0..10 {
+            c.insert_cloud_none_at(format!("c{i}"), t0);
+        }
+        assert!(c.cloud_misses.len() <= c.len());
     }
 
     #[test]

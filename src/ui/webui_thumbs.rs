@@ -13,10 +13,13 @@
 //! At most `WORKERS` pictures are made at a time, newest request first; the
 //! queue is bounded (the oldest, scrolled past, are answered "none"). Made
 //! pictures stay in a small LRU (`MAX_CACHED`) keyed by path, size and
-//! date, which the memory guard can drop (`shed`).
+//! date, which the memory guard can drop (`shed`). A file without one is
+//! remembered too; if it was cloud-only then, only for
+//! `thumb_cache::CLOUD_MISS_RETRY` (it may be downloaded since).
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Condvar, Mutex};
+use std::time::Instant;
 
 use winapi::shared::windef::HGDIOBJ;
 use winapi::um::wingdi::DeleteObject;
@@ -48,8 +51,9 @@ struct State {
     /// Cache key -> (PNG, last use).
     cache: HashMap<String, (Arc<Vec<u8>>, u64)>,
     tick: u64,
-    /// Files that have no thumbnail.
-    none: HashSet<String>,
+    /// Files that have no thumbnail, with when they were missed if they
+    /// were cloud-only then.
+    none: HashMap<String, Option<Instant>>,
     jobs: Vec<Job>,
     workers: usize,
 }
@@ -111,9 +115,12 @@ impl ThumbBroker {
             drop(st);
             return reply(Some(png));
         }
-        if st.none.contains(&cache_key) {
-            drop(st);
-            return reply(None);
+        if let Some(&cloud) = st.none.get(&cache_key) {
+            if crate::thumb_cache::miss_stands(cloud.map(|at| at.elapsed())) {
+                drop(st);
+                return reply(None);
+            }
+            st.none.remove(&cache_key);
         }
         st.jobs.push(Job { path, cache_key, reply });
         let mut dropped = Vec::new();
@@ -159,7 +166,8 @@ fn worker(inner: Arc<Inner>) {
                 };
             }
         };
-        let png = crate::crash_log::catch(|| make_png(&job.path)).flatten().map(Arc::new);
+        let (png, local) = crate::crash_log::catch(|| make_png(&job.path)).unwrap_or((None, true));
+        let png = png.map(Arc::new);
         if let Ok(mut st) = inner.state.lock() {
             match &png {
                 Some(p) => {
@@ -176,7 +184,7 @@ fn worker(inner: Arc<Inner>) {
                     if st.none.len() >= MAX_NONE {
                         st.none.clear();
                     }
-                    st.none.insert(job.cache_key.clone());
+                    st.none.insert(job.cache_key.clone(), (!local).then(Instant::now));
                 }
             }
         }
@@ -184,14 +192,15 @@ fn worker(inner: Arc<Inner>) {
     }
 }
 
-/// The shell's thumbnail of `path` as PNG, or `None` when it has none.
-fn make_png(path: &str) -> Option<Vec<u8>> {
-    let tile = super::thumbs::shell_thumbnail(path, TILE);
+/// The shell's thumbnail of `path` as PNG, or `None` when it has none, and
+/// whether the file was on this PC (see `thumbs::shell_thumbnail`).
+fn make_png(path: &str) -> (Option<Vec<u8>>, bool) {
+    let (tile, local) = super::thumbs::shell_thumbnail(path, TILE);
     if tile.is_null() {
-        return None;
+        return (None, local);
     }
     let px = super::thumbs::bitmap_pixels(tile);
     unsafe { DeleteObject(tile as HGDIOBJ) };
-    let (w, h, px) = px?;
-    crate::webui::png::from_argb(w as u32, h as u32, &px)
+    let png = px.and_then(|(w, h, px)| crate::webui::png::from_argb(w as u32, h as u32, &px));
+    (png, local)
 }
