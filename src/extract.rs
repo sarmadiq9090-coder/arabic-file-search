@@ -29,6 +29,7 @@ pub(crate) mod hostile;
 #[cfg(test)]
 mod slow;
 mod mail;
+mod pdf_fix;
 mod pdf_guard;
 mod pdf_images;
 
@@ -1022,13 +1023,28 @@ struct UnsafePdf;
 /// has found that walking the document ends: pdf-extract recurses without
 /// limit, and a stack overflow ends the process whatever catches panics.
 fn pdf_text(bytes: &[u8]) -> Result<Option<String>, UnsafePdf> {
-    let Ok(mut doc) = lopdf::Document::load_mem(bytes) else { return Ok(None) };
+    let has_pages = |d: &lopdf::Document| !d.get_pages().is_empty();
+    // A table lopdf cannot read, or one that leads to no pages: rebuilt
+    // from the object headers, as viewers do (`pdf_fix`).
+    let mut doc = match lopdf::Document::load_mem(bytes) {
+        Ok(doc) if has_pages(&doc) => doc,
+        loaded => match pdf_fix::with_rebuilt_xref(bytes).and_then(|b| lopdf::Document::load_mem(&b).ok()).filter(has_pages) {
+            Some(doc) => doc,
+            None => match loaded {
+                Ok(doc) => doc,
+                Err(_) => return Ok(None),
+            },
+        },
+    };
     if doc.is_encrypted() && doc.decrypt("").is_err() {
         return Ok(None);
     }
     if !unchecked("BAHTH_TEST_UNCHECKED_PDF") && !pdf_guard::bounded(&doc) {
         return Err(UnsafePdf);
     }
+    // Fonts in StandardEncoding (the standard 14 fonts' own) or an encoding
+    // pdf-extract does not know would make it panic: no text at all.
+    pdf_fix::simple_font_encodings(&mut doc);
     let mut text = String::new();
     let done = pdf_extract::output_doc(&doc, &mut pdf_extract::PlainTextOutput::new(&mut text));
     Ok(done.is_ok().then_some(text))
@@ -2036,6 +2052,66 @@ mod tests {
         let _ = extract_text(&p);
         let p = write_file("bad2.pdf", &[0xFFu8; 300]);
         assert!(extract_text(&p).is_none());
+    }
+
+    /// The FIN1 test PDFs, written by hand: PDF 1.4, one uncompressed
+    /// content stream, the standard Helvetica (Type 1, no embedded font, no
+    /// ToUnicode) with the encoding `enc` (an object of its own when it is a
+    /// dictionary), and a cross-reference table whose entries end in `eol`.
+    fn fin1_pdf(enc: &str, eol: &str, text: &str) -> Vec<u8> {
+        let stream = format!("BT\n/F1 12 Tf\n72 720 Td\n({text}) Tj\nET");
+        let font = match enc {
+            "" => "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_owned(),
+            e if e.starts_with("<<") => "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding 6 0 R >>".to_owned(),
+            e => format!("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding {e} >>"),
+        };
+        let mut objs = vec![
+            "<< /Type /Catalog /Pages 2 0 R >>".to_owned(),
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_owned(),
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>".to_owned(),
+            format!("<< /Length {} >>\nstream\n{stream}\nendstream", stream.len()),
+            font,
+        ];
+        if enc.starts_with("<<") {
+            objs.push(enc.to_owned());
+        }
+        let mut pdf = b"%PDF-1.4\r\n%\xE2\xE3\xCF\xD3\r\n".to_vec();
+        let mut offsets = Vec::new();
+        for (i, o) in objs.iter().enumerate() {
+            offsets.push(pdf.len());
+            pdf.extend(format!("{} 0 obj\r\n{o}\r\nendobj\r\n", i + 1).bytes());
+        }
+        let xref = pdf.len();
+        pdf.extend(format!("xref\r\n0 {}\r\n0000000000 65535 f{eol}", objs.len() + 1).bytes());
+        for off in offsets {
+            pdf.extend(format!("{off:010} 00000 n{eol}").bytes());
+        }
+        pdf.extend(format!("trailer\r\n<< /Size {} /Root 1 0 R >>\r\nstartxref\r\n{xref}\r\n%%EOF\r\n", objs.len() + 1).bytes());
+        pdf
+    }
+
+    #[test]
+    fn standard_14_font_pdfs_are_read() {
+        // FIN1 F2: none of these was found by a search inside documents.
+        for enc in ["/StandardEncoding", "", "/WinAnsiEncoding", "/MacRomanEncoding", "/PDFDocEncoding", "<< /Type /Encoding /BaseEncoding /StandardEncoding >>"] {
+            // A valid table (20-byte entries), and the common 19-byte one lopdf refuses.
+            for eol in ["\r\n", " \n", "\n"] {
+                let p = write_file("synthetic pdf BTX-P1.pdf", &fin1_pdf(enc, eol, "emeraldtest"));
+                let t = extract_text(&p).unwrap_or_default();
+                assert!(t.contains("emeraldtest"), "{enc} {eol:?}: {t:?}");
+            }
+        }
+        // Standard maps byte 39 to the right quote, as every viewer shows it.
+        let p = write_file("q.pdf", &fin1_pdf("/StandardEncoding", "\r\n", "don't"));
+        assert!(extract_text(&p).unwrap_or_default().contains("don\u{2019}t"));
+        // A table whose offsets point nowhere: rebuilt as well.
+        let mut pdf = fin1_pdf("/StandardEncoding", "\r\n", "emeraldtest");
+        let at = pdf.windows(4).position(|w| w == b"xref").unwrap();
+        // Every offset a million bytes too far.
+        let tail = String::from_utf8(pdf.split_off(at)).unwrap().replace("0000000", "0000001");
+        pdf.extend(tail.bytes());
+        let p = write_file("shifted.pdf", &pdf);
+        assert!(extract_text(&p).unwrap_or_default().contains("emeraldtest"));
     }
 
     #[test]
