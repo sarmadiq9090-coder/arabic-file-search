@@ -40,16 +40,11 @@ pub(super) fn shared() -> Option<&'static ContentCache> {
                 }
                 c.clear_markers_at_exit();
                 // Installing the Arabic OCR language pack (or a newer reader)
-                // makes scanned PDFs and images worth reading once more.
-                // (And a new version of the program: files a run was ended
-                // while reading are tried once more.)
-                let signature = format!(
-                    "app {}; extractor {}; ocr {}",
-                    env!("CARGO_PKG_VERSION"),
-                    content_cache::EXTRACTOR_VERSION,
-                    crate::ocr::languages().join(",")
-                );
-                let dropped = c.revalidate(&signature);
+                // makes scanned PDFs and images worth reading once more; a
+                // new version of the program alone does not (only the files
+                // a run was ended while reading are tried once more).
+                let signature = content_cache::signature(&crate::ocr::languages());
+                let dropped = c.revalidate(&signature, env!("CARGO_PKG_VERSION"));
                 if dropped > 0 {
                     log(&format!("content index: {dropped} documents to read again ({signature})"));
                 }

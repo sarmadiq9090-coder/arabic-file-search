@@ -63,9 +63,37 @@ const IDX: &str = "content.idx";
 /// [`ContentCache::revalidate`]).
 const SIGNATURE: &str = "extractor.txt";
 /// Bumped when an extractor learns to read files it gave no text for
-/// before: their "no text" entries are then dropped once.
-#[cfg_attr(not(windows), allow(dead_code))] // read by the Windows UI
+/// before (only then, not for every new version of the program): their
+/// "no text" entries and the images are then dropped and read once more
+/// (see [`ContentCache::revalidate`]). On a big disk that is hours of OCR,
+/// so a release that does not change what the extractors read keeps it.
 pub const EXTRACTOR_VERSION: u32 = 2;
+
+/// The signature [`ContentCache::revalidate`] compares: the extractor
+/// version and the OCR languages installed (`ocr_languages`), never the
+/// program's version.
+#[cfg_attr(not(windows), allow(dead_code))] // read by the Windows UI
+pub fn signature(ocr_languages: &[String]) -> String {
+    format!("extractor {EXTRACTOR_VERSION}; ocr {}", ocr_languages.join(","))
+}
+
+/// The signature and the program version in what
+/// [`ContentCache::revalidate`] wrote: `{signature}\napp {version}`. Up to
+/// 0.10 it was one line, `app 0.10.0; extractor 2; ocr …`, the program's
+/// version first: read the same way, so that update does not read every
+/// image again either.
+fn split_signature(stored: &str) -> (&str, &str) {
+    if let Some(rest) = stored.strip_prefix("app ")
+        && let Some((program, signature)) = rest.split_once("; ")
+    {
+        return (signature, program);
+    }
+    match stored.split_once("\napp ") {
+        Some((signature, program)) => (signature, program),
+        None => (stored, ""),
+    }
+}
+
 /// When the store last forgot deleted files (unix seconds), see
 /// [`ContentCache::evict_missing`].
 const EVICTED: &str = "evicted.txt";
@@ -563,19 +591,23 @@ impl ContentCache {
     }
 
     /// Drops what may read differently now that the extractors changed:
-    /// when `signature` (the extractor version and the OCR languages, say)
-    /// is not the one the store was filled with, every "no text" entry
-    /// (scanned PDFs found empty before the Arabic OCR language pack was
-    /// installed, files an older version could not read) and every image
-    /// entry is forgotten, so each is read once more. Files a run died
-    /// reading are tried once more too (the signature names the program's
-    /// version: a new version may read them, and a file that was only being
-    /// read when the program was ended from outside is not lost for good);
-    /// should one kill the process again, it is skipped again until the
-    /// next version. Returns how many entries were dropped.
-    pub fn revalidate(&self, signature: &str) -> usize {
+    /// when `signature` ([`signature`]: the extractor version and the OCR
+    /// languages) is not the one the store was filled with, every "no text"
+    /// entry (scanned PDFs found empty before the Arabic OCR language pack
+    /// was installed, files an older extractor could not read) and every
+    /// image entry is forgotten, so each is read once more. A new version of
+    /// the program (`program`) with the same signature keeps them: only the
+    /// files a run died reading are tried once more then (a new version may
+    /// read them, and a file that was only being read when the program was
+    /// ended from outside is not lost for good); should one kill the process
+    /// again, it is skipped again until the next version. Returns how many
+    /// entries were dropped.
+    pub fn revalidate(&self, signature: &str, program: &str) -> usize {
         let file = self.dir.join(SIGNATURE);
-        if fs::read_to_string(&file).is_ok_and(|s| s == signature) {
+        let stored = fs::read_to_string(&file).ok();
+        let (old_signature, old_program) = stored.as_deref().map_or(("", ""), split_signature);
+        let all = old_signature != signature;
+        if !all && old_program == program {
             return 0;
         }
         let dropped = {
@@ -588,8 +620,9 @@ impl ContentCache {
                     .and_then(|e| e.to_str())
                     .is_some_and(|e| IMAGE_EXTS.contains(&e.to_ascii_lowercase().as_str()));
                 let keep = match m.kind {
+                    Kind::NoText if !all => m.hash != POISONED,
                     Kind::NoText => false,
-                    Kind::Text => !image,
+                    Kind::Text => !all || !image,
                 };
                 if !keep && m.kind == Kind::Text {
                     garbage += u64::from(m.len);
@@ -603,7 +636,7 @@ impl ContentCache {
         };
         // The new signature only once the store no longer has the old entries.
         if self.flush().is_ok() {
-            let _ = fs::write(&file, signature);
+            let _ = fs::write(&file, format!("{signature}\napp {program}"));
         }
         dropped
     }
@@ -1990,27 +2023,70 @@ mod tests {
         // "no text" until the file changed.
         let dir = temp_dir("signature");
         let c = ContentCache::open(&dir).unwrap();
-        assert_eq!(c.revalidate("v2 ocr=en-US"), 0, "an empty store has nothing to drop");
+        assert_eq!(c.revalidate("v2 ocr=en-US", "1.0.0"), 0, "an empty store has nothing to drop");
         c.put("C:\\scan.pdf", 1, 1, None);
         c.put("C:\\photo.JPG", 2, 2, Some("صورة"));
         c.put("C:\\report.docx", 3, 3, Some(AR));
         c.put("C:\\poisoned.pdf", 4, 4, None);
         c.lock().map.get_mut("C:\\poisoned.pdf").unwrap().hash = POISONED;
-        assert_eq!(c.revalidate("v2 ocr=en-US"), 0, "same signature: nothing changes");
-        assert_eq!(c.revalidate("v2 ocr=ar-SA,en-US"), 3);
+        assert_eq!(c.revalidate("v2 ocr=en-US", "1.0.0"), 0, "same signature: nothing changes");
+        assert_eq!(c.revalidate("v2 ocr=ar-SA,en-US", "1.0.0"), 3);
         assert_eq!(c.get("C:\\scan.pdf", 1, 1), None);
         assert_eq!(c.get("C:\\photo.JPG", 2, 2), None);
         assert_eq!(c.get("C:\\report.docx", 3, 3), Some(Some(AR.into())));
         // A file a run died reading (or was only ended while reading) is
-        // tried once more with a new version.
+        // tried once more with a new extractor.
         assert_eq!(c.get("C:\\poisoned.pdf", 4, 4), None);
         // Read again and stored: kept from now on, also after a reopen.
         c.put("C:\\scan.pdf", 1, 1, Some("نص من OCR"));
         c.flush().unwrap();
         drop(c);
         let c = ContentCache::open(&dir).unwrap();
-        assert_eq!(c.revalidate("v2 ocr=ar-SA,en-US"), 0);
+        assert_eq!(c.revalidate("v2 ocr=ar-SA,en-US", "1.0.0"), 0);
         assert_eq!(c.get("C:\\scan.pdf", 1, 1).unwrap().unwrap(), "نص من OCR");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_new_program_version_alone_rereads_only_the_files_a_run_died_in() {
+        // Every release re-read every image (OCR) and every "no text"
+        // document: hours of work on a big disk. Now only a new extractor
+        // signature does; a new version retries the few poisoned files.
+        let dir = temp_dir("signature-version");
+        let sig = signature(&["ar-SA".to_string(), "en-US".to_string()]);
+        assert_eq!(sig, format!("extractor {EXTRACTOR_VERSION}; ocr ar-SA,en-US"));
+        assert!(!sig.contains("app"), "the program version is not part of it");
+        let c = ContentCache::open(&dir).unwrap();
+        let fill = |c: &ContentCache| {
+            c.put("C:\\scan.pdf", 1, 1, None);
+            c.put("C:\\photo.png", 2, 2, Some("صورة"));
+            c.put("C:\\poisoned.pdf", 4, 4, None);
+            c.lock().map.get_mut("C:\\poisoned.pdf").unwrap().hash = POISONED;
+        };
+        // A store filled by 0.10, whose signature began with its version.
+        fill(&c);
+        fs::write(dir.join(SIGNATURE), format!("app 0.10.0; {sig}")).unwrap();
+        assert_eq!(c.revalidate(&sig, "1.0.0"), 1, "only the poisoned file");
+        assert_eq!(c.get("C:\\scan.pdf", 1, 1), Some(None));
+        assert_eq!(c.get("C:\\photo.png", 2, 2), Some(Some("صورة".into())));
+        assert_eq!(c.get("C:\\poisoned.pdf", 4, 4), None);
+        assert_eq!(c.revalidate(&sig, "1.0.0"), 0, "then nothing");
+        // The next release, same extractor: the images and "no text" stay.
+        fill(&c);
+        assert_eq!(c.revalidate(&sig, "1.0.1"), 1);
+        assert_eq!(c.get("C:\\photo.png", 2, 2), Some(Some("صورة".into())));
+        assert_eq!(c.get("C:\\scan.pdf", 1, 1), Some(None));
+        // A new extractor version: read once more.
+        let newer = sig.replace(&format!("extractor {EXTRACTOR_VERSION}"), &format!("extractor {}", EXTRACTOR_VERSION + 1));
+        assert_eq!(c.revalidate(&newer, "1.0.1"), 2);
+        assert_eq!(c.get("C:\\photo.png", 2, 2), None);
+        assert_eq!(c.get("C:\\scan.pdf", 1, 1), None);
+        // Remembered across a reopen.
+        drop(c);
+        let c = ContentCache::open(&dir).unwrap();
+        assert_eq!(c.revalidate(&newer, "1.0.1"), 0);
+        assert_eq!(split_signature("garbage"), ("garbage", ""));
+        assert_eq!(split_signature(&format!("{sig}\napp 2.0")), (sig.as_str(), "2.0"));
         fs::remove_dir_all(&dir).unwrap();
     }
 
