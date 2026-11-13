@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind ܒܦܠܚܐ ܝܠܗ ܡܢ ܦܘܠܕܪ ܕܙܒܢܐ ܩܠܝܠܐ (ܒܠܟܝ ܡܢ ܓܘ ܦܝܠܐ zip)، ܕWindows ܡܨܐ ܕܡܣܦܩ ܠܗ ܒܟܠ ܙܒܢܐ.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind ܒܦܠܚܐ ܝܠܗ ܡܢ ܦܘܠܕܪ ܕܡܚܬܝܬ̈ܐ ܕܝܘܟ. ܐܢ ܦܝܠܐ ܐܬܫܝܦ ܐܘ ܦܘܠܕܪ ܐܬܕܟܝ، ܬܘܟܢܝܬܐ ܒܕ ܟܠܝܐ ܡܢ ܦܠܚܐ.",
   "\nStarting with Windows will use the new place.": "\nܫܘܪܝܐ ܥܡ Windows ܒܕ ܡܦܠܚ ܕܘܟܬܐ ܚܕܬܐ.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nܟܒܥܝܬ ܫܢܝܐ ܬܘܟܢܝܬܐ ܠܕܘܟܬܐ ܩܝܘܡܬܐ؟ ܒܕ ܡܬܢܣܚܐ ܠ:\n{shown_dir}\nܒܕ ܡܬܬܘܣܦܐ ܠܪܫܝܡܬܐ ܕStart، ܘܒܕ ܫܪܝܐ ܡܢ ܪܝܫ ܡܢ ܬܡܢ. ܛܘܝܒ̈ܐ ܘܦܗܪܣܬܐ ܕܝܘܟ ܦܝܫܝ ܐܝܟ ܕܐܝܬܝܗܘܢ.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nܟܒܥܝܬ ܫܢܝܐ ܬܘܟܢܝܬܐ ܠܕܘܟܬܐ ܩܝܘܡܬܐ؟ ܒܕ ܡܬܢܣܚܐ ܠ:\n{shown_dir}\nܒܕ ܡܬܬܘܣܦܐ ܠܪܫܝܡܬܐ ܕStart ܘܠDesktop، ܘܒܕ ܫܪܝܐ ܡܢ ܪܝܫ ܡܢ ܬܡܢ. ܛܘܝܒ̈ܐ ܘܦܗܪܣܬܐ ܕܝܘܟ ܦܝܫܝ ܐܝܟ ܕܐܝܬܝܗܘܢ.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "ܠܐ ܡܨܐܠܗ ܢܣܚܐ ܬܘܟܢܝܬܐ ܠܕܘܟܬܐ ܩܝܘܡܬܐ:\n{e}\n\nܬܘܟܢܝܬܐ ܦܝܫܐ ܦܠܚܐ ܡܢ ܕܘܟܬܐ ܕܐܝܬܝܗ̇.",
   "the new copy did not start": "ܢܘܣܚܐ ܚܕܬܐ ܠܐ ܫܪܝܠܗ",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "ܬܘܟܢܝܬܐ ܐܬܢܣܚܬ ܠܕܘܟܬܐ ܩܝܘܡܬܐ، ܐܠܐ ܠܐ ܡܨܐܠܗ̇ ܫܘܪܝܐ ܡܢ ܪܝܫ ܡܢ ܬܡܢ ({e}).\nܦܬܘܚ ܠܗ̇ ܡܢ ܪܫܝܡܬܐ ܕStart.",
@@ -786,7 +786,10 @@
   "toman": "ܬܘܡܐܢ",
   "{d} {} {y} AH": "{d} {} {y} ܕܗܓܪܐ",
   "{lead} Checked {checked} of {total} documents…": "{lead} ܐܬܒܚܪܘ {checked} ܡܢ {total} ܟܬܒ̈ܬܐ…",
-  "{}, {d} {} {y}": "{}، {d} {} {y}"
+  "{}, {d} {} {y}": "{}، {d} {} {y}",
+  "Also read inside program and system files": "ܩܪܝ ܐܦ ܓܘ ܦܝ̈ܠܐ ܕܬܘܟܝ̈ܬܐ ܘܕܛܟܣܐ",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ܫܡܗ̈ܐ ܕܦܝ̈ܠܐ ܡܛܝܒܝܢ · ܩܪܝܢܐ ܟܬܒ̈ܬܐ ܕܦܘܠܕܪ̈ܐ ܕܝܠܟ: {checked} ܡܢ {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ܫܡܗ̈ܐ ܕܦܝ̈ܠܐ ܘܦܘܠܕܪ̈ܐ ܕܝܠܟ ܡܛܝܒܝܢ · ܩܪܝܢܐ ܟܬܒ̈ܬܐ ܐܚܪܢܝ̈ܬܐ: {checked} ܡܢ {total}"
  },
  "js": {
   "ph": "ܒܨܝ ܒܫܡܐ ܕܦܝܠܐ…",
@@ -837,7 +840,9 @@
    [
     "\"ܩܝܡܐ ܕܐܓܪܐ\"",
     "ܦܬܓܡܐ ܚܬܝܬܐ"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "ܥܩܪܐ ܥܪܒܝܐ: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "ܚܕ ܣܪܛܐ ܩܐ ܟܠ ܦܠܛܐ، ܕܝܬܝܪ ܦܠ̈ܛܐ ܡܚܘܝ",
   "showPreview": "ܚܘܝܐ ܕܚܙܝܐ ܩܕܡܝܐ",
   "hidePreview": "ܛܫܝܐ ܕܚܙܝܐ ܩܕܡܝܐ",
+  "clearQ": "ܫܘܦ ܒܥܬܐ",
+  "filtersBtn": "ܡܨܠܝܬܐ",
+  "clearFilters": "ܫܩܘܠ ܟܠ ܡܨܠܝܬܐ",
+  "ixContents": "ܡܬܡܢܝܢ ܡܐܢܐ ܕܟܬܒܐ · ${n}%",
+  "theme": "ܐܣܟܝܡܐ",
+  "themeSub": "«ܡܢ ܢܦܫܗ» ܪܕܐ ܒܬܪ ܐܣܟܝܡܐ ܢܗܝܪܐ ܐܘ ܚܫܘܟܐ ܕWindows",
+  "themes": {
+   "auto": "ܡܢ ܢܦܫܗ",
+   "light": "ܢܗܝܪܐ",
+   "dark": "ܚܫܘܟܐ",
+   "midnight": "ܣܡܘܩܐ ܕܦܠܓܘܬ ܠܠܝܐ",
+   "kiwi": "ܟܝܘܝ"
+  },
   "sMore": "ܝܬܝܪ",
   "sMoreRow": "ܓܘܒ̈ܝܐ ܐ̄ܚܪ̈ܢܐ",
   "sMoreSub": "ܒܘܚܪܢܐ ܕܚܘܕ̈ܬܐ، ܥܘܕܪܢܐ ܘܦܘܢܝ ܡܠܬܐ، ܡ̈ܐܢܐ ܐܝܟ ܦܝ̈ܠܐ ܬܢܝ̈ܢܐ ܘܪ̈ܒܘܬܐ ܕܦܘܠܕܪ̈ܐ، ܘܛܘܝܒ̈ܐ ܕܒܨܝܐ ܡܢ ܟܠ ܕܘܟܐ",
@@ -1049,12 +1067,14 @@
     "ܦܘܠܕܪ̈ܐ ܒܠܚܘܕ"
    ],
    [
-    "root: كتاب",
-    "ܗܘ ܥܩܪܐ ܥܪܒܝܐ: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: ܡܘܕܥܢܬܘܐ",
     "ܣܒܪܐ ܦܘܕܐ ܕܟܬܒܐ"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "ܗܘ ܥܩܪܐ ܥܪܒܝܐ: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"ܩܘܛܝܐ ܙܥܘܪܐ ܕܒܨܝܐ ܡܢ ܟܠ ܬܘܟܢܝܬܐ\"], [\"Ctrl+Alt+G\", \"ܓܘ ܟܘܬܐ ܕܢܛܪܐ/ܦܬܚܐ: ܐܙܠܐ ܠܦܘܠܕܪ ܕܦܠܛܐ\"], [\"Enter\", \"ܦܬܚܐ ܕܦܝܠܐ\"], [\"Ctrl+Enter\", \"ܦܬܚܐ ܕܦܘܠܕܪ ܕܝܠܗ\"], [\"↓\", \"ܠܦܠ̈ܛܐ (ܓܘ ܩܘܛܝܐ ܣܦܝܩܐ: ܬܫܥܝܬܐ)\"],\n        [\"Ctrl+C\", \"ܢܣܚܐ ܕܦܝܠܐ\"], [\"Ctrl+Shift+C\", \"ܢܣܚܐ ܕܫܒܝܠܐ\"], [\"F2\", \"ܫܚܠܘܦܐ ܕܫܡܐ\"], [\"Delete\", \"ܠܣܠܐ ܕܡܫܝ̈ܦܐ\"], [\"F4\", \"ܟܠ ܦܚ̈ܡܐ ܓܘ ܦܝܠܐ\"], [\"Ctrl+H\", \"ܬܫܥܝܬܐ\"], [\"Ctrl+T\", \"ܨܘܪ̈ܬܐ ܙܥܘܪ̈ܬܐ\"], [\"Ctrl+,\", \"ܛܘܝܒ̈ܐ\"], [\"F1\", \"ܐܕܐ ܟܪܛܝܣܐ\"]]",
   "helpKeysH": "ܠܘܚܐ ܕܩܠܝܕ̈ܐ",
   "helpMore": "ܟܠ ܐܘܪ̈ܚܬܐ ܕܒܨܝܐ…",
-  "helpSub": "ܠܚܘܨ ܥܠ ܡܬܠܐ ܩܐ ܕܡܬܟܬܒ ܓܘ ܩܘܛܝܐ ܕܒܨܝܐ. ܟܠ ܡܨܠܠܢܐ ܐܝܬ ܠܗ ܐܦ ܟܬܒܐ ܥܪܒܝܐ.",
+  "helpSub": "ܠܚܘܨ ܥܠ ܡܬܠܐ ܩܐ ܕܡܬܟܬܒ ܓܘ ܩܘܛܝܐ ܕܒܨܝܐ.",
+  "helpSubArab": "ܟܠ ܡܨܠܠܢܐ ܐܝܬ ܠܗ ܐܦ ܟܬܒܐ ܥܪܒܝܐ.",
   "kLabel": "ܩܝ̈ܣܐ ܕܩܘܪܒܐ ܕܠܘܚܐ ܕܩܠܝܕ̈ܐ",
   "offline": "ܕܝܣܩܐ ܠܐ ܝܠܗ ܚܒܝܫܐ",
   "qsNone": "ܠܝܬ ܦܠܛܐ ܩܐ ܫܢܝܐ ܟܘܬܐ ܠܦܘܠܕܪ ܕܝܠܗ. ܫܚܠܦ ܒܨܝܐ، ܐܘ ܠܚܘܨ Esc ܩܐ ܒܛܠܐ.",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "ܒܨܝܐ ܡܢ ܬܠܝܦܘܢ (ܡܨܕܐ ܕܒܝܬܐ)",
   "sPhoneSub": "ܒܨܝ ܓܘ ܦܝ̈ܠܐ ܕܐܕܐ ܚܫܘܒܬܐ ܡܢ ܒܪܐܘܙܪ ܕܬܠܝܦܘܢ ܕܝܘܟ ܥܠ ܗܝ Wi-Fi. ܩܐ ܩܪܝܐ ܒܠܚܘܕ، ܘܥܠ ܡܨܕܐ ܕܒܝܬܐ ܕܝܘܟ ܒܠܚܘܕ.",
   "sPhoneWait": "ܒܘܚܪܢܐ ܕܡܨܕܐ…",
-  "updChecking": "ܒܘܚܪܢܐ ܕܚܘܕ̈ܬܐ…"
+  "updChecking": "ܒܘܚܪܢܐ ܕܚܘܕ̈ܬܐ…",
+  "sReadPrograms": "ܩܪܝ ܐܦ ܓܘ ܦܝ̈ܠܐ ܕܬܘܟܝ̈ܬܐ ܘܕܛܟܣܐ"
  }
 }

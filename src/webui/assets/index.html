@@ -23,33 +23,32 @@
       <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
       <input id="q" role="combobox" aria-expanded="false" aria-controls="list" aria-autocomplete="list" aria-keyshortcuts="Control+F F3" dir="auto" autocomplete="off" spellcheck="false" data-i18n-placeholder="ph" data-i18n-label="ph">
       <span class="meta" id="meta"></span>
+      <!-- (Esc clears the box too: not a tab stop of its own.) -->
+      <button class="qclear" id="q-clear" type="button" tabindex="-1" data-i18n-label="clearQ" data-i18n-title="clearQ">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
     </label>
-    <button class="hbtn" id="help-btn" type="button" aria-keyshortcuts="F1" data-i18n-label="helpH" data-i18n-title="helpKey">
-      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.4c-.6.3-1 .8-1 1.5v.4M12 16.8v.2"/></svg>
-    </button>
     <span class="popwrap">
       <button class="hbtn" id="hist-btn" type="button" aria-keyshortcuts="Control+H" aria-haspopup="menu" aria-expanded="false" data-i18n-label="history" data-i18n-title="historyKey">
-        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
-        <span class="hlbl" data-i18n="history"></span>
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
       </button>
       <div class="menu pop" id="hist" role="menu" aria-labelledby="hist-btn" hidden></div>
     </span>
     <button class="hbtn" id="set-btn" type="button" aria-keyshortcuts="Control+Comma" aria-pressed="false" data-i18n-label="settings" data-i18n-title="settingsKey">
       <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-      <span class="hlbl" data-i18n="settings"></span>
     </button>
+    <!-- ⋮: the secondary actions (export, update index, help, theme, updates, report). -->
+    <span class="popwrap">
+      <button class="hbtn" id="more-btn" type="button" aria-haspopup="menu" aria-expanded="false" data-i18n-label="sMore" data-i18n-title="sMore">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="18.5" r="1.3"/></svg>
+      </button>
+      <div class="menu pop" id="more-menu" role="menu" aria-labelledby="more-btn" hidden></div>
+    </span>
   </div>
   <div class="chips" role="toolbar" id="chips" data-i18n-label="filters"></div>
   <div class="apps" id="apps" role="toolbar" data-i18n-label="appsLabel" hidden></div>
   <div class="switched" id="switched" role="status" hidden></div>
   <div class="switched qswitch" id="qswitch" role="status" hidden></div>
-
-  <!-- (Not a live region: its numbers change every second while indexing.) -->
-  <div class="banner" id="banner" role="region" aria-labelledby="banner-title" hidden>
-    <span class="t num" id="banner-title"></span>
-    <span class="s" id="banner-sub"></span>
-    <div class="bar" id="banner-bar"><i></i></div>
-  </div>
 
   <div class="body" id="view-results" hidden>
     <section class="results">
@@ -91,10 +90,13 @@
 
   <div class="rating" id="rating" role="region" data-i18n-label="rateRegion" hidden></div>
   <footer class="status">
-    <span class="dot" id="dot"></span><span class="num" id="status-text"></span>
+    <span class="num" id="status-text"></span>
     <button class="btn small" id="stop" type="button" hidden data-i18n="stop"></button>
     <span class="grow"></span>
-    <span class="keys" role="note" data-i18n-label="kLabel"><span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="kNav"></span></span><span><kbd>Enter</kbd> <span data-i18n="kOpen"></span></span><span><kbd>Ctrl+Enter</kbd> <span data-i18n="kFolder"></span></span><span><kbd>Shift+F10</kbd> <span data-i18n="kMenu"></span></span><span><kbd id="hk-kbd">Ctrl+Alt+F</kbd></span></span>
+    <!-- Indexing: its progress, and the bar; else the index's size. (Not a live
+         region: its numbers change every second while indexing.) -->
+    <span class="ix" id="ix"><span class="num" id="ix-text"></span><span class="bar" id="ix-bar" hidden><i></i></span></span>
+    <span class="keys" role="note" data-i18n-label="kLabel"><kbd id="hk-kbd">Ctrl+Alt+F</kbd></span>
   </footer>
   <div class="menu ctx" id="ctx" role="menu" data-i18n-label="more" hidden></div>
   <div class="veil" id="veil" hidden>

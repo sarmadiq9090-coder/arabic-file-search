@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "O InstaFind está sendo executado de uma pasta temporária (talvez de dentro de um arquivo zip), que o Windows pode esvaziar a qualquer momento.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "O InstaFind está sendo executado da sua pasta Downloads. Se o arquivo for excluído ou a pasta for limpa, o programa deixará de funcionar.",
   "\nStarting with Windows will use the new place.": "\nA inicialização com o Windows usará o novo local.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nMover o programa para um local permanente? Ele será copiado para:\n{shown_dir}\nadicionado ao menu Iniciar e reiniciado de lá. Suas configurações e seu índice permanecem como estão.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nMover o programa para um local permanente? Ele será copiado para:\n{shown_dir}\nadicionado ao menu Iniciar e à área de trabalho, e reiniciado de lá. Suas configurações e seu índice permanecem como estão.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "Não foi possível copiar o programa para o local permanente:\n{e}\n\nO programa continua funcionando de onde está.",
   "the new copy did not start": "a nova cópia não iniciou",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "O programa foi copiado para o local permanente, mas não foi possível reiniciá-lo de lá ({e}).\nAbra-o pelo menu Iniciar.",
@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} de {} de {y} d.H.",
   "{lead} Checked {checked} of {total} documents…": "{lead} Verificados {checked} de {total} documentos…",
-  "{}, {d} {} {y}": "{}, {d} de {} de {y}"
+  "{}, {d} {} {y}": "{}, {d} de {} de {y}",
+  "Also read inside program and system files": "Ler também o conteúdo de arquivos de programas e do sistema",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Nomes de arquivos prontos · lendo os documentos das suas pastas: {checked} de {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Nomes de arquivos e suas pastas prontos · lendo outros documentos: {checked} de {total}"
  },
  "js": {
   "ph": "Pesquisar nomes de arquivo…",
@@ -837,7 +840,9 @@
    [
     "\"contrato de aluguel\"",
     "Frase exata"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Raiz árabe: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "Também encontra “أحمد”"
    ]
+  ],
+  "tipFold": [
+   "acao",
+   "Também encontra «ação»"
   ],
   "kNav": "Mover",
   "kOpen": "Abrir",
@@ -969,6 +978,19 @@
   "compactSub": "Uma linha por resultado, para caber mais",
   "showPreview": "Mostrar a visualização",
   "hidePreview": "Ocultar a visualização",
+  "clearQ": "Limpar pesquisa",
+  "filtersBtn": "Filtros",
+  "clearFilters": "Remover todos os filtros",
+  "ixContents": "A indexar o conteúdo dos documentos · ${n}%",
+  "theme": "Tema",
+  "themeSub": "“Automático” segue o modo claro ou escuro do Windows",
+  "themes": {
+   "auto": "Automático",
+   "light": "Claro",
+   "dark": "Escuro",
+   "midnight": "Azul meia-noite",
+   "kiwi": "Kiwi"
+  },
   "sMore": "Mais",
   "sMoreRow": "Mais opções",
   "sMoreSub": "Verificar atualizações, suporte e comentários, ferramentas como arquivos duplicados e tamanhos das pastas, e configurações da pesquisa de qualquer lugar",
@@ -1049,12 +1071,14 @@
     "somente pastas"
    ],
    [
-    "root: كتاب",
-    "mesma raiz árabe: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: relatrio",
     "tolera um erro de digitação"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "mesma raiz árabe: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"a caixa de pesquisa pequena em qualquer programa\"], [\"Ctrl+Alt+G\", \"em uma caixa Salvar/Abrir: ir para a pasta de um resultado\"], [\"Enter\", \"abrir o arquivo\"], [\"Ctrl+Enter\", \"abrir a pasta dele\"], [\"↓\", \"para os resultados (com a caixa vazia: histórico)\"],\n        [\"Ctrl+C\", \"copiar o arquivo\"], [\"Ctrl+Shift+C\", \"copiar o caminho\"], [\"F2\", \"renomear\"], [\"Delete\", \"para a Lixeira\"], [\"F4\", \"todas as correspondências no arquivo\"], [\"Ctrl+H\", \"histórico\"], [\"Ctrl+T\", \"miniaturas\"], [\"Ctrl+,\", \"configurações\"], [\"F1\", \"este cartão\"]]",
   "helpKeysH": "Teclado",
   "helpMore": "Todas as formas de pesquisar…",
-  "helpSub": "Clique em um exemplo para colocá-lo na caixa de pesquisa. Cada filtro também tem uma grafia em árabe.",
+  "helpSub": "Clique em um exemplo para colocá-lo na caixa de pesquisa.",
+  "helpSubArab": "Cada filtro também tem uma grafia em árabe.",
   "kLabel": "Atalhos de teclado",
   "offline": "unidade não conectada",
   "qsNone": "Não há resultado para cuja pasta levar a caixa de diálogo. Mude a pesquisa ou pressione Esc para cancelar.",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "Pesquisar pelo celular (rede doméstica)",
   "sPhoneSub": "Pesquise os arquivos deste computador pelo navegador do celular, na mesma rede Wi-Fi. Somente leitura, e só na sua rede doméstica.",
   "sPhoneWait": "Verificando a rede…",
-  "updChecking": "Verificando se há atualizações…"
+  "updChecking": "Verificando se há atualizações…",
+  "sReadPrograms": "Ler também o conteúdo de arquivos de programas e do sistema"
  }
 }

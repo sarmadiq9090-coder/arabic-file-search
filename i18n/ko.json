@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind가 임시 폴더(zip 파일 안일 수 있음)에서 실행 중이며, Windows가 언제든지 이 폴더를 비울 수 있습니다.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind가 다운로드 폴더에서 실행 중입니다. 파일이 삭제되거나 폴더가 정리되면 프로그램이 작동하지 않습니다.",
   "\nStarting with Windows will use the new place.": "\nWindows 시작 시 실행에도 새 위치가 사용됩니다.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\n프로그램을 고정된 위치로 옮기시겠습니까? 다음 위치로 복사되고:\n{shown_dir}\n시작 메뉴에 추가된 후 그곳에서 다시 시작됩니다. 설정과 인덱스는 그대로 유지됩니다.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\n프로그램을 고정된 위치로 옮기시겠습니까? 다음 위치로 복사되고:\n{shown_dir}\n시작 메뉴와 바탕 화면에 추가된 후 그곳에서 다시 시작됩니다. 설정과 인덱스는 그대로 유지됩니다.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "프로그램을 고정된 위치로 복사할 수 없습니다:\n{e}\n\n프로그램은 현재 위치에서 계속 작동합니다.",
   "the new copy did not start": "새 복사본이 시작되지 않았습니다",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "프로그램을 고정된 위치로 복사했지만 그곳에서 다시 시작할 수 없습니다({e}).\n시작 메뉴에서 여세요.",
@@ -786,7 +786,10 @@
   "toman": "토만",
   "{d} {} {y} AH": "히즈라력 {y}년 {} {d}일",
   "{lead} Checked {checked} of {total} documents…": "{lead} 문서 {total}개 중 {checked}개 확인함…",
-  "{}, {d} {} {y}": "{}, {y}년 {} {d}일"
+  "{}, {d} {} {y}": "{}, {y}년 {} {d}일",
+  "Also read inside program and system files": "프로그램 및 시스템 파일 내용도 읽기",
+  "File names ready · reading inside your folders: {checked} of {mine}": "파일 이름 준비됨 · 내 폴더의 문서 읽는 중: {checked}/{mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "파일 이름과 내 폴더 준비됨 · 기타 문서 읽는 중: {checked}/{total}"
  },
  "js": {
   "ph": "파일 이름 검색…",
@@ -837,7 +840,9 @@
    [
     "\"임대 계약서\"",
     "정확한 구문"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "아랍어 어근: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "결과당 한 줄로 표시해 더 많이 보이게 합니다",
   "showPreview": "미리 보기 표시",
   "hidePreview": "미리 보기 숨기기",
+  "clearQ": "검색 지우기",
+  "filtersBtn": "필터",
+  "clearFilters": "모든 필터 제거",
+  "ixContents": "문서 내용 색인 중 · ${n}%",
+  "theme": "테마",
+  "themeSub": "‘자동’은 Windows의 밝은 모드 또는 어두운 모드를 따릅니다",
+  "themes": {
+   "auto": "자동",
+   "light": "밝게",
+   "dark": "어둡게",
+   "midnight": "미드나이트 블루",
+   "kiwi": "키위"
+  },
   "sMore": "더 보기",
   "sMoreRow": "추가 옵션",
   "sMoreSub": "업데이트 확인, 지원 및 피드백, 중복 파일과 폴더 크기 같은 도구, 어디서나 검색 설정",
@@ -1049,12 +1067,14 @@
     "폴더만"
    ],
    [
-    "root: كتاب",
-    "같은 아랍어 어근: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: reprot",
     "오타 허용(report를 찾음)"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "같은 아랍어 어근: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"어느 프로그램에서나 작은 검색 상자\"], [\"Ctrl+Alt+G\", \"저장/열기 대화 상자에서: 결과의 폴더로 이동\"], [\"Enter\", \"파일 열기\"], [\"Ctrl+Enter\", \"해당 폴더 열기\"], [\"↓\", \"결과로 이동(빈 상자에서는 기록)\"], [\"Ctrl+C\", \"파일 복사\"], [\"Ctrl+Shift+C\", \"경로 복사\"], [\"F2\", \"이름 바꾸기\"], [\"Delete\", \"휴지통으로\"], [\"F4\", \"파일의 모든 일치 항목\"], [\"Ctrl+H\", \"기록\"], [\"Ctrl+T\", \"미리 보기 아이콘\"], [\"Ctrl+,\", \"설정\"], [\"F1\", \"이 카드\"]]",
   "helpKeysH": "키보드",
   "helpMore": "모든 검색 방법…",
-  "helpSub": "예제를 클릭하면 검색 상자에 입력됩니다. 모든 필터는 아랍어로도 쓸 수 있습니다.",
+  "helpSub": "예제를 클릭하면 검색 상자에 입력됩니다.",
+  "helpSubArab": "모든 필터는 아랍어로도 쓸 수 있습니다.",
   "kLabel": "바로 가기 키",
   "offline": "드라이브가 연결되지 않음",
   "qsNone": "대화 상자를 이동할 결과가 없습니다. 검색을 바꾸거나 Esc를 눌러 취소하세요.",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "휴대폰에서 검색(홈 네트워크)",
   "sPhoneSub": "같은 Wi-Fi에 연결된 휴대폰 브라우저에서 이 PC의 파일을 검색합니다. 읽기 전용이며 홈 네트워크에서만 작동합니다.",
   "sPhoneWait": "네트워크를 확인하는 중…",
-  "updChecking": "업데이트를 확인하는 중…"
+  "updChecking": "업데이트를 확인하는 중…",
+  "sReadPrograms": "프로그램 및 시스템 파일 내용도 읽기"
  }
 }

@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind geçici bir klasörden (belki bir zip dosyasının içinden) çalışıyor; Windows bu klasörü her an boşaltabilir.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind, İndirilenler klasörünüzden çalışıyor. Dosya silinirse veya klasör temizlenirse program çalışmayı bırakır.",
   "\nStarting with Windows will use the new place.": "\nWindows ile başlatma yeni konumu kullanacak.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nProgram kalıcı bir konuma taşınsın mı? Şuraya kopyalanır:\n{shown_dir}\nBaşlat menüsüne eklenir ve oradan yeniden başlatılır. Ayarlarınız ve dizininiz olduğu gibi kalır.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nProgram kalıcı bir konuma taşınsın mı? Şuraya kopyalanır:\n{shown_dir}\nBaşlat menüsüne ve masaüstüne eklenir ve oradan yeniden başlatılır. Ayarlarınız ve dizininiz olduğu gibi kalır.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "Program kalıcı konuma kopyalanamadı:\n{e}\n\nProgram bulunduğu yerden çalışmaya devam ediyor.",
   "the new copy did not start": "yeni kopya başlamadı",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "Program kalıcı konuma kopyalandı ancak oradan yeniden başlatılamadı ({e}).\nBaşlat menüsünden açın.",
@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} {y} H.",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} / {total} belge denetlendi…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Program ve sistem dosyalarının içini de oku",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Dosya adları hazır · klasörlerinizdeki belgeler okunuyor: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Dosya adları ve klasörleriniz hazır · diğer belgeler okunuyor: {checked} / {total}"
  },
  "js": {
   "ph": "Dosya adlarında ara…",
@@ -837,7 +840,9 @@
    [
     "\"kira sözleşmesi\"",
     "Tam ifade"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Arapça kök: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "«أحمد» sözcüğünü de bulur"
    ]
+  ],
+  "tipFold": [
+   "sirket",
+   "«şirket» de bulunur"
   ],
   "kNav": "Gezin",
   "kOpen": "Aç",
@@ -969,6 +978,19 @@
   "compactSub": "Her sonuç için tek satır; böylece daha fazlası sığar",
   "showPreview": "Önizlemeyi göster",
   "hidePreview": "Önizlemeyi gizle",
+  "clearQ": "Aramayı temizle",
+  "filtersBtn": "Filtreler",
+  "clearFilters": "Tüm filtreleri kaldır",
+  "ixContents": "Belge içerikleri dizine ekleniyor · %${n}",
+  "theme": "Tema",
+  "themeSub": "“Otomatik”, Windows'un açık veya koyu modunu izler",
+  "themes": {
+   "auto": "Otomatik",
+   "light": "Açık",
+   "dark": "Koyu",
+   "midnight": "Gece mavisi",
+   "kiwi": "Kivi"
+  },
   "sMore": "Diğer",
   "sMoreRow": "Diğer seçenekler",
   "sMoreSub": "Güncelleştirmeleri denetleme, destek ve geri bildirim, yinelenen dosyalar ve klasör boyutları gibi araçlar ve her yerden arama ayarları",
@@ -1049,12 +1071,14 @@
     "yalnızca klasörler"
    ],
    [
-    "root: كتاب",
-    "aynı Arapça kök: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: rapro",
     "bir yazım hatasını tolere eder"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "aynı Arapça kök: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"herhangi bir programdan küçük arama kutusu\"], [\"Ctrl+Alt+G\", \"Kaydet/Aç penceresinde: bir sonucun klasörüne git\"], [\"Enter\", \"dosyayı aç\"], [\"Ctrl+Enter\", \"klasörünü aç\"], [\"↓\", \"sonuçlara (boş kutuda: geçmiş)\"],\n        [\"Ctrl+C\", \"dosyayı kopyala\"], [\"Ctrl+Shift+C\", \"yolu kopyala\"], [\"F2\", \"yeniden adlandır\"], [\"Delete\", \"Geri Dönüşüm Kutusu'na\"], [\"F4\", \"dosyadaki tüm eşleşmeler\"], [\"Ctrl+H\", \"geçmiş\"], [\"Ctrl+T\", \"küçük resimler\"], [\"Ctrl+,\", \"ayarlar\"], [\"F1\", \"bu kart\"]]",
   "helpKeysH": "Klavye",
   "helpMore": "Tüm arama yolları…",
-  "helpSub": "Arama kutusuna yazmak için bir örneğe tıklayın. Her filtrenin Arapça yazılışı da vardır.",
+  "helpSub": "Arama kutusuna yazmak için bir örneğe tıklayın.",
+  "helpSubArab": "Her filtrenin Arapça yazılışı da vardır.",
   "kLabel": "Klavye kısayolları",
   "offline": "sürücü bağlı değil",
   "qsNone": "Pencerenin taşınacağı bir sonuç yok. Aramayı değiştirin veya iptal etmek için Esc tuşuna basın.",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "Telefondan ara (ev ağı)",
   "sPhoneSub": "Aynı Wi-Fi ağındaki telefonunuzun tarayıcısından bu bilgisayarın dosyalarında arayın. Salt okunurdur ve yalnızca ev ağınızda çalışır.",
   "sPhoneWait": "Ağ denetleniyor…",
-  "updChecking": "Güncelleştirmeler denetleniyor…"
+  "updChecking": "Güncelleştirmeler denetleniyor…",
+  "sReadPrograms": "Program ve sistem dosyalarının içini de oku"
  }
 }

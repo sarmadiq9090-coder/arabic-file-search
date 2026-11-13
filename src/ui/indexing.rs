@@ -25,6 +25,7 @@ impl App {
             Some(w) if !w.finished.load(Ordering::Relaxed) => Indexing::Contents {
                 checked: w.progress.checked.load(Ordering::Relaxed),
                 total: w.progress.total.load(Ordering::Relaxed),
+                mine: w.progress.mine.load(Ordering::Relaxed),
             },
             _ => Indexing::Idle,
         }

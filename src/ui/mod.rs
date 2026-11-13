@@ -309,6 +309,8 @@ pub struct App {
     menu_content_index: nwg::MenuItem,
     /// Read cloud-only files too (downloads them); off by default.
     menu_read_cloud: nwg::MenuItem,
+    /// Read inside program and system files too; off by default.
+    menu_read_programs: nwg::MenuItem,
     menu_auto_index: nwg::MenuItem,
     menu_hide_system: nwg::MenuItem,
     menu_update: nwg::MenuItem,

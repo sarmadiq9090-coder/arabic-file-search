@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind 正從暫存資料夾執行（可能是直接從 zip 檔案中執行），Windows 隨時可能清空該資料夾。",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind 正從「下載」資料夾執行。如果檔案被刪除或資料夾被清理，程式將無法繼續運作。",
   "\nStarting with Windows will use the new place.": "\n開機啟動將使用新位置。",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\n要將程式移到固定位置嗎？程式會複製到：\n{shown_dir}\n加入「開始」功能表，並從該處重新啟動。您的設定和索引會保持不變。{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\n要將程式移到固定位置嗎？程式會複製到：\n{shown_dir}\n加入「開始」功能表和桌面，並從該處重新啟動。您的設定和索引會保持不變。{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "無法將程式複製到固定位置：\n{e}\n\n程式會繼續從目前位置執行。",
   "the new copy did not start": "新複本無法啟動",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "程式已複製到固定位置，但無法從該處重新啟動（{e}）。\n請從「開始」功能表開啟。",
@@ -786,7 +786,10 @@
   "toman": "托曼",
   "{d} {} {y} AH": "伊斯蘭曆{y}年{}{d}日",
   "{lead} Checked {checked} of {total} documents…": "{lead} 已檢查 {checked}/{total} 份文件…",
-  "{}, {d} {} {y}": "{}，{y}年{}{d}日"
+  "{}, {d} {} {y}": "{}，{y}年{}{d}日",
+  "Also read inside program and system files": "也讀取程式和系統檔案的內容",
+  "File names ready · reading inside your folders: {checked} of {mine}": "檔案名稱已就緒 · 正在讀取你的資料夾中的文件：{checked}/{mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "檔案名稱和你的資料夾已就緒 · 正在讀取其他文件：{checked}/{total}"
  },
  "js": {
   "ph": "搜尋檔案名稱…",
@@ -837,7 +840,9 @@
    [
     "\"租賃合約\"",
     "完全相符的片語"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "阿拉伯文字根：مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "每個結果一行，可顯示更多結果",
   "showPreview": "顯示預覽",
   "hidePreview": "隱藏預覽",
+  "clearQ": "清除搜尋",
+  "filtersBtn": "篩選",
+  "clearFilters": "清除所有篩選",
+  "ixContents": "正在為文件內容建立索引 · ${n}%",
+  "theme": "佈景主題",
+  "themeSub": "「自動」會跟隨 Windows 的淺色或深色模式",
+  "themes": {
+   "auto": "自動",
+   "light": "淺色",
+   "dark": "深色",
+   "midnight": "午夜藍",
+   "kiwi": "奇異果"
+  },
   "sMore": "更多",
   "sMoreRow": "更多選項",
   "sMoreSub": "檢查更新、支援與意見反應、重複檔案和資料夾大小等工具，以及隨處搜尋設定",
@@ -1049,12 +1067,14 @@
     "僅限資料夾"
    ],
    [
-    "root: كتاب",
-    "相同的阿拉伯文字根：مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: reprot",
     "容許拼字錯誤（可找到 report）"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "相同的阿拉伯文字根：مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"從任何程式開啟小型搜尋方塊\"], [\"Ctrl+Alt+G\", \"在「儲存/開啟」對話方塊中：移至結果所在的資料夾\"], [\"Enter\", \"開啟檔案\"], [\"Ctrl+Enter\", \"開啟所在資料夾\"], [\"↓\", \"移至結果（搜尋方塊空白時：歷程記錄）\"], [\"Ctrl+C\", \"複製檔案\"], [\"Ctrl+Shift+C\", \"複製路徑\"], [\"F2\", \"重新命名\"], [\"Delete\", \"移至資源回收筒\"], [\"F4\", \"檔案中的所有相符項目\"], [\"Ctrl+H\", \"歷程記錄\"], [\"Ctrl+T\", \"縮圖\"], [\"Ctrl+,\", \"設定\"], [\"F1\", \"這張卡片\"]]",
   "helpKeysH": "鍵盤",
   "helpMore": "所有搜尋方式…",
-  "helpSub": "按一下範例即可將其填入搜尋方塊。每個篩選條件也都有阿拉伯文寫法。",
+  "helpSub": "按一下範例即可將其填入搜尋方塊。",
+  "helpSubArab": "每個篩選條件也都有阿拉伯文寫法。",
   "kLabel": "鍵盤快速鍵",
   "offline": "磁碟機未連線",
   "qsNone": "沒有可讓對話方塊移過去的結果。請變更搜尋，或按 Esc 取消。",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "從手機搜尋（家用網路）",
   "sPhoneSub": "在同一個 Wi-Fi 下，從手機瀏覽器搜尋這台電腦的檔案。唯讀，且僅限您的家用網路。",
   "sPhoneWait": "正在檢查網路…",
-  "updChecking": "正在檢查更新…"
+  "updChecking": "正在檢查更新…",
+  "sReadPrograms": "也讀取程式和系統檔案的內容"
  }
 }

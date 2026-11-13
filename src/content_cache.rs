@@ -45,6 +45,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use crate::cloud;
 use crate::content_words::{self, Found, Plan, WordStats, Words};
 use crate::extract;
+use crate::system_files;
 use crate::index::Entry;
 
 /// Bumped whenever the on-disk format changes; an older store is rebuilt.
@@ -534,6 +535,59 @@ pub fn is_document(e: &Entry) -> bool {
         && e.size <= extract::MAX_FILE_SIZE
         && extract::is_supported(&e.ext())
         && !own_data_dirs().iter().any(|dir| in_folder(&e.path, dir))
+}
+
+/// The user's choice "Also read inside program and system files"
+/// (`Settings::read_program_files`, off by default): see [`warm_wanted`] and
+/// [`searched_inside`].
+static READ_PROGRAMS: AtomicBool = AtomicBool::new(false);
+
+#[cfg_attr(not(windows), allow(dead_code))] // the Windows UI
+pub fn set_read_programs(on: bool) {
+    READ_PROGRAMS.store(on, Ordering::Relaxed);
+}
+
+pub fn read_programs() -> bool {
+    READ_PROGRAMS.load(Ordering::Relaxed)
+}
+
+fn is_image(e: &Entry) -> bool {
+    IMAGE_EXTS.contains(&e.ext().as_str())
+}
+
+/// Whether the background warm-up reads `e` ([`is_document`] first). Unless
+/// the user asked for `everything` (the setting above), not the files in
+/// program, system and developer-cache folders
+/// ([`system_files::is_program_path`]: hundreds of thousands of small code,
+/// json and xml files on a typical PC), and images (read through OCR, the
+/// slowest by far) only in the user's own folders
+/// ([`system_files::in_user_folders`]). A search still reads the others it
+/// reaches ([`searched_inside`]) and stores what it read, and what is stored
+/// already stays.
+#[cfg_attr(not(windows), allow(dead_code))] // the Windows UI
+pub fn warm_wanted(e: &Entry, everything: bool) -> bool {
+    is_document(e) && warm_reads(&e.path, is_image(e), everything)
+}
+
+/// [`warm_wanted`] for a document at `path`, an `image` or not.
+fn warm_reads(path: &str, image: bool, everything: bool) -> bool {
+    everything || (!system_files::is_program_path(path) && (!image || system_files::in_user_folders(path)))
+}
+
+/// Whether a search inside documents looks inside the document at `path`:
+/// not in a program or system folder ([`system_files::is_program_path`]),
+/// unless the user asked for them (`programs`: the setting, system files
+/// shown, or the search limited to such a folder; see [`programs_searched`]).
+/// Their stored texts stay in the content index meanwhile.
+pub fn searched_inside(path: &str, programs: bool) -> bool {
+    programs || !system_files::is_program_path(path)
+}
+
+/// Whether a search inside documents within `scope` includes program and
+/// system files: the user's setting, system files shown (`show_system`), or
+/// a scope that is such a folder itself (asked for explicitly).
+pub fn programs_searched(show_system: bool, scope: &str) -> bool {
+    read_programs() || show_system || (!scope.is_empty() && system_files::is_program_path(scope))
 }
 
 /// The program's own data folders (`%LOCALAPPDATA%\BahthSari\`, with the
@@ -1168,6 +1222,10 @@ pub struct WarmProgress {
     pub cloud: AtomicUsize,
     /// Documents whose stored text it added to the word index (no file read).
     pub indexed: AtomicUsize,
+    /// The first of `total`: stored texts to add to the word index and the
+    /// documents in the user's own folders (`warm_rank` 0), which go first;
+    /// once `checked` reaches it, the user's folders are done.
+    pub mine: AtomicUsize,
 }
 
 /// How many threads [`warm`] should use on this machine: half the logical
@@ -1203,29 +1261,19 @@ const IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif"]
 
 /// Where `e` goes in the warm-up order (lower first), so the documents a
 /// first content search most likely wants are cached first: the user's own
-/// folders, then everything else, then program and system folders, then big
-/// files and archives, then images (OCR).
+/// folders ([`system_files::in_user_folders`]), then everything else, then
+/// program and system folders (read only when the user asked, see
+/// [`warm_wanted`]), then big files and archives, then images (OCR).
 fn warm_rank(e: &Entry) -> u8 {
-    let ext = e.ext();
-    if IMAGE_EXTS.contains(&ext.as_str()) {
+    if is_image(e) {
         return 4;
     }
-    if e.size > BIG_FILE || extract::is_archive(&ext) {
+    if e.size > BIG_FILE || extract::is_archive(&e.ext()) {
         return 3;
     }
-    let p = e.path.to_lowercase().replace('/', "\\");
-    let has = |parts: &[&str]| parts.iter().any(|x| p.contains(x));
-    if has(&[
-        "\\appdata\\",
-        "\\program files",
-        "\\programdata\\",
-        "\\windows\\",
-        "\\$recycle.bin\\",
-        "\\node_modules\\",
-        "\\.git\\",
-    ]) {
+    if system_files::is_program_path(&e.path) {
         2
-    } else if has(&["\\desktop\\", "\\documents\\", "\\downloads\\", "\\onedrive"]) {
+    } else if system_files::in_user_folders(&e.path) {
         0
     } else {
         1
@@ -1290,6 +1338,7 @@ fn warm_with(
     // Indexing a stored text takes no file and little time: those first,
     // so searches get fast soonest.
     todo.sort_by_cached_key(|&(e, stored)| (!stored, warm_rank(e), Reverse(e.mtime)));
+    progress.mine.store(todo.iter().take_while(|&&(e, stored)| stored || warm_rank(e) == 0).count(), Ordering::Relaxed);
     progress.total.store(todo.len(), Ordering::Relaxed);
     let next = AtomicUsize::new(0);
     // When the warm-up last saved, and how many documents it had added.
@@ -1756,7 +1805,64 @@ mod tests {
         assert_eq!(rank("C:\\Users\\a\\Documents\\x.zip"), 3);
         assert_eq!(warm_rank(&e("C:\\Users\\a\\Documents\\big.pdf", BIG_FILE + 1)), 3);
         assert_eq!(rank("C:\\Users\\a\\Documents\\صورة.JPG"), 4);
+        assert_eq!(rank("C:\\Users\\a\\Documents\\app\\node_modules\\x\\README.md"), 2);
+        assert_eq!(rank("C:\\Windows\\System32\\x.xml"), 2);
         assert!((1..=4).contains(&warm_threads()));
+    }
+
+    #[test]
+    fn warm_skips_program_files_and_far_images_unless_asked() {
+        let e = |path: &str| Entry { path: path.into(), size: 1000, mtime: 0, is_dir: false, norm_name: "".into() };
+        // Images are documents only where Windows OCR is (never in tests).
+        let wanted = |path: &str, all: bool| {
+            let e = e(path);
+            let read = warm_reads(path, is_image(&e), all);
+            assert!(is_image(&e) || warm_wanted(&e, all) == read, "{path}");
+            read
+        };
+        for p in [r"C:\Users\a\Documents\تقرير.docx", r"D:\عمل\x.pdf", r"C:\Users\a\Pictures\notes.txt", r"C:\Users\a\Desktop\scan.png"] {
+            assert!(wanted(p, false) && wanted(p, true), "{p}");
+        }
+        for p in [
+            r"C:\Program Files\App\x.json",
+            r"C:\Users\a\AppData\Roaming\App\x.xml",
+            r"C:\Windows\x.txt",
+            r"C:\Users\a\Documents\app\node_modules\x\index.js",
+            r"C:\Users\a\Pictures\photo.jpg",
+            r"D:\Photos\x.jpeg",
+        ] {
+            assert!(!wanted(p, false) && wanted(p, true), "{p}");
+        }
+        assert!(!warm_wanted(&e(r"C:\Users\a\Documents\x.exe"), true));
+        // Searches look inside program files only when asked.
+        assert!(searched_inside(r"C:\Users\a\Documents\x.txt", false));
+        assert!(!searched_inside(r"C:\Program Files\x.txt", false) && searched_inside(r"C:\Program Files\x.txt", true));
+        assert!(!programs_searched(false, "") && !programs_searched(false, r"C:\Users\a\"));
+        assert!(programs_searched(true, "") && programs_searched(false, r"C:\Program Files\App\"));
+    }
+
+    #[test]
+    fn warm_counts_the_users_folders_first() {
+        // Not in the temp folder: on Windows that is AppData\Local\Temp, a
+        // program folder, so nothing in it would count as the user's.
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target").join(format!("bahth_cc_warm-mine_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        assert!(!system_files::is_program_path(&dir.to_string_lossy()), "{}", dir.display());
+        let dir = crate::test_temp::TempPath::at(dir);
+        let mut entries = Vec::new();
+        for (i, sub) in ["Documents", "Desktop", "Work", "Other", "Documents"].iter().enumerate() {
+            let d = dir.join(sub);
+            fs::create_dir_all(&d).unwrap();
+            let p = d.join(format!("f{i}.txt"));
+            fs::write(&p, format!("text {i}")).unwrap();
+            entries.push(file_entry(&p, 100 + i as i64));
+        }
+        let cache = ContentCache::open(&dir.join("store")).unwrap();
+        let p = WarmProgress::default();
+        warm(&entries, &cache, &p, &AtomicBool::new(false), 2, &|| {});
+        assert_eq!((p.mine.load(Ordering::Relaxed), p.total.load(Ordering::Relaxed), p.added.load(Ordering::Relaxed)), (3, 5, 5));
+        drop(cache);
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
@@ -2115,6 +2221,127 @@ mod tests {
             eprintln!("  new policy at {rate} docs/s: {saves} saves, {} MB written", written as u64 >> 20);
         }
         drop(big);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A synthetic PC: `n` files, 70% program/system/dev-cache text assets
+    /// (json, xml, js, html, css, txt under Program Files, ProgramData,
+    /// AppData, node_modules, .git, $Recycle.Bin), 20% user documents
+    /// (docx, pdf, txt, md; three quarters in Documents/Desktop/Downloads,
+    /// the rest in D/Work), 10% images (jpg/png, everywhere). Paths keep the
+    /// Windows folder names under `dir`, which the rules match at any depth.
+    fn bench_pc(dir: &Path, n: usize) -> Vec<Entry> {
+        let mut rng = Rng(0x1D3C_5EED);
+        let program_roots = [
+            "C/Program Files/App{k}/resources",
+            "C/Program Files (x86)/Tool{k}/share",
+            "C/ProgramData/Vendor{k}/data",
+            "C/Users/me/AppData/Roaming/Electron{k}/User",
+            "C/Users/me/AppData/Local/Programs/App{k}/locales",
+            "C/Users/me/Documents/code/web{k}/node_modules/pkg{k}/lib",
+            "C/Users/me/Documents/code/web{k}/.git/objects/info",
+            "C/$Recycle.Bin/S-1-5-21/x{k}",
+        ];
+        let user_roots = ["C/Users/me/Documents/عمل{k}", "C/Users/me/Desktop", "C/Users/me/Downloads", "D/Work/Project{k}"];
+        let image_roots = ["C/Users/me/Documents/Scans", "C/Users/me/Pictures/Camera{k}", "C/Program Files/App{k}/icons", "D/Photos/{k}"];
+        let words = ["تقرير", "المبيعات", "ميزانية", "report", "budget", "invoice", "عقد", "config", "value", "name"];
+        let mut out = Vec::with_capacity(n);
+        let pdf = bench_pdf(&(0..40).map(|j| format!("Annual report line {j} budget invoice")).collect::<Vec<_>>());
+        for i in 0..n {
+            let k = i % 40;
+            let slot = i % 10;
+            let (root, name, bytes): (&str, String, Vec<u8>) = if slot < 7 {
+                let ext = ["json", "xml", "js", "html", "css", "txt"][rng.below(6)];
+                let len = 300 + rng.below(6000);
+                let body: String = (0..len / 7).map(|_| words[rng.below(words.len())]).collect::<Vec<_>>().join(" ");
+                (program_roots[i % program_roots.len()], format!("asset{i}.{ext}"), body.into_bytes())
+            } else if slot < 9 {
+                let root = user_roots[(i / 10) % user_roots.len()];
+                let body: String = (0..400).map(|_| words[rng.below(words.len())]).collect::<Vec<_>>().join(" ");
+                match (i / 10) % 4 {
+                    0 => {
+                        let xml = format!(
+                            r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>{body}</w:t></w:r></w:p></w:body></w:document>"#
+                        );
+                        let mut zw = zip::ZipWriter::new(io::Cursor::new(Vec::new()));
+                        zw.start_file("word/document.xml", zip::write::SimpleFileOptions::default()).unwrap();
+                        zw.write_all(xml.as_bytes()).unwrap();
+                        (root, format!("doc{i}.docx"), zw.finish().unwrap().into_inner())
+                    }
+                    1 => (root, format!("p{i}.pdf"), pdf.clone()),
+                    2 => (root, format!("t{i}.txt"), body.into_bytes()),
+                    _ => (root, format!("n{i}.md"), body.into_bytes()),
+                }
+            } else {
+                let ext = ["jpg", "png"][i % 2];
+                (image_roots[(i / 10) % image_roots.len()], format!("img{i}.{ext}"), vec![0xFF; 2000])
+            };
+            let sub = dir.join(root.replace("{k}", &k.to_string()));
+            fs::create_dir_all(&sub).unwrap();
+            let p = sub.join(name);
+            fs::write(&p, bytes).unwrap();
+            out.push(file_entry(&p, 1_600_000_000 + i as i64));
+        }
+        out
+    }
+
+    /// The default rules against the 1.0.0 behaviour (everything read) on
+    /// [`bench_pc`]: what each would read, and how long the warm-up takes to
+    /// finish the user's folders and everything.
+    /// `BENCH_FILES=20000 cargo test --release bench_index_speed -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn bench_index_speed() {
+        let n: usize = std::env::var("BENCH_FILES").ok().and_then(|s| s.parse().ok()).unwrap_or(20_000);
+        let threads: usize = std::env::var("BENCH_THREADS").ok().and_then(|s| s.parse().ok()).unwrap_or_else(warm_threads);
+        let dir = temp_dir("bench-pc");
+        let t = Instant::now();
+        let entries = bench_pc(&dir.join("pc"), n);
+        eprintln!("{n} files written in {} ms; {threads} warm-up threads", t.elapsed().as_millis());
+        // Images are documents only with Windows OCR: counted by the rule.
+        let images: Vec<&Entry> = entries.iter().filter(|e| is_image(e)).collect();
+        let ocr = |all: bool| images.iter().filter(|e| warm_reads(&e.path, true, all)).count();
+        eprintln!("images (OCR on Windows, not run here): 1.0.0 reads {}, 1.1.0 reads {} of {}", ocr(true), ocr(false), images.len());
+        // BENCH_MODE=old or new runs one of them only (each on a cold store).
+        let mode = std::env::var("BENCH_MODE").unwrap_or_default();
+        for (label, all) in [("1.0.0 (everything)", true), ("1.1.0 default", false)] {
+            if (mode == "old" && !all) || (mode == "new" && all) {
+                continue;
+            }
+            let docs: Vec<Entry> = entries.iter().filter(|e| warm_wanted(e, all)).cloned().collect();
+            let mine = docs.iter().filter(|e| warm_rank(e) == 0).count();
+            let store = dir.join(format!("store-{all}"));
+            let cache = ContentCache::open(&store).unwrap();
+            let p = WarmProgress::default();
+            let done = AtomicBool::new(false);
+            let t = Instant::now();
+            let mine_ms = std::thread::scope(|s| {
+                let watcher = s.spawn(|| {
+                    while !done.load(Ordering::Relaxed) {
+                        let m = p.mine.load(Ordering::Relaxed);
+                        if p.total.load(Ordering::Relaxed) > 0 && p.checked.load(Ordering::Relaxed) >= m {
+                            return t.elapsed().as_millis();
+                        }
+                        std::thread::sleep(Duration::from_millis(2));
+                    }
+                    t.elapsed().as_millis()
+                });
+                warm(&docs, &cache, &p, &AtomicBool::new(false), threads, &|| {});
+                done.store(true, Ordering::Relaxed);
+                watcher.join().unwrap()
+            });
+            let all_ms = t.elapsed().as_millis();
+            let s = cache.stats();
+            eprintln!(
+                "{label}: reads {} documents ({} in the user's folders); user's folders done at {mine_ms} ms, all done at {all_ms} ms; stored {} ({} with text), {} KB",
+                docs.len(),
+                mine,
+                s.documents,
+                s.texts,
+                s.bytes / 1024
+            );
+            assert_eq!(p.mine.load(Ordering::Relaxed), mine);
+        }
         fs::remove_dir_all(&dir).unwrap();
     }
 

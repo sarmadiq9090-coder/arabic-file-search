@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind ⴰⵔ ⵉⵜⵜⵅⴷⴰⵎ ⵙⴳ ⵢⴰⵏ ⵓⴽⴰⵔⴰⵎ ⵏ ⴽⵔⴰ ⵏ ⵓⵣⵎⵣ (ⵉⵣⵎⵔ ⴰⴷ ⵉⴳ ⴳ ⵡⴰⵏⵙⴰ ⵏ ⵓⴼⴰⵢⵍⵓ zip), ⵏⵏⴰ ⵉⵣⵎⵔ Windows ⴰⴷ ⵜ ⵉⵅⵡⵉ ⴳ ⴽⵓ ⴰⴽⵓⴷ.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind ⴰⵔ ⵉⵜⵜⵅⴷⴰⵎ ⵙⴳ ⵓⴽⴰⵔⴰⵎ ⵏ ⵉⴳⴳⵎⴰⵏ ⵏⵏⴽ. ⵎⴽ ⵉⵜⵜⵡⴰⴽⴽⵙ ⵓⴼⴰⵢⵍⵓ ⵏⵖ ⵉⵜⵜⵓⵙⵣⴷⴳ ⵓⴽⴰⵔⴰⵎ, ⴰⵖⴰⵡⴰⵙ ⴰⴷ ⵉⴱⴷⴷ ⴰⵅⴷⴷⵉⵎ.",
   "\nStarting with Windows will use the new place.": "\nⴰⴱⴷⴰⵢ ⴰⴽⴷ Windows ⴰⴷ ⵉⵙⵎⵔⵙ ⴰⴷⵖⴰⵔ ⴰⵎⴰⵢⵏⵓ.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nⵉⵙ ⵜⵔⵉⴷ ⴰⴷ ⵜⵙⵎⵓⵜⵜⵉⴷ ⴰⵖⴰⵡⴰⵙ ⵖⵔ ⵢⴰⵏ ⵓⴷⵖⴰⵔ ⵉⵖⵣⵣⵉⴼⵏ? ⴰⴷ ⵉⵜⵜⵓⵙⵏⵖⵍ ⵖⵔ:\n{shown_dir}\nⴰⴷ ⵉⵜⵜⵓⵔⵏⵓ ⵖⵔ ⵜⵍⴳⴰⵎⵜ ⵏ Start, ⴷ ⴰⴷ ⵉⴱⴷⵓ ⴷⴰⵖ ⵙⴳ ⵜⵎⵏ. ⵜⵉⵙⵖⴰⵍ ⵏⵏⴽ ⴷ ⵓⵎⴰⵜⴰⵔ ⵏⵏⴽ ⴰⴷ ⵇⵇⵉⵎⵏ ⵎⴰⵏⵉⵎⴽ ⵍⵍⴰⵏ.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nⵉⵙ ⵜⵔⵉⴷ ⴰⴷ ⵜⵙⵎⵓⵜⵜⵉⴷ ⴰⵖⴰⵡⴰⵙ ⵖⵔ ⵢⴰⵏ ⵓⴷⵖⴰⵔ ⵉⵖⵣⵣⵉⴼⵏ? ⴰⴷ ⵉⵜⵜⵓⵙⵏⵖⵍ ⵖⵔ:\n{shown_dir}\nⴰⴷ ⵉⵜⵜⵓⵔⵏⵓ ⵖⵔ ⵜⵍⴳⴰⵎⵜ ⵏ Start ⴷ Desktop, ⴷ ⴰⴷ ⵉⴱⴷⵓ ⴷⴰⵖ ⵙⴳ ⵜⵎⵏ. ⵜⵉⵙⵖⴰⵍ ⵏⵏⴽ ⴷ ⵓⵎⴰⵜⴰⵔ ⵏⵏⴽ ⴰⴷ ⵇⵇⵉⵎⵏ ⵎⴰⵏⵉⵎⴽ ⵍⵍⴰⵏ.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "ⵓⵔ ⵉⵣⵎⵉⵔ ⴰⴷ ⵉⵙⵏⵖⵍ ⴰⵖⴰⵡⴰⵙ ⵖⵔ ⵓⴷⵖⴰⵔ ⵉⵖⵣⵣⵉⴼⵏ:\n{e}\n\nⴰⵖⴰⵡⴰⵙ ⴰⴷ ⵉⴹⴼⵓⵔ ⴰⵅⴷⴷⵉⵎ ⵙⴳ ⵓⴷⵖⴰⵔ ⵏⵏⵙ.",
   "the new copy did not start": "ⵜⴰⵙⵏⵖⵍⵜ ⵜⴰⵎⴰⵢⵏⵓⵜ ⵓⵔ ⵜⴱⴷⵉ",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "ⴰⵖⴰⵡⴰⵙ ⵉⵜⵜⵓⵙⵏⵖⵍ ⵖⵔ ⵓⴷⵖⴰⵔ ⵉⵖⵣⵣⵉⴼⵏ, ⵎⴰⵛⵛ ⵓⵔ ⵉⵣⵎⵉⵔ ⴰⴷ ⵉⴱⴷⵓ ⴷⴰⵖ ⵙⴳ ⵜⵎⵏ ({e}).\nⵕⵥⵎ ⵜ ⵙⴳ ⵜⵍⴳⴰⵎⵜ ⵏ Start.",
@@ -786,7 +786,10 @@
   "toman": "ⵜⵓⵎⴰⵏ",
   "{d} {} {y} AH": "{d} {} {y} (ⴰⵀⵉⵊⵔⵉ)",
   "{lead} Checked {checked} of {total} documents…": "{lead} ⵜⵜⵓⵙⵏⵇⴷⵏ {checked} ⵙⴳ {total} ⵏ ⵉⵙⵎⵍⵉⵢⵏ…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "ⵖⵔ ⴰⵡⴷ ⴰⵏⵙⴰ ⵏ ⵉⴼⵓⵢⵍⴰ ⵏ ⵉⵖⴰⵡⴰⵙⵏ ⴷ ⵓⵏⴳⵔⴰⵡ",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ⵉⵙⵎⴰⵡⵏ ⵏ ⵉⴼⵓⵢⵍⴰ ⵡⵊⴷⵏ · ⵜⵖⵓⵔⵉ ⵏ ⵉⵙⵎⵍⵉⵢⵏ ⵏ ⵉⴽⵓⵔⴰⵎ ⵏⵏⴽ: {checked} ⵙⴳ {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ⵉⵙⵎⴰⵡⵏ ⵏ ⵉⴼⵓⵢⵍⴰ ⴷ ⵉⴽⵓⵔⴰⵎ ⵏⵏⴽ ⵡⵊⴷⵏ · ⵜⵖⵓⵔⵉ ⵏ ⵉⵙⵎⵍⵉⵢⵏ ⵢⴰⴹⵏ: {checked} ⵙⴳ {total}"
  },
  "js": {
   "ph": "ⵔⵣⵓ ⵙ ⵉⵙⵎ ⵏ ⵓⴼⴰⵢⵍⵓ…",
@@ -837,7 +840,9 @@
    [
     "\"ⴰⵎⵢⴰⵏⴰⵡ ⵏ ⵓⴽⵔⴰⵡ\"",
     "ⵜⴰⵡⵉⵏⵙⵜ ⵙ ⵓⵎⵓⵏ"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "ⴰⵥⵓⵕ ⴰⵄⵔⴰⴱ: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "ⵢⴰⵏ ⵉⵣⵔⵉ ⵉ ⴽⵓ ⵜⴰⵢⴰⴼⵓⵜ, ⵙ ⵓⵢⴰ ⴰⴷ ⴷ ⴱⴷⴷⵔⵏⵜ ⵜⵉⵢⴰⴼⵓⵜⵉⵏ ⵓⴳⴳⴰⵔ",
   "showPreview": "ⵙⴽⵏ ⵜⴰⵎⵥⵕⵉⵜ ⵜⴰⵣⵡⴰⵔⵓⵜ",
   "hidePreview": "ⴼⴼⵔ ⵜⴰⵎⵥⵕⵉⵜ ⵜⴰⵣⵡⴰⵔⵓⵜ",
+  "clearQ": "ⵙⴼⴹ ⴰⵔⵣⵣⵓ",
+  "filtersBtn": "ⵉⵙⵡⴰⵢⵏ",
+  "clearFilters": "ⴽⴽⵙ ⴰⴽⴽ ⵉⵙⵡⴰⵢⵏ",
+  "ixContents": "ⴰⵙⵎⵉⵍ ⵏ ⵜⵓⵎⴰⵢⵜ ⵏ ⵉⵏⵖⵎⵉⵙⵏ · ${n}%",
+  "theme": "ⴰⵙⵏⵉⵍ",
+  "themeSub": "«ⴰⵡⵓⵔⵎⴰⵏ» ⵉⴹⴼⴼⵔ ⴰⵙⵏⵉⵍ ⴰⵏⴼⴰⵡ ⵏⵖ ⴰⴱⵔⵔⴽⴰⵏ ⵏ Windows",
+  "themes": {
+   "auto": "ⴰⵡⵓⵔⵎⴰⵏ",
+   "light": "ⴰⵏⴼⴰⵡ",
+   "dark": "ⴰⴱⵔⵔⴽⴰⵏ",
+   "midnight": "ⴰⵏⵉⵍⵉ ⵏ ⵜⴰⵣⵣⵓⵍⵜ ⵏ ⵢⵉⴹ",
+   "kiwi": "ⴽⵉⵡⵉ"
+  },
   "sMore": "ⵓⴳⴳⴰⵔ",
   "sMoreRow": "ⵜⵉⴼⵔⴰⵏ ⵢⴰⴹⵏⵉⵏ",
   "sMoreSub": "ⴰⵙⵏⵇⴷ ⵏ ⵉⵙⵎⴰⵢⵏⵓⵜⵏ, ⵜⵉⵡⵉⵙⵉ ⴷ ⵜⵏⵏⴰⵢⵉⵏ, ⵉⵍⵍⴰⵍⵏ ⵣⵓⵏⴷ ⵉⴼⵓⵢⵍⴰ ⵉⵎⵙⵏⵖⵍⵏ ⴷ ⵜⵉⴷⴷⵉ ⵏ ⵉⴽⴰⵔⴰⵎⵏ, ⴷ ⵜⵉⵙⵖⴰⵍ ⵏ ⵓⵔⵣⵣⵓ ⵙⴳ ⴽⵓ ⴰⴷⵖⴰⵔ",
@@ -1049,12 +1067,14 @@
     "ⵖⴰⵙ ⵉⴽⴰⵔⴰⵎⵏ"
    ],
    [
-    "root: كتاب",
-    "ⴰⵥⵓⵕ ⴰⵄⵔⴰⴱ ⵏⵏⴰ: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: ⴰⵏⵇⵉⵙⵙ",
     "ⵉⵇⴱⵍ ⵢⴰⵜ ⵜⵣⴳⵍⵜ ⵏ ⵜⵉⵔⵔⴰ"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "ⴰⵥⵓⵕ ⴰⵄⵔⴰⴱ ⵏⵏⴰ: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"ⵜⴰⵙⵓⴷⵓⵏⵜ ⵜⴰⵎⵥⵥⵢⴰⵏⵜ ⵏ ⵓⵔⵣⵣⵓ ⵙⴳ ⴽⵓ ⴰⵖⴰⵡⴰⵙ\"], [\"Ctrl+Alt+G\", \"ⴳ ⵓⵙⴼⴰⵢⵍⵓ ⵏ ⵓⵃⴹⴰⵢ/ⵓⵕⵥⵥⵎ: ⴷⴷⵓ ⵖⵔ ⵓⴽⴰⵔⴰⵎ ⵏ ⵢⴰⵜ ⵜⵢⴰⴼⵓⵜ\"], [\"Enter\", \"ⵕⵥⵎ ⴰⴼⴰⵢⵍⵓ\"], [\"Ctrl+Enter\", \"ⵕⵥⵎ ⴰⴽⴰⵔⴰⵎ ⵏⵏⵙ\"], [\"↓\", \"ⵖⵔ ⵜⵢⴰⴼⵓⵜⵉⵏ (ⴳ ⵜⴰⵙⵓⴷⵓⵏⵜ ⵜⵉⵍⵉⵜ: ⴰⵎⵣⵔⵓⵢ)\"],\n        [\"Ctrl+C\", \"ⵙⵏⵖⵍ ⴰⴼⴰⵢⵍⵓ\"], [\"Ctrl+Shift+C\", \"ⵙⵏⵖⵍ ⴰⴱⵔⵉⴷ\"], [\"F2\", \"ⵙⵏⴼⵍ ⵉⵙⵎ\"], [\"Delete\", \"ⵖⵔ ⵜⵇⴼⴼⵓⵜ ⵏ ⵓⴽⴽⴰⵙ\"], [\"F4\", \"ⵎⴰⵕⵕⴰ ⵜⵉⵎⵙⴰⵙⴰⵜⵉⵏ ⴳ ⵓⴼⴰⵢⵍⵓ\"], [\"Ctrl+H\", \"ⴰⵎⵣⵔⵓⵢ\"], [\"Ctrl+T\", \"ⵜⵉⵡⵍⴰⴼⵉⵏ ⵉⵎⵥⵥⵢⴰⵏⵏ\"], [\"Ctrl+,\", \"ⵜⵉⵙⵖⴰⵍ\"], [\"F1\", \"ⵜⴰⴽⴰⵕⴹⴰ ⴰ\"]]",
   "helpKeysH": "ⴰⵏⴰⵙ ⵏ ⵜⵙⵓⵔⵉⵡⵉⵏ",
   "helpMore": "ⵎⴰⵕⵕⴰ ⵉⴱⵔⵉⴷⵏ ⵏ ⵓⵔⵣⵣⵓ…",
-  "helpSub": "ⵙⵙⵏⴷ ⵖⴼ ⵢⴰⵏ ⵓⵎⴷⵢⴰ ⵃⵎⴰ ⴰⴷ ⵉⴽⵛⵎ ⵜⴰⵙⵓⴷⵓⵏⵜ ⵏ ⵓⵔⵣⵣⵓ. ⴽⵓ ⴰⵙⵖⵣⴼ ⵖⵓⵔⵙ ⵓⵍⴰ ⵜⵉⵔⵔⴰ ⵙ ⵜⵄⵔⴰⴱⵜ.",
+  "helpSub": "ⵙⵙⵏⴷ ⵖⴼ ⵢⴰⵏ ⵓⵎⴷⵢⴰ ⵃⵎⴰ ⴰⴷ ⵉⴽⵛⵎ ⵜⴰⵙⵓⴷⵓⵏⵜ ⵏ ⵓⵔⵣⵣⵓ.",
+  "helpSubArab": "ⴽⵓ ⴰⵙⵖⵣⴼ ⵖⵓⵔⵙ ⵓⵍⴰ ⵜⵉⵔⵔⴰ ⵙ ⵜⵄⵔⴰⴱⵜ.",
   "kLabel": "ⵉⵏⴰⵍⴽⵎⵏ ⵉⵣⵔⵔⴰⴱⵏ ⵏ ⵓⵏⴰⵙ ⵏ ⵜⵙⵓⵔⵉⵡⵉⵏ",
   "offline": "ⴰⴷⵉⵙⴽ ⵓⵔ ⵉⵜⵜⵓⵇⵇⵏ",
   "qsNone": "ⵓⵍⴰ ⵜⴰⵢⴰⴼⵓⵜ ⵖⵔ ⵓⴽⴰⵔⴰⵎ ⵏⵏⵙ ⵔⴰⴷ ⵉⵎⵓⵜⵜⵉ ⵓⵙⴼⴰⵢⵍⵓ. ⵙⵏⴼⵍ ⴰⵔⵣⵣⵓ, ⵏⵖ ⵙⵙⵏⴷ Esc ⵃⵎⴰ ⴰⴷ ⵜⵙⴼⵙⵅⴷ.",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "ⴰⵔⵣⵣⵓ ⵙⴳ ⵓⵜⵉⵍⵉⴼⵓⵏ (ⴰⵥⵟⵟⴰ ⵏ ⵜⴷⴷⴰⵔⵜ)",
   "sPhoneSub": "ⵔⵣⵓ ⴳ ⵉⴼⵓⵢⵍⴰ ⵏ ⵓⵙⵓⵏⵖⵓ ⴰⴷ ⵙⴳ ⵉⵎⵉⵏⵉⴳ ⵏ ⵓⵜⵉⵍⵉⴼⵓⵏ ⵏⵏⴽ ⴳ Wi-Fi ⵏⵏⴰ. ⵉ ⵜⵖⵓⵔⵉ ⴽⴰ, ⴷ ⵖⴰⵙ ⴳ ⵓⵥⵟⵟⴰ ⵏ ⵜⴷⴷⴰⵔⵜ ⵏⵏⴽ.",
   "sPhoneWait": "ⴰⵙⵏⵇⴷ ⵏ ⵓⵥⵟⵟⴰ…",
-  "updChecking": "ⴰⵙⵏⵇⴷ ⵏ ⵉⵙⵎⴰⵢⵏⵓⵜⵏ…"
+  "updChecking": "ⴰⵙⵏⵇⴷ ⵏ ⵉⵙⵎⴰⵢⵏⵓⵜⵏ…",
+  "sReadPrograms": "ⵖⵔ ⴰⵡⴷ ⴰⵏⵙⴰ ⵏ ⵉⴼⵓⵢⵍⴰ ⵏ ⵉⵖⴰⵡⴰⵙⵏ ⴷ ⵓⵏⴳⵔⴰⵡ"
  }
 }

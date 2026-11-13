@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind ଏକ ଅସ୍ଥାୟୀ ଫୋଲ୍ଡରରୁ (ସମ୍ଭବତଃ ଏକ zip ଫାଇଲ୍ ଭିତରୁ) ଚାଲୁଛି, ଯାହାକୁ Windows ଯେକୌଣସି ସମୟରେ ଖାଲି କରିପାରେ।",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind ଆପଣଙ୍କ ଡାଉନଲୋଡ୍ ଫୋଲ୍ଡରରୁ ଚାଲୁଛି। ଯଦି ଫାଇଲ୍ ବିଲୋପ ହୁଏ କିମ୍ବା ଫୋଲ୍ଡର୍ ସଫା କରାଯାଏ, ପ୍ରୋଗ୍ରାମ କାମ କରିବା ବନ୍ଦ କରିଦେବ।",
   "\nStarting with Windows will use the new place.": "\nWindows ସହିତ ଆରମ୍ଭ ହେବା ସମୟରେ ନୂଆ ସ୍ଥାନ ବ୍ୟବହାର ହେବ।",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nପ୍ରୋଗ୍ରାମକୁ ଏକ ସ୍ଥାୟୀ ସ୍ଥାନକୁ ଘୁଞ୍ଚାଇବେ କି? ଏହାକୁ ଏଠାକୁ କପି କରାଯିବ:\n{shown_dir}\nଷ୍ଟାର୍ଟ ମେନୁରେ ଯୋଡ଼ାଯିବ, ଏବଂ ସେଠାରୁ ପୁନଃଆରମ୍ଭ କରାଯିବ। ଆପଣଙ୍କ ସେଟିଂସ୍ ଏବଂ ଇଣ୍ଡେକ୍ସ ଯେମିତି ଅଛି ସେମିତି ରହିବ।{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nପ୍ରୋଗ୍ରାମକୁ ଏକ ସ୍ଥାୟୀ ସ୍ଥାନକୁ ଘୁଞ୍ଚାଇବେ କି? ଏହାକୁ ଏଠାକୁ କପି କରାଯିବ:\n{shown_dir}\nଷ୍ଟାର୍ଟ ମେନୁ ଓ ଡେସ୍କଟପରେ ଯୋଡ଼ାଯିବ, ଏବଂ ସେଠାରୁ ପୁନଃଆରମ୍ଭ କରାଯିବ। ଆପଣଙ୍କ ସେଟିଂସ୍ ଏବଂ ଇଣ୍ଡେକ୍ସ ଯେମିତି ଅଛି ସେମିତି ରହିବ।{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "ପ୍ରୋଗ୍ରାମକୁ ସ୍ଥାୟୀ ସ୍ଥାନକୁ କପି କରାଯାଇପାରିଲା ନାହିଁ:\n{e}\n\nପ୍ରୋଗ୍ରାମ ଯେଉଁଠାରେ ଅଛି ସେଠାରୁ କାମ କରିବା ଜାରି ରଖିବ।",
   "the new copy did not start": "ନୂଆ କପି ଆରମ୍ଭ ହେଲା ନାହିଁ",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "ପ୍ରୋଗ୍ରାମକୁ ସ୍ଥାୟୀ ସ୍ଥାନକୁ କପି କରାଗଲା, କିନ୍ତୁ ସେଠାରୁ ପୁନଃଆରମ୍ଭ କରାଯାଇପାରିଲା ନାହିଁ ({e})।\nଏହାକୁ ଷ୍ଟାର୍ଟ ମେନୁରୁ ଖୋଲନ୍ତୁ।",
@@ -786,7 +786,10 @@
   "toman": "ତୋମାନ",
   "{d} {} {y} AH": "{d} {} {y} ହିଜରୀ",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total}ଟିରୁ {checked}ଟି ଡକ୍ୟୁମେଣ୍ଟ ଯାଞ୍ଚ କରାଗଲା…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "ପ୍ରୋଗ୍ରାମ୍ ଓ ସିଷ୍ଟମ୍ ଫାଇଲ୍ ଭିତରେ ମଧ୍ୟ ପଢ଼ନ୍ତୁ",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ଫାଇଲ୍ ନାମ ପ୍ରସ୍ତୁତ · ଆପଣଙ୍କ ଫୋଲ୍ଡରର ଡକ୍ୟୁମେଣ୍ଟ ପଢ଼ାଯାଉଛି: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ଫାଇଲ୍ ନାମ ଓ ଆପଣଙ୍କ ଫୋଲ୍ଡର ପ୍ରସ୍ତୁତ · ଅନ୍ୟ ଡକ୍ୟୁମେଣ୍ଟ ପଢ଼ାଯାଉଛି: {checked} / {total}"
  },
  "js": {
   "ph": "ଫାଇଲ୍ ନାମରେ ସନ୍ଧାନ କରନ୍ତୁ…",
@@ -837,7 +840,9 @@
    [
     "\"ଭଡ଼ା ଚୁକ୍ତି\"",
     "ସଠିକ୍ ବାକ୍ୟାଂଶ"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "ଆରବୀ ମୂଳ ଶବ୍ଦ: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "ପ୍ରତି ଫଳାଫଳ ପାଇଁ ଗୋଟିଏ ଧାଡ଼ି, ଯାହାଫଳରେ ଅଧିକ ଫଳାଫଳ ଧରେ",
   "showPreview": "ପୂର୍ବାବଲୋକନ ଦେଖାନ୍ତୁ",
   "hidePreview": "ପୂର୍ବାବଲୋକନ ଲୁଚାନ୍ତୁ",
+  "clearQ": "ସନ୍ଧାନ ସଫା କରନ୍ତୁ",
+  "filtersBtn": "ଫିଲ୍ଟର",
+  "clearFilters": "ସମସ୍ତ ଫିଲ୍ଟର ହଟାନ୍ତୁ",
+  "ixContents": "ଦସ୍ତାବିଜର ବିଷୟବସ୍ତୁ ସୂଚୀବଦ୍ଧ ହେଉଛି · ${n}%",
+  "theme": "ଥିମ୍",
+  "themeSub": "“ସ୍ୱୟଂଚାଳିତ” Windows ର ହାଲୁକା କିମ୍ବା ଗାଢ଼ ମୋଡ୍ ଅନୁସରଣ କରେ",
+  "themes": {
+   "auto": "ସ୍ୱୟଂଚାଳିତ",
+   "light": "ହାଲୁକା",
+   "dark": "ଗାଢ଼",
+   "midnight": "ମଧ୍ୟରାତ୍ରି ନୀଳ",
+   "kiwi": "କିୱି"
+  },
   "sMore": "ଅଧିକ",
   "sMoreRow": "ଅଧିକ ବିକଳ୍ପ",
   "sMoreSub": "ଅପଡେଟ୍ ଯାଞ୍ଚ, ସହାୟତା ଏବଂ ମତାମତ, ନକଲ ଫାଇଲ୍ ଏବଂ ଫୋଲ୍ଡର୍ ଆକାର ଭଳି ଉପକରଣ, ଏବଂ ଯେକୌଣସି ସ୍ଥାନରୁ ସନ୍ଧାନ ସେଟିଂସ୍",
@@ -1049,12 +1067,14 @@
     "କେବଳ ଫୋଲ୍ଡର୍"
    ],
    [
-    "root: كتاب",
-    "ସମାନ ଆରବୀ ମୂଳ ଶବ୍ଦ: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: reprot",
     "ଟାଇପ୍ ଭୁଲ ସହିନିଏ (“report” ଖୋଜେ)"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "ସମାନ ଆରବୀ ମୂଳ ଶବ୍ଦ: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"ଯେକୌଣସି ପ୍ରୋଗ୍ରାମରୁ ଛୋଟ ସନ୍ଧାନ ବାକ୍ସ\"], [\"Ctrl+Alt+G\", \"Save/Open ଡାୟଲଗ୍‌ରେ: ଏକ ଫଳାଫଳର ଫୋଲ୍ଡର୍‌କୁ ଯାଆନ୍ତୁ\"], [\"Enter\", \"ଫାଇଲ୍ ଖୋଲନ୍ତୁ\"], [\"Ctrl+Enter\", \"ଏହାର ଫୋଲ୍ଡର୍ ଖୋଲନ୍ତୁ\"], [\"↓\", \"ଫଳାଫଳକୁ (ଖାଲି ବାକ୍ସରେ: ଇତିହାସ)\"], [\"Ctrl+C\", \"ଫାଇଲ୍ କପି କରନ୍ତୁ\"], [\"Ctrl+Shift+C\", \"ପାଥ୍ କପି କରନ୍ତୁ\"], [\"F2\", \"ପୁନଃନାମକରଣ\"], [\"Delete\", \"ରିସାଇକଲ୍ ବିନ୍‌କୁ\"], [\"F4\", \"ଫାଇଲ୍‌ରେ ସମସ୍ତ ମେଳ\"], [\"Ctrl+H\", \"ଇତିହାସ\"], [\"Ctrl+T\", \"ଥମ୍ବନେଲ୍\"], [\"Ctrl+,\", \"ସେଟିଂସ୍\"], [\"F1\", \"ଏହି କାର୍ଡ\"]]",
   "helpKeysH": "କୀବୋର୍ଡ୍",
   "helpMore": "ସନ୍ଧାନ କରିବାର ସମସ୍ତ ଉପାୟ…",
-  "helpSub": "ଏକ ଉଦାହରଣକୁ ସନ୍ଧାନ ବାକ୍ସରେ ରଖିବାକୁ ତାହା ଉପରେ କ୍ଲିକ୍ କରନ୍ତୁ। ପ୍ରତ୍ୟେକ ଫିଲ୍ଟରର ଏକ ଆରବୀ ବନାନ ମଧ୍ୟ ଅଛି।",
+  "helpSub": "ଏକ ଉଦାହରଣକୁ ସନ୍ଧାନ ବାକ୍ସରେ ରଖିବାକୁ ତାହା ଉପରେ କ୍ଲିକ୍ କରନ୍ତୁ।",
+  "helpSubArab": "ପ୍ରତ୍ୟେକ ଫିଲ୍ଟରର ଏକ ଆରବୀ ବନାନ ମଧ୍ୟ ଅଛି।",
   "kLabel": "କୀବୋର୍ଡ୍ ସର୍ଟକଟ୍",
   "offline": "ଡ୍ରାଇଭ୍ ସଂଯୁକ୍ତ ନାହିଁ",
   "qsNone": "ଡାୟଲଗ୍‌କୁ ଘୁଞ୍ଚାଇବା ପାଇଁ କୌଣସି ଫଳାଫଳ ନାହିଁ। ସନ୍ଧାନ ବଦଳାନ୍ତୁ, କିମ୍ବା ବାତିଲ୍ କରିବାକୁ Esc ଦବାନ୍ତୁ।",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "ଫୋନରୁ ସନ୍ଧାନ (ଘରୋଇ ନେଟୱର୍କ)",
   "sPhoneSub": "ସେହି Wi-Fi ରେ ଥିବା ଆପଣଙ୍କ ଫୋନର ବ୍ରାଉଜରରୁ ଏହି PC ର ଫାଇଲ୍ ସନ୍ଧାନ କରନ୍ତୁ। କେବଳ ପଢ଼ିବା ପାଇଁ, ଏବଂ କେବଳ ଆପଣଙ୍କ ଘରୋଇ ନେଟୱର୍କରେ।",
   "sPhoneWait": "ନେଟୱର୍କ ଯାଞ୍ଚ କରାଯାଉଛି…",
-  "updChecking": "ଅପଡେଟ୍ ଯାଞ୍ଚ କରାଯାଉଛି…"
+  "updChecking": "ଅପଡେଟ୍ ଯାଞ୍ଚ କରାଯାଉଛି…",
+  "sReadPrograms": "ପ୍ରୋଗ୍ରାମ୍ ଓ ସିଷ୍ଟମ୍ ଫାଇଲ୍ ଭିତରେ ମଧ୍ୟ ପଢ଼ନ୍ତୁ"
  }
 }

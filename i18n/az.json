@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind müvəqqəti qovluqdan işləyir (bəlkə zip faylın içindən); Windows onu istənilən vaxt boşalda bilər.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind Endirmələr qovluğunuzdan işləyir. Fayl silinsə və ya qovluq təmizlənsə, proqram işləməyi dayandırar.",
   "\nStarting with Windows will use the new place.": "\nWindows ilə başlama yeni yerdən istifadə edəcək.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nProqram daimi yerə köçürülsün? O, bura kopyalanacaq:\n{shown_dir}\nBaşlat menyusuna əlavə ediləcək və oradan yenidən başladılacaq. Parametrləriniz və indeksiniz olduğu kimi qalır.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nProqram daimi yerə köçürülsün? O, bura kopyalanacaq:\n{shown_dir}\nBaşlat menyusuna və iş masasına əlavə ediləcək və oradan yenidən başladılacaq. Parametrləriniz və indeksiniz olduğu kimi qalır.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "Proqram daimi yerə kopyalana bilmədi:\n{e}\n\nProqram olduğu yerdən işləməyə davam edir.",
   "the new copy did not start": "yeni nüsxə başlamadı",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "Proqram daimi yerə kopyalandı, lakin oradan yenidən başlaya bilmədi ({e}).\nOnu Başlat menyusundan açın.",
@@ -786,7 +786,10 @@
   "toman": "tümən",
   "{d} {} {y} AH": "{d} {} {y} h.",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} / {total} sənəd yoxlanıldı…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Proqram və sistem fayllarının içini də oxu",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Fayl adları hazırdır · qovluqlarınızdakı sənədlər oxunur: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Fayl adları və qovluqlarınız hazırdır · digər sənədlər oxunur: {checked} / {total}"
  },
  "js": {
   "ph": "Fayl adlarında axtarın…",
@@ -837,7 +840,9 @@
    [
     "\"icarə müqaviləsi\"",
     "Dəqiq ifadə"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Ərəb kökü: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "«أحمد» sözünü də tapır"
    ]
+  ],
+  "tipFold": [
+   "uzum",
+   "«üzüm» də tapılır"
   ],
   "kNav": "Keçid",
   "kOpen": "Aç",
@@ -969,6 +978,19 @@
   "compactSub": "Hər nəticəyə bir sətir, beləliklə daha çoxu sığır",
   "showPreview": "Önbaxışı göstər",
   "hidePreview": "Önbaxışı gizlət",
+  "clearQ": "Axtarışı təmizlə",
+  "filtersBtn": "Filtrlər",
+  "clearFilters": "Bütün filtrləri sil",
+  "ixContents": "Sənədlərin məzmunu indekslənir · ${n}%",
+  "theme": "Mövzu",
+  "themeSub": "“Avtomatik” Windows-un açıq və ya tünd rejimini izləyir",
+  "themes": {
+   "auto": "Avtomatik",
+   "light": "Açıq",
+   "dark": "Tünd",
+   "midnight": "Gecə mavisi",
+   "kiwi": "Kivi"
+  },
   "sMore": "Daha çox",
   "sMoreRow": "Digər seçimlər",
   "sMoreSub": "Yeniləmələri yoxlamaq, dəstək və rəy, dublikat fayllar və qovluq ölçüləri kimi alətlər, həmçinin hər yerdən axtarış parametrləri",
@@ -1049,12 +1071,14 @@
     "yalnız qovluqlar"
    ],
    [
-    "root: كتاب",
-    "eyni ərəb kökü: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: hesbat",
     "bir yazı səhvinə dözür"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "eyni ərəb kökü: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"istənilən proqramdan kiçik axtarış qutusu\"], [\"Ctrl+Alt+G\", \"Saxla/Aç pəncərəsində: nəticənin qovluğuna keç\"], [\"Enter\", \"faylı aç\"], [\"Ctrl+Enter\", \"onun qovluğunu aç\"], [\"↓\", \"nəticələrə (boş qutuda: tarixçə)\"],\n        [\"Ctrl+C\", \"faylı kopyala\"], [\"Ctrl+Shift+C\", \"yolu kopyala\"], [\"F2\", \"adını dəyiş\"], [\"Delete\", \"Zibil qutusuna\"], [\"F4\", \"fayldakı bütün uyğunluqlar\"], [\"Ctrl+H\", \"tarixçə\"], [\"Ctrl+T\", \"miniatürlər\"], [\"Ctrl+,\", \"parametrlər\"], [\"F1\", \"bu kart\"]]",
   "helpKeysH": "Klaviatura",
   "helpMore": "Bütün axtarış üsulları…",
-  "helpSub": "Axtarış qutusuna yazmaq üçün nümunəyə klikləyin. Hər filtrin ərəbcə yazılışı da var.",
+  "helpSub": "Axtarış qutusuna yazmaq üçün nümunəyə klikləyin.",
+  "helpSubArab": "Hər filtrin ərəbcə yazılışı da var.",
   "kLabel": "Klaviatura qısayolları",
   "offline": "disk qoşulmayıb",
   "qsNone": "Pəncərəni qovluğuna köçürmək üçün nəticə yoxdur. Axtarışı dəyişin və ya ləğv etmək üçün Esc basın.",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "Telefondan axtarış (ev şəbəkəsi)",
   "sPhoneSub": "Eyni Wi-Fi şəbəkəsindəki telefonunuzun brauzerindən bu kompüterin fayllarında axtarın. Yalnız oxumaq üçündür və yalnız ev şəbəkənizdə işləyir.",
   "sPhoneWait": "Şəbəkə yoxlanılır…",
-  "updChecking": "Yeniləmələr yoxlanılır…"
+  "updChecking": "Yeniləmələr yoxlanılır…",
+  "sReadPrograms": "Proqram və sistem fayllarının içini də oxu"
  }
 }

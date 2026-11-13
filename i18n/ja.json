@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind は一時フォルダー (zip ファイル内など) から実行されています。このフォルダーは Windows によっていつでも空にされる可能性があります。",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind は [ダウンロード] フォルダーから実行されています。ファイルが削除されたりフォルダーが整理されたりすると、プログラムは動作しなくなります。",
   "\nStarting with Windows will use the new place.": "\nWindows と同時に起動する場合も新しい場所が使われます。",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nプログラムを固定の場所に移動しますか？ 次の場所にコピーされ:\n{shown_dir}\nスタート メニューに追加されて、そこから再起動します。設定とインデックスはそのまま残ります。{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nプログラムを固定の場所に移動しますか？ 次の場所にコピーされ:\n{shown_dir}\nスタート メニューとデスクトップに追加されて、そこから再起動します。設定とインデックスはそのまま残ります。{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "プログラムを固定の場所にコピーできませんでした:\n{e}\n\nプログラムは現在の場所で引き続き動作します。",
   "the new copy did not start": "新しいコピーが起動しませんでした",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "プログラムを固定の場所にコピーしましたが、そこから再起動できませんでした ({e})。\nスタート メニューから開いてください。",
@@ -786,7 +786,10 @@
   "toman": "トマン",
   "{d} {} {y} AH": "ヒジュラ暦{y}年{}{d}日",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total} 件中 {checked} 件のドキュメントを確認しました…",
-  "{}, {d} {} {y}": "{}、{y}年{}{d}日"
+  "{}, {d} {} {y}": "{}、{y}年{}{d}日",
+  "Also read inside program and system files": "プログラム ファイルとシステム ファイルの中も読み取る",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ファイル名の準備完了 · あなたのフォルダー内のドキュメントを読み取り中: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ファイル名とあなたのフォルダーの準備完了 · その他のドキュメントを読み取り中: {checked} / {total}"
  },
  "js": {
   "ph": "ファイル名を検索…",
@@ -837,7 +840,9 @@
    [
     "\"賃貸借契約\"",
     "完全に一致する語句"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "アラビア語の語根: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "«أحمد» も見つかります"
    ]
+  ],
+  "tipFold": [
+   "かめら",
+   "「カメラ」も見つかります"
   ],
   "kNav": "移動",
   "kOpen": "開く",
@@ -969,6 +978,19 @@
   "compactSub": "結果を 1 行ずつ表示し、より多く収まるようにします",
   "showPreview": "プレビューを表示",
   "hidePreview": "プレビューを非表示",
+  "clearQ": "検索をクリア",
+  "filtersBtn": "フィルター",
+  "clearFilters": "すべてのフィルターを解除",
+  "ixContents": "ドキュメントの内容をインデックス作成中 · ${n}%",
+  "theme": "テーマ",
+  "themeSub": "「自動」は Windows のライト/ダーク モードに従います",
+  "themes": {
+   "auto": "自動",
+   "light": "ライト",
+   "dark": "ダーク",
+   "midnight": "ミッドナイト ブルー",
+   "kiwi": "キウイ"
+  },
   "sMore": "その他",
   "sMoreRow": "その他のオプション",
   "sMoreSub": "更新プログラムの確認、サポートとフィードバック、重複ファイルやフォルダーのサイズなどのツール、どこからでも検索の設定",
@@ -1049,12 +1071,14 @@
     "フォルダーのみ"
    ],
    [
-    "root: كتاب",
-    "同じアラビア語の語根: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: reprot",
     "入力ミスを許容 (report が見つかる)"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "同じアラビア語の語根: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"どのプログラムからでも小さな検索ボックス\"], [\"Ctrl+Alt+G\", \"[保存]/[開く] ダイアログで: 結果のフォルダーへ移動\"], [\"Enter\", \"ファイルを開く\"], [\"Ctrl+Enter\", \"フォルダーを開く\"], [\"↓\", \"結果へ (空のボックスでは履歴)\"], [\"Ctrl+C\", \"ファイルをコピー\"], [\"Ctrl+Shift+C\", \"パスをコピー\"], [\"F2\", \"名前の変更\"], [\"Delete\", \"ごみ箱へ\"], [\"F4\", \"ファイル内のすべての一致\"], [\"Ctrl+H\", \"履歴\"], [\"Ctrl+T\", \"縮小版\"], [\"Ctrl+,\", \"設定\"], [\"F1\", \"このカード\"]]",
   "helpKeysH": "キーボード",
   "helpMore": "すべての検索方法…",
-  "helpSub": "例をクリックすると検索ボックスに入力されます。どのフィルターにもアラビア語の書き方があります。",
+  "helpSub": "例をクリックすると検索ボックスに入力されます。",
+  "helpSubArab": "どのフィルターにもアラビア語の書き方があります。",
   "kLabel": "キーボード ショートカット",
   "offline": "ドライブが接続されていません",
   "qsNone": "ダイアログの移動先になる結果がありません。検索を変更するか、Esc を押してキャンセルしてください。",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "スマートフォンから検索 (ホーム ネットワーク)",
   "sPhoneSub": "同じ Wi-Fi につないだスマートフォンのブラウザーから、この PC のファイルを検索します。読み取り専用で、ホーム ネットワークでのみ使えます。",
   "sPhoneWait": "ネットワークを確認しています…",
-  "updChecking": "更新プログラムを確認しています…"
+  "updChecking": "更新プログラムを確認しています…",
+  "sReadPrograms": "プログラム ファイルとシステム ファイルの中も読み取る"
  }
 }

@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind एक अस्थायी फ़ोल्डर से चल रहा है (शायद किसी zip फ़ाइल के अंदर से), जिसे Windows कभी भी खाली कर सकता है।",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind आपके डाउनलोड फ़ोल्डर से चल रहा है। यदि फ़ाइल हटा दी गई या फ़ोल्डर साफ़ किया गया, तो प्रोग्राम काम करना बंद कर देगा।",
   "\nStarting with Windows will use the new place.": "\nWindows के साथ शुरू होने पर नई जगह का उपयोग होगा।",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nक्या प्रोग्राम को किसी स्थायी जगह पर ले जाएँ? इसे यहाँ कॉपी किया जाएगा:\n{shown_dir}\nप्रारंभ मेनू में जोड़ा जाएगा, और वहीं से पुनः प्रारंभ किया जाएगा। आपकी सेटिंग्स और इंडेक्स जैसे हैं वैसे ही रहेंगे।{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nक्या प्रोग्राम को किसी स्थायी जगह पर ले जाएँ? इसे यहाँ कॉपी किया जाएगा:\n{shown_dir}\nप्रारंभ मेनू और डेस्कटॉप पर जोड़ा जाएगा, और वहीं से पुनः प्रारंभ किया जाएगा। आपकी सेटिंग्स और इंडेक्स जैसे हैं वैसे ही रहेंगे।{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "प्रोग्राम को स्थायी जगह पर कॉपी नहीं किया जा सका:\n{e}\n\nप्रोग्राम अपनी वर्तमान जगह से काम करता रहेगा।",
   "the new copy did not start": "नई प्रति शुरू नहीं हुई",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "प्रोग्राम स्थायी जगह पर कॉपी हो गया, लेकिन वहाँ से पुनः प्रारंभ नहीं हो सका ({e})।\nइसे प्रारंभ मेनू से खोलें।",
@@ -786,7 +786,10 @@
   "toman": "तोमान",
   "{d} {} {y} AH": "{d} {} {y} हिजरी",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total} में से {checked} दस्तावेज़ जाँचे गए…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "प्रोग्राम और सिस्टम फ़ाइलों के अंदर भी पढ़ें",
+  "File names ready · reading inside your folders: {checked} of {mine}": "फ़ाइल नाम तैयार · आपके फ़ोल्डरों के दस्तावेज़ पढ़े जा रहे हैं: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "फ़ाइल नाम और आपके फ़ोल्डर तैयार · अन्य दस्तावेज़ पढ़े जा रहे हैं: {checked} / {total}"
  },
  "js": {
   "ph": "फ़ाइल नाम खोजें…",
@@ -837,7 +840,9 @@
    [
     "\"किराया अनुबंध\"",
     "सटीक वाक्यांश"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "अरबी मूल शब्द: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "हर परिणाम के लिए एक पंक्ति, ताकि ज़्यादा परिणाम दिखें",
   "showPreview": "पूर्वावलोकन दिखाएँ",
   "hidePreview": "पूर्वावलोकन छिपाएँ",
+  "clearQ": "खोज साफ़ करें",
+  "filtersBtn": "फ़िल्टर",
+  "clearFilters": "सभी फ़िल्टर हटाएँ",
+  "ixContents": "दस्तावेज़ों की सामग्री अनुक्रमित हो रही है · ${n}%",
+  "theme": "थीम",
+  "themeSub": "“स्वचालित” Windows के लाइट या डार्क मोड का पालन करता है",
+  "themes": {
+   "auto": "स्वचालित",
+   "light": "लाइट",
+   "dark": "डार्क",
+   "midnight": "मिडनाइट ब्लू",
+   "kiwi": "कीवी"
+  },
   "sMore": "अधिक",
   "sMoreRow": "अधिक विकल्प",
   "sMoreSub": "अपडेट की जाँच, सहायता और फ़ीडबैक, डुप्लिकेट फ़ाइलें और फ़ोल्डर आकार जैसे टूल, और कहीं से भी खोजने की सेटिंग्स",
@@ -1049,12 +1067,14 @@
     "केवल फ़ोल्डर"
    ],
    [
-    "root: كتاب",
-    "वही अरबी मूल शब्द: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: reprot",
     "टाइपिंग की गलती सह लेता है (“report” ढूँढ़ता है)"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "वही अरबी मूल शब्द: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"किसी भी प्रोग्राम से छोटा खोज बॉक्स\"], [\"Ctrl+Alt+G\", \"सहेजें/खोलें डायलॉग में: परिणाम के फ़ोल्डर पर जाएँ\"], [\"Enter\", \"फ़ाइल खोलें\"], [\"Ctrl+Enter\", \"उसका फ़ोल्डर खोलें\"], [\"↓\", \"परिणामों पर (खाली बॉक्स में: इतिहास)\"], [\"Ctrl+C\", \"फ़ाइल कॉपी करें\"], [\"Ctrl+Shift+C\", \"पथ कॉपी करें\"], [\"F2\", \"नाम बदलें\"], [\"Delete\", \"रीसायकल बिन में\"], [\"F4\", \"फ़ाइल में सभी मिलान\"], [\"Ctrl+H\", \"इतिहास\"], [\"Ctrl+T\", \"थंबनेल\"], [\"Ctrl+,\", \"सेटिंग्स\"], [\"F1\", \"यह कार्ड\"]]",
   "helpKeysH": "कीबोर्ड",
   "helpMore": "खोजने के सभी तरीके…",
-  "helpSub": "किसी उदाहरण को खोज बॉक्स में डालने के लिए उस पर क्लिक करें। हर फ़िल्टर की एक अरबी वर्तनी भी है।",
+  "helpSub": "किसी उदाहरण को खोज बॉक्स में डालने के लिए उस पर क्लिक करें।",
+  "helpSubArab": "हर फ़िल्टर की एक अरबी वर्तनी भी है।",
   "kLabel": "कीबोर्ड शॉर्टकट",
   "offline": "ड्राइव कनेक्ट नहीं है",
   "qsNone": "डायलॉग को ले जाने के लिए कोई परिणाम नहीं है। खोज बदलें, या रद्द करने के लिए Esc दबाएँ।",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "फ़ोन से खोजें (होम नेटवर्क)",
   "sPhoneSub": "उसी Wi-Fi पर अपने फ़ोन के ब्राउज़र से इस PC की फ़ाइलें खोजें। केवल पढ़ने के लिए, और केवल आपके होम नेटवर्क पर।",
   "sPhoneWait": "नेटवर्क की जाँच की जा रही है…",
-  "updChecking": "अपडेट की जाँच की जा रही है…"
+  "updChecking": "अपडेट की जाँच की जा रही है…",
+  "sReadPrograms": "प्रोग्राम और सिस्टम फ़ाइलों के अंदर भी पढ़ें"
  }
 }

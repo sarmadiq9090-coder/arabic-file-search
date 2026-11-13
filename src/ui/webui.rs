@@ -463,8 +463,12 @@ mod imp {
             let raw = nwg::bind_raw_event_handler(
                 &handle,
                 0x1_0041,
-                crate::crash_log::guard_raw(move |h: HWND, msg: UINT, w: WPARAM, _l: LPARAM| {
-                    use winapi::um::winuser::{SIZE_MINIMIZED, SIZE_RESTORED, WM_SHOWWINDOW, WM_SIZE};
+                crate::crash_log::guard_raw(move |h: HWND, msg: UINT, w: WPARAM, l: LPARAM| {
+                    use winapi::um::winuser::{SIZE_MINIMIZED, SIZE_RESTORED, WM_SETTINGCHANGE, WM_SHOWWINDOW, WM_SIZE};
+                    // Windows switched light/dark: the title bar of "Automatic" follows (the page by itself).
+                    if msg == WM_SETTINGCHANGE && surface::is_theme_change(l) {
+                        weak.upgrade()?.webui_title_bar();
+                    }
                     if msg == WM_SHOWWINDOW && w != 0 {
                         super::super::placement::keep_on_screen(h);
                         // (Shown by any means: the page is visible and resumed.)
@@ -512,7 +516,7 @@ mod imp {
             self.webui.host.replace(None);
             let token = bridge::new_token();
             self.webui.token.replace(token.clone());
-            let dark = surface::apps_dark();
+            let dark = self.webui_dark();
             // Creating the page runs a message loop: a second launch then
             // must not find the classic window by its title and show it too.
             self.window.set_text(&format!("{} (classic)", title()));
@@ -811,7 +815,7 @@ mod imp {
             }
             let window = &self.webui.parts.window;
             if let Some(h) = window.handle.hwnd() {
-                surface::dwm_style(h, surface::apps_dark(), false, false);
+                surface::dwm_style(h, self.webui_dark(), false, false);
                 // Inside the work area before it shows (see the raw handler).
                 super::super::placement::keep_on_screen(h);
                 window.set_visible(true);
@@ -1114,6 +1118,24 @@ mod imp {
             self.webui_send(&msg);
         }
 
+        /// The theme's colours are dark: Windows' own app mode for
+        /// "Automatic", else the theme chosen in Settings.
+        fn webui_dark(&self) -> bool {
+            self.state.borrow().settings.theme.dark(surface::apps_dark())
+        }
+
+        /// The new window's title bar dark or light, as its theme.
+        fn webui_title_bar(&self) {
+            if let Some(h) = self.webui.parts.window.handle.hwnd() {
+                surface::dwm_style(h, self.webui_dark(), false, false);
+                // (Windows 10 repaints the caption only when its frame changes.)
+                unsafe {
+                    use winapi::um::winuser::{SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos};
+                    SetWindowPos(h, std::ptr::null_mut(), 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                }
+            }
+        }
+
         /// Something the Settings view shows changed outside the page (a
         /// check for updates started or ended, search from phone started or
         /// stopped): sent now when the page is there, else on the first
@@ -1137,6 +1159,7 @@ mod imp {
                     autostart: autostart::is_enabled(),
                     content_index: s.content_index,
                     read_cloud_files: s.read_cloud_files,
+                    read_program_files: s.read_program_files,
                     auto_index: s.auto_index,
                     hide_system: s.hide_system,
                     hotkey_quick: s.hotkey_opens == HotkeyOpens::Quick,
@@ -1148,6 +1171,7 @@ mod imp {
                     hotkey: s.hotkey.code(),
                     hotkey_taken: super::super::keys::hotkey_taken(),
                     hotkeys: bridge::hotkeys(),
+                    theme: s.theme.code(),
                     phone: self.phone_settings(),
                 })
             };
@@ -1489,6 +1513,13 @@ mod imp {
                     if let Some(app) = self.webui.me.borrow().upgrade() {
                         app.open_web_window();
                     }
+                }
+                // The page shows the theme at once; the title bar follows it here.
+                Request::Theme { key } => {
+                    self.state.borrow_mut().settings.theme = key;
+                    self.save_settings();
+                    self.webui_title_bar();
+                    self.webui_send_settings();
                 }
                 Request::Hotkey { key } => {
                     if !self.change_hotkey(key) {
@@ -1870,6 +1901,11 @@ mod imp {
                 Setting::ReadCloudFiles => {
                     if self.menu_read_cloud.checked() != on {
                         self.toggle_read_cloud();
+                    }
+                }
+                Setting::ReadProgramFiles => {
+                    if self.menu_read_programs.checked() != on {
+                        self.toggle_read_programs();
                     }
                 }
                 Setting::AutoIndex => {

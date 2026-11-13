@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind запущен из временной папки (возможно, прямо из zip-архива), которую Windows может очистить в любой момент.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind запущен из папки «Загрузки». Если файл удалят или папку очистят, программа перестанет работать.",
   "\nStarting with Windows will use the new place.": "\nЗапуск вместе с Windows будет выполняться из нового расположения.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nПереместить программу в постоянное место? Она будет скопирована в:\n{shown_dir}\nдобавлена в меню «Пуск» и перезапущена оттуда. Ваши настройки и индекс сохранятся.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nПереместить программу в постоянное место? Она будет скопирована в:\n{shown_dir}\nдобавлена в меню «Пуск» и на рабочий стол, а затем перезапущена оттуда. Ваши настройки и индекс сохранятся.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "Не удалось скопировать программу в постоянное место:\n{e}\n\nПрограмма продолжит работать из текущего расположения.",
   "the new copy did not start": "новая копия не запустилась",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "Программа скопирована в постоянное место, но не смогла перезапуститься оттуда ({e}).\nОткройте её из меню «Пуск».",
@@ -786,7 +786,10 @@
   "toman": "томан",
   "{d} {} {y} AH": "{d} {} {y} г. х.",
   "{lead} Checked {checked} of {total} documents…": "{lead} Проверено документов: {checked} из {total}…",
-  "{}, {d} {} {y}": "{}, {d} {} {y} г."
+  "{}, {d} {} {y}": "{}, {d} {} {y} г.",
+  "Also read inside program and system files": "Читать также содержимое программных и системных файлов",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Имена файлов готовы · чтение документов в ваших папках: {checked} из {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Имена файлов и ваши папки готовы · чтение остальных документов: {checked} из {total}"
  },
  "js": {
   "ph": "Поиск по именам файлов…",
@@ -837,7 +840,9 @@
    [
     "\"договор аренды\"",
     "Точная фраза"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Арабский корень: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "Находит и «أحمد»"
    ]
+  ],
+  "tipFold": [
+   "елка",
+   "Находит и «ёлка»"
   ],
   "kNav": "Перемещение",
   "kOpen": "Открыть",
@@ -969,6 +978,19 @@
   "compactSub": "Одна строка на результат, чтобы помещалось больше",
   "showPreview": "Показать предпросмотр",
   "hidePreview": "Скрыть предпросмотр",
+  "clearQ": "Очистить поиск",
+  "filtersBtn": "Фильтры",
+  "clearFilters": "Сбросить все фильтры",
+  "ixContents": "Индексация содержимого документов · ${n}%",
+  "theme": "Тема",
+  "themeSub": "«Автоматически» — как светлый или тёмный режим Windows",
+  "themes": {
+   "auto": "Автоматически",
+   "light": "Светлая",
+   "dark": "Тёмная",
+   "midnight": "Полночный синий",
+   "kiwi": "Киви"
+  },
   "sMore": "Ещё",
   "sMoreRow": "Другие параметры",
   "sMoreSub": "Проверка обновлений, поддержка и отзывы, инструменты (повторяющиеся файлы, размеры папок) и параметры поиска из любого места",
@@ -1049,12 +1071,14 @@
     "только папки"
    ],
    [
-    "root: كتاب",
-    "тот же арабский корень: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: отчот",
     "допускает опечатку"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "тот же арабский корень: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"маленькое поле поиска из любой программы\"], [\"Ctrl+Alt+G\", \"в окне «Сохранить/Открыть»: перейти в папку результата\"], [\"Enter\", \"открыть файл\"], [\"Ctrl+Enter\", \"открыть его папку\"], [\"↓\", \"к результатам (в пустом поле: журнал)\"],\n        [\"Ctrl+C\", \"копировать файл\"], [\"Ctrl+Shift+C\", \"копировать путь\"], [\"F2\", \"переименовать\"], [\"Delete\", \"в корзину\"], [\"F4\", \"все совпадения в файле\"], [\"Ctrl+H\", \"журнал\"], [\"Ctrl+T\", \"эскизы\"], [\"Ctrl+,\", \"параметры\"], [\"F1\", \"эта карточка\"]]",
   "helpKeysH": "Клавиатура",
   "helpMore": "Все способы поиска…",
-  "helpSub": "Нажмите на пример, чтобы вставить его в поле поиска. У каждого фильтра есть и арабское написание.",
+  "helpSub": "Нажмите на пример, чтобы вставить его в поле поиска.",
+  "helpSubArab": "У каждого фильтра есть и арабское написание.",
   "kLabel": "Сочетания клавиш",
   "offline": "диск не подключён",
   "qsNone": "Нет результата, в папку которого можно перевести окно. Измените запрос или нажмите Esc для отмены.",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "Поиск с телефона (домашняя сеть)",
   "sPhoneSub": "Ищите файлы этого компьютера из браузера телефона в той же сети Wi-Fi. Только чтение и только в вашей домашней сети.",
   "sPhoneWait": "Проверка сети…",
-  "updChecking": "Проверка обновлений…"
+  "updChecking": "Проверка обновлений…",
+  "sReadPrograms": "Читать также содержимое программных и системных файлов"
  }
 }

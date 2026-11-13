@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind запущено з тимчасової папки (можливо, просто з zip-архіву), яку Windows може очистити будь-коли.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind запущено з папки «Завантаження». Якщо файл видалять або папку очистять, програма перестане працювати.",
   "\nStarting with Windows will use the new place.": "\nЗапуск разом із Windows виконуватиметься з нового розташування.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nПеремістити програму в постійне місце? Її буде скопійовано до:\n{shown_dir}\nдодано до меню «Пуск» і перезапущено звідти. Ваші налаштування та індекс збережуться.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nПеремістити програму в постійне місце? Її буде скопійовано до:\n{shown_dir}\nдодано до меню «Пуск» і на робочий стіл, а потім перезапущено звідти. Ваші налаштування та індекс збережуться.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "Не вдалося скопіювати програму в постійне місце:\n{e}\n\nПрограма й далі працюватиме з поточного розташування.",
   "the new copy did not start": "нова копія не запустилася",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "Програму скопійовано в постійне місце, але вона не змогла перезапуститися звідти ({e}).\nВідкрийте її з меню «Пуск».",
@@ -786,7 +786,10 @@
   "toman": "томан",
   "{d} {} {y} AH": "{d} {} {y} р. за гіджрою",
   "{lead} Checked {checked} of {total} documents…": "{lead} Перевірено документів: {checked} з {total}…",
-  "{}, {d} {} {y}": "{}, {d} {} {y} р."
+  "{}, {d} {} {y}": "{}, {d} {} {y} р.",
+  "Also read inside program and system files": "Читати також вміст програмних і системних файлів",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Імена файлів готові · читання документів у ваших папках: {checked} з {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Імена файлів і ваші папки готові · читання інших документів: {checked} з {total}"
  },
  "js": {
   "ph": "Пошук за іменами файлів…",
@@ -837,7 +840,9 @@
    [
     "\"договір оренди\"",
     "Точна фраза"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Арабський корінь: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "Знаходить і «أحمد»"
    ]
+  ],
+  "tipFold": [
+   "ганок",
+   "Знаходить і «ґанок»"
   ],
   "kNav": "Переміщення",
   "kOpen": "Відкрити",
@@ -969,6 +978,19 @@
   "compactSub": "Один рядок на результат, щоб уміщалося більше",
   "showPreview": "Показати попередній перегляд",
   "hidePreview": "Сховати попередній перегляд",
+  "clearQ": "Очистити пошук",
+  "filtersBtn": "Фільтри",
+  "clearFilters": "Скинути всі фільтри",
+  "ixContents": "Індексування вмісту документів · ${n}%",
+  "theme": "Тема",
+  "themeSub": "«Автоматично» — як світлий або темний режим Windows",
+  "themes": {
+   "auto": "Автоматично",
+   "light": "Світла",
+   "dark": "Темна",
+   "midnight": "Опівнічний синій",
+   "kiwi": "Ківі"
+  },
   "sMore": "Більше",
   "sMoreRow": "Інші параметри",
   "sMoreSub": "Перевірка оновлень, підтримка й відгуки, інструменти (однакові файли, розміри папок) і параметри пошуку з будь-якого місця",
@@ -1049,12 +1071,14 @@
     "лише папки"
    ],
    [
-    "root: كتاب",
-    "той самий арабський корінь: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: звті",
     "допускає помилку"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "той самий арабський корінь: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"маленьке поле пошуку з будь-якої програми\"], [\"Ctrl+Alt+G\", \"у вікні «Зберегти/Відкрити»: перейти до папки результату\"], [\"Enter\", \"відкрити файл\"], [\"Ctrl+Enter\", \"відкрити його папку\"], [\"↓\", \"до результатів (у порожньому полі: журнал)\"],\n        [\"Ctrl+C\", \"копіювати файл\"], [\"Ctrl+Shift+C\", \"копіювати шлях\"], [\"F2\", \"перейменувати\"], [\"Delete\", \"до кошика\"], [\"F4\", \"усі збіги у файлі\"], [\"Ctrl+H\", \"журнал\"], [\"Ctrl+T\", \"ескізи\"], [\"Ctrl+,\", \"параметри\"], [\"F1\", \"ця картка\"]]",
   "helpKeysH": "Клавіатура",
   "helpMore": "Усі способи пошуку…",
-  "helpSub": "Клацніть приклад, щоб вставити його в поле пошуку. Кожен фільтр має й арабське написання.",
+  "helpSub": "Клацніть приклад, щоб вставити його в поле пошуку.",
+  "helpSubArab": "Кожен фільтр має й арабське написання.",
   "kLabel": "Сполучення клавіш",
   "offline": "диск не підключено",
   "qsNone": "Немає результату, до папки якого можна перевести вікно. Змініть запит або натисніть Esc, щоб скасувати.",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "Пошук із телефона (домашня мережа)",
   "sPhoneSub": "Шукайте файли цього комп’ютера з браузера телефона в тій самій мережі Wi-Fi. Лише читання і лише у вашій домашній мережі.",
   "sPhoneWait": "Перевірка мережі…",
-  "updChecking": "Перевірка оновлень…"
+  "updChecking": "Перевірка оновлень…",
+  "sReadPrograms": "Читати також вміст програмних і системних файлів"
  }
 }

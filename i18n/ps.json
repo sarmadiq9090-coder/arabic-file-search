@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind له یوې لنډمهاله پوښۍ څخه چلېږي (کېدای شي د zip دوتنې دننه څخه)، چې Windows یې هر وخت خالي کولای شي.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind ستاسو د Downloads له پوښۍ څخه چلېږي. که دوتنه ړنګه شي یا پوښۍ پاکه شي، پروګرام به کار پرېږدي.",
   "\nStarting with Windows will use the new place.": "\nله Windows سره پیل کېدل به نوی ځای کاروي.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nپروګرام یوه دایمي ځای ته ولېږدول شي؟ دې ځای ته کاپي کېږي:\n{shown_dir}\nد Start مینو ته ورزیاتېږي، او له هغه ځایه بیا پیلېږي. ستاسو امستنې او انډکس همغسې پاتې کېږي.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nپروګرام یوه دایمي ځای ته ولېږدول شي؟ دې ځای ته کاپي کېږي:\n{shown_dir}\nد Start مینو او ډیسکټاپ ته ورزیاتېږي، او له هغه ځایه بیا پیلېږي. ستاسو امستنې او انډکس همغسې پاتې کېږي.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "پروګرام دایمي ځای ته کاپي نه شو:\n{e}\n\nپروګرام له خپل اوسني ځای څخه کار ته دوام ورکوي.",
   "the new copy did not start": "نوې کاپي پیل نه شوه",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "پروګرام دایمي ځای ته کاپي شو، خو له هغه ځایه بیا پیل نه شو ({e}).\nله Start مینو څخه یې پرانیزئ.",
@@ -786,7 +786,10 @@
   "toman": "تومان",
   "{d} {} {y} AH": "{d} {} {y} هـ ق",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} له {total} اسنادو څخه وکتل شول…",
-  "{}, {d} {} {y}": "{}، {d} {} {y} ز"
+  "{}, {d} {} {y}": "{}، {d} {} {y} ز",
+  "Also read inside program and system files": "د پروګرامونو او سیسټم دوتنو دننه هم ولوله",
+  "File names ready · reading inside your folders: {checked} of {mine}": "د دوتنو نومونه چمتو دي · ستاسو د پوښیو اسناد لوستل کېږي: {checked} له {mine} څخه",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "د دوتنو نومونه او ستاسو پوښۍ چمتو دي · نور اسناد لوستل کېږي: {checked} له {total} څخه"
  },
  "js": {
   "ph": "د دوتنو نومونه ولټوئ…",
@@ -837,7 +840,9 @@
    [
     "\"د کرایې تړون\"",
     "دقیقه جمله"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "عربي ریښه: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "د هرې پایلې لپاره یوه کرښه، څو ډېرې پایلې ځای شي",
   "showPreview": "مخکتنه ښودل",
   "hidePreview": "مخکتنه پټول",
+  "clearQ": "لټون پاک کړئ",
+  "filtersBtn": "چاڼونه",
+  "clearFilters": "ټول چاڼونه لرې کړئ",
+  "ixContents": "د اسنادو منځپانګه فهرست کېږي · ${n}٪",
+  "theme": "بڼه",
+  "themeSub": "«خپلکاره» د وینډوز روښانه یا تیاره حالت تعقیبوي",
+  "themes": {
+   "auto": "خپلکاره",
+   "light": "روښانه",
+   "dark": "تیاره",
+   "midnight": "د نیمې شپې شین",
+   "kiwi": "کیوي"
+  },
   "sMore": "نور",
   "sMoreRow": "نور اختیارونه",
   "sMoreSub": "د اوسمهالونو کتل، ملاتړ او نظر، د تکراري دوتنو او د پوښیو د اندازو په څېر وسایل، او له هر ځایه د لټون امستنې",
@@ -1049,12 +1067,14 @@
     "یوازې پوښۍ"
    ],
    [
-    "root: كتاب",
-    "همغه عربي ریښه: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: راپرو",
     "یوه لیکنیزه تېروتنه زغمي"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "همغه عربي ریښه: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"له هر پروګرام څخه د لټون کوچنی بکس\"], [\"Ctrl+Alt+G\", \"د خوندي کولو/پرانیستلو په کړکۍ کې: د یوې پایلې پوښۍ ته تلل\"], [\"Enter\", \"دوتنه پرانیستل\"], [\"Ctrl+Enter\", \"د هغې پوښۍ پرانیستل\"], [\"↓\", \"پایلو ته (په تش بکس کې: مخینه)\"],\n        [\"Ctrl+C\", \"دوتنه کاپي کول\"], [\"Ctrl+Shift+C\", \"مسیر کاپي کول\"], [\"F2\", \"نوم بدلول\"], [\"Delete\", \"د بیا کارونې ټوکرۍ ته\"], [\"F4\", \"په دوتنه کې ټول سمونونه\"], [\"Ctrl+H\", \"مخینه\"], [\"Ctrl+T\", \"کوچني انځورونه\"], [\"Ctrl+,\", \"امستنې\"], [\"F1\", \"دا کارت\"]]",
   "helpKeysH": "کیبورډ",
   "helpMore": "د لټون ټولې لارې…",
-  "helpSub": "په یوې بېلګې کلیک وکړئ چې د لټون بکس کې ولیکل شي. هر فلټر عربي لیکدود هم لري.",
+  "helpSub": "په یوې بېلګې کلیک وکړئ چې د لټون بکس کې ولیکل شي.",
+  "helpSubArab": "هر فلټر عربي لیکدود هم لري.",
   "kLabel": "د کیبورډ لنډلارې",
   "offline": "ډرایو نه دی نښلول شوی",
   "qsNone": "داسې پایله نشته چې کړکۍ یې پوښۍ ته ولېږدول شي. لټون بدل کړئ، یا د لغوه کولو لپاره Esc کېکاږئ.",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "له تلیفون څخه لټون (د کور شبکه)",
   "sPhoneSub": "په همغه Wi-Fi کې د خپل تلیفون له براوزر څخه د دې کمپیوټر دوتنې ولټوئ. یوازې د لوستلو لپاره، او یوازې ستاسو د کور په شبکه کې.",
   "sPhoneWait": "شبکه کتل کېږي…",
-  "updChecking": "اوسمهالونه کتل کېږي…"
+  "updChecking": "اوسمهالونه کتل کېږي…",
+  "sReadPrograms": "د پروګرامونو او سیسټم دوتنو دننه هم ولوله"
  }
 }

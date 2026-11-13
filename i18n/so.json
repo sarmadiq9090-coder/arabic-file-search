@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind wuxuu ka shaqeynayaa gal ku meel gaar ah (malaha gudaha fayl zip ah), kaas oo Windows uu madhin karo waqti kasta.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind wuxuu ka shaqeynayaa galkaaga Soo-dejinta. Haddii faylka la tirtiro ama galka la nadiifiyo, barnaamijku wuu joogsanayaa.",
   "\nStarting with Windows will use the new place.": "\nKu bilaabashada Windows waxay isticmaali doontaa meesha cusub.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nMa loo wareejiyaa barnaamijka meel joogto ah? Waxaa lagu koobiyeyn doonaa:\n{shown_dir}\nwaxaa lagu dari doonaa liiska Start, waxaana halkaas dib looga bilaabi doonaa. Dejintaada iyo tusmadaadu sidooda ayay ahaanayaan.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nMa loo wareejiyaa barnaamijka meel joogto ah? Waxaa lagu koobiyeyn doonaa:\n{shown_dir}\nwaxaa lagu dari doonaa liiska Start iyo desktop-ka, waxaana halkaas dib looga bilaabi doonaa. Dejintaada iyo tusmadaadu sidooda ayay ahaanayaan.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "Barnaamijka lama koobiyeyn karin meesha joogtada ah:\n{e}\n\nBarnaamijku wuxuu sii shaqeynayaa meesha uu joogo.",
   "the new copy did not start": "nuqulka cusub ma bilaabin",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "Barnaamijka waxaa lagu koobiyeeyay meesha joogtada ah, laakiin halkaas dib ugama bilaabmi karin ({e}).\nKa fur liiska Start.",
@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} {y} Hijriyada",
   "{lead} Checked {checked} of {total} documents…": "{lead} La baaray {checked} ka mid ah {total} dukumenti…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Sidoo kale akhri gudaha faylasha barnaamijyada iyo nidaamka",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Magacyada faylasha waa diyaar · dukumentiyada galalkaaga ayaa la akhrinayaa: {checked} ka mid ah {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Magacyada faylasha iyo galalkaagu waa diyaar · dukumentiyada kale ayaa la akhrinayaa: {checked} ka mid ah {total}"
  },
  "js": {
   "ph": "Ka raadi magacyada faylasha…",
@@ -837,7 +840,9 @@
    [
     "\"heshiis kiro\"",
     "Weedh sax ah"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Xididka Carabiga: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "Sidoo kale wuxuu helaa «أحمد»"
    ]
+  ],
+  "tipFold": [
+   "cafe",
+   "Sidoo kale wuxuu helaa “café”"
   ],
   "kNav": "U dhaqaaq",
   "kOpen": "Fur",
@@ -969,6 +978,19 @@
   "compactSub": "Hal sadar natiijo kasta, si kuwo badan ay ugu filnaadaan",
   "showPreview": "Muuji horudhaca",
   "hidePreview": "Qari horudhaca",
+  "clearQ": "Tirtir raadinta",
+  "filtersBtn": "Shaandheeyayaal",
+  "clearFilters": "Ka saar dhammaan shaandheeyayaasha",
+  "ixContents": "Waxaa la tusmaynayaa waxa ku jira dukumentiyada · ${n}%",
+  "theme": "Muuqaal",
+  "themeSub": "“Toos” wuxuu raacaa habka iftiinka ama mugdiga ee Windows",
+  "themes": {
+   "auto": "Toos",
+   "light": "Iftiin",
+   "dark": "Mugdi",
+   "midnight": "Buluug saqda dhexe",
+   "kiwi": "Kiwi"
+  },
   "sMore": "Wax kale",
   "sMoreRow": "Xulashooyin kale",
   "sMoreSub": "Hubinta cusboonaysiinta, taageero iyo fikrado, qalab sida faylal isku mid ah iyo cabbirka galalka, iyo dejinta raadinta meel kasta",
@@ -1049,12 +1071,14 @@
     "galalka oo keliya"
    ],
    [
-    "root: كتاب",
-    "isla xididka Carabiga: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: warbxiin",
     "wuu u dulqaataa khalad qoraal"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "isla xididka Carabiga: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"sanduuqa raadinta yar ee barnaamij kasta\"], [\"Ctrl+Alt+G\", \"daaqadda Save/Open: u gudub galka natiijada\"], [\"Enter\", \"fur faylka\"], [\"Ctrl+Enter\", \"fur galkiisa\"], [\"↓\", \"natiijooyinka (sanduuq madhan: taariikhda)\"], [\"Ctrl+C\", \"koobiyee faylka\"], [\"Ctrl+Shift+C\", \"koobiyee dariiqa\"], [\"F2\", \"magac u beddel\"], [\"Delete\", \"u dir Qashin-qubka\"], [\"F4\", \"dhammaan isku-ekaanshaha faylka\"], [\"Ctrl+H\", \"taariikhda\"], [\"Ctrl+T\", \"sawirrada yaryar\"], [\"Ctrl+,\", \"dejinta\"], [\"F1\", \"kaarkan\"]]",
   "helpKeysH": "Kiiboodhka",
   "helpMore": "Dhammaan siyaabaha raadinta…",
-  "helpSub": "Guji tusaale si loogu qoro sanduuqa raadinta. Shaandhayn kasta waxay sidoo kale leedahay higaad Carabi ah.",
+  "helpSub": "Guji tusaale si loogu qoro sanduuqa raadinta.",
+  "helpSubArab": "Shaandhayn kasta waxay sidoo kale leedahay higaad Carabi ah.",
   "kLabel": "Furayaasha gaagaaban ee kiiboodhka",
   "offline": "darawalka lama xiriirin",
   "qsNone": "Ma jirto natiijo loo raro daaqadda. Beddel raadinta, ama riix Esc si aad u joojiso.",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "Ka raadi taleefanka (shabakadda guriga)",
   "sPhoneSub": "Ka raadi faylasha kombiyuutarkan biraawsarka taleefankaaga oo ku jira isla Wi-Fi-ga. Akhris keliya, oo shabakadda gurigaaga oo keliya.",
   "sPhoneWait": "Shabakadda ayaa la hubinayaa…",
-  "updChecking": "Cusboonaysiinta ayaa la hubinayaa…"
+  "updChecking": "Cusboonaysiinta ayaa la hubinayaa…",
+  "sReadPrograms": "Sidoo kale akhri gudaha faylasha barnaamijyada iyo nidaamka"
  }
 }

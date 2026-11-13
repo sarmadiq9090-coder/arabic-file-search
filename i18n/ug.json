@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind ۋاقىتلىق قىسقۇچتىن ئىشلەۋاتىدۇ (بەلكىم zip ھۆججىتىنىڭ ئىچىدىن)، Windows ئۇنى خالىغان ۋاقىتتا بوشىتىۋېتىشى مۇمكىن.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind چۈشۈرۈلمىلەر قىسقۇچىڭىزدىن ئىشلەۋاتىدۇ. ھۆججەت ئۆچۈرۈلسە ياكى قىسقۇچ تازىلانسا، پروگرامما ئىشلىمەي قالىدۇ.",
   "\nStarting with Windows will use the new place.": "\nWindows بىلەن قوزغىلىش يېڭى ئورۇننى ئىشلىتىدۇ.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nپروگراممىنى مەڭگۈلۈك ئورۇنغا يۆتكەمسىز؟ ئۇ بۇ يەرگە كۆچۈرۈلىدۇ:\n{shown_dir}\nباشلاش تىزىملىكىگە قوشۇلىدۇ ۋە ئۇ يەردىن قايتا قوزغىتىلىدۇ. تەڭشەكلىرىڭىز ۋە ئىندېكسىڭىز شۇ پېتى قالىدۇ.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nپروگراممىنى مەڭگۈلۈك ئورۇنغا يۆتكەمسىز؟ ئۇ بۇ يەرگە كۆچۈرۈلىدۇ:\n{shown_dir}\nباشلاش تىزىملىكى ۋە ئۈستەل يۈزىگە قوشۇلىدۇ ۋە ئۇ يەردىن قايتا قوزغىتىلىدۇ. تەڭشەكلىرىڭىز ۋە ئىندېكسىڭىز شۇ پېتى قالىدۇ.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "پروگراممىنى مەڭگۈلۈك ئورۇنغا كۆچۈرگىلى بولمىدى:\n{e}\n\nپروگرامما ھازىرقى ئورنىدا ئىشلەۋېرىدۇ.",
   "the new copy did not start": "يېڭى نۇسخا قوزغالمىدى",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "پروگرامما مەڭگۈلۈك ئورۇنغا كۆچۈرۈلدى، لېكىن ئۇ يەردىن قايتا قوزغالمىدى ({e}).\nئۇنى باشلاش تىزىملىكىدىن ئېچىڭ.",
@@ -786,7 +786,10 @@
   "toman": "تومان",
   "{d} {} {y} AH": "ھىجرىيە {y}-يىلى {d}-{}",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total} پۈتۈكتىن {checked} تەكشۈرۈلدى…",
-  "{}, {d} {} {y}": "{}، مىلادىيە {y}-يىلى {d}-{}"
+  "{}, {d} {} {y}": "{}، مىلادىيە {y}-يىلى {d}-{}",
+  "Also read inside program and system files": "پروگرامما ۋە سىستېما ھۆججەتلىرىنىڭ ئىچىنىمۇ ئوقۇ",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ھۆججەت ناملىرى تەييار · قىسقۇچلىرىڭىزدىكى پۈتۈكلەر ئوقۇلۇۋاتىدۇ: {mine} دىن {checked}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ھۆججەت ناملىرى ۋە قىسقۇچلىرىڭىز تەييار · باشقا پۈتۈكلەر ئوقۇلۇۋاتىدۇ: {total} دىن {checked}"
  },
  "js": {
   "ph": "ھۆججەت نامى بويىچە ئىزدەش…",
@@ -837,7 +840,9 @@
    [
     "\"ئىجارە توختامى\"",
     "ئېنىق ئىبارە"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "ئەرەبچە يىلتىز: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "ھەر بىر نەتىجىگە بىر قۇر، شۇڭا تېخىمۇ كۆپ نەتىجە سىغىدۇ",
   "showPreview": "ئالدىن كۆرۈشنى كۆرسىتىش",
   "hidePreview": "ئالدىن كۆرۈشنى يوشۇرۇش",
+  "clearQ": "ئىزدەشنى تازىلاش",
+  "filtersBtn": "سۈزگۈچلەر",
+  "clearFilters": "بارلىق سۈزگۈچلەرنى ئۆچۈرۈش",
+  "ixContents": "ھۆججەت مەزمۇنى ئىندېكسلىنىۋاتىدۇ · ${n}%",
+  "theme": "ئۇسلۇب",
+  "themeSub": "«ئاپتوماتىك» Windows نىڭ يورۇق ياكى قاراڭغۇ ھالىتىگە ئەگىشىدۇ",
+  "themes": {
+   "auto": "ئاپتوماتىك",
+   "light": "يورۇق",
+   "dark": "قاراڭغۇ",
+   "midnight": "يېرىم كېچە كۆكى",
+   "kiwi": "كىۋى"
+  },
   "sMore": "تېخىمۇ كۆپ",
   "sMoreRow": "باشقا تاللانمىلار",
   "sMoreSub": "يېڭىلانمىلارنى تەكشۈرۈش، ياردەم ۋە پىكىر، تەكرار ھۆججەتلەر ۋە قىسقۇچ چوڭلۇقلىرىغا ئوخشاش قوراللار، ھەمدە خالىغان يەردىن ئىزدەش تەڭشەكلىرى",
@@ -1049,12 +1067,14 @@
     "پەقەت قىسقۇچلار"
    ],
    [
-    "root: كتاب",
-    "ئوخشاش ئەرەبچە يىلتىز: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: دوكالت",
     "بىر ئىملا خاتالىقىغا يول قويىدۇ"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "ئوخشاش ئەرەبچە يىلتىز: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"خالىغان پروگراممىدىن كىچىك ئىزدەش رامكىسى\"], [\"Ctrl+Alt+G\", \"ساقلاش/ئېچىش كۆزنىكىدە: نەتىجىنىڭ قىسقۇچىغا بېرىش\"], [\"Enter\", \"ھۆججەتنى ئېچىش\"], [\"Ctrl+Enter\", \"ئۇنىڭ قىسقۇچىنى ئېچىش\"], [\"↓\", \"نەتىجىلەرگە (بوش رامكىدا: تارىخ)\"],\n        [\"Ctrl+C\", \"ھۆججەتنى كۆچۈرۈش\"], [\"Ctrl+Shift+C\", \"يولنى كۆچۈرۈش\"], [\"F2\", \"نامىنى ئۆزگەرتىش\"], [\"Delete\", \"ئەخلەت ساندۇقىغا\"], [\"F4\", \"ھۆججەتتىكى بارلىق ماسلىقلار\"], [\"Ctrl+H\", \"تارىخ\"], [\"Ctrl+T\", \"كىچىك سۈرەتلەر\"], [\"Ctrl+,\", \"تەڭشەكلەر\"], [\"F1\", \"بۇ كارتا\"]]",
   "helpKeysH": "كۇنۇپكا تاختىسى",
   "helpMore": "ئىزدەشنىڭ بارلىق ئۇسۇللىرى…",
-  "helpSub": "ئىزدەش رامكىسىغا قويۇش ئۈچۈن بىر مىسالنى چېكىڭ. ھەر بىر سۈزگۈچنىڭ ئەرەبچە يېزىلىشىمۇ بار.",
+  "helpSub": "ئىزدەش رامكىسىغا قويۇش ئۈچۈن بىر مىسالنى چېكىڭ.",
+  "helpSubArab": "ھەر بىر سۈزگۈچنىڭ ئەرەبچە يېزىلىشىمۇ بار.",
   "kLabel": "كۇنۇپكا تاختىسى تېزلەتمىلىرى",
   "offline": "دىسكا ئۇلانمىغان",
   "qsNone": "كۆزنەكنى قىسقۇچىغا يۆتكەيدىغان نەتىجە يوق. ئىزدەشنى ئۆزگەرتىڭ، ياكى بىكار قىلىش ئۈچۈن Esc نى بېسىڭ.",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "تېلېفوندىن ئىزدەش (ئۆي تورى)",
   "sPhoneSub": "ئوخشاش Wi-Fi دىكى تېلېفونىڭىزنىڭ توركۆرگۈسىدىن بۇ كومپيۇتېرنىڭ ھۆججەتلىرىنى ئىزدەڭ. پەقەت ئوقۇشقىلا بولىدۇ، پەقەت ئۆي تورىڭىزدىلا.",
   "sPhoneWait": "تور تەكشۈرۈلۈۋاتىدۇ…",
-  "updChecking": "يېڭىلانمىلار تەكشۈرۈلۈۋاتىدۇ…"
+  "updChecking": "يېڭىلانمىلار تەكشۈرۈلۈۋاتىدۇ…",
+  "sReadPrograms": "پروگرامما ۋە سىستېما ھۆججەتلىرىنىڭ ئىچىنىمۇ ئوقۇ"
  }
 }

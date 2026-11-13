@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind از یک پوشه موقت اجرا می‌شود (شاید از داخل یک فایل zip)، که Windows ممکن است هر زمان آن را خالی کند.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind از پوشه Downloads شما اجرا می‌شود. اگر فایل حذف یا پوشه پاک‌سازی شود، برنامه دیگر کار نمی‌کند.",
   "\nStarting with Windows will use the new place.": "\nشروع همراه با Windows از محل جدید استفاده خواهد کرد.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nبرنامه به یک محل دائمی منتقل شود؟ در این مسیر کپی می‌شود:\n{shown_dir}\nبه منوی Start افزوده می‌شود و از آنجا دوباره راه‌اندازی می‌شود. تنظیمات و نمایه شما همان‌طور می‌مانند.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nبرنامه به یک محل دائمی منتقل شود؟ در این مسیر کپی می‌شود:\n{shown_dir}\nبه منوی Start و دسکتاپ افزوده می‌شود و از آنجا دوباره راه‌اندازی می‌شود. تنظیمات و نمایه شما همان‌طور می‌مانند.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "کپی برنامه به محل دائمی ممکن نشد:\n{e}\n\nبرنامه از همان محل فعلی به کار ادامه می‌دهد.",
   "the new copy did not start": "نسخه جدید اجرا نشد",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "برنامه به محل دائمی کپی شد، اما از آنجا دوباره راه‌اندازی نشد ({e}).\nآن را از منوی Start باز کنید.",
@@ -786,7 +786,10 @@
   "toman": "تومان",
   "{d} {} {y} AH": "{d} {} {y} ق",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} از {total} سند بررسی شد…",
-  "{}, {d} {} {y}": "{}، {d} {} {y} م"
+  "{}, {d} {} {y}": "{}، {d} {} {y} م",
+  "Also read inside program and system files": "محتوای فایل‌های برنامه و سیستم را هم بخوان",
+  "File names ready · reading inside your folders: {checked} of {mine}": "نام فایل‌ها آماده است · در حال خواندن اسناد پوشه‌های شما: {checked} از {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "نام فایل‌ها و پوشه‌های شما آماده است · در حال خواندن سایر اسناد: {checked} از {total}"
  },
  "js": {
   "ph": "جستجوی نام فایل‌ها…",
@@ -837,7 +840,9 @@
    [
     "\"قرارداد اجاره\"",
     "عبارت دقیق"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "ریشه عربی: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "هر نتیجه در یک خط، تا موارد بیشتری جا شوند",
   "showPreview": "نمایش پیش‌نمایش",
   "hidePreview": "پنهان کردن پیش‌نمایش",
+  "clearQ": "پاک کردن جستجو",
+  "filtersBtn": "فیلترها",
+  "clearFilters": "حذف همه فیلترها",
+  "ixContents": "در حال نمایه‌سازی محتوای اسناد · ${n}٪",
+  "theme": "پوسته",
+  "themeSub": "«خودکار» از حالت روشن یا تیره ویندوز پیروی می‌کند",
+  "themes": {
+   "auto": "خودکار",
+   "light": "روشن",
+   "dark": "تیره",
+   "midnight": "آبی نیمه‌شب",
+   "kiwi": "کیوی"
+  },
   "sMore": "بیشتر",
   "sMoreRow": "گزینه‌های بیشتر",
   "sMoreSub": "بررسی به‌روزرسانی، پشتیبانی و بازخورد، ابزارهایی مثل فایل‌های تکراری و اندازه پوشه‌ها، و تنظیمات جستجو از هر جا",
@@ -1049,12 +1067,14 @@
     "فقط پوشه‌ها"
    ],
    [
-    "root: كتاب",
-    "همان ریشه عربی: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: گذارش",
     "یک غلط تایپی را می‌پذیرد"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "همان ریشه عربی: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"کادر جستجوی کوچک از هر برنامه‌ای\"], [\"Ctrl+Alt+G\", \"در پنجره ذخیره/باز کردن: رفتن به پوشه یک نتیجه\"], [\"Enter\", \"باز کردن فایل\"], [\"Ctrl+Enter\", \"باز کردن پوشه آن\"], [\"↓\", \"به نتایج (در کادر خالی: سابقه)\"],\n        [\"Ctrl+C\", \"کپی فایل\"], [\"Ctrl+Shift+C\", \"کپی مسیر\"], [\"F2\", \"تغییر نام\"], [\"Delete\", \"به سطل بازیافت\"], [\"F4\", \"همه موارد منطبق در فایل\"], [\"Ctrl+H\", \"سابقه\"], [\"Ctrl+T\", \"تصاویر کوچک\"], [\"Ctrl+,\", \"تنظیمات\"], [\"F1\", \"همین کارت\"]]",
   "helpKeysH": "صفحه‌کلید",
   "helpMore": "همه روش‌های جستجو…",
-  "helpSub": "روی یک مثال کلیک کنید تا در کادر جستجو نوشته شود. هر فیلتر نگارش عربی هم دارد.",
+  "helpSub": "روی یک مثال کلیک کنید تا در کادر جستجو نوشته شود.",
+  "helpSubArab": "هر فیلتر نگارش عربی هم دارد.",
   "kLabel": "میان‌برهای صفحه‌کلید",
   "offline": "درایو متصل نیست",
   "qsNone": "نتیجه‌ای نیست که پنجره به پوشه‌اش منتقل شود. جستجو را تغییر دهید یا برای لغو Esc را فشار دهید.",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "جستجو از تلفن (شبکه خانگی)",
   "sPhoneSub": "فایل‌های این رایانه را از مرورگر تلفن خود در همان Wi-Fi جستجو کنید. فقط‌خواندنی است و فقط در شبکه خانگی شما.",
   "sPhoneWait": "در حال بررسی شبکه…",
-  "updChecking": "در حال بررسی به‌روزرسانی…"
+  "updChecking": "در حال بررسی به‌روزرسانی…",
+  "sReadPrograms": "محتوای فایل‌های برنامه و سیستم را هم بخوان"
  }
 }

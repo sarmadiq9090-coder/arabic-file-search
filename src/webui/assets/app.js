@@ -179,7 +179,9 @@
       recent: "ملفات فتحتها مؤخراً", recentNone: "الملفات التي تفتحها تظهر هنا.", tryThese: "جرّب هذه",
       trust: "ملفاتك وفهرسها يبقيان على جهازك ولا نجمع بيانات استخدام. يتصل البرنامج بالإنترنت فقط ليتحقق من التحديثات (GitHub) ولأسعار العملات؛ والبحث من الهاتف يعمل داخل شبكة بيتك فقط.",
       trustStore: "ملفاتك وفهرسها يبقيان على جهازك ولا نجمع بيانات استخدام. يتصل البرنامج بالإنترنت فقط لأسعار العملات، وتصله التحديثات من Microsoft Store.",
-      tips: [["تقرير .pdf", "ملفات PDF فقط"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"], ['"عقد إيجار"', "العبارة كما هي"], ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["hgjrvdv", "لوحة المفاتيح الخطأ ← «التقرير»"]],
+      tips: [["تقرير .pdf", "ملفات PDF فقط"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"], ['"عقد إيجار"', "العبارة كما هي"]],
+      tipsArab: [["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["hgjrvdv", "لوحة المفاتيح الخطأ ← «التقرير»"]],
+      tipFold: ["cafe", "يجد «café» أيضاً"],
       kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد", kMenu: "المزيد",
       open: "فتح", openFolder: "فتح المجلد", copyPath: "نسخ المسار", more: "إجراءات أخرى",
       fDetails: "تفاصيل الملف", kLabel: "اختصارات لوحة المفاتيح", fType: "النوع", fSize: "الحجم", fMod: "تاريخ التعديل", fMatches: "التطابقات", folder: "مجلد", file: "ملف", fileOf: (x) => `ملف ${x}`,
@@ -226,6 +228,8 @@
       sDisplay: "العرض", sDigits: "عرض الأرقام بالعربية (٠١٢٣)",
       app: "تطبيق", appsLabel: "برامج بهذا الاسم",
       grid: "عرض المصغرات (Ctrl+T)",
+      clearQ: "مسح البحث", filtersBtn: "التصفية", clearFilters: "إزالة كل عوامل التصفية", ixContents: (n) => `فهرسة محتوى المستندات · ${n}٪`,
+      theme: "السمة", themeSub: "«تلقائي» يتبع الوضع الفاتح أو الداكن في ويندوز", themes: { auto: "تلقائي", light: "فاتح", dark: "داكن", midnight: "ليلي أزرق", kiwi: "كيوي" },
       compact: "عرض مضغوط", compactSub: "سطر واحد لكل نتيجة، فتظهر نتائج أكثر", showPreview: "إظهار المعاينة", hidePreview: "إخفاء المعاينة",
       sMore: "المزيد", sMoreRow: "خيارات أخرى", sMoreSub: "التحقق من التحديثات، الدعم والملاحظات، أدوات مثل الملفات المكررة وأحجام المجلدات، وإعدادات البحث من أي مكان", moreBtn: "فتح قائمة الخيارات…",
       sHelp: "التحديثات والمساعدة", sUpdRow: "التحديثات", sUpdSub: (v) => `الإصدار المثبّت ${v}. يتحقق البرنامج من وجود إصدار أحدث ويعرض عليك تثبيته.`, updBtn: "التحقق من التحديثات…", updChecking: "جارٍ التحقق من التحديثات…",
@@ -234,6 +238,7 @@
       sSearch: "البحث والفهرسة", sHideSystem: "إخفاء ملفات النظام", sHideSystemSub: "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
       sContentIndex: "فهرسة محتوى المستندات في الخلفية", sContentIndexSub: "بحث أسرع داخل الملفات، ويشمل النص في الصور والملفات الممسوحة",
       sReadCloud: "قراءة محتوى الملفات الموجودة على السحابة فقط (يُنزّلها من الإنترنت)",
+      sReadPrograms: "اقرأ داخل ملفات البرامج والنظام أيضاً",
       sAutoIndex: "تحديث الفهرس تلقائياً عند تغيّر الملفات", reindex: "تحديث الفهرس الآن",
       sAnywhere: "البحث من أي مكان", sHotkey: (k) => `${k} يفتح خانة البحث الصغيرة؛ عند إيقافه يفتح هذه النافذة`,
       sHotkeyKeys: "اختصار فتح البحث", sHotkeyKeysSub: "يعمل من أي برنامج. اختر غيره إن كان برنامج آخر يستعمله.",
@@ -246,11 +251,12 @@
       sPhoneIdle: "توقّف وحده بعد ساعتين دون أي طلب من الهاتف، للأمان. شغّله من جديد حين تحتاجه.", sPhoneAllow: "السماح بهذه الشبكة", sPhoneMore: "إعدادات أخرى…", sPhoneMoreSub: "المنفذ، والسماح بتنزيل الملفات، ورمز ورابط جديدان",
       sAbout: "حول البرنامج", version: (v) => `بحث سريع (InstaFind) — الإصدار ${v}`,
       // «كيف أبحث؟» (the ? button and F1): examples to click, and the keys.
-      helpH: "كيف أبحث؟", helpKey: "كيف أبحث؟ (F1)", helpMore: "كل طرق البحث…", helpSub: "انقر مثالاً ليُكتب في خانة البحث. تعمل الأمثلة بالعربية والإنجليزية، والأرقام العربية مقبولة.",
+      helpH: "كيف أبحث؟", helpKey: "كيف أبحث؟ (F1)", helpMore: "كل طرق البحث…", helpSub: "انقر مثالاً ليُكتب في خانة البحث. تعمل الأمثلة بالعربية والإنجليزية، والأرقام العربية مقبولة.", helpSubArab: "",
       helpEx: [["تقرير المبيعات", "الاسم فيه الكلمتان معاً"], ['"عقد إيجار"', "العبارة كما هي"], ["تقرير .pdf", "ملفات PDF فقط (أو ext:pdf)"], ["ext:docx,xlsx", "أكثر من نوع"],
         ["صورة|فيديو", "إحدى الكلمتين"], ["عقد -قديم", "دون ما فيه «قديم» (أو !قديم)"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"],
         ["dm:2026-05", "عُدّلت في أيار 2026"], ["كلمة:عقد", "الكلمة كاملة: «عقد» لا «العقود»"], ['"عقد إيجار"~5', "الكلمتان وبينهما 5 كلمات على الأكثر"], ["مجلد: صور", "المجلدات فقط"],
-        ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["تقريب: تقريز", "يتحمّل خطأً إملائياً"], ["size:>1gb", "بالإنجليزية أيضاً: أكبر من 1 غيغابايت"], ["dm:thisweek", "بالإنجليزية أيضاً: هذا الأسبوع"]],
+        ["تقريب: تقريز", "يتحمّل خطأً إملائياً"]],
+      helpExArab: [["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["size:>1gb", "بالإنجليزية أيضاً: أكبر من 1 غيغابايت"], ["dm:thisweek", "بالإنجليزية أيضاً: هذا الأسبوع"]],
       helpInside: "للبحث داخل المستندات (PDF وWord وExcel والصور): اضغط «داخل المستندات» ثم Enter.",
       helpKeysH: "لوحة المفاتيح",
       helpKeys: (hk) => [[hk, "خانة البحث الصغيرة من أي برنامج"], ["Ctrl+Alt+G", "في نافذة حفظ أو فتح: الانتقال إلى مجلد نتيجة"], ["Enter", "فتح الملف"], ["Ctrl+Enter", "فتح مجلده"], ["↓", "إلى النتائج (وفي خانة فارغة: السجل)"],
@@ -267,7 +273,12 @@
       recent: "Recently opened files", recentNone: "Files you open show up here.", tryThese: "Try these",
       trust: "Your files and their index stay on your PC; no usage data is collected. InstaFind goes online only to check for updates (GitHub) and fetch exchange rates; phone search works only on your home network.",
       trustStore: "Your files and their index stay on your PC; no usage data is collected. InstaFind goes online only to fetch exchange rates, and its updates come from the Microsoft Store.",
-      tips: [["report .pdf", "PDF files only"], ["size:>10mb", "Bigger than 10 MB"], ["dm:thisweek", "Changed this week"], ['"lease agreement"', "Exact phrase"], ["root: كتاب", "Arabic root: مكتبة، الكاتب"], ["احمد", "Also finds «أحمد»"]],
+      tips: [["report .pdf", "PDF files only"], ["size:>10mb", "Bigger than 10 MB"], ["dm:thisweek", "Changed this week"], ['"lease agreement"', "Exact phrase"]],
+      // (Shown only in a language written in Arabic script: see ARAB_SCRIPT.)
+      tipsArab: [["root: كتاب", "Arabic root: مكتبة، الكاتب"], ["احمد", "Also finds «أحمد»"]],
+      // (Latin, Cyrillic and Japanese only, FOLD_SCRIPT: a word of the language
+      // typed without its accents, ё or katakana, that finds it written with them.)
+      tipFold: ["cafe", "Also finds “café”"],
       kNav: "Move", kOpen: "Open", kFolder: "Folder", kMenu: "More",
       open: "Open", openFolder: "Open folder", copyPath: "Copy path", more: "More actions",
       fDetails: "File details", kLabel: "Keyboard shortcuts", fType: "Type", fSize: "Size", fMod: "Modified", fMatches: "Matches", folder: "Folder", file: "File", fileOf: (x) => `${x} file`,
@@ -309,6 +320,8 @@
       sDisplay: "Display", sDigits: "Show Arabic-Indic digits (٠١٢٣)",
       app: "App", appsLabel: "Programs by this name",
       grid: "Thumbnail view (Ctrl+T)",
+      clearQ: "Clear search", filtersBtn: "Filters", clearFilters: "Clear all filters", ixContents: (n) => `Indexing document contents · ${n}%`,
+      theme: "Theme", themeSub: "“Automatic” follows Windows' light or dark mode", themes: { auto: "Automatic", light: "Light", dark: "Dark", midnight: "Midnight blue", kiwi: "Kiwi" },
       compact: "Compact rows", compactSub: "One line per result, so more of them fit", showPreview: "Show the preview", hidePreview: "Hide the preview",
       sMore: "More", sMoreRow: "More options", sMoreSub: "Check for updates, support and feedback, tools such as duplicate files and folder sizes, and search-from-anywhere settings", moreBtn: "Open the Options menu…",
       sHelp: "Updates and help", sUpdRow: "Updates", sUpdSub: (v) => `Installed version ${v}. Looks for a newer version and offers to install it.`, updBtn: "Check for updates…", updChecking: "Checking for updates…",
@@ -317,6 +330,7 @@
       sSearch: "Search and indexing", sHideSystem: "Hide system files", sHideSystemSub: "The Windows folder, temporary and cache files",
       sContentIndex: "Index document contents in the background", sContentIndexSub: "Faster search inside files, text in pictures and scans included",
       sReadCloud: "Read contents of cloud-only files (downloads them)",
+      sReadPrograms: "Also read inside program and system files",
       sAutoIndex: "Update the index automatically when files change", reindex: "Update the index now",
       sAnywhere: "Search from anywhere", sHotkey: (k) => `${k} opens the small search box; when off, it opens this window.`,
       sHotkeyKeys: "Shortcut to open the search", sHotkeyKeysSub: "Works in any program. Pick another if another program uses it.",
@@ -328,11 +342,12 @@
       sPhoneQrLabel: "QR code that opens phone search", sPhoneOff: "Off. Turn it on to see the address and the PIN.", sPhoneWait: "Checking the network…",
       sPhoneIdle: "It turned itself off after two hours with no request from a phone, to be safe. Turn it on again when you need it.", sPhoneAllow: "Allow this network", sPhoneMore: "More settings…", sPhoneMoreSub: "The port, downloading files, and a new PIN and link",
       sAbout: "About", version: (v) => `InstaFind — version ${v}`,
-      helpH: "How to search", helpKey: "How to search (F1)", helpMore: "All the ways to search…", helpSub: "Click an example to put it in the search box. Every filter also has an Arabic spelling.",
+      helpH: "How to search", helpKey: "How to search (F1)", helpMore: "All the ways to search…", helpSub: "Click an example to put it in the search box.", helpSubArab: "Every filter also has an Arabic spelling.",
       helpEx: [["sales report", "names with both words"], ['"lease agreement"', "the exact phrase"], ["report .pdf", "PDF files only (or ext:pdf)"], ["ext:docx,xlsx", "several types"],
         ["photo|video", "either word"], ["contract -old", "without “old” (or !old)"], ["size:>10mb", "bigger than 10 MB"], ["dm:thisweek", "changed this week"],
         ["dm:2026-05", "changed in May 2026"], ["ww:contract", "whole word only"], ['"lease contract"~5', "both words within 5 words"], ["folder: photos", "folders only"],
-        ["root: كتاب", "same Arabic root: مكتبة، الكاتب"], ["fuzzy: reprot", "tolerates a typo"], ["حجم:>1ج", "in Arabic too: bigger than 1 GB"], ["احمد", "also finds «أحمد»"]],
+        ["fuzzy: reprot", "tolerates a typo"]],
+      helpExArab: [["root: كتاب", "same Arabic root: مكتبة، الكاتب"], ["حجم:>1ج", "in Arabic too: bigger than 1 GB"], ["احمد", "also finds «أحمد»"]],
       helpInside: "To search inside documents (PDF, Word, Excel, pictures): press “Inside documents”, then Enter.",
       helpKeysH: "Keyboard",
       helpKeys: (hk) => [[hk, "the small search box from any program"], ["Ctrl+Alt+G", "in a Save/Open dialog: go to a result's folder"], ["Enter", "open the file"], ["Ctrl+Enter", "open its folder"], ["↓", "to the results (in an empty box: history)"],
@@ -340,6 +355,15 @@
     },
   });
   const SORTS = ["best", "name", "path", "size", "date"];
+  // The examples ("Try these", the help card) that make sense in the
+  // interface's script (src/i18n.rs LOCALES, ISO 15924): the Arabic ones
+  // (roots, hamza and alef spellings, Arabic filters) only in a language
+  // written in Arabic script; the accent fold (cafe → café, елка → ёлка,
+  // かめら → カメラ) in a Latin, Cyrillic or Japanese one; the rest everywhere.
+  const SCRIPT = typeof I18N.script === "string" ? I18N.script : LANG === "ar" ? "Arab" : "Latn";
+  const ARAB_SCRIPT = SCRIPT === "Arab", FOLD_SCRIPT = ["Latn", "Cyrl", "Jpan"].includes(SCRIPT);
+  const tipList = () => ARAB_SCRIPT ? [...T.tips, ...T.tipsArab] : FOLD_SCRIPT ? [...T.tips, T.tipFold] : T.tips;
+  const helpExList = () => ARAB_SCRIPT ? [...T.helpEx, ...T.helpExArab] : FOLD_SCRIPT ? [...T.helpEx, T.tipFold] : T.helpEx;
   // The privacy line: the Store version's updates come from the Store, not GitHub.
   function trustText() { return S.store ? T.trustStore : T.trust; }
 
@@ -448,6 +472,7 @@
     pane: [["rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }], ["path", { d: "M14 5v14" }]],
     flag: [["path", { d: "M5 21V4M5 4h11l-2 4 2 4H5" }]],
     info: [["circle", { cx: "12", cy: "12", r: "9" }], ["path", { d: "M12 11v6M12 7.5v.5" }]],
+    drive: [["rect", { x: "3", y: "8", width: "18", height: "9", rx: "2" }], ["path", { d: "M3 13h18M7 15.2h.01" }]],
     help: [["circle", { cx: "12", cy: "12", r: "9" }], ["path", { d: "M9.6 9.3a2.5 2.5 0 1 1 3.4 2.4c-.6.3-1 .8-1 1.5v.4M12 16.8v.2" }]],
   };
 
@@ -458,6 +483,8 @@
     ["#8A55C9", ["jpg", "jpeg", "png", "gif", "bmp", "webp", "heic", "tif", "tiff", "svg"]],
     ["#C2417F", ["mp3", "wav", "m4a", "aac", "flac", "ogg", "wma", "opus", "mp4", "mkv", "avi", "mov", "wmv", "webm"]],
     ["#123B2A", ["exe", "msi", "bat", "cmd", "ps1", "lnk", "appx", "msix"]],
+    // Code and markup: yellow, its label dark (white on yellow is unreadable).
+    ["#E3B341", ["js", "mjs", "cjs", "jsx", "ts", "tsx", "json", "py", "rs", "go", "java", "c", "cpp", "h", "cs", "php", "rb", "sh", "html", "htm", "css", "xml", "yml", "yaml", "toml", "sql"], "#3A2E05"],
   ];
   function badge(r, cls = "ft") {
     const svg = document.createElementNS(SVG_NS, "svg");
@@ -475,7 +502,7 @@
     const label = ext.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
     if (label) {
       const t = document.createElementNS(SVG_NS, "text");
-      for (const [k, v] of Object.entries({ x: "14.5", y: "25", "text-anchor": "middle", "font-size": label.length > 3 ? "6.2" : "7.5", "font-weight": "600", fill: "#fff" })) t.setAttribute(k, v);
+      for (const [k, v] of Object.entries({ x: "14.5", y: "25", "text-anchor": "middle", "font-size": label.length > 3 ? "6.2" : "7.5", "font-weight": "600", fill: (fam && fam[2]) || "#fff" })) t.setAttribute(k, v);
       t.textContent = label;
       svg.append(t);
     }
@@ -666,6 +693,7 @@
     settings(m) {
       const hide = S.settings && S.settings.hide_system !== m.hide_system;
       S.settings = m;
+      if (m.theme && m.theme !== curTheme()) applyTheme(m.theme);
       $("hk-kbd").textContent = hotkeyText();
       if (S.digits !== !!m.digits) { S.digits = !!m.digits; render(true); renderRecent(); }
       if (S.view === "settings") renderSettings();
@@ -842,8 +870,10 @@
   // window under 800 px high. The preview pane can be hidden.
   const PREF = (() => { try { return JSON.parse(localStorage.getItem("instafind.view") || "{}") || {}; } catch { return {}; } })();
   function savePref() { try { localStorage.setItem("instafind.view", JSON.stringify(PREF)); } catch { /* not kept */ } }
-  function compactOn() { return typeof PREF.compact === "boolean" ? PREF.compact : innerHeight < 800; }
-  function previewOn() { return PREF.preview !== false; }
+  // (Two-line rows unless the window is very low; the preview pane by
+  // itself only where the list keeps its room, as in Explorer.)
+  function compactOn() { return typeof PREF.compact === "boolean" ? PREF.compact : innerHeight < 600; }
+  function previewOn() { return typeof PREF.preview === "boolean" ? PREF.preview : innerWidth >= 1200; }
   function gridOn() { return PREF.grid === true; }
   function applyView() {
     document.body.classList.toggle("compact", compactOn());
@@ -885,16 +915,12 @@
       const el = btn("icon view", ic, null, click, { id, role: "switch", "aria-checked": String(on), "aria-label": label, title: label });
       return el;
     };
-    const tools = [
-      btn("small", I.export, T.exportBtn, () => send({ op: "export" }), { id: "tool-export" }),
-      btn("small", I.refresh, T.reindexBtn, () => send({ op: "reindex" }), { id: "tool-reindex" }),
-    ];
-    return h("span", { class: "viewbtns" }, ...tools,
+    return h("span", { class: "viewbtns" },
       b("view-grid", I.grid, gridOn(), T.grid, () => toggleGrid()),
       b("view-compact", I.rows, compactOn(), T.compact, () => setPref("compact", !compactOn())),
       b("view-preview", I.pane, previewOn(), T.showPreview, () => setPref("preview", !previewOn())));
   }
-  window.addEventListener("resize", () => { if (typeof PREF.compact !== "boolean") { applyView(); renderChips(); } });
+  window.addEventListener("resize", () => { if (typeof PREF.compact !== "boolean" || typeof PREF.preview !== "boolean") { applyView(); renderChips(); } });
   function renderApps() {
     const box = $("apps");
     const show = S.apps.seq === S.seq && S.apps.apps.length > 0 && S.q.trim() && !S.content && (S.view === "results" || S.view === "nores");
@@ -1171,36 +1197,40 @@
     else if (s.kind === "contents") { S.content = true; renderChips(); runSearch(); }
     else if (s.kind === "web") send({ op: "web", q: S.q });
   }
-  // The indexing banner: in full for its first seconds, then one line.
-  let bannerSince = 0;
+  // The index at the status bar's end: while indexing, how far it got with
+  // a thin bar (a percentage while document contents are read: "checked of
+  // total" in the program's words, in either order); else its size.
   function renderBanner() {
-    const busy = S.state !== "ready";
-    $("banner").hidden = !busy || S.view === "settings";
-    if (!busy) { bannerSince = 0; $("banner").classList.remove("slim"); return; }
-    if (!bannerSince) {
-      bannerSince = Date.now();
-      setTimeout(() => { if (bannerSince) $("banner").classList.add("slim"); }, 6000);
+    const busy = S.state !== "ready", bar = $("ix-bar");
+    // (The tooltip keeps the program's own words, e.g. "your folders first",
+    // which the short percentage below leaves out.)
+    $("ix").title = busy ? (S.stateText ? digits(S.stateText) + "\n" : "") + T.ixSub : "";
+    const say = (text) => { $("ix-text").replaceChildren(); fill($("ix-text"), [[text, false]]); };
+    if (!busy) { say(S.files ? T.files(S.files) : ""); bar.hidden = true; return; }
+    let pct = null;
+    const n = S.state === "contents" ? (S.stateText || "").match(/\d[\d,]*/g) : null;
+    if (n && n.length >= 2) {
+      const [a, b] = n.slice(-2).map((x) => Number(x.replace(/,/g, "")));
+      if (Math.max(a, b) > 0) pct = Math.floor((Math.min(a, b) * 100) / Math.max(a, b));
     }
-    $("banner-title").textContent = S.state === "loading" ? T.loading : digits(S.stateText);
-    $("banner-sub").textContent = T.ixSub;
-    $("banner-bar").classList.add("busy");
+    say(S.state === "loading" ? T.loading : pct !== null ? T.ixContents(num(pct)) : digits(S.stateText));
+    bar.hidden = false;
+    bar.classList.toggle("busy", pct === null);
+    bar.firstElementChild.style.width = pct === null ? "" : pct + "%";
   }
   function renderStatus() {
-    const busy = S.state !== "ready";
-    $("dot").classList.toggle("busy", busy || S.running);
-    let text;
+    let text = "";
     if (S.notice) text = S.notice;
-    else if (busy) text = S.state === "loading" ? T.loading : digits(S.stateText);
-    else text = T.files(S.files);
-    if (!S.notice && S.view !== "empty" && S.view !== "settings") {
-      if (S.content && contentStale()) text = T.pressEnter + " · " + text;
+    else if (S.view !== "empty" && S.view !== "settings") {
+      if (S.content && contentStale()) text = T.pressEnter;
       else if (S.isContent && S.progress) text = digits(S.progress);
-      else text = (S.note ? S.note + " · " : "") + T.count(S.total, S.ms) + " · " + text;
+      else text = (S.note ? S.note + " · " : "") + T.count(S.total, S.ms);
       if (S.warnings.length) text += ` — ${T.note}: ${S.warnings.join(["ar", "fa", "ur", "ps", "ckb", "ug"].includes(CODE) ? "، " : "; ")}`;
-    } else if (!S.notice && S.content && contentStale() && S.q.trim()) text = T.pressEnter;
+    } else if (S.content && contentStale() && S.q.trim()) text = T.pressEnter;
     $("status-text").replaceChildren();
     fill($("status-text"), [[text, false]]);
     $("status-text").classList.toggle("warn", !!(S.notice && S.noticeWarn));
+    renderBanner();
   }
   for (const ev of ["keydown", "mousedown"]) document.addEventListener(ev, () => { if (S.notice && S.noticeWarn) { S.notice = ""; S.noticeWarn = false; renderStatus(); } }, true);
   function renderStop() { $("stop").hidden = !S.running; }
@@ -1211,44 +1241,54 @@
     liveTimer = setTimeout(() => { $("live").textContent = T.nres(S.total); }, 500);
   }
 
-  // ---------- filter chips and their menus ----------
-  // Each chip: [id, icon, label when off, the label when on, its choices, chosen, pick].
-  function chipDefs() {
-    const sortLabel = `${T.sortBy}: ${T.sorts[S.sort]}${S.sort === "best" ? "" : ` (${S.desc ? T.desc : T.asc})`}`;
-    return [
-      { id: "kind", ic: I.doc, label: T.type, on: S.kind > 0 && S.kinds[S.kind], value: `${T.type}: ${S.kinds[S.kind] || ""}`, items: S.kinds, cur: S.kind, pick: (i) => setFilter("kind", i), clear: () => setFilter("kind", 0) },
-      { id: "size", ic: I.scale, label: T.size, on: S.size > 0, value: `${T.size}: ${S.sizes[S.size] || ""}`, items: S.sizes, cur: S.size, pick: (i) => setFilter("size", i), clear: () => setFilter("size", 0) },
-      { id: "date", ic: I.cal, label: T.date, on: S.date > 0, value: `${T.date}: ${S.dates[S.date] || ""}`, items: S.dates, cur: S.date, pick: (i) => setFilter("date", i), clear: () => setFilter("date", 0) },
-      { id: "scope", ic: I.folder, label: `${T.lookIn}: ${T.allDrives}`, on: !!S.scope, value: null, items: [T.allDrives, T.chooseFolder], cur: S.scope ? -1 : 0, pick: (i) => send({ op: i ? "pick_folder" : "all_drives" }), clear: () => send({ op: "all_drives" }) },
-      { id: "content", ic: I.text, label: T.inside, toggle: true, on: S.content },
-      { id: "sort", ic: I.sort, label: sortLabel, end: true, items: SORTS.map((k) => T.sorts[k]), cur: SORTS.indexOf(S.sort), pick: (i) => setSort(SORTS[i], SORTS[i] === S.sort ? !S.desc : false) },
-    ];
+  // ---------- the toolbar: Filters, the scope, inside documents, the view, the order ----------
+  // A button with its menu of choices ([label, chosen, data]); `pick(item)`
+  // gets the clicked item's element.
+  function menuChip(id, ic, label, attrs, items, pick, end) {
+    const chip = h("button", Object.assign({ class: "chip" + (end ? " end" : ""), id: "chip-" + id, type: "button", "aria-haspopup": "menu", "aria-expanded": "false" }, attrs), icon(ic));
+    chip.append(...[].concat(label), icon(I.down, "i caret"));
+    const menu = h("div", { class: "menu", role: "menu", id: "menu-" + id, "aria-label": attrs["aria-label"] || T.filtersBtn, hidden: true }, ...items);
+    const wrap = h("span", { class: "chipwrap" + (end ? " end" : "") }, chip, menu);
+    chip.addEventListener("click", (e) => { if (e.target.closest("[data-clear]")) { send({ op: "all_drives" }); return; } toggleMenu("menu-" + id); });
+    menu.addEventListener("click", (e) => { const it = e.target.closest("[data-k]"); if (it) { closeMenus(); pick(it); } });
+    return wrap;
   }
+  const radio = (label, on, data) => { const it = h("div", { role: "menuitemradio", tabindex: "-1", "aria-checked": String(on) }, label); Object.assign(it.dataset, data); return it; };
+  const tsep = () => h("span", { class: "tsep", "aria-hidden": "true" });
   function renderChips() {
-    const wraps = chipDefs().map((d) => {
-      const chip = h("button", { class: "chip" + (d.on ? " on" : "") + (d.end ? " end" : ""), id: "chip-" + d.id, type: "button", "aria-pressed": !d.toggle && d.on ? "true" : null, role: d.toggle ? "switch" : null, "aria-checked": d.toggle ? String(!!d.on) : null, "aria-haspopup": d.items ? "menu" : null, "aria-expanded": d.items ? "false" : null }, icon(d.ic));
-      if (d.id === "scope" && S.scope) chip.append(h("span", null, `${T.lookIn}: `), pathEl(S.scope, 48));
-      else chip.append(h("span", null, d.on && d.value ? d.value : d.label));
-      if (d.items) {
-        const caret = icon(d.on && d.clear ? I.x : I.down, "i caret");
-        if (d.on && d.clear) { caret.dataset.clear = "1"; caret.setAttribute("aria-label", T.clearFilter); }
-        chip.append(caret);
-      }
-      const wrap = h("span", { class: "chipwrap" + (d.end ? " end" : "") }, chip);
-      if (d.items) {
-        const menu = h("div", { class: "menu", role: "menu", id: "menu-" + d.id, "aria-label": d.label, hidden: true });
-        d.items.forEach((label, i) => { const it = h("div", { role: "menuitemradio", tabindex: "-1", "aria-checked": String(i === d.cur) }, label); it.dataset.k = i; menu.append(it); });
-        wrap.append(menu);
-      }
-      chip.addEventListener("click", (e) => {
-        if (d.toggle) { S.content = !S.content; renderChips(); q.focus(); updatePlaceholder(); if (S.q.trim()) runSearch(); return; }
-        if (d.on && d.clear && e.target.closest("[data-clear]")) { d.clear(); return; }
-        toggleMenu("menu-" + d.id);
-      });
-      wrap.addEventListener("click", (e) => { const it = e.target.closest("[data-k]"); if (it) { closeMenus(); d.pick(+it.dataset.k); } });
-      return wrap;
-    });
-    $("chips").replaceChildren(...wraps, viewButtons());
+    // Filters: type, size and date in one menu, a group each.
+    const groups = [["kind", T.type, S.kinds, S.kind], ["size", T.size, S.sizes, S.size], ["date", T.date, S.dates, S.date]];
+    const on = groups.filter(([, , items, cur]) => cur > 0 && items[cur]);
+    const fItems = groups.map(([g, title, items, cur]) => h("div", { class: "mgroup", role: "group", "aria-label": title }, h("div", { class: "mh", role: "presentation" }, title), ...items.map((label, i) => radio(label, i === cur, { g, k: i }))));
+    if (on.length) {
+      const clear = h("div", { role: "menuitem", tabindex: "-1", id: "filters-clear" }, icon(I.x), h("span", null, T.clearFilters));
+      clear.dataset.k = "-1";
+      fItems.push(h("div", { class: "sep", role: "separator" }), clear);
+    }
+    const fLabel = on.length ? `${T.filtersBtn}: ${on.map(([, t, items, cur]) => `${t}: ${items[cur]}`).join("، ")}` : T.filtersBtn;
+    const filters = menuChip("filters", I.filter, [h("span", { class: "cl" }, T.filtersBtn), on.length ? h("span", { class: "fcount num" }, num(on.length)) : null].filter(Boolean),
+      { "aria-label": fLabel, title: on.length ? fLabel : null }, fItems,
+      (it) => { if (it.dataset.k === "-1") { S.kind = 0; S.size = 0; S.date = 0; S.kindLabel = ""; renderChips(); q.focus(); if (S.q.trim()) runSearch(); } else setFilter(it.dataset.g, +it.dataset.k); });
+    filters.querySelector(".chip").classList.toggle("on", on.length > 0);
+    filters.querySelector(".menu").classList.add("fmenu");
+    // The scope: all drives, or a folder (its × goes back to all drives).
+    const scopeLabel = S.scope ? [h("span", { class: "sr" }, `${T.lookIn}: `), pathEl(S.scope, 48)] : [h("span", { class: "cl" }, T.allDrives)];
+    const scope = menuChip("scope", S.scope ? I.folder : I.drive, scopeLabel, { "aria-label": S.scope ? `${T.lookIn}: ${S.scope}` : `${T.lookIn}: ${T.allDrives}` },
+      [T.allDrives, T.chooseFolder].map((label, i) => radio(label, i === (S.scope ? -1 : 0), { k: i })), (it) => send({ op: +it.dataset.k ? "pick_folder" : "all_drives" }));
+    if (S.scope) {
+      const chip = scope.querySelector(".chip"), caret = chip.querySelector(".caret");
+      chip.classList.add("on");
+      const x = icon(I.x, "i caret"); x.dataset.clear = "1"; x.setAttribute("aria-label", T.clearFilter);
+      caret.replaceWith(x);
+    }
+    // Inside documents: a switch.
+    const content = h("button", { class: "chip" + (S.content ? " on" : ""), id: "chip-content", type: "button", role: "switch", "aria-checked": String(S.content) }, icon(I.text), h("span", { class: "cl" }, T.inside));
+    content.addEventListener("click", () => { S.content = !S.content; renderChips(); q.focus(); updatePlaceholder(); if (S.q.trim()) runSearch(); });
+    // The order, at the far end.
+    const sortLabel = `${T.sortBy}: ${T.sorts[S.sort]}${S.sort === "best" ? "" : ` (${S.desc ? T.desc : T.asc})`}`;
+    const sort = menuChip("sort", I.sort, h("span", { class: "cl" }, T.sorts[S.sort]), { "aria-label": sortLabel, title: sortLabel },
+      SORTS.map((k, i) => radio(T.sorts[k], i === SORTS.indexOf(S.sort), { k: i })), (it) => { const k = SORTS[+it.dataset.k]; setSort(k, k === S.sort ? !S.desc : false); }, true);
+    $("chips").replaceChildren(filters, tsep(), scope, tsep(), h("span", { class: "chipwrap" }, content), h("span", { class: "grow" }), viewButtons(), tsep(), sort);
     updatePlaceholder();
   }
   // (The box's accessible name follows its hint: names or inside documents.)
@@ -1370,13 +1410,13 @@
   // clicked, and the keys. Static text only.
   function helpCard() {
     closeMenus();
-    const ex = h("div", { class: "hx-list", role: "list", "aria-label": T.helpH }, ...T.helpEx.map(([c, d], i) => {
+    const ex = h("div", { class: "hx-list", role: "list", "aria-label": T.helpH }, ...helpExList().map(([c, d], i) => {
       const b = h("button", { class: "hx", type: "button", id: "hx" + i }, h("code", { dir: "auto" }, c), h("span", null, d));
       b.addEventListener("click", () => { closeDialog(); closeSettings(); q.value = c; onInput(); q.focus(); });
       return h("div", { role: "listitem" }, b);
     }));
     const keys = h("dl", { class: "hk-list", "aria-labelledby": "hk-h" }, ...T.helpKeys(hotkeyText()).flatMap(([k, d]) => [h("dt", null, h("kbd", null, k)), h("dd", null, d)]));
-    dialog(T.helpH, [h("p", { class: "sub" }, T.helpSub), ex, h("p", { class: "sub" }, T.helpInside), h("h4", { id: "hk-h" }, T.helpKeysH), keys],
+    dialog(T.helpH, [h("p", { class: "sub" }, ARAB_SCRIPT && T.helpSubArab ? `${T.helpSub} ${T.helpSubArab}` : T.helpSub), ex, h("p", { class: "sub" }, T.helpInside), h("h4", { id: "hk-h" }, T.helpKeysH), keys],
       [btn("", I.x, T.close, closeDialog, { id: "help-close" })], "help");
     $("dlg").classList.add("help");
     $("hx0").focus();
@@ -1386,7 +1426,6 @@
     const st = S.settings, hk = st && (st.hotkeys || []).find(([code]) => code === st.hotkey);
     return hk ? hk[1] : "Ctrl+Alt+F";
   }
-  $("help-btn").addEventListener("click", helpCard);
 
   // The dialogs name the list their row was in when they opened (`at`).
   function renameDialog(r, listName, at = listAt(listName)) {
@@ -1461,6 +1500,52 @@
   function openHistory() { renderHistory(); toggleMenu("hist"); if (!$("hist").hidden) $("hist").querySelector('[tabindex="-1"]:not([aria-disabled="true"])')?.focus(); }
   $("hist-btn").addEventListener("click", openHistory);
 
+  // ---------- themes ----------
+  // The page's colours (app.css, :root[data-theme]); "auto" follows
+  // Windows' light or dark mode. Kept by the program (settings.txt); this
+  // page's storage only paints the last one at once on the next start.
+  const THEMES = ["auto", "light", "dark", "midnight", "kiwi"];
+  function curTheme() { const t = document.documentElement.dataset.theme; return THEMES.includes(t) ? t : "auto"; }
+  function applyTheme(t) {
+    t = THEMES.includes(t) ? t : "auto";
+    document.documentElement.dataset.theme = t;
+    try { localStorage.setItem("instafind.theme", t); } catch { /* not kept */ }
+  }
+  function setTheme(t) {
+    if (!THEMES.includes(t)) return;
+    applyTheme(t);
+    if (S.settings) S.settings.theme = t;
+    send({ op: "theme", key: t });
+    if (S.view === "settings") renderSettings();
+  }
+  try { applyTheme(localStorage.getItem("instafind.theme")); } catch { applyTheme("auto"); }
+
+  // ---------- ⋮: the secondary actions ----------
+  function renderMore() {
+    const item = (id, ic, label, key, fn) => {
+      const it = h("div", { role: "menuitem", tabindex: "-1", id }, icon(ic), h("span", null, label), key ? h("kbd", null, key) : null);
+      it.addEventListener("click", () => { closeMenus(); fn(); });
+      return it;
+    };
+    const sep = () => h("div", { class: "sep", role: "separator" });
+    const themes = THEMES.map((t) => {
+      const it = h("div", { role: "menuitemradio", tabindex: "-1", id: "more-theme-" + t, "aria-checked": String(t === curTheme()) }, h("span", { class: "swatch", "data-swatch": t, "aria-hidden": "true" }, h("i"), h("i")), h("span", null, T.themes[t]));
+      it.addEventListener("click", () => { closeMenus(); setTheme(t); q.focus(); });
+      return it;
+    });
+    const store = S.settings && S.settings.store;
+    $("more-menu").replaceChildren(
+      item("tool-export", I.export, T.exportBtn, null, () => send({ op: "export" })),
+      item("tool-reindex", I.refresh, T.reindexBtn, null, () => send({ op: "reindex" })),
+      item("more-help", I.help, T.helpH, "F1", helpCard),
+      sep(), h("div", { class: "mh", role: "presentation" }, T.theme), h("div", { role: "group", "aria-label": T.theme }, ...themes),
+      sep(), item("more-updates", I.refresh, store ? T.updBtnStore : T.updBtn, null, () => send({ op: "check_updates" })),
+      item("more-report", I.flag, T.reportBtn, null, () => send({ op: "report_problem" })));
+  }
+  $("more-btn").addEventListener("click", () => { renderMore(); toggleMenu("more-menu"); });
+  $("q-clear").addEventListener("mousedown", (e) => e.preventDefault());
+  $("q-clear").addEventListener("click", () => { q.value = ""; onInput(); q.focus(); });
+
   // ---------- settings ----------
   function openSettings() {
     closeMenus();
@@ -1490,7 +1575,8 @@
   }
   function renderSettings() {
     const st = S.settings;
-    const refocus = document.activeElement && document.activeElement.id === "check-updates";
+    // (Drawn again when the program answers: the focus stays where it was.)
+    const refocus = document.activeElement && document.activeElement.closest("#settings") && document.activeElement.id;
     const box = $("settings");
     if (!st) { box.replaceChildren(); return; }
     const sw = (key, label, sub) => {
@@ -1528,8 +1614,9 @@
           const b = h("button", { class: "sw", type: "button", role: "switch", "aria-checked": String(on), id: "set-compact", "aria-label": T.compact, "aria-describedby": "set-compact-d" }, h("span", { class: "knob" }));
           b.addEventListener("click", () => setPref("compact", !compactOn()));
           return h("div", { class: "srow" }, h("label", { for: "set-compact" }, h("span", null, T.compact), h("small", { id: "set-compact-d" }, T.compactSub)), b);
-        })()),
-      section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("read_cloud_files", T.sReadCloud), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
+        })(),
+        themeRow()),
+      section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("read_cloud_files", T.sReadCloud), sw("read_program_files", T.sReadPrograms), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
       section(T.sAnywhere, sw("hotkey_quick", T.sHotkey(hotkeyText())), hotkeyRow(st), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
       ...[phoneSection(st, section)].filter(Boolean),
       section(T.sStartup, sw("autostart", T.sAutostart)),
@@ -1543,7 +1630,26 @@
       section(T.sMore, h("div", { class: "srow" }, h("div", { class: "slbl" }, h("span", null, T.sMoreRow), h("small", { id: "options-menu-d" }, T.sMoreSub)), btn("", I.dots, T.moreBtn, () => send({ op: "options_menu" }), { id: "options-menu", "aria-describedby": "options-menu-d" }))),
       section(T.sAbout, h("p", { class: "num" }, digits(T.version(st.version))), h("p", { class: "muted" }, trustText())),
     );
-    if (refocus) $("check-updates")?.focus({ preventScroll: true });
+    if (refocus) $(refocus)?.focus({ preventScroll: true });
+  }
+  // The colour themes: a radio group (one tab stop, the arrows choose), each
+  // with a small sample of its colours. A choice shows at once.
+  function themeRow() {
+    const cur = curTheme();
+    const group = h("div", { class: "themes", role: "radiogroup", "aria-labelledby": "theme-label", "aria-describedby": "theme-d" }, ...THEMES.map((t) => {
+      const b = h("button", { class: "thm" + (t === cur ? " on" : ""), type: "button", role: "radio", "aria-checked": String(t === cur), id: "theme-" + t, tabindex: t === cur ? "0" : "-1" },
+        h("span", { class: "swatch", "data-swatch": t, "aria-hidden": "true" }, h("i"), h("i")), h("span", { class: "tn" }, T.themes[t]));
+      b.addEventListener("click", () => { setTheme(t); $("theme-" + t)?.focus(); });
+      return b;
+    }));
+    group.addEventListener("keydown", (e) => {
+      const step = { ArrowDown: 1, ArrowUp: -1, ArrowRight: document.documentElement.dir === "rtl" ? -1 : 1, ArrowLeft: document.documentElement.dir === "rtl" ? 1 : -1 }[e.key];
+      if (!step) return;
+      const t = THEMES[(THEMES.indexOf(curTheme()) + step + THEMES.length) % THEMES.length];
+      setTheme(t); $("theme-" + t)?.focus();
+      e.preventDefault(); e.stopPropagation();
+    });
+    return h("div", { class: "srow themerow" }, h("div", { class: "slbl" }, h("span", { id: "theme-label" }, T.theme), h("small", { id: "theme-d" }, T.themeSub)), group);
   }
   // Search from phone (not in the Store edition, which has none): the
   // switch, then the address, the PIN and a QR code of the direct link.
@@ -1862,7 +1968,7 @@
   for (const el of document.querySelectorAll("[data-i18n-placeholder]")) el.placeholder = T[el.dataset.i18nPlaceholder];
   for (const el of document.querySelectorAll("[data-i18n-label]")) el.setAttribute("aria-label", T[el.dataset.i18nLabel]);
   for (const el of document.querySelectorAll("[data-i18n-title]")) el.title = T[el.dataset.i18nTitle];
-  $("tips").replaceChildren(...T.tips.map(([c, s], i) => h("div", { class: "tip", role: "listitem" }, h("button", { class: "tq", type: "button", dir: "auto", "aria-describedby": "tip-d" + i }, c), h("span", { id: "tip-d" + i }, s))));
+  $("tips").replaceChildren(...tipList().map(([c, s], i) => h("div", { class: "tip", role: "listitem" }, h("button", { class: "tq", type: "button", dir: "auto", "aria-describedby": "tip-d" + i }, c), h("span", { id: "tip-d" + i }, s))));
   $("tips").after(h("div", { class: "tips-more" }, btn("small", I.help, T.helpMore, helpCard, { id: "help-more" })));
   setView("empty");
   applyView();

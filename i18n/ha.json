@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind na aiki daga babban fayil na wucin gadi (wataƙila daga cikin fayil na zip), wanda Windows za ta iya goge shi a kowane lokaci.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind na aiki daga babban fayil ɗin Abubuwan da aka sauke. Idan aka share fayil ɗin ko aka tsaftace babban fayil ɗin, shirin zai daina aiki.",
   "\nStarting with Windows will use the new place.": "\nFarawa tare da Windows za ta yi amfani da sabon wurin.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nA matsar da shirin zuwa wuri na dindindin? Za a kwafa shi zuwa:\n{shown_dir}\na ƙara shi a menyun Farawa (Start), sannan a sake farawa daga can. Saitunanka da fihirisarka za su kasance yadda suke.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nA matsar da shirin zuwa wuri na dindindin? Za a kwafa shi zuwa:\n{shown_dir}\na ƙara shi a menyun Farawa (Start) da kan tebur (desktop), sannan a sake farawa daga can. Saitunanka da fihirisarka za su kasance yadda suke.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "Ba a iya kwafa shirin zuwa wuri na dindindin ba:\n{e}\n\nShirin na ci gaba da aiki daga inda yake.",
   "the new copy did not start": "sabon kwafin bai fara ba",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "An kwafa shirin zuwa wuri na dindindin, amma bai iya sake farawa daga can ba ({e}).\nBuɗe shi daga menyun Farawa (Start).",
@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} {y} (Hijira)",
   "{lead} Checked {checked} of {total} documents…": "{lead} An duba takardu {checked} cikin {total}…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Karanta cikin fayilolin shirye-shirye da na tsarin ma",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Sunayen fayiloli sun shirya · ana karanta takardun manyan fayilolinka: {checked} cikin {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Sunayen fayiloli da manyan fayilolinka sun shirya · ana karanta sauran takardu: {checked} cikin {total}"
  },
  "js": {
   "ph": "Bincika sunayen fayiloli…",
@@ -837,7 +840,9 @@
    [
     "\"yarjejeniyar haya\"",
     "Ainihin jumla"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Tushen kalmar Larabci: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "Yana samun «أحمد» ma"
    ]
+  ],
+  "tipFold": [
+   "cafe",
+   "Yana samo “café” ma"
   ],
   "kNav": "Motsa",
   "kOpen": "Buɗe",
@@ -969,6 +978,19 @@
   "compactSub": "Layi ɗaya ga kowane sakamako, don ƙarin su su dace",
   "showPreview": "Nuna samfoti",
   "hidePreview": "Ɓoye samfoti",
+  "clearQ": "Share bincike",
+  "filtersBtn": "Matattara",
+  "clearFilters": "Cire duk matattara",
+  "ixContents": "Ana tsara abubuwan da ke cikin takardu · ${n}%",
+  "theme": "Jigo",
+  "themeSub": "“Atomatik” yana bin yanayin haske ko duhu na Windows",
+  "themes": {
+   "auto": "Atomatik",
+   "light": "Haske",
+   "dark": "Duhu",
+   "midnight": "Shuɗin dare",
+   "kiwi": "Kiwi"
+  },
   "sMore": "Ƙari",
   "sMoreRow": "Ƙarin zaɓuɓɓuka",
   "sMoreSub": "Duba sabuntawa, tallafi da ra’ayoyi, kayan aiki kamar fayiloli iri ɗaya da girman manyan fayiloli, da saitunan bincike daga ko’ina",
@@ -1049,12 +1071,14 @@
     "manyan fayiloli kawai"
    ],
    [
-    "root: كتاب",
-    "tushen Larabci ɗaya: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: rahtoo",
     "yana jure kuskuren rubutu"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "tushen Larabci ɗaya: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"ƙaramin akwatin bincike daga kowane shiri\"], [\"Ctrl+Alt+G\", \"a taga Ajiye/Buɗe: je zuwa babban fayil ɗin sakamako\"], [\"Enter\", \"buɗe fayil ɗin\"], [\"Ctrl+Enter\", \"buɗe babban fayil ɗinsa\"], [\"↓\", \"zuwa sakamako (a akwati maras komai: tarihi)\"],\n        [\"Ctrl+C\", \"kwafi fayil ɗin\"], [\"Ctrl+Shift+C\", \"kwafi hanyar\"], [\"F2\", \"sake suna\"], [\"Delete\", \"zuwa Kwandon Shara\"], [\"F4\", \"duk abubuwan da suka dace a cikin fayil\"], [\"Ctrl+H\", \"tarihi\"], [\"Ctrl+T\", \"ƙananan hotuna\"], [\"Ctrl+,\", \"saituna\"], [\"F1\", \"wannan katin\"]]",
   "helpKeysH": "Allon madannai",
   "helpMore": "Duk hanyoyin bincike…",
-  "helpSub": "Danna misali don saka shi a akwatin bincike. Kowane matattara yana da rubutun Larabci ma.",
+  "helpSub": "Danna misali don saka shi a akwatin bincike.",
+  "helpSubArab": "Kowane matattara yana da rubutun Larabci ma.",
   "kLabel": "Gajerun hanyoyin madannai",
   "offline": "faifai ba a haɗa shi ba",
   "qsNone": "Babu sakamakon da za a matsar da taga zuwa babban fayil ɗinsa. Canza binciken, ko danna Esc don soke.",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "Bincike daga waya (hanyar sadarwa ta gida)",
   "sPhoneSub": "Bincika fayilolin wannan kwamfuta daga burauzar wayarka a kan Wi-Fi ɗaya. Karantawa kawai, kuma a hanyar sadarwa ta gidanka kawai.",
   "sPhoneWait": "Ana duba hanyar sadarwa…",
-  "updChecking": "Ana duba sabuntawa…"
+  "updChecking": "Ana duba sabuntawa…",
+  "sReadPrograms": "Karanta cikin fayilolin shirye-shirye da na tsarin ma"
  }
 }

@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind ਇੱਕ ਅਸਥਾਈ ਫੋਲਡਰ ਤੋਂ (ਸ਼ਾਇਦ ਕਿਸੇ zip ਫ਼ਾਈਲ ਦੇ ਅੰਦਰੋਂ) ਚੱਲ ਰਿਹਾ ਹੈ, ਜਿਸਨੂੰ Windows ਕਿਸੇ ਵੀ ਸਮੇਂ ਖ਼ਾਲੀ ਕਰ ਸਕਦਾ ਹੈ।",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind ਤੁਹਾਡੇ ਡਾਊਨਲੋਡ ਫੋਲਡਰ ਤੋਂ ਚੱਲ ਰਿਹਾ ਹੈ। ਜੇ ਫ਼ਾਈਲ ਮਿਟਾ ਦਿੱਤੀ ਗਈ ਜਾਂ ਫੋਲਡਰ ਸਾਫ਼ ਕੀਤਾ ਗਿਆ, ਤਾਂ ਪ੍ਰੋਗਰਾਮ ਕੰਮ ਕਰਨਾ ਬੰਦ ਕਰ ਦੇਵੇਗਾ।",
   "\nStarting with Windows will use the new place.": "\nWindows ਨਾਲ ਸ਼ੁਰੂ ਹੋਣ ਵੇਲੇ ਨਵੀਂ ਥਾਂ ਵਰਤੀ ਜਾਵੇਗੀ।",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nਕੀ ਪ੍ਰੋਗਰਾਮ ਨੂੰ ਪੱਕੀ ਥਾਂ ਉੱਤੇ ਲੈ ਜਾਣਾ ਹੈ? ਇਸਨੂੰ ਇੱਥੇ ਕਾਪੀ ਕੀਤਾ ਜਾਵੇਗਾ:\n{shown_dir}\nਸਟਾਰਟ ਮੀਨੂ ਵਿੱਚ ਜੋੜਿਆ ਜਾਵੇਗਾ, ਅਤੇ ਉੱਥੋਂ ਮੁੜ-ਸ਼ੁਰੂ ਕੀਤਾ ਜਾਵੇਗਾ। ਤੁਹਾਡੀਆਂ ਸੈਟਿੰਗਾਂ ਅਤੇ ਇੰਡੈਕਸ ਜਿਵੇਂ ਹਨ ਉਵੇਂ ਰਹਿਣਗੇ।{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nਕੀ ਪ੍ਰੋਗਰਾਮ ਨੂੰ ਪੱਕੀ ਥਾਂ ਉੱਤੇ ਲੈ ਜਾਣਾ ਹੈ? ਇਸਨੂੰ ਇੱਥੇ ਕਾਪੀ ਕੀਤਾ ਜਾਵੇਗਾ:\n{shown_dir}\nਸਟਾਰਟ ਮੀਨੂ ਅਤੇ ਡੈਸਕਟਾਪ ਵਿੱਚ ਜੋੜਿਆ ਜਾਵੇਗਾ, ਅਤੇ ਉੱਥੋਂ ਮੁੜ-ਸ਼ੁਰੂ ਕੀਤਾ ਜਾਵੇਗਾ। ਤੁਹਾਡੀਆਂ ਸੈਟਿੰਗਾਂ ਅਤੇ ਇੰਡੈਕਸ ਜਿਵੇਂ ਹਨ ਉਵੇਂ ਰਹਿਣਗੇ।{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "ਪ੍ਰੋਗਰਾਮ ਨੂੰ ਪੱਕੀ ਥਾਂ ਉੱਤੇ ਕਾਪੀ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ:\n{e}\n\nਪ੍ਰੋਗਰਾਮ ਜਿੱਥੇ ਹੈ ਉੱਥੋਂ ਹੀ ਕੰਮ ਕਰਦਾ ਰਹੇਗਾ।",
   "the new copy did not start": "ਨਵੀਂ ਕਾਪੀ ਸ਼ੁਰੂ ਨਹੀਂ ਹੋਈ",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "ਪ੍ਰੋਗਰਾਮ ਪੱਕੀ ਥਾਂ ਉੱਤੇ ਕਾਪੀ ਹੋ ਗਿਆ, ਪਰ ਉੱਥੋਂ ਮੁੜ-ਸ਼ੁਰੂ ਨਹੀਂ ਹੋ ਸਕਿਆ ({e})।\nਇਸਨੂੰ ਸਟਾਰਟ ਮੀਨੂ ਤੋਂ ਖੋਲ੍ਹੋ।",
@@ -786,7 +786,10 @@
   "toman": "ਤੋਮਾਨ",
   "{d} {} {y} AH": "{d} {} {y} ਹਿਜਰੀ",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total} ਵਿੱਚੋਂ {checked} ਦਸਤਾਵੇਜ਼ ਜਾਂਚੇ ਗਏ…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "ਪ੍ਰੋਗਰਾਮ ਅਤੇ ਸਿਸਟਮ ਫ਼ਾਈਲਾਂ ਦੇ ਅੰਦਰ ਵੀ ਪੜ੍ਹੋ",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ਫ਼ਾਈਲ ਨਾਮ ਤਿਆਰ · ਤੁਹਾਡੇ ਫੋਲਡਰਾਂ ਦੇ ਦਸਤਾਵੇਜ਼ ਪੜ੍ਹੇ ਜਾ ਰਹੇ ਹਨ: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ਫ਼ਾਈਲ ਨਾਮ ਅਤੇ ਤੁਹਾਡੇ ਫੋਲਡਰ ਤਿਆਰ · ਹੋਰ ਦਸਤਾਵੇਜ਼ ਪੜ੍ਹੇ ਜਾ ਰਹੇ ਹਨ: {checked} / {total}"
  },
  "js": {
   "ph": "ਫ਼ਾਈਲਾਂ ਦੇ ਨਾਵਾਂ ਵਿੱਚ ਖੋਜੋ…",
@@ -837,7 +840,9 @@
    [
     "\"ਕਿਰਾਇਆ ਸਮਝੌਤਾ\"",
     "ਬਿਲਕੁਲ ਇਹੀ ਵਾਕੰਸ਼"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "ਅਰਬੀ ਮੂਲ: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "ਹਰ ਨਤੀਜੇ ਲਈ ਇੱਕ ਲਾਈਨ, ਤਾਂ ਜੋ ਵੱਧ ਨਤੀਜੇ ਸਮਾ ਸਕਣ",
   "showPreview": "ਪੂਰਵ-ਝਲਕ ਦਿਖਾਓ",
   "hidePreview": "ਪੂਰਵ-ਝਲਕ ਲੁਕਾਓ",
+  "clearQ": "ਖੋਜ ਸਾਫ਼ ਕਰੋ",
+  "filtersBtn": "ਫਿਲਟਰ",
+  "clearFilters": "ਸਾਰੇ ਫਿਲਟਰ ਹਟਾਓ",
+  "ixContents": "ਦਸਤਾਵੇਜ਼ਾਂ ਦੀ ਸਮੱਗਰੀ ਇੰਡੈਕਸ ਹੋ ਰਹੀ ਹੈ · ${n}%",
+  "theme": "ਥੀਮ",
+  "themeSub": "“ਆਟੋਮੈਟਿਕ” Windows ਦੇ ਲਾਈਟ ਜਾਂ ਡਾਰਕ ਮੋਡ ਦੀ ਪਾਲਣਾ ਕਰਦਾ ਹੈ",
+  "themes": {
+   "auto": "ਆਟੋਮੈਟਿਕ",
+   "light": "ਲਾਈਟ",
+   "dark": "ਡਾਰਕ",
+   "midnight": "ਅੱਧੀ ਰਾਤ ਨੀਲਾ",
+   "kiwi": "ਕੀਵੀ"
+  },
   "sMore": "ਹੋਰ",
   "sMoreRow": "ਹੋਰ ਵਿਕਲਪ",
   "sMoreSub": "ਅੱਪਡੇਟਾਂ ਦੀ ਜਾਂਚ, ਸਹਾਇਤਾ ਅਤੇ ਫੀਡਬੈਕ, ਡੁਪਲੀਕੇਟ ਫ਼ਾਈਲਾਂ ਅਤੇ ਫੋਲਡਰਾਂ ਦੇ ਆਕਾਰ ਵਰਗੇ ਟੂਲ, ਅਤੇ ਕਿਤੋਂ ਵੀ ਖੋਜੋ ਦੀਆਂ ਸੈਟਿੰਗਾਂ",
@@ -1049,12 +1067,14 @@
     "ਸਿਰਫ਼ ਫੋਲਡਰ"
    ],
    [
-    "root: كتاب",
-    "ਉਹੀ ਅਰਬੀ ਮੂਲ: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: reprot",
     "ਟਾਈਪਿੰਗ ਦੀ ਗ਼ਲਤੀ ਸਹਿ ਲੈਂਦਾ ਹੈ (“report” ਲੱਭਦਾ ਹੈ)"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "ਉਹੀ ਅਰਬੀ ਮੂਲ: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"ਕਿਸੇ ਵੀ ਪ੍ਰੋਗਰਾਮ ਤੋਂ ਛੋਟਾ ਖੋਜ ਬਾਕਸ\"], [\"Ctrl+Alt+G\", \"Save/Open ਡਾਇਲਾਗ ਵਿੱਚ: ਕਿਸੇ ਨਤੀਜੇ ਦੇ ਫੋਲਡਰ ਉੱਤੇ ਜਾਓ\"], [\"Enter\", \"ਫ਼ਾਈਲ ਖੋਲ੍ਹੋ\"], [\"Ctrl+Enter\", \"ਇਸਦਾ ਫੋਲਡਰ ਖੋਲ੍ਹੋ\"], [\"↓\", \"ਨਤੀਜਿਆਂ ਉੱਤੇ (ਖ਼ਾਲੀ ਬਾਕਸ ਵਿੱਚ: ਇਤਿਹਾਸ)\"], [\"Ctrl+C\", \"ਫ਼ਾਈਲ ਕਾਪੀ ਕਰੋ\"], [\"Ctrl+Shift+C\", \"ਪਾਥ ਕਾਪੀ ਕਰੋ\"], [\"F2\", \"ਨਾਮ ਬਦਲੋ\"], [\"Delete\", \"ਰੀਸਾਈਕਲ ਬਿਨ ਵਿੱਚ\"], [\"F4\", \"ਫ਼ਾਈਲ ਵਿੱਚ ਸਾਰੇ ਮੇਲ\"], [\"Ctrl+H\", \"ਇਤਿਹਾਸ\"], [\"Ctrl+T\", \"ਥੰਬਨੇਲ\"], [\"Ctrl+,\", \"ਸੈਟਿੰਗਾਂ\"], [\"F1\", \"ਇਹ ਕਾਰਡ\"]]",
   "helpKeysH": "ਕੀਬੋਰਡ",
   "helpMore": "ਖੋਜਣ ਦੇ ਸਾਰੇ ਤਰੀਕੇ…",
-  "helpSub": "ਕਿਸੇ ਉਦਾਹਰਨ ਨੂੰ ਖੋਜ ਬਾਕਸ ਵਿੱਚ ਪਾਉਣ ਲਈ ਉਸ ਉੱਤੇ ਕਲਿੱਕ ਕਰੋ। ਹਰ ਫਿਲਟਰ ਦਾ ਇੱਕ ਅਰਬੀ ਰੂਪ ਵੀ ਹੈ।",
+  "helpSub": "ਕਿਸੇ ਉਦਾਹਰਨ ਨੂੰ ਖੋਜ ਬਾਕਸ ਵਿੱਚ ਪਾਉਣ ਲਈ ਉਸ ਉੱਤੇ ਕਲਿੱਕ ਕਰੋ।",
+  "helpSubArab": "ਹਰ ਫਿਲਟਰ ਦਾ ਇੱਕ ਅਰਬੀ ਰੂਪ ਵੀ ਹੈ।",
   "kLabel": "ਕੀਬੋਰਡ ਸ਼ਾਰਟਕੱਟ",
   "offline": "ਡਰਾਈਵ ਜੁੜੀ ਨਹੀਂ",
   "qsNone": "ਡਾਇਲਾਗ ਨੂੰ ਲਿਜਾਣ ਲਈ ਕੋਈ ਨਤੀਜਾ ਨਹੀਂ। ਖੋਜ ਬਦਲੋ, ਜਾਂ ਰੱਦ ਕਰਨ ਲਈ Esc ਦਬਾਓ।",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "ਫ਼ੋਨ ਤੋਂ ਖੋਜੋ (ਘਰੇਲੂ ਨੈੱਟਵਰਕ)",
   "sPhoneSub": "ਉਸੇ Wi-Fi ਉੱਤੇ ਆਪਣੇ ਫ਼ੋਨ ਦੇ ਬ੍ਰਾਊਜ਼ਰ ਤੋਂ ਇਸ PC ਦੀਆਂ ਫ਼ਾਈਲਾਂ ਖੋਜੋ। ਸਿਰਫ਼ ਪੜ੍ਹਨ ਲਈ, ਅਤੇ ਸਿਰਫ਼ ਤੁਹਾਡੇ ਘਰੇਲੂ ਨੈੱਟਵਰਕ ਉੱਤੇ।",
   "sPhoneWait": "ਨੈੱਟਵਰਕ ਦੀ ਜਾਂਚ ਹੋ ਰਹੀ ਹੈ…",
-  "updChecking": "ਅੱਪਡੇਟਾਂ ਦੀ ਜਾਂਚ ਹੋ ਰਹੀ ਹੈ…"
+  "updChecking": "ਅੱਪਡੇਟਾਂ ਦੀ ਜਾਂਚ ਹੋ ਰਹੀ ਹੈ…",
+  "sReadPrograms": "ਪ੍ਰੋਗਰਾਮ ਅਤੇ ਸਿਸਟਮ ਫ਼ਾਈਲਾਂ ਦੇ ਅੰਦਰ ਵੀ ਪੜ੍ਹੋ"
  }
 }

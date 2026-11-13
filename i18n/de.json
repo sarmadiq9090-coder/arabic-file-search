@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind wird aus einem temporären Ordner ausgeführt (vielleicht aus einer ZIP-Datei heraus), den Windows jederzeit leeren kann.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind wird aus Ihrem Ordner „Downloads“ ausgeführt. Wenn die Datei gelöscht oder der Ordner aufgeräumt wird, funktioniert das Programm nicht mehr.",
   "\nStarting with Windows will use the new place.": "\nDer Start mit Windows verwendet den neuen Speicherort.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nDas Programm an einen dauerhaften Speicherort verschieben? Es wird kopiert nach:\n{shown_dir}\nzum Startmenü hinzugefügt und von dort neu gestartet. Ihre Einstellungen und Ihr Index bleiben erhalten.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nDas Programm an einen dauerhaften Speicherort verschieben? Es wird kopiert nach:\n{shown_dir}\nzum Startmenü und zum Desktop hinzugefügt und von dort neu gestartet. Ihre Einstellungen und Ihr Index bleiben erhalten.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "Das Programm konnte nicht an den dauerhaften Speicherort kopiert werden:\n{e}\n\nDas Programm funktioniert weiterhin von seinem aktuellen Speicherort aus.",
   "the new copy did not start": "die neue Kopie ist nicht gestartet",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "Das Programm wurde an den dauerhaften Speicherort kopiert, konnte dort aber nicht neu gestartet werden ({e}).\nÖffnen Sie es über das Startmenü.",
@@ -786,7 +786,10 @@
   "toman": "Toman",
   "{d} {} {y} AH": "{d}. {} {y} n. H.",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} von {total} Dokumenten geprüft…",
-  "{}, {d} {} {y}": "{}, {d}. {} {y}"
+  "{}, {d} {} {y}": "{}, {d}. {} {y}",
+  "Also read inside program and system files": "Auch in Programm- und Systemdateien lesen",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Dateinamen bereit · Dokumente in Ihren Ordnern werden gelesen: {checked} von {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Dateinamen und Ihre Ordner bereit · weitere Dokumente werden gelesen: {checked} von {total}"
  },
  "js": {
   "ph": "Dateinamen durchsuchen…",
@@ -837,7 +840,9 @@
    [
     "\"Vertrag Wohnung\"",
     "Genaue Wortfolge"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Arabische Wurzel: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "Findet auch „أحمد“"
    ]
+  ],
+  "tipFold": [
+   "strasse",
+   "Findet auch „Straße“"
   ],
   "kNav": "Bewegen",
   "kOpen": "Öffnen",
@@ -969,6 +978,19 @@
   "compactSub": "Eine Zeile pro Ergebnis, damit mehr Platz haben",
   "showPreview": "Vorschau anzeigen",
   "hidePreview": "Vorschau ausblenden",
+  "clearQ": "Suche löschen",
+  "filtersBtn": "Filter",
+  "clearFilters": "Alle Filter entfernen",
+  "ixContents": "Dokumentinhalte werden indexiert · ${n} %",
+  "theme": "Design",
+  "themeSub": "„Automatisch“ folgt dem hellen oder dunklen Modus von Windows",
+  "themes": {
+   "auto": "Automatisch",
+   "light": "Hell",
+   "dark": "Dunkel",
+   "midnight": "Mitternachtsblau",
+   "kiwi": "Kiwi"
+  },
   "sMore": "Mehr",
   "sMoreRow": "Weitere Optionen",
   "sMoreSub": "Nach Updates suchen, Support und Feedback, Tools wie doppelte Dateien und Ordnergrößen sowie Einstellungen für die Suche von überall",
@@ -1049,12 +1071,14 @@
     "nur Ordner"
    ],
    [
-    "root: كتاب",
-    "gleiche arabische Wurzel: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: bericth",
     "verzeiht einen Tippfehler"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "gleiche arabische Wurzel: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"das kleine Suchfeld aus jedem Programm\"], [\"Ctrl+Alt+G\", \"in einem Speichern/Öffnen-Dialog: zum Ordner eines Ergebnisses wechseln\"], [\"Enter\", \"die Datei öffnen\"], [\"Ctrl+Enter\", \"ihren Ordner öffnen\"], [\"↓\", \"zu den Ergebnissen (bei leerem Feld: Verlauf)\"],\n        [\"Ctrl+C\", \"die Datei kopieren\"], [\"Ctrl+Shift+C\", \"den Pfad kopieren\"], [\"F2\", \"umbenennen\"], [\"Delete\", \"in den Papierkorb\"], [\"F4\", \"alle Treffer in der Datei\"], [\"Ctrl+H\", \"Verlauf\"], [\"Ctrl+T\", \"Miniaturansichten\"], [\"Ctrl+,\", \"Einstellungen\"], [\"F1\", \"diese Übersicht\"]]",
   "helpKeysH": "Tastatur",
   "helpMore": "Alle Suchmöglichkeiten…",
-  "helpSub": "Klicken Sie auf ein Beispiel, um es ins Suchfeld zu übernehmen. Jeder Filter hat auch eine arabische Schreibweise.",
+  "helpSub": "Klicken Sie auf ein Beispiel, um es ins Suchfeld zu übernehmen.",
+  "helpSubArab": "Jeder Filter hat auch eine arabische Schreibweise.",
   "kLabel": "Tastenkombinationen",
   "offline": "Laufwerk nicht verbunden",
   "qsNone": "Kein Ergebnis, zu dessen Ordner der Dialog wechseln könnte. Ändern Sie die Suche, oder drücken Sie Esc zum Abbrechen.",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "Vom Smartphone suchen (Heimnetzwerk)",
   "sPhoneSub": "Durchsuchen Sie die Dateien dieses PCs im Browser Ihres Smartphones im selben WLAN. Nur Lesezugriff, und nur in Ihrem Heimnetzwerk.",
   "sPhoneWait": "Netzwerk wird geprüft…",
-  "updChecking": "Es wird nach Updates gesucht…"
+  "updChecking": "Es wird nach Updates gesucht…",
+  "sReadPrograms": "Auch in Programm- und Systemdateien lesen"
  }
 }

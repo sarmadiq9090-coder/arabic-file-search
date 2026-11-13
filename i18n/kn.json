@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind ತಾತ್ಕಾಲಿಕ ಫೋಲ್ಡರ್‌ನಿಂದ (ಬಹುಶಃ zip ಫೈಲ್‌ನ ಒಳಗಿನಿಂದ) ರನ್ ಆಗುತ್ತಿದೆ, ಅದನ್ನು Windows ಯಾವಾಗ ಬೇಕಾದರೂ ಖಾಲಿ ಮಾಡಬಹುದು.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind ನಿಮ್ಮ ಡೌನ್‌ಲೋಡ್‌ಗಳು ಫೋಲ್ಡರ್‌ನಿಂದ ರನ್ ಆಗುತ್ತಿದೆ. ಫೈಲ್ ಅಳಿಸಿದರೆ ಅಥವಾ ಫೋಲ್ಡರ್ ಸ್ವಚ್ಛಗೊಳಿಸಿದರೆ, ಪ್ರೋಗ್ರಾಂ ಕೆಲಸ ಮಾಡುವುದನ್ನು ನಿಲ್ಲಿಸುತ್ತದೆ.",
   "\nStarting with Windows will use the new place.": "\nWindows ಜೊತೆಗೆ ಪ್ರಾರಂಭವಾಗುವಾಗ ಹೊಸ ಸ್ಥಳವನ್ನು ಬಳಸಲಾಗುತ್ತದೆ.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nಪ್ರೋಗ್ರಾಂ ಅನ್ನು ಶಾಶ್ವತ ಸ್ಥಳಕ್ಕೆ ಸರಿಸಬೇಕೆ? ಅದನ್ನು ಇಲ್ಲಿಗೆ ನಕಲಿಸಲಾಗುತ್ತದೆ:\n{shown_dir}\nಪ್ರಾರಂಭ ಮೆನುಗೆ ಸೇರಿಸಲಾಗುತ್ತದೆ, ಮತ್ತು ಅಲ್ಲಿಂದ ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತದೆ. ನಿಮ್ಮ ಸೆಟ್ಟಿಂಗ್‌ಗಳು ಮತ್ತು ಸೂಚಿಕೆ ಹಾಗೆಯೇ ಉಳಿಯುತ್ತವೆ.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nಪ್ರೋಗ್ರಾಂ ಅನ್ನು ಶಾಶ್ವತ ಸ್ಥಳಕ್ಕೆ ಸರಿಸಬೇಕೆ? ಅದನ್ನು ಇಲ್ಲಿಗೆ ನಕಲಿಸಲಾಗುತ್ತದೆ:\n{shown_dir}\nಪ್ರಾರಂಭ ಮೆನು ಮತ್ತು ಡೆಸ್ಕ್‌ಟಾಪ್‌ಗೆ ಸೇರಿಸಲಾಗುತ್ತದೆ, ಮತ್ತು ಅಲ್ಲಿಂದ ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತದೆ. ನಿಮ್ಮ ಸೆಟ್ಟಿಂಗ್‌ಗಳು ಮತ್ತು ಸೂಚಿಕೆ ಹಾಗೆಯೇ ಉಳಿಯುತ್ತವೆ.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "ಪ್ರೋಗ್ರಾಂ ಅನ್ನು ಶಾಶ್ವತ ಸ್ಥಳಕ್ಕೆ ನಕಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ:\n{e}\n\nಪ್ರೋಗ್ರಾಂ ಈಗ ಇರುವ ಸ್ಥಳದಿಂದಲೇ ಕೆಲಸ ಮಾಡುತ್ತಿರುತ್ತದೆ.",
   "the new copy did not start": "ಹೊಸ ಪ್ರತಿ ಪ್ರಾರಂಭವಾಗಲಿಲ್ಲ",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "ಪ್ರೋಗ್ರಾಂ ಅನ್ನು ಶಾಶ್ವತ ಸ್ಥಳಕ್ಕೆ ನಕಲಿಸಲಾಗಿದೆ, ಆದರೆ ಅಲ್ಲಿಂದ ಮರುಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ ({e}).\nಪ್ರಾರಂಭ ಮೆನುವಿನಿಂದ ಅದನ್ನು ತೆರೆಯಿರಿ.",
@@ -786,7 +786,10 @@
   "toman": "ತೋಮಾನ್",
   "{d} {} {y} AH": "{d} {} {y} ಹಿಜರಿ",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total} ರಲ್ಲಿ {checked} ಡಾಕ್ಯುಮೆಂಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲಾಗಿದೆ…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "ಪ್ರೋಗ್ರಾಂ ಮತ್ತು ಸಿಸ್ಟಮ್ ಫೈಲ್‌ಗಳ ಒಳಗೂ ಓದಿ",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ಫೈಲ್ ಹೆಸರುಗಳು ಸಿದ್ಧ · ನಿಮ್ಮ ಫೋಲ್ಡರ್‌ಗಳ ಡಾಕ್ಯುಮೆಂಟ್‌ಗಳನ್ನು ಓದಲಾಗುತ್ತಿದೆ: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ಫೈಲ್ ಹೆಸರುಗಳು ಮತ್ತು ನಿಮ್ಮ ಫೋಲ್ಡರ್‌ಗಳು ಸಿದ್ಧ · ಇತರ ಡಾಕ್ಯುಮೆಂಟ್‌ಗಳನ್ನು ಓದಲಾಗುತ್ತಿದೆ: {checked} / {total}"
  },
  "js": {
   "ph": "ಫೈಲ್ ಹೆಸರುಗಳಲ್ಲಿ ಹುಡುಕಿ…",
@@ -837,7 +840,9 @@
    [
     "\"ಬಾಡಿಗೆ ಒಪ್ಪಂದ\"",
     "ನಿಖರ ಪದಗುಚ್ಛ"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "ಅರೇಬಿಕ್ ಮೂಲ ಪದ: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "ಪ್ರತಿ ಫಲಿತಾಂಶಕ್ಕೆ ಒಂದು ಸಾಲು, ಆದ್ದರಿಂದ ಹೆಚ್ಚು ಫಲಿತಾಂಶಗಳು ಹಿಡಿಸುತ್ತವೆ",
   "showPreview": "ಮುನ್ನೋಟವನ್ನು ತೋರಿಸಿ",
   "hidePreview": "ಮುನ್ನೋಟವನ್ನು ಮರೆಮಾಡಿ",
+  "clearQ": "ಹುಡುಕಾಟ ತೆರವುಗೊಳಿಸಿ",
+  "filtersBtn": "ಫಿಲ್ಟರ್‌ಗಳು",
+  "clearFilters": "ಎಲ್ಲ ಫಿಲ್ಟರ್‌ಗಳನ್ನು ತೆಗೆದುಹಾಕಿ",
+  "ixContents": "ದಾಖಲೆಗಳ ವಿಷಯವನ್ನು ಸೂಚಿಕೆ ಮಾಡಲಾಗುತ್ತಿದೆ · ${n}%",
+  "theme": "ಥೀಮ್",
+  "themeSub": "“ಸ್ವಯಂಚಾಲಿತ” Windows ನ ಲೈಟ್ ಅಥವಾ ಡಾರ್ಕ್ ಮೋಡ್ ಅನ್ನು ಅನುಸರಿಸುತ್ತದೆ",
+  "themes": {
+   "auto": "ಸ್ವಯಂಚಾಲಿತ",
+   "light": "ಲೈಟ್",
+   "dark": "ಡಾರ್ಕ್",
+   "midnight": "ಮಧ್ಯರಾತ್ರಿ ನೀಲಿ",
+   "kiwi": "ಕಿವಿ"
+  },
   "sMore": "ಇನ್ನಷ್ಟು",
   "sMoreRow": "ಇನ್ನಷ್ಟು ಆಯ್ಕೆಗಳು",
   "sMoreSub": "ನವೀಕರಣಗಳ ಪರಿಶೀಲನೆ, ಬೆಂಬಲ ಮತ್ತು ಪ್ರತಿಕ್ರಿಯೆ, ನಕಲಿ ಫೈಲ್‌ಗಳು ಮತ್ತು ಫೋಲ್ಡರ್ ಗಾತ್ರಗಳಂತಹ ಸಾಧನಗಳು, ಮತ್ತು ಎಲ್ಲಿಂದಲಾದರೂ ಹುಡುಕಿ ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
@@ -1049,12 +1067,14 @@
     "ಫೋಲ್ಡರ್‌ಗಳು ಮಾತ್ರ"
    ],
    [
-    "root: كتاب",
-    "ಅದೇ ಅರೇಬಿಕ್ ಮೂಲ ಪದ: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: reprot",
     "ಕಾಗುಣಿತ ದೋಷವನ್ನು ಸಹಿಸುತ್ತದೆ (“report” ಅನ್ನು ಹುಡುಕುತ್ತದೆ)"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "ಅದೇ ಅರೇಬಿಕ್ ಮೂಲ ಪದ: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"ಯಾವುದೇ ಪ್ರೋಗ್ರಾಂನಿಂದ ಸಣ್ಣ ಹುಡುಕಾಟ ಪೆಟ್ಟಿಗೆ\"], [\"Ctrl+Alt+G\", \"Save/Open ಸಂವಾದದಲ್ಲಿ: ಫಲಿತಾಂಶದ ಫೋಲ್ಡರ್‌ಗೆ ಹೋಗಿ\"], [\"Enter\", \"ಫೈಲ್ ತೆರೆಯಿರಿ\"], [\"Ctrl+Enter\", \"ಅದರ ಫೋಲ್ಡರ್ ತೆರೆಯಿರಿ\"], [\"↓\", \"ಫಲಿತಾಂಶಗಳಿಗೆ (ಖಾಲಿ ಪೆಟ್ಟಿಗೆಯಲ್ಲಿ: ಇತಿಹಾಸ)\"], [\"Ctrl+C\", \"ಫೈಲ್ ನಕಲಿಸಿ\"], [\"Ctrl+Shift+C\", \"ಪಾತ್ ನಕಲಿಸಿ\"], [\"F2\", \"ಮರುಹೆಸರಿಸಿ\"], [\"Delete\", \"ಮರುಬಳಕೆ ಬುಟ್ಟಿಗೆ\"], [\"F4\", \"ಫೈಲ್‌ನಲ್ಲಿನ ಎಲ್ಲಾ ಹೊಂದಾಣಿಕೆಗಳು\"], [\"Ctrl+H\", \"ಇತಿಹಾಸ\"], [\"Ctrl+T\", \"ಥಂಬ್‌ನೇಲ್‌ಗಳು\"], [\"Ctrl+,\", \"ಸೆಟ್ಟಿಂಗ್‌ಗಳು\"], [\"F1\", \"ಈ ಕಾರ್ಡ್\"]]",
   "helpKeysH": "ಕೀಬೋರ್ಡ್",
   "helpMore": "ಹುಡುಕುವ ಎಲ್ಲಾ ವಿಧಾನಗಳು…",
-  "helpSub": "ಉದಾಹರಣೆಯನ್ನು ಹುಡುಕಾಟ ಪೆಟ್ಟಿಗೆಯಲ್ಲಿ ಹಾಕಲು ಅದನ್ನು ಕ್ಲಿಕ್ ಮಾಡಿ. ಪ್ರತಿಯೊಂದು ಫಿಲ್ಟರ್‌ಗೂ ಅರೇಬಿಕ್ ಕಾಗುಣಿತವಿದೆ.",
+  "helpSub": "ಉದಾಹರಣೆಯನ್ನು ಹುಡುಕಾಟ ಪೆಟ್ಟಿಗೆಯಲ್ಲಿ ಹಾಕಲು ಅದನ್ನು ಕ್ಲಿಕ್ ಮಾಡಿ.",
+  "helpSubArab": "ಪ್ರತಿಯೊಂದು ಫಿಲ್ಟರ್‌ಗೂ ಅರೇಬಿಕ್ ಕಾಗುಣಿತವಿದೆ.",
   "kLabel": "ಕೀಬೋರ್ಡ್ ಶಾರ್ಟ್‌ಕಟ್‌ಗಳು",
   "offline": "ಡ್ರೈವ್ ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
   "qsNone": "ಸಂವಾದವನ್ನು ಸರಿಸಲು ಯಾವುದೇ ಫಲಿತಾಂಶವಿಲ್ಲ. ಹುಡುಕಾಟವನ್ನು ಬದಲಿಸಿ, ಅಥವಾ ರದ್ದುಗೊಳಿಸಲು Esc ಒತ್ತಿ.",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "ಫೋನ್‌ನಿಂದ ಹುಡುಕಿ (ಮನೆಯ ನೆಟ್‌ವರ್ಕ್)",
   "sPhoneSub": "ಅದೇ Wi-Fi ನಲ್ಲಿರುವ ನಿಮ್ಮ ಫೋನ್‌ನ ಬ್ರೌಸರ್‌ನಿಂದ ಈ PC ಯ ಫೈಲ್‌ಗಳನ್ನು ಹುಡುಕಿ. ಓದಲು ಮಾತ್ರ, ಮತ್ತು ನಿಮ್ಮ ಮನೆಯ ನೆಟ್‌ವರ್ಕ್‌ನಲ್ಲಿ ಮಾತ್ರ.",
   "sPhoneWait": "ನೆಟ್‌ವರ್ಕ್ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…",
-  "updChecking": "ನವೀಕರಣಗಳಿಗಾಗಿ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…"
+  "updChecking": "ನವೀಕರಣಗಳಿಗಾಗಿ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…",
+  "sReadPrograms": "ಪ್ರೋಗ್ರಾಂ ಮತ್ತು ಸಿಸ್ಟಮ್ ಫೈಲ್‌ಗಳ ಒಳಗೂ ಓದಿ"
  }
 }

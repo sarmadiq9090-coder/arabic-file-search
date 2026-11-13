@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind vaqtinchalik jilddan ishlamoqda (ehtimol zip fayl ichidan), Windows uni istalgan vaqtda tozalashi mumkin.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind Yuklanmalar jildingizdan ishlamoqda. Agar fayl oʻchirilsa yoki jild tozalansa, dastur ishlashdan toʻxtaydi.",
   "\nStarting with Windows will use the new place.": "\nWindows bilan ishga tushish yangi joydan foydalanadi.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nDastur doimiy joyga koʻchirilsinmi? U shu yerga nusxalanadi:\n{shown_dir}\nStart menyusiga qoʻshiladi va oʻsha yerdan qayta ishga tushiriladi. Sozlamalaringiz va indeksingiz oʻz holicha qoladi.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nDastur doimiy joyga koʻchirilsinmi? U shu yerga nusxalanadi:\n{shown_dir}\nStart menyusiga va ish stoliga qoʻshiladi va oʻsha yerdan qayta ishga tushiriladi. Sozlamalaringiz va indeksingiz oʻz holicha qoladi.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "Dasturni doimiy joyga nusxalab boʻlmadi:\n{e}\n\nDastur turgan joyidan ishlashda davom etadi.",
   "the new copy did not start": "yangi nusxa ishga tushmadi",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "Dastur doimiy joyga nusxalandi, lekin u yerdan qayta ishga tusha olmadi ({e}).\nUni Start menyusidan oching.",
@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "hijriy {y}-yil {d}-{}",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} / {total} hujjat tekshirildi…",
-  "{}, {d} {} {y}": "{}, {y}-yil {d}-{}"
+  "{}, {d} {} {y}": "{}, {y}-yil {d}-{}",
+  "Also read inside program and system files": "Dastur va tizim fayllari ichini ham oʻqish",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Fayl nomlari tayyor · jildlaringizdagi hujjatlar oʻqilmoqda: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Fayl nomlari va jildlaringiz tayyor · boshqa hujjatlar oʻqilmoqda: {checked} / {total}"
  },
  "js": {
   "ph": "Fayl nomlarida qidiring…",
@@ -837,7 +840,9 @@
    [
     "\"ijara shartnomasi\"",
     "Aynan shu ibora"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Arab tilidagi oʻzak: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "«أحمد» ni ham topadi"
    ]
+  ],
+  "tipFold": [
+   "cafe",
+   "“café” ni ham topadi"
   ],
   "kNav": "Harakat",
   "kOpen": "Ochish",
@@ -969,6 +978,19 @@
   "compactSub": "Har bir natija uchun bitta qator, shunda koʻproq sigʻadi",
   "showPreview": "Oldindan koʻrishni koʻrsatish",
   "hidePreview": "Oldindan koʻrishni yashirish",
+  "clearQ": "Qidiruvni tozalash",
+  "filtersBtn": "Filtrlar",
+  "clearFilters": "Barcha filtrlarni olib tashlash",
+  "ixContents": "Hujjatlar mazmuni indekslanmoqda · ${n}%",
+  "theme": "Mavzu",
+  "themeSub": "“Avtomatik” Windows’ning yorug‘ yoki qorong‘i rejimiga mos keladi",
+  "themes": {
+   "auto": "Avtomatik",
+   "light": "Yorug‘",
+   "dark": "Qorong‘i",
+   "midnight": "Yarim tun ko‘ki",
+   "kiwi": "Kivi"
+  },
   "sMore": "Yana",
   "sMoreRow": "Boshqa parametrlar",
   "sMoreSub": "Yangilanishlarni tekshirish, yordam va fikr-mulohaza, takroriy fayllar va jildlar hajmi kabi vositalar hamda istalgan joydan qidirish sozlamalari",
@@ -1049,12 +1071,14 @@
     "faqat jildlar"
    ],
    [
-    "root: كتاب",
-    "bir xil arabcha oʻzak: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: hisbot",
     "imlo xatosiga chidaydi"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "bir xil arabcha oʻzak: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"istalgan dasturdan kichik qidiruv maydoni\"], [\"Ctrl+Alt+G\", \"Saqlash/Ochish oynasida: natija jildiga oʻtish\"], [\"Enter\", \"faylni ochish\"], [\"Ctrl+Enter\", \"uning jildini ochish\"], [\"↓\", \"natijalarga (boʻsh maydonda: tarix)\"],\n        [\"Ctrl+C\", \"faylni nusxalash\"], [\"Ctrl+Shift+C\", \"yoʻlni nusxalash\"], [\"F2\", \"nomini oʻzgartirish\"], [\"Delete\", \"Savatga\"], [\"F4\", \"fayldagi barcha mosliklar\"], [\"Ctrl+H\", \"tarix\"], [\"Ctrl+T\", \"eskizlar\"], [\"Ctrl+,\", \"sozlamalar\"], [\"F1\", \"shu karta\"]]",
   "helpKeysH": "Klaviatura",
   "helpMore": "Qidirishning barcha usullari…",
-  "helpSub": "Qidiruv maydoniga qoʻyish uchun misolni bosing. Har bir filtrning arabcha yozilishi ham bor.",
+  "helpSub": "Qidiruv maydoniga qoʻyish uchun misolni bosing.",
+  "helpSubArab": "Har bir filtrning arabcha yozilishi ham bor.",
   "kLabel": "Tugmalar birikmalari",
   "offline": "disk ulanmagan",
   "qsNone": "Oynani jildiga koʻchirish uchun natija yoʻq. Qidiruvni oʻzgartiring yoki bekor qilish uchun Esc ni bosing.",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "Telefondan qidirish (uy tarmogʻi)",
   "sPhoneSub": "Xuddi shu Wi-Fi tarmogʻidagi telefoningiz brauzeridan bu kompyuter fayllarini qidiring. Faqat oʻqish uchun va faqat uy tarmogʻingizda.",
   "sPhoneWait": "Tarmoq tekshirilmoqda…",
-  "updChecking": "Yangilanishlar tekshirilmoqda…"
+  "updChecking": "Yangilanishlar tekshirilmoqda…",
+  "sReadPrograms": "Dastur va tizim fayllari ichini ham oʻqish"
  }
 }

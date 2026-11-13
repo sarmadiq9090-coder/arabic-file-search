@@ -12,6 +12,8 @@
     "cancel": "Cancel",
     "chooseFolder": "Choose folder…",
     "clearFilter": "Remove",
+    "clearFilters": "Clear all filters",
+    "clearQ": "Clear search",
     "clearRecent": "Clear history and recent files",
     "clearSaved": "Delete all saved searches",
     "close": "Close",
@@ -32,6 +34,7 @@
     "fileOf": "FN:(x) => `${x} file`",
     "files": "FN:(n) => `Index up to date · ${num(n)} files`",
     "filters": "Filters",
+    "filtersBtn": "Filters",
     "firstLines": "FN:(n) => `(first ${num(n)} lines)`",
     "folder": "Folder",
     "gone": "Moved to the Recycle Bin",
@@ -86,12 +89,14 @@
         "folders only"
       ],
       [
-        "root: كتاب",
-        "same Arabic root: مكتبة، الكاتب"
-      ],
-      [
         "fuzzy: reprot",
         "tolerates a typo"
+      ]
+    ],
+    "helpExArab": [
+      [
+        "root: كتاب",
+        "same Arabic root: مكتبة، الكاتب"
       ],
       [
         "حجم:>1ج",
@@ -105,14 +110,16 @@
     "helpH": "How to search",
     "helpInside": "To search inside documents (PDF, Word, Excel, pictures): press “Inside documents”, then Enter.",
     "helpKey": "How to search (F1)",
-    "helpKeys": "FN:(hk) => [[hk, \"the small search box from any program\"], [\"Ctrl+Alt+G\", \"in a Save/Open dialog: go to a result's folder\"], [\"Enter\", \"open the file\"], [\"Ctrl+Enter\", \"open its folder\"], [\"↓\", \"to the results (in an empty box: history)\"],\n        [\"Ctrl+C\", \"copy the file\"], [\"Ctrl+Shift+C\", \"copy the path\"], [\"F2\", \"rename\"], [\"Delete\", \"to the Recycle Bin\"], [\"F4\", \"all matches in the file\"], [\"Ctrl+H\", \"history\"], [\"Ctrl+T\", \"thumbnails\"], [\"Ctrl+,\", \"settings\"], [\"F1\", \"this card\"]]",
+    "helpKeys": "FN:(hk) => [[hk, \"the small search box from any program\"], [\"Ctrl+Alt+G\", \"in a Save/Open dialog: go to a result's folder\"], [\"Enter\", \"open the file\"], [\"Ctrl+Enter\", \"open its folder\"], [\"↓\", \"to the results (in an empty box: history)\"],\r\n        [\"Ctrl+C\", \"copy the file\"], [\"Ctrl+Shift+C\", \"copy the path\"], [\"F2\", \"rename\"], [\"Delete\", \"to the Recycle Bin\"], [\"F4\", \"all matches in the file\"], [\"Ctrl+H\", \"history\"], [\"Ctrl+T\", \"thumbnails\"], [\"Ctrl+,\", \"settings\"], [\"F1\", \"this card\"]]",
     "helpKeysH": "Keyboard",
     "helpMore": "All the ways to search…",
-    "helpSub": "Click an example to put it in the search box. Every filter also has an Arabic spelling.",
+    "helpSub": "Click an example to put it in the search box.",
+    "helpSubArab": "Every filter also has an Arabic spelling.",
     "hidePreview": "Hide the preview",
     "history": "History",
     "historyKey": "History (Ctrl+H)",
     "inside": "Inside documents",
+    "ixContents": "FN:(n) => `Indexing document contents · ${n}%`",
     "ixSub": "You can search now; results may be incomplete until we finish. The list updates by itself.",
     "kFolder": "Folder",
     "kLabel": "Keyboard shortcuts",
@@ -225,6 +232,7 @@
     "sPhoneSub": "Search this PC's files from your phone's browser on the same Wi-Fi. Read-only, and only on your home network.",
     "sPhoneWait": "Checking the network…",
     "sReadCloud": "Read contents of cloud-only files (downloads them)",
+    "sReadPrograms": "Also read inside program and system files",
     "sReportRow": "Report a problem",
     "sReportSub": "Shows what would be shared first; then you send it by email or on the GitHub page (which is public: anyone can read it). Nothing is sent automatically, and file names and paths are removed.",
     "sSearch": "Search and indexing",
@@ -263,6 +271,19 @@
     "switchedText": "This is InstaFind's new look.",
     "tagHead": "Nothing gets lost silently",
     "tagTail": ": when we find nothing, we tell you where we looked and what to try.",
+    "theme": "Theme",
+    "themeSub": "“Automatic” follows Windows' light or dark mode",
+    "themes": {
+      "auto": "Automatic",
+      "dark": "Dark",
+      "kiwi": "Kiwi",
+      "light": "Light",
+      "midnight": "Midnight blue"
+    },
+    "tipFold": [
+      "cafe",
+      "Also finds “café”"
+    ],
     "tips": [
       [
         "report .pdf",
@@ -279,7 +300,9 @@
       [
         "\"lease agreement\"",
         "Exact phrase"
-      ],
+      ]
+    ],
+    "tipsArab": [
       [
         "root: كتاب",
         "Arabic root: مكتبة، الكاتب"
@@ -319,6 +342,8 @@
     "cancel": "إلغاء",
     "chooseFolder": "اختيار مجلد…",
     "clearFilter": "إزالة",
+    "clearFilters": "إزالة كل عوامل التصفية",
+    "clearQ": "مسح البحث",
     "clearRecent": "مسح السجل والملفات الأخيرة",
     "clearSaved": "حذف كل البحوث المحفوظة",
     "close": "إغلاق",
@@ -339,6 +364,7 @@
     "fileOf": "FN:(x) => `ملف ${x}`",
     "files": "FN:(n) => `الفهرس محدَّث · عدد الملفات: ${num(n)}`",
     "filters": "عوامل التصفية",
+    "filtersBtn": "التصفية",
     "firstLines": "FN:(n) => `(أول الأسطر فقط، عددها: ${num(n)})`",
     "folder": "مجلد",
     "gone": "نُقل إلى سلة المحذوفات",
@@ -393,12 +419,14 @@
         "المجلدات فقط"
       ],
       [
-        "جذر: كتاب",
-        "مكتبة، الكاتب، كتابات"
-      ],
-      [
         "تقريب: تقريز",
         "يتحمّل خطأً إملائياً"
+      ]
+    ],
+    "helpExArab": [
+      [
+        "جذر: كتاب",
+        "مكتبة، الكاتب، كتابات"
       ],
       [
         "size:>1gb",
@@ -412,14 +440,16 @@
     "helpH": "كيف أبحث؟",
     "helpInside": "للبحث داخل المستندات (PDF وWord وExcel والصور): اضغط «داخل المستندات» ثم Enter.",
     "helpKey": "كيف أبحث؟ (F1)",
-    "helpKeys": "FN:(hk) => [[hk, \"خانة البحث الصغيرة من أي برنامج\"], [\"Ctrl+Alt+G\", \"في نافذة حفظ أو فتح: الانتقال إلى مجلد نتيجة\"], [\"Enter\", \"فتح الملف\"], [\"Ctrl+Enter\", \"فتح مجلده\"], [\"↓\", \"إلى النتائج (وفي خانة فارغة: السجل)\"],\n        [\"Ctrl+C\", \"نسخ الملف\"], [\"Ctrl+Shift+C\", \"نسخ المسار\"], [\"F2\", \"تغيير الاسم\"], [\"Delete\", \"إلى سلة المحذوفات\"], [\"F4\", \"كل التطابقات داخل الملف\"], [\"Ctrl+H\", \"السجل\"], [\"Ctrl+T\", \"المصغرات\"], [\"Ctrl+,\", \"الإعدادات\"], [\"F1\", \"هذه البطاقة\"]]",
+    "helpKeys": "FN:(hk) => [[hk, \"خانة البحث الصغيرة من أي برنامج\"], [\"Ctrl+Alt+G\", \"في نافذة حفظ أو فتح: الانتقال إلى مجلد نتيجة\"], [\"Enter\", \"فتح الملف\"], [\"Ctrl+Enter\", \"فتح مجلده\"], [\"↓\", \"إلى النتائج (وفي خانة فارغة: السجل)\"],\r\n        [\"Ctrl+C\", \"نسخ الملف\"], [\"Ctrl+Shift+C\", \"نسخ المسار\"], [\"F2\", \"تغيير الاسم\"], [\"Delete\", \"إلى سلة المحذوفات\"], [\"F4\", \"كل التطابقات داخل الملف\"], [\"Ctrl+H\", \"السجل\"], [\"Ctrl+T\", \"المصغرات\"], [\"Ctrl+,\", \"الإعدادات\"], [\"F1\", \"هذه البطاقة\"]]",
     "helpKeysH": "لوحة المفاتيح",
     "helpMore": "كل طرق البحث…",
     "helpSub": "انقر مثالاً ليُكتب في خانة البحث. تعمل الأمثلة بالعربية والإنجليزية، والأرقام العربية مقبولة.",
+    "helpSubArab": "",
     "hidePreview": "إخفاء المعاينة",
     "history": "السجل",
     "historyKey": "السجل (Ctrl+H)",
     "inside": "داخل المستندات",
+    "ixContents": "FN:(n) => `فهرسة محتوى المستندات · ${n}٪`",
     "ixSub": "يمكنك البحث الآن. قد تكون النتائج ناقصة إلى أن تنتهي الفهرسة، وتكتمل القائمة تلقائياً.",
     "kFolder": "المجلد",
     "kLabel": "اختصارات لوحة المفاتيح",
@@ -532,6 +562,7 @@
     "sPhoneSub": "ابحث في ملفات هذا الحاسوب من متصفح هاتفك المتصل بشبكة Wi-Fi نفسها. للقراءة فقط، ويعمل في شبكة البيت فقط.",
     "sPhoneWait": "جارٍ التحقق من الشبكة…",
     "sReadCloud": "قراءة محتوى الملفات الموجودة على السحابة فقط (يُنزّلها من الإنترنت)",
+    "sReadPrograms": "اقرأ داخل ملفات البرامج والنظام أيضاً",
     "sReportRow": "الإبلاغ عن مشكلة",
     "sReportSub": "تعرض ما سيُشارَك قبل أي شيء، ثم ترسله أنت بالبريد أو من صفحة GitHub (وهي عامة يراها أي أحد). لا يُرسل شيء تلقائياً، وأسماء الملفات والمسارات تُحذف.",
     "sSearch": "البحث والفهرسة",
@@ -570,6 +601,19 @@
     "switchedText": "هذا هو الشكل الجديد لبحث سريع.",
     "tagHead": "لا شيء يضيع بصمت",
     "tagTail": ": إذا لم نجد شيئاً نقول لك أين بحثنا وماذا تجرّب.",
+    "theme": "السمة",
+    "themeSub": "«تلقائي» يتبع الوضع الفاتح أو الداكن في ويندوز",
+    "themes": {
+      "auto": "تلقائي",
+      "dark": "داكن",
+      "kiwi": "كيوي",
+      "light": "فاتح",
+      "midnight": "ليلي أزرق"
+    },
+    "tipFold": [
+      "cafe",
+      "يجد «café» أيضاً"
+    ],
     "tips": [
       [
         "تقرير .pdf",
@@ -586,7 +630,9 @@
       [
         "\"عقد إيجار\"",
         "العبارة كما هي"
-      ],
+      ]
+    ],
+    "tipsArab": [
       [
         "جذر: كتاب",
         "مكتبة، الكاتب، كتابات"
@@ -673,6 +719,7 @@
     "All types": "كل الأنواع",
     "Allow downloading result files to the phone": "السماح بتنزيل ملفات النتائج إلى الهاتف",
     "Allow this network": "السماح بهذه الشبكة",
+    "Also read inside program and system files": "اقرأ داخل ملفات البرامج والنظام أيضاً",
     "Also search inside documents": "البحث داخل المستندات أيضاً",
     "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "الاختصار Alt+Space مستخدم من برنامج آخر، فلا يمكن استخدامه هنا. يبقى {} متاحاً.",
     "Alt+Space opens the quick search": "Alt+Space يفتح نافذة البحث الصغيرة",
@@ -847,7 +894,9 @@
     "File": "الملف",
     "File copied. Paste it anywhere with Ctrl+V.": "تم نسخ الملف. الصقه حيث تريد بـ Ctrl+V.",
     "File name or a word…": "اسم الملف أو كلمة…",
+    "File names and your folders ready · reading other documents: {checked} of {total}": "أسماء الملفات ومجلداتك جاهزة · تُقرأ بقية المستندات: {checked} من {total}",
     "File names ready · reading inside documents: {checked} of {total}": "أسماء الملفات جاهزة · تُقرأ محتويات المستندات: {checked} من {total}",
+    "File names ready · reading inside your folders: {checked} of {mine}": "أسماء الملفات جاهزة · تُقرأ مستندات مجلداتك: {checked} من {mine}",
     "File system": "نظام الملفات",
     "Files": "عدد الملفات",
     "Find duplicate files…": "البحث عن الملفات المكررة…",
@@ -907,7 +956,7 @@
     "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "يعمل «InstaFind» الآن من مجلد التنزيلات. إذا حُذف الملف أو نُظّف المجلد سيتوقف البرنامج.",
     "InstaFind is still running. Open it from its icon next to the clock. To close it completely: Options ▸ Exit the program.": "بحث سريع ما زال يعمل. افتحه من أيقونته بجانب الساعة. للإغلاق نهائياً: خيارات ← خروج من البرنامج.",
     "InstaFind is still running. Open it with {key}. To close it completely: Options ▸ Exit the program.": "بحث سريع ما زال يعمل. افتحه بـ {key}. للإغلاق نهائياً: خيارات ← خروج من البرنامج.",
-    "InstaFind ran into an internal error last time. A report about it was saved on your computer only.\n\nSend it to the developer so it can be fixed? A GitHub page opens with the report (version, Windows version and where in the program it happened) for you to review before pressing “Submit”. Nothing is sent automatically.": "حدث خطأ داخلي في بحث سريع في المرة السابقة، وحُفظ تقرير عنه على جهازك فقط.\n\nهل تريد إرساله للمطوّر لإصلاحه؟ ستُفتح صفحة GitHub فيها التقرير (رقم الإصدار، نظام ويندوز، ومكان الخطأ في البرنامج) لتراجعها قبل الضغط على «Submit». لا يُرسَل شيء تلقائياً.",
+    "InstaFind ran into an internal error last time. A report about it was saved on your computer only.\n\n\r\n             Send it to the developer so it can be fixed? A GitHub page opens with the report (version, Windows version and where in the program it happened) for you to review before pressing “Submit”. Nothing is sent automatically.": "حدث خطأ داخلي في بحث سريع في المرة السابقة، وحُفظ تقرير عنه على جهازك فقط.\n\n\r\n             هل تريد إرساله للمطوّر لإصلاحه؟ ستُفتح صفحة GitHub فيها التقرير (رقم الإصدار، نظام ويندوز، ومكان الخطأ في البرنامج) لتراجعها قبل الضغط على «Submit». لا يُرسَل شيء تلقائياً.",
     "InstaFind search box — click it or press {}": "خانة بحث سريع — انقرها أو اضغط {}",
     "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "بحث سريع (InstaFind) — الإصدار {}\nبحث فوري عن الملفات وداخل المستندات، بالعربية والإنجليزية.\n\nاضغط {hk} من أي مكان لتبحث.\n{}\n\nالدعم: {}\n{}\n\nتراخيص المكوّنات الخارجية التي يستعملها البرنامج في THIRD-PARTY-NOTICES.txt. هل تريد فتحه؟",
     "Installed apps": "التطبيقات المثبتة",
@@ -972,7 +1021,7 @@
     "No files match your search. Try:": "لم نجد ملفات تطابق بحثك. جرّب:",
     "No home network connection found; it works on this PC only.": "لم يُعثر على اتصال بشبكة منزلية، يعمل على هذا الحاسوب فقط.",
     "No home network connection found; it works on this PC only:": "لم يُعثر على اتصال بشبكة منزلية، يعمل على هذا الحاسوب فقط",
-    "No index yet: open InstaFind once to build it, then try again.\n": "لا يوجد فهرس بعد: افتح برنامج «بحث سريع» مرة واحدة لبنائه، ثم أعد المحاولة.\nNo index yet: open InstaFind once to build it, then try again.\n",
+    "No index yet: open InstaFind once to build it, then try again.\r\n": "لا يوجد فهرس بعد: افتح برنامج «بحث سريع» مرة واحدة لبنائه، ثم أعد المحاولة.\r\nNo index yet: open InstaFind once to build it, then try again.\r\n",
     "No mail program opened. Press “Copy” and send the report to {}.": "لا يوجد برنامج بريد يفتح هنا. اضغط «نسخ» وأرسل التقرير إلى {}.",
     "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "لا يوجد برنامج بريد يفتح هنا. نُسخ التقرير: الصقه في رسالة إلى {} من بريدك (من الهاتف أو المتصفح).",
     "No plain text files in the current results.": "لا توجد ملفات نصية عادية في النتائج الحالية.",
@@ -1129,7 +1178,7 @@
     "Search the names of this PC's files. The same syntax works: ext:pdf, dm:today, size:>10mb…": "ابحث في أسماء ملفات هذا الحاسوب. يمكن استخدام نفس صيغ البحث: ext:pdf و dm:today و size:>10mb…",
     "Search the web": "ابحث في الويب",
     "Search the web for “{terms}”": "ابحث في الويب عن «{terms}»",
-    "Search this PC's files from your phone's browser on the same home network (Wi-Fi): open the address below and type the PIN. Read-only, and only devices on the local network are accepted.\r\nWindows Firewall may ask the first time: allow private networks only, not public ones. Turn it off when you don't need it.": "ابحث في ملفات هذا الحاسوب من متصفح هاتفك المتصل بشبكة المنزل (Wi-Fi) نفسها: افتح العنوان أدناه واكتب الرمز السري. للقراءة فقط، ولا يقبل إلا أجهزة الشبكة المحلية.\r\nقد يسألك جدار حماية ويندوز في أول مرة: اسمح بالشبكات الخاصة فقط، لا العامة. أوقفه حين لا تحتاجه.",
+    "Search this PC's files from your phone's browser on the same home network (Wi-Fi): open the address below and type the PIN. \r\nRead-only, and only devices on the local network are accepted.\r\n\r\nWindows Firewall may ask the first time: allow private networks only, not public ones. Turn it off when you don't need it.": "ابحث في ملفات هذا الحاسوب من متصفح هاتفك المتصل بشبكة المنزل (Wi-Fi) نفسها: افتح العنوان أدناه واكتب الرمز السري. \r\nللقراءة فقط، ولا يقبل إلا أجهزة الشبكة المحلية.\r\n\r\nقد يسألك جدار حماية ويندوز في أول مرة: اسمح بالشبكات الخاصة فقط، لا العامة. أوقفه حين لا تحتاجه.",
     "Search {name} for “{terms}”": "ابحث في {name} عن «{terms}»",
     "Search...": "ابحث...",
     "Searched {} documents: found {} files.{cached}": "انتهى البحث. المستندات المفحوصة: {}، عدد النتائج: {}.{cached}",
@@ -1363,7 +1412,7 @@
     "{status} (showing the first {} results only; add a word or pick a folder to narrow the search.)": "{status} (تُعرض أول النتائج فقط، وعددها: {}؛ أضف كلمة أو اختر مجلداً لتضييق البحث.)",
     "{total} results": "عدد النتائج: {total}",
     "{total} results (showing the first {shown})": "عدد النتائج: {total} (تظهر أول {shown})",
-    "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nهل تريد نقل البرنامج إلى مكان دائم؟ سيُنسخ إلى:\n{shown_dir}\nوتُضاف له أيقونة في قائمة «ابدأ»، ثم يُعاد تشغيله من هناك. إعداداتك وفهرسك يبقيان كما هما.{autostart_line}",
+    "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nهل تريد نقل البرنامج إلى مكان دائم؟ سيُنسخ إلى:\n{shown_dir}\nوتُضاف له أيقونة في قائمة «ابدأ» وعلى سطح المكتب، ثم يُعاد تشغيله من هناك. إعداداتك وفهرسك يبقيان كما هما.{autostart_line}",
     "{}\r\nMatches: {}\r\n": "{}\r\nعدد التطابقات: {}\r\n",
     "{} bytes": "{} بايت",
     "{} files restored.": "أُرجعت الملفات. عددها: {}.",

@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind ഒരു താൽക്കാലിക ഫോൾഡറിൽ നിന്നാണ് (ഒരുപക്ഷേ ഒരു zip ഫയലിനുള്ളിൽ നിന്ന്) പ്രവർത്തിക്കുന്നത്, Windows അത് എപ്പോൾ വേണമെങ്കിലും ശൂന്യമാക്കിയേക്കാം.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind നിങ്ങളുടെ ഡൗൺലോഡുകൾ ഫോൾഡറിൽ നിന്നാണ് പ്രവർത്തിക്കുന്നത്. ഫയൽ ഇല്ലാതാക്കിയാലോ ഫോൾഡർ വൃത്തിയാക്കിയാലോ, പ്രോഗ്രാം പ്രവർത്തിക്കുന്നത് നിർത്തും.",
   "\nStarting with Windows will use the new place.": "\nWindows-നൊപ്പം ആരംഭിക്കുമ്പോൾ പുതിയ സ്ഥലം ഉപയോഗിക്കും.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nപ്രോഗ്രാം ഒരു സ്ഥിരമായ സ്ഥലത്തേക്ക് നീക്കണോ? ഇത് ഇവിടേക്ക് പകർത്തും:\n{shown_dir}\nആരംഭ മെനുവിൽ ചേർക്കും, അവിടെ നിന്ന് പുനരാരംഭിക്കും. നിങ്ങളുടെ ക്രമീകരണങ്ങളും സൂചികയും അതേപടി നിലനിൽക്കും.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nപ്രോഗ്രാം ഒരു സ്ഥിരമായ സ്ഥലത്തേക്ക് നീക്കണോ? ഇത് ഇവിടേക്ക് പകർത്തും:\n{shown_dir}\nആരംഭ മെനുവിലും ഡെസ്ക്ടോപ്പിലും ചേർക്കും, അവിടെ നിന്ന് പുനരാരംഭിക്കും. നിങ്ങളുടെ ക്രമീകരണങ്ങളും സൂചികയും അതേപടി നിലനിൽക്കും.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "പ്രോഗ്രാം സ്ഥിരമായ സ്ഥലത്തേക്ക് പകർത്താൻ കഴിഞ്ഞില്ല:\n{e}\n\nപ്രോഗ്രാം ഇപ്പോഴുള്ള സ്ഥലത്ത് നിന്ന് തന്നെ പ്രവർത്തിക്കുന്നത് തുടരും.",
   "the new copy did not start": "പുതിയ പകർപ്പ് ആരംഭിച്ചില്ല",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "പ്രോഗ്രാം സ്ഥിരമായ സ്ഥലത്തേക്ക് പകർത്തി, പക്ഷേ അവിടെ നിന്ന് പുനരാരംഭിക്കാൻ കഴിഞ്ഞില്ല ({e}).\nആരംഭ മെനുവിൽ നിന്ന് ഇത് തുറക്കുക.",
@@ -786,7 +786,10 @@
   "toman": "ടോമൻ",
   "{d} {} {y} AH": "{d} {} {y} ഹിജ്റ",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total} പ്രമാണങ്ങളിൽ {checked} എണ്ണം പരിശോധിച്ചു…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "പ്രോഗ്രാം, സിസ്റ്റം ഫയലുകൾക്കുള്ളിലും വായിക്കുക",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ഫയൽ പേരുകൾ തയ്യാർ · നിങ്ങളുടെ ഫോൾഡറുകളിലെ പ്രമാണങ്ങൾ വായിക്കുന്നു: {mine}-ൽ {checked}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ഫയൽ പേരുകളും നിങ്ങളുടെ ഫോൾഡറുകളും തയ്യാർ · മറ്റ് പ്രമാണങ്ങൾ വായിക്കുന്നു: {total}-ൽ {checked}"
  },
  "js": {
   "ph": "ഫയൽ പേരുകളിൽ തിരയുക…",
@@ -837,7 +840,9 @@
    [
     "\"വാടക കരാർ\"",
     "കൃത്യമായ വാചകം"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "അറബി മൂലപദം: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "ഓരോ ഫലത്തിനും ഒരു വരി, അതിനാൽ കൂടുതൽ ഫലങ്ങൾ ഉൾക്കൊള്ളും",
   "showPreview": "പ്രിവ്യൂ കാണിക്കുക",
   "hidePreview": "പ്രിവ്യൂ മറയ്ക്കുക",
+  "clearQ": "തിരയൽ മായ്ക്കുക",
+  "filtersBtn": "ഫിൽട്ടറുകൾ",
+  "clearFilters": "എല്ലാ ഫിൽട്ടറുകളും നീക്കുക",
+  "ixContents": "പ്രമാണങ്ങളുടെ ഉള്ളടക്കം സൂചികയിലാക്കുന്നു · ${n}%",
+  "theme": "തീം",
+  "themeSub": "“സ്വയമേവ” Windows-ന്റെ ലൈറ്റ് അല്ലെങ്കിൽ ഡാർക്ക് മോഡ് പിന്തുടരുന്നു",
+  "themes": {
+   "auto": "സ്വയമേവ",
+   "light": "ലൈറ്റ്",
+   "dark": "ഡാർക്ക്",
+   "midnight": "അർധരാത്രി നീല",
+   "kiwi": "കിവി"
+  },
   "sMore": "കൂടുതൽ",
   "sMoreRow": "കൂടുതൽ ഓപ്ഷനുകൾ",
   "sMoreSub": "അപ്‌ഡേറ്റ് പരിശോധന, പിന്തുണയും ഫീഡ്ബാക്കും, തനിപ്പകർപ്പ് ഫയലുകളും ഫോൾഡർ വലുപ്പങ്ങളും പോലുള്ള ടൂളുകൾ, എവിടെ നിന്നും തിരയുക ക്രമീകരണങ്ങൾ",
@@ -1049,12 +1067,14 @@
     "ഫോൾഡറുകൾ മാത്രം"
    ],
    [
-    "root: كتاب",
-    "അതേ അറബി മൂലപദം: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: reprot",
     "അക്ഷരത്തെറ്റ് സഹിക്കും (“report” കണ്ടെത്തും)"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "അതേ അറബി മൂലപദം: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"ഏത് പ്രോഗ്രാമിൽ നിന്നും ചെറിയ തിരയൽ ബോക്സ്\"], [\"Ctrl+Alt+G\", \"Save/Open ഡയലോഗിൽ: ഒരു ഫലത്തിന്റെ ഫോൾഡറിലേക്ക് പോകുക\"], [\"Enter\", \"ഫയൽ തുറക്കുക\"], [\"Ctrl+Enter\", \"അതിന്റെ ഫോൾഡർ തുറക്കുക\"], [\"↓\", \"ഫലങ്ങളിലേക്ക് (ശൂന്യമായ ബോക്സിൽ: ചരിത്രം)\"], [\"Ctrl+C\", \"ഫയൽ പകർത്തുക\"], [\"Ctrl+Shift+C\", \"പാത്ത് പകർത്തുക\"], [\"F2\", \"പേരുമാറ്റുക\"], [\"Delete\", \"റീസൈക്കിൾ ബിന്നിലേക്ക്\"], [\"F4\", \"ഫയലിലെ എല്ലാ പൊരുത്തങ്ങളും\"], [\"Ctrl+H\", \"ചരിത്രം\"], [\"Ctrl+T\", \"ലഘുചിത്രങ്ങൾ\"], [\"Ctrl+,\", \"ക്രമീകരണങ്ങൾ\"], [\"F1\", \"ഈ കാർഡ്\"]]",
   "helpKeysH": "കീബോർഡ്",
   "helpMore": "തിരയാനുള്ള എല്ലാ വഴികളും…",
-  "helpSub": "ഒരു ഉദാഹരണം തിരയൽ ബോക്സിൽ ഇടാൻ അതിൽ ക്ലിക്ക് ചെയ്യുക. ഓരോ ഫിൽട്ടറിനും ഒരു അറബി അക്ഷരവിന്യാസവുമുണ്ട്.",
+  "helpSub": "ഒരു ഉദാഹരണം തിരയൽ ബോക്സിൽ ഇടാൻ അതിൽ ക്ലിക്ക് ചെയ്യുക.",
+  "helpSubArab": "ഓരോ ഫിൽട്ടറിനും ഒരു അറബി അക്ഷരവിന്യാസവുമുണ്ട്.",
   "kLabel": "കീബോർഡ് കുറുക്കുവഴികൾ",
   "offline": "ഡ്രൈവ് കണക്റ്റ് ചെയ്തിട്ടില്ല",
   "qsNone": "ഡയലോഗ് നീക്കാൻ ഫലമൊന്നുമില്ല. തിരയൽ മാറ്റുക, അല്ലെങ്കിൽ റദ്ദാക്കാൻ Esc അമർത്തുക.",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "ഫോണിൽ നിന്ന് തിരയുക (ഹോം നെറ്റ്‌വർക്ക്)",
   "sPhoneSub": "അതേ Wi-Fi-യിലുള്ള നിങ്ങളുടെ ഫോണിന്റെ ബ്രൗസറിൽ നിന്ന് ഈ PC-യിലെ ഫയലുകൾ തിരയുക. വായിക്കാൻ മാത്രം, നിങ്ങളുടെ ഹോം നെറ്റ്‌വർക്കിൽ മാത്രം.",
   "sPhoneWait": "നെറ്റ്‌വർക്ക് പരിശോധിക്കുന്നു…",
-  "updChecking": "അപ്‌ഡേറ്റുകൾക്കായി പരിശോധിക്കുന്നു…"
+  "updChecking": "അപ്‌ഡേറ്റുകൾക്കായി പരിശോധിക്കുന്നു…",
+  "sReadPrograms": "പ്രോഗ്രാം, സിസ്റ്റം ഫയലുകൾക്കുള്ളിലും വായിക്കുക"
  }
 }

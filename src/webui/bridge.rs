@@ -129,6 +129,8 @@ pub enum Setting {
     ContentIndex,
     /// Read cloud-only files too, which downloads them.
     ReadCloudFiles,
+    /// Read inside program and system files too.
+    ReadProgramFiles,
     /// Update the index when files change.
     AutoIndex,
     /// Leave Windows' own files out of the results.
@@ -283,6 +285,9 @@ pub enum Request {
     /// [`crate::settings::Hotkey::ALL`]; refused by Windows when another
     /// program has it, then the old one stays).
     Hotkey { key: crate::settings::Hotkey },
+    /// Use colour theme `key` for the main window from now on (one of
+    /// [`crate::settings::Theme::ALL`]); the page has already applied it.
+    Theme { key: crate::settings::Theme },
     /// Search from phone: allow the network this PC is on now (Windows
     /// does not mark it private, or it is not the home network).
     PhoneAllow {},
@@ -425,6 +430,7 @@ pub struct SettingsOut {
     pub autostart: bool,
     pub content_index: bool,
     pub read_cloud_files: bool,
+    pub read_program_files: bool,
     pub auto_index: bool,
     pub hide_system: bool,
     pub hotkey_quick: bool,
@@ -441,6 +447,8 @@ pub struct SettingsOut {
     pub hotkey: &'static str,
     pub hotkey_taken: bool,
     pub hotkeys: Vec<[&'static str; 2]>,
+    /// The colour theme (`Theme::code`: auto, light, dark, midnight, kiwi).
+    pub theme: &'static str,
     /// Search from phone; `None` in the Microsoft Store version (it has none).
     pub phone: Option<PhoneOut>,
 }
@@ -1538,6 +1546,7 @@ mod tests {
         assert_eq!(req(r#""op":"clear_recent""#), Ok(Request::ClearRecent {}));
         assert_eq!(req(r#""op":"set","key":"hide_system","on":false"#), Ok(Request::Set { key: Setting::HideSystem, on: false }));
         assert_eq!(req(r#""op":"set","key":"read_cloud_files","on":true"#), Ok(Request::Set { key: Setting::ReadCloudFiles, on: true }));
+        assert_eq!(req(r#""op":"set","key":"read_program_files","on":true"#), Ok(Request::Set { key: Setting::ReadProgramFiles, on: true }));
         assert_eq!(req(r#""op":"set","key":"run_command","on":true"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"set","key":"digits""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"lang","lang":"en""#), Ok(Request::Lang { lang: LangCode(Locale::of(Lang::En)) }));
@@ -1559,6 +1568,11 @@ mod tests {
         assert_eq!(req(r#""op":"hotkey","key":"win_alt_f""#), Ok(Request::Hotkey { key: crate::settings::Hotkey::WinAltF }));
         assert_eq!(req(r#""op":"hotkey","key":"alt_f4""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"hotkey""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"theme","key":"midnight""#), Ok(Request::Theme { key: crate::settings::Theme::Midnight }));
+        assert_eq!(req(r#""op":"theme","key":"auto""#), Ok(Request::Theme { key: crate::settings::Theme::Auto }));
+        assert_eq!(req(r#""op":"theme","key":"sepia""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"theme","key":"dark","x":1"#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"theme""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"set","key":"phone","on":true"#), Ok(Request::Set { key: Setting::Phone, on: true }));
         assert_eq!(req(r#""op":"phone_allow""#), Ok(Request::PhoneAllow {}));
         assert_eq!(req(r#""op":"phone_window""#), Ok(Request::PhoneWindow {}));
@@ -1970,7 +1984,7 @@ mod tests {
         assert!(s.contains(r#"a\"b</script>"#));
         assert!(matches!(status(true, Indexing::Idle, 0, Lang::Ar), Outbound::Status { state: "loading", .. }));
         assert!(matches!(status(false, Indexing::Names { found: 5 }, 0, Lang::Ar), Outbound::Status { state: "names", text: Some(_), .. }));
-        assert!(matches!(status(false, Indexing::Contents { checked: 3, total: 3 }, 9, Lang::Ar), Outbound::Status { state: "ready", text: None, files: 9 }));
+        assert!(matches!(status(false, Indexing::Contents { checked: 3, total: 3, mine: 0 }, 9, Lang::Ar), Outbound::Status { state: "ready", text: None, files: 9 }));
         assert_eq!(kinds(Lang::En)[1], "Documents");
         assert_eq!(kinds(Lang::Ar)[1], "مستندات");
         let settings = Outbound::Settings(SettingsOut {
@@ -1980,6 +1994,7 @@ mod tests {
             autostart: true,
             content_index: true,
             read_cloud_files: false,
+            read_program_files: false,
             auto_index: true,
             hide_system: true,
             hotkey_quick: true,
@@ -1991,12 +2006,13 @@ mod tests {
             hotkey: "ctrl_alt_f",
             hotkey_taken: true,
             hotkeys: hotkeys(),
+            theme: "kiwi",
             phone: None,
         });
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.starts_with(r#"{"type":"settings","lang":"ar","next_lang":"en""#), "{json}");
         assert!(json.contains(r#""version":"1.0.0","store":true,"checking_updates":true,"hotkey":"ctrl_alt_f","hotkey_taken":true,"hotkeys":[["ctrl_alt_f","Ctrl+Alt+F"],["ctrl_alt_space","Ctrl+Alt+Space"],"#), "{json}");
-        assert!(json.ends_with(r#""phone":null}"#), "{json}");
+        assert!(json.ends_with(r#""theme":"kiwi","phone":null}"#), "{json}");
         let json = serde_json::to_string(&Outbound::Renamed { list: List::Recent, seq: 0, ver: 3, id: 1, name: "a".into() }).unwrap();
         assert_eq!(json, r#"{"type":"renamed","list":"recent","seq":0,"ver":3,"id":1,"name":"a"}"#);
     }

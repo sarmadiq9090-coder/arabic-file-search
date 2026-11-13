@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind sedang berjalan dari folder sementara (mungkin dari dalam fail zip), yang boleh dikosongkan oleh Windows pada bila-bila masa.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind sedang berjalan dari folder Muat Turun anda. Jika fail dipadam atau folder dibersihkan, program akan berhenti berfungsi.",
   "\nStarting with Windows will use the new place.": "\nMula bersama Windows akan menggunakan lokasi baharu.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nAlihkan program ke lokasi kekal? Ia akan disalin ke:\n{shown_dir}\nditambah pada menu Mula, dan dimulakan semula dari situ. Seting dan indeks anda kekal seperti sedia ada.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nAlihkan program ke lokasi kekal? Ia akan disalin ke:\n{shown_dir}\nditambah pada menu Mula dan desktop, dan dimulakan semula dari situ. Seting dan indeks anda kekal seperti sedia ada.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "Tidak dapat menyalin program ke lokasi kekal:\n{e}\n\nProgram terus berfungsi dari lokasinya sekarang.",
   "the new copy did not start": "salinan baharu tidak bermula",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "Program telah disalin ke lokasi kekal, tetapi tidak dapat dimulakan semula dari situ ({e}).\nBukanya dari menu Mula.",
@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} {y} H",
   "{lead} Checked {checked} of {total} documents…": "{lead} Menyemak {checked} daripada {total} dokumen…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Baca juga kandungan fail program dan sistem",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Nama fail sedia · membaca dokumen dalam folder anda: {checked} daripada {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Nama fail dan folder anda sedia · membaca dokumen lain: {checked} daripada {total}"
  },
  "js": {
   "ph": "Cari nama fail…",
@@ -837,7 +840,9 @@
    [
     "\"perjanjian sewa\"",
     "Frasa tepat"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Kata akar Arab: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "Turut menemui «أحمد»"
    ]
+  ],
+  "tipFold": [
+   "cafe",
+   "Turut menemui “café”"
   ],
   "kNav": "Gerak",
   "kOpen": "Buka",
@@ -969,6 +978,19 @@
   "compactSub": "Satu baris bagi setiap hasil, supaya lebih banyak yang muat",
   "showPreview": "Tunjukkan pratonton",
   "hidePreview": "Sembunyikan pratonton",
+  "clearQ": "Kosongkan carian",
+  "filtersBtn": "Penapis",
+  "clearFilters": "Buang semua penapis",
+  "ixContents": "Mengindeks kandungan dokumen · ${n}%",
+  "theme": "Tema",
+  "themeSub": "“Automatik” mengikut mod cerah atau gelap Windows",
+  "themes": {
+   "auto": "Automatik",
+   "light": "Cerah",
+   "dark": "Gelap",
+   "midnight": "Biru tengah malam",
+   "kiwi": "Kiwi"
+  },
   "sMore": "Lagi",
   "sMoreRow": "Lagi pilihan",
   "sMoreSub": "Semak kemas kini, sokongan dan maklum balas, alat seperti fail pendua dan saiz folder, serta seting carian dari mana-mana sahaja",
@@ -1049,12 +1071,14 @@
     "folder sahaja"
    ],
    [
-    "root: كتاب",
-    "kata akar Arab yang sama: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: lapoarn",
     "bertolak ansur dengan salah taip"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "kata akar Arab yang sama: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"kotak carian kecil dari mana-mana program\"], [\"Ctrl+Alt+G\", \"dalam dialog Simpan/Buka: pergi ke folder hasil\"], [\"Enter\", \"buka fail\"], [\"Ctrl+Enter\", \"buka foldernya\"], [\"↓\", \"ke hasil (dalam kotak kosong: sejarah)\"], [\"Ctrl+C\", \"salin fail\"], [\"Ctrl+Shift+C\", \"salin laluan\"], [\"F2\", \"namakan semula\"], [\"Delete\", \"ke Tong Kitar Semula\"], [\"F4\", \"semua padanan dalam fail\"], [\"Ctrl+H\", \"sejarah\"], [\"Ctrl+T\", \"lakaran kenit\"], [\"Ctrl+,\", \"seting\"], [\"F1\", \"kad ini\"]]",
   "helpKeysH": "Papan kekunci",
   "helpMore": "Semua cara untuk mencari…",
-  "helpSub": "Klik contoh untuk meletakkannya dalam kotak carian. Setiap penapis juga mempunyai ejaan Arab.",
+  "helpSub": "Klik contoh untuk meletakkannya dalam kotak carian.",
+  "helpSubArab": "Setiap penapis juga mempunyai ejaan Arab.",
   "kLabel": "Pintasan papan kekunci",
   "offline": "pemacu tidak bersambung",
   "qsNone": "Tiada hasil untuk mengalihkan dialog. Ubah carian, atau tekan Esc untuk membatalkan.",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "Cari dari telefon (rangkaian rumah)",
   "sPhoneSub": "Cari fail PC ini daripada pelayar telefon anda pada Wi-Fi yang sama. Baca sahaja, dan hanya pada rangkaian rumah anda.",
   "sPhoneWait": "Menyemak rangkaian…",
-  "updChecking": "Menyemak kemas kini…"
+  "updChecking": "Menyemak kemas kini…",
+  "sReadPrograms": "Baca juga kandungan fail program dan sistem"
  }
 }

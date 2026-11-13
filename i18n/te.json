@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind తాత్కాలిక ఫోల్డర్ నుండి (బహుశా zip ఫైల్ లోపల నుండి) నడుస్తోంది, Windows దాన్ని ఎప్పుడైనా ఖాళీ చేయవచ్చు.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind మీ డౌన్‌లోడ్‌ల ఫోల్డర్ నుండి నడుస్తోంది. ఫైల్ తొలగించబడినా లేదా ఫోల్డర్ శుభ్రం చేయబడినా, ప్రోగ్రామ్ పని చేయడం ఆగిపోతుంది.",
   "\nStarting with Windows will use the new place.": "\nWindowsతో ప్రారంభించడం కొత్త స్థానాన్ని ఉపయోగిస్తుంది.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nప్రోగ్రామ్‌ను శాశ్వత స్థానానికి తరలించాలా? ఇది ఇక్కడికి కాపీ చేయబడుతుంది:\n{shown_dir}\nప్రారంభ మెనుకు జోడించబడి, అక్కడి నుండి పునఃప్రారంభించబడుతుంది. మీ సెట్టింగ్‌లు మరియు సూచిక అలాగే ఉంటాయి.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nప్రోగ్రామ్‌ను శాశ్వత స్థానానికి తరలించాలా? ఇది ఇక్కడికి కాపీ చేయబడుతుంది:\n{shown_dir}\nప్రారంభ మెను మరియు డెస్క్‌టాప్‌కు జోడించబడి, అక్కడి నుండి పునఃప్రారంభించబడుతుంది. మీ సెట్టింగ్‌లు మరియు సూచిక అలాగే ఉంటాయి.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "ప్రోగ్రామ్‌ను శాశ్వత స్థానానికి కాపీ చేయడం సాధ్యం కాలేదు:\n{e}\n\nప్రోగ్రామ్ ఇప్పుడున్న చోటు నుండే పని చేస్తూ ఉంటుంది.",
   "the new copy did not start": "కొత్త కాపీ ప్రారంభం కాలేదు",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "ప్రోగ్రామ్ శాశ్వత స్థానానికి కాపీ చేయబడింది, కానీ అక్కడి నుండి పునఃప్రారంభించడం సాధ్యం కాలేదు ({e}).\nప్రారంభ మెను నుండి దాన్ని తెరవండి.",
@@ -786,7 +786,10 @@
   "toman": "తోమాన్",
   "{d} {} {y} AH": "{d} {} {y} హిజ్రీ",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total} లో {checked} పత్రాలు తనిఖీ చేయబడ్డాయి…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "ప్రోగ్రామ్ మరియు సిస్టమ్ ఫైల్‌ల లోపల కూడా చదువు",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ఫైల్ పేర్లు సిద్ధం · మీ ఫోల్డర్‌లలోని పత్రాలను చదువుతోంది: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ఫైల్ పేర్లు మరియు మీ ఫోల్డర్‌లు సిద్ధం · ఇతర పత్రాలను చదువుతోంది: {checked} / {total}"
  },
  "js": {
   "ph": "ఫైల్ పేర్లలో శోధించు…",
@@ -837,7 +840,9 @@
    [
     "\"అద్దె ఒప్పందం\"",
     "ఖచ్చితమైన పదబంధం"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "అరబిక్ మూల పదం: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "ఒక్కో ఫలితానికి ఒక పంక్తి, కాబట్టి ఎక్కువ ఫలితాలు సరిపోతాయి",
   "showPreview": "ప్రివ్యూను చూపు",
   "hidePreview": "ప్రివ్యూను దాచు",
+  "clearQ": "శోధనను క్లియర్ చేయండి",
+  "filtersBtn": "ఫిల్టర్‌లు",
+  "clearFilters": "అన్ని ఫిల్టర్‌లను తీసివేయండి",
+  "ixContents": "పత్రాల కంటెంట్ ఇండెక్స్ అవుతోంది · ${n}%",
+  "theme": "థీమ్",
+  "themeSub": "“స్వయంచాలకం” Windows లైట్ లేదా డార్క్ మోడ్‌ను అనుసరిస్తుంది",
+  "themes": {
+   "auto": "స్వయంచాలకం",
+   "light": "లైట్",
+   "dark": "డార్క్",
+   "midnight": "అర్ధరాత్రి నీలం",
+   "kiwi": "కివి"
+  },
   "sMore": "మరిన్ని",
   "sMoreRow": "మరిన్ని ఎంపికలు",
   "sMoreSub": "నవీకరణల కోసం తనిఖీ, మద్దతు మరియు అభిప్రాయం, నకిలీ ఫైల్‌లు మరియు ఫోల్డర్ పరిమాణాలు వంటి సాధనాలు, మరియు ఎక్కడి నుండైనా శోధించు సెట్టింగ్‌లు",
@@ -1049,12 +1067,14 @@
     "ఫోల్డర్‌లు మాత్రమే"
    ],
    [
-    "root: كتاب",
-    "అదే అరబిక్ మూల పదం: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: reprot",
     "అక్షర దోషాన్ని సహిస్తుంది (“report”ను కనుగొంటుంది)"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "అదే అరబిక్ మూల పదం: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"ఏ ప్రోగ్రామ్ నుండైనా చిన్న శోధన పెట్టె\"], [\"Ctrl+Alt+G\", \"Save/Open డైలాగ్‌లో: ఫలితం ఫోల్డర్‌కు వెళ్లు\"], [\"Enter\", \"ఫైల్‌ను తెరువు\"], [\"Ctrl+Enter\", \"దాని ఫోల్డర్‌ను తెరువు\"], [\"↓\", \"ఫలితాలకు (ఖాళీ పెట్టెలో: చరిత్ర)\"], [\"Ctrl+C\", \"ఫైల్‌ను కాపీ చేయి\"], [\"Ctrl+Shift+C\", \"మార్గాన్ని కాపీ చేయి\"], [\"F2\", \"పేరు మార్చు\"], [\"Delete\", \"రీసైకిల్ బిన్‌కు\"], [\"F4\", \"ఫైల్‌లోని అన్ని సరిపోలికలు\"], [\"Ctrl+H\", \"చరిత్ర\"], [\"Ctrl+T\", \"సూక్ష్మచిత్రాలు\"], [\"Ctrl+,\", \"సెట్టింగ్‌లు\"], [\"F1\", \"ఈ కార్డ్\"]]",
   "helpKeysH": "కీబోర్డ్",
   "helpMore": "శోధించడానికి అన్ని మార్గాలు…",
-  "helpSub": "ఉదాహరణను శోధన పెట్టెలో ఉంచడానికి దాన్ని క్లిక్ చేయండి. ప్రతి ఫిల్టర్‌కు అరబిక్ స్పెల్లింగ్ కూడా ఉంది.",
+  "helpSub": "ఉదాహరణను శోధన పెట్టెలో ఉంచడానికి దాన్ని క్లిక్ చేయండి.",
+  "helpSubArab": "ప్రతి ఫిల్టర్‌కు అరబిక్ స్పెల్లింగ్ కూడా ఉంది.",
   "kLabel": "కీబోర్డ్ సత్వరమార్గాలు",
   "offline": "డ్రైవ్ కనెక్ట్ కాలేదు",
   "qsNone": "డైలాగ్‌ను తరలించడానికి ఫలితం ఏదీ లేదు. శోధనను మార్చండి, లేదా రద్దు చేయడానికి Esc నొక్కండి.",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "ఫోన్ నుండి శోధించు (ఇంటి నెట్‌వర్క్)",
   "sPhoneSub": "అదే Wi-Fiలో ఉన్న మీ ఫోన్ బ్రౌజర్ నుండి ఈ PC ఫైల్‌లను శోధించండి. చదవడానికి మాత్రమే, మరియు మీ ఇంటి నెట్‌వర్క్‌లో మాత్రమే.",
   "sPhoneWait": "నెట్‌వర్క్ తనిఖీ చేయబడుతోంది…",
-  "updChecking": "నవీకరణల కోసం తనిఖీ చేస్తోంది…"
+  "updChecking": "నవీకరణల కోసం తనిఖీ చేస్తోంది…",
+  "sReadPrograms": "ప్రోగ్రామ్ మరియు సిస్టమ్ ఫైల్‌ల లోపల కూడా చదువు"
  }
 }

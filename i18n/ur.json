@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind ایک عارضی فولڈر سے چل رہا ہے (شاید کسی zip فائل کے اندر سے)، جسے Windows کسی بھی وقت خالی کر سکتا ہے۔",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind آپ کے Downloads فولڈر سے چل رہا ہے۔ اگر فائل حذف ہو گئی یا فولڈر صاف کر دیا گیا تو پروگرام کام کرنا بند کر دے گا۔",
   "\nStarting with Windows will use the new place.": "\nWindows کے ساتھ شروع ہونے کے لیے نئی جگہ استعمال ہوگی۔",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nکیا پروگرام کو کسی مستقل جگہ منتقل کریں؟ اسے یہاں کاپی کیا جائے گا:\n{shown_dir}\nاسٹارٹ مینو میں شامل کیا جائے گا، اور وہاں سے دوبارہ شروع کیا جائے گا۔ آپ کی ترتیبات اور انڈیکس جیسے ہیں ویسے رہیں گے۔{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nکیا پروگرام کو کسی مستقل جگہ منتقل کریں؟ اسے یہاں کاپی کیا جائے گا:\n{shown_dir}\nاسٹارٹ مینو اور ڈیسک ٹاپ پر شامل کیا جائے گا، اور وہاں سے دوبارہ شروع کیا جائے گا۔ آپ کی ترتیبات اور انڈیکس جیسے ہیں ویسے رہیں گے۔{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "پروگرام مستقل جگہ پر کاپی نہیں ہو سکا:\n{e}\n\nپروگرام اپنی موجودہ جگہ سے کام کرتا رہے گا۔",
   "the new copy did not start": "نئی کاپی شروع نہیں ہوئی",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "پروگرام مستقل جگہ پر کاپی ہو گیا، لیکن وہاں سے دوبارہ شروع نہیں ہو سکا ({e})۔\nاسے اسٹارٹ مینو سے کھولیں۔",
@@ -786,7 +786,10 @@
   "toman": "تومان",
   "{d} {} {y} AH": "{d} {} {y} ھ",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total} میں سے {checked} دستاویزات جانچی گئیں…",
-  "{}, {d} {} {y}": "{}، {d} {} {y}ء"
+  "{}, {d} {} {y}": "{}، {d} {} {y}ء",
+  "Also read inside program and system files": "پروگرام اور سسٹم فائلوں کے اندر بھی پڑھیں",
+  "File names ready · reading inside your folders: {checked} of {mine}": "فائلوں کے نام تیار · آپ کے فولڈرز کی دستاویزات پڑھی جا رہی ہیں: {mine} میں سے {checked}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "فائلوں کے نام اور آپ کے فولڈرز تیار · دیگر دستاویزات پڑھی جا رہی ہیں: {total} میں سے {checked}"
  },
  "js": {
   "ph": "فائلوں کے نام تلاش کریں…",
@@ -837,7 +840,9 @@
    [
     "\"کرایہ نامہ\"",
     "بالکل یہی جملہ"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "عربی مادہ: مكتبة، الكاتب"
@@ -969,6 +974,19 @@
   "compactSub": "ہر نتیجے کے لیے ایک سطر، تاکہ زیادہ نتائج سما سکیں",
   "showPreview": "پیش منظر دکھائیں",
   "hidePreview": "پیش منظر چھپائیں",
+  "clearQ": "تلاش صاف کریں",
+  "filtersBtn": "فلٹرز",
+  "clearFilters": "تمام فلٹرز ہٹائیں",
+  "ixContents": "دستاویزات کے مواد کی فہرست سازی جاری ہے · ${n}٪",
+  "theme": "تھیم",
+  "themeSub": "«خودکار» ونڈوز کے ہلکے یا گہرے موڈ کی پیروی کرتا ہے",
+  "themes": {
+   "auto": "خودکار",
+   "light": "ہلکا",
+   "dark": "گہرا",
+   "midnight": "آدھی رات کا نیلا",
+   "kiwi": "کیوی"
+  },
   "sMore": "مزید",
   "sMoreRow": "مزید اختیارات",
   "sMoreSub": "اپ ڈیٹس کی جانچ، معاونت اور رائے، ڈپلیکیٹ فائلیں اور فولڈرز کے سائز جیسے ٹولز، اور کہیں سے بھی تلاش کی ترتیبات",
@@ -1049,12 +1067,14 @@
     "صرف فولڈرز"
    ],
    [
-    "root: كتاب",
-    "وہی عربی مادہ: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: رپوٹ",
     "ٹائپنگ کی ایک غلطی برداشت کرتا ہے"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "وہی عربی مادہ: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1091,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"کسی بھی پروگرام سے چھوٹا سرچ باکس\"], [\"Ctrl+Alt+G\", \"محفوظ کریں/کھولیں ونڈو میں: کسی نتیجے کے فولڈر پر جائیں\"], [\"Enter\", \"فائل کھولیں\"], [\"Ctrl+Enter\", \"اس کا فولڈر کھولیں\"], [\"↓\", \"نتائج پر (خالی باکس میں: سرگزشت)\"],\n        [\"Ctrl+C\", \"فائل کاپی کریں\"], [\"Ctrl+Shift+C\", \"راستہ کاپی کریں\"], [\"F2\", \"نام تبدیل کریں\"], [\"Delete\", \"ری سائیکل بن میں\"], [\"F4\", \"فائل میں تمام مماثلتیں\"], [\"Ctrl+H\", \"سرگزشت\"], [\"Ctrl+T\", \"تھمب نیلز\"], [\"Ctrl+,\", \"ترتیبات\"], [\"F1\", \"یہ کارڈ\"]]",
   "helpKeysH": "کی بورڈ",
   "helpMore": "تلاش کے تمام طریقے…",
-  "helpSub": "کسی مثال پر کلک کریں تاکہ وہ سرچ باکس میں آ جائے۔ ہر فلٹر کی عربی املا بھی ہے۔",
+  "helpSub": "کسی مثال پر کلک کریں تاکہ وہ سرچ باکس میں آ جائے۔",
+  "helpSubArab": "ہر فلٹر کی عربی املا بھی ہے۔",
   "kLabel": "کی بورڈ شارٹ کٹس",
   "offline": "ڈرائیو منسلک نہیں",
   "qsNone": "کوئی ایسا نتیجہ نہیں جس کے فولڈر میں ونڈو لے جائی جائے۔ تلاش بدلیں، یا منسوخ کرنے کے لیے Esc دبائیں۔",
@@ -1093,6 +1114,7 @@
   "sPhoneRow": "فون سے تلاش (گھریلو نیٹ ورک)",
   "sPhoneSub": "اسی Wi-Fi پر اپنے فون کے براؤزر سے اس PC کی فائلیں تلاش کریں۔ صرف پڑھنے کے لیے، اور صرف آپ کے گھریلو نیٹ ورک پر۔",
   "sPhoneWait": "نیٹ ورک کی جانچ ہو رہی ہے…",
-  "updChecking": "اپ ڈیٹس کی جانچ ہو رہی ہے…"
+  "updChecking": "اپ ڈیٹس کی جانچ ہو رہی ہے…",
+  "sReadPrograms": "پروگرام اور سسٹم فائلوں کے اندر بھی پڑھیں"
  }
 }

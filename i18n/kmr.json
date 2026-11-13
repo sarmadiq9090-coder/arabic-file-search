@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind ji peldankeke demkî dixebite (belkî ji nav pelekî zip), ku Windows dikare her dem vala bike.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind ji peldanka Downloads dixebite. Heke pel were jêbirin an peldank were paqijkirin, bername dê nexebite.",
   "\nStarting with Windows will use the new place.": "\nDestpêkirina bi Windows re dê cihê nû bi kar bîne.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nBername bibe cihekî mayînde? Ew tê kopîkirin bo:\n{shown_dir}\nli menuya Start tê zêdekirin, û ji wir ji nû ve dest pê dike. Mîheng û pêrista te wekî xwe dimînin.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nBername bibe cihekî mayînde? Ew tê kopîkirin bo:\n{shown_dir}\nli menuya Start û sermasê tê zêdekirin, û ji wir ji nû ve dest pê dike. Mîheng û pêrista te wekî xwe dimînin.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "Bername nehat kopîkirin bo cihê mayînde:\n{e}\n\nBername ji cihê xwe yê niha berdewam dixebite.",
   "the new copy did not start": "kopiya nû dest pê nekir",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "Bername hat kopîkirin bo cihê mayînde, lê nikarî ji wir ji nû ve dest pê bike ({e}).\nWê ji menuya Start veke.",
@@ -786,7 +786,10 @@
   "toman": "tumen",
   "{d} {} {y} AH": "{d} {} {y} (Koçî)",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} ji {total} belgeyan hatin kontrolkirin…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Naveroka pelên bername û pergalê jî bixwîne",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Navên pelan amade ne · belgeyên peldankên te tên xwendin: {checked} ji {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Navên pelan û peldankên te amade ne · belgeyên din tên xwendin: {checked} ji {total}"
  },
  "js": {
   "ph": "Li navên pelan bigere…",
@@ -837,7 +840,9 @@
    [
     "\"peymana kirê\"",
     "Hevoka tam"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Koka erebî: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "“أحمد” jî dibîne"
    ]
+  ],
+  "tipFold": [
+   "sev",
+   "«şêv» jî dibîne"
   ],
   "kNav": "Tevgerîn",
   "kOpen": "Veke",
@@ -969,6 +978,19 @@
   "compactSub": "Ji bo her encamê rêzek, da ku bêtir cih bigirin",
   "showPreview": "Pêşdîtinê nîşan bide",
   "hidePreview": "Pêşdîtinê veşêre",
+  "clearQ": "Lêgerînê paqij bike",
+  "filtersBtn": "Parzûn",
+  "clearFilters": "Hemû parzûnan rake",
+  "ixContents": "Naveroka belgeyan tê îndekskirin · ${n}%",
+  "theme": "Rûkar",
+  "themeSub": "“Xweber” moda ronî an tarî ya Windowsê dişopîne",
+  "themes": {
+   "auto": "Xweber",
+   "light": "Ronî",
+   "dark": "Tarî",
+   "midnight": "Şîniya şevê",
+   "kiwi": "Kîwî"
+  },
   "sMore": "Zêdetir",
   "sMoreRow": "Vebijarkên din",
   "sMoreSub": "Kontrolkirina rojanekirinan, piştgirî û nêrîn, amûrên wekî pelên dubare û mezinahiya peldankan, û mîhengên lêgerîna ji her derê",
@@ -1049,12 +1071,14 @@
     "tenê peldank"
    ],
    [
-    "root: كتاب",
-    "heman koka erebî: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: rapro",
     "xeletiyeke nivîsînê qebûl dike"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "heman koka erebî: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"qutiya lêgerînê ya biçûk ji her bernameyê\"], [\"Ctrl+Alt+G\", \"di pencereya Tomar bike/Veke de: biçe peldanka encamekê\"], [\"Enter\", \"pelê veke\"], [\"Ctrl+Enter\", \"peldanka wê veke\"], [\"↓\", \"ber bi encaman (di qutiya vala de: dîrok)\"],\n        [\"Ctrl+C\", \"pelê kopî bike\"], [\"Ctrl+Shift+C\", \"riyê kopî bike\"], [\"F2\", \"navê biguherîne\"], [\"Delete\", \"bo Selika Çopê\"], [\"F4\", \"hemû lihevhatin di pelê de\"], [\"Ctrl+H\", \"dîrok\"], [\"Ctrl+T\", \"wêneyên biçûk\"], [\"Ctrl+,\", \"mîheng\"], [\"F1\", \"ev kart\"]]",
   "helpKeysH": "Klavye",
   "helpMore": "Hemû awayên lêgerînê…",
-  "helpSub": "Li mînakekê bitikîne da ku bikeve qutiya lêgerînê. Her parzûnek bi erebî jî tê nivîsîn.",
+  "helpSub": "Li mînakekê bitikîne da ku bikeve qutiya lêgerînê.",
+  "helpSubArab": "Her parzûnek bi erebî jî tê nivîsîn.",
   "kLabel": "Kurterêyên klavyeyê",
   "offline": "dîsk ne girêdayî ye",
   "qsNone": "Encamek tune ku pencere biçe peldanka wê. Lêgerînê biguherîne, an ji bo betalkirinê pêl Esc bike.",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "Lêgerîn ji telefonê (tora malê)",
   "sPhoneSub": "Ji geroka telefona xwe ya li ser heman Wi-Fi di pelên vê komputerê de bigere. Tenê ji bo xwendinê ye, û tenê li ser tora mala te.",
   "sPhoneWait": "Tor tê kontrolkirin…",
-  "updChecking": "Li rojanekirinan tê kontrolkirin…"
+  "updChecking": "Li rojanekirinan tê kontrolkirin…",
+  "sReadPrograms": "Naveroka pelên bername û pergalê jî bixwîne"
  }
 }

@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind đang chạy từ một thư mục tạm (có thể từ bên trong tệp zip), mà Windows có thể dọn sạch bất cứ lúc nào.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind đang chạy từ thư mục Tải xuống của bạn. Nếu tệp bị xóa hoặc thư mục bị dọn dẹp, chương trình sẽ ngừng hoạt động.",
   "\nStarting with Windows will use the new place.": "\nKhởi động cùng Windows sẽ dùng vị trí mới.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nChuyển chương trình đến một vị trí cố định? Chương trình sẽ được sao chép vào:\n{shown_dir}\nthêm vào menu Bắt đầu và khởi động lại từ đó. Cài đặt và chỉ mục của bạn vẫn được giữ nguyên.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nChuyển chương trình đến một vị trí cố định? Chương trình sẽ được sao chép vào:\n{shown_dir}\nthêm vào menu Bắt đầu và màn hình nền, rồi khởi động lại từ đó. Cài đặt và chỉ mục của bạn vẫn được giữ nguyên.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "Không thể sao chép chương trình đến vị trí cố định:\n{e}\n\nChương trình vẫn tiếp tục chạy từ vị trí hiện tại.",
   "the new copy did not start": "bản sao mới không khởi động được",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "Chương trình đã được sao chép đến vị trí cố định, nhưng không thể khởi động lại từ đó ({e}).\nHãy mở nó từ menu Bắt đầu.",
@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} năm {y} Hijri",
   "{lead} Checked {checked} of {total} documents…": "{lead} Đã kiểm tra {checked}/{total} tài liệu…",
-  "{}, {d} {} {y}": "{}, {d} {} năm {y}"
+  "{}, {d} {} {y}": "{}, {d} {} năm {y}",
+  "Also read inside program and system files": "Đọc cả bên trong tệp chương trình và tệp hệ thống",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Tên tệp đã sẵn sàng · đang đọc tài liệu trong thư mục của bạn: {checked}/{mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Tên tệp và thư mục của bạn đã sẵn sàng · đang đọc các tài liệu khác: {checked}/{total}"
  },
  "js": {
   "ph": "Tìm tên tệp…",
@@ -837,7 +840,9 @@
    [
     "\"hợp đồng thuê\"",
     "Đúng cụm từ"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Gốc từ tiếng Ả Rập: مكتبة، الكاتب"
@@ -846,6 +851,10 @@
     "احمد",
     "Cũng tìm thấy «أحمد»"
    ]
+  ],
+  "tipFold": [
+   "tieng viet",
+   "Cũng tìm thấy “tiếng Việt”"
   ],
   "kNav": "Di chuyển",
   "kOpen": "Mở",
@@ -969,6 +978,19 @@
   "compactSub": "Mỗi kết quả một dòng, để hiển thị được nhiều hơn",
   "showPreview": "Hiện bản xem trước",
   "hidePreview": "Ẩn bản xem trước",
+  "clearQ": "Xóa tìm kiếm",
+  "filtersBtn": "Bộ lọc",
+  "clearFilters": "Xóa tất cả bộ lọc",
+  "ixContents": "Đang lập chỉ mục nội dung tài liệu · ${n}%",
+  "theme": "Chủ đề",
+  "themeSub": "“Tự động” theo chế độ sáng hoặc tối của Windows",
+  "themes": {
+   "auto": "Tự động",
+   "light": "Sáng",
+   "dark": "Tối",
+   "midnight": "Xanh nửa đêm",
+   "kiwi": "Kiwi"
+  },
   "sMore": "Thêm",
   "sMoreRow": "Tùy chọn khác",
   "sMoreSub": "Kiểm tra bản cập nhật, hỗ trợ và phản hồi, các công cụ như tệp trùng lặp và kích thước thư mục, và cài đặt tìm kiếm từ mọi nơi",
@@ -1049,12 +1071,14 @@
     "chỉ thư mục"
    ],
    [
-    "root: كتاب",
-    "cùng gốc từ tiếng Ả Rập: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: reprot",
     "chấp nhận lỗi gõ (tìm thấy “report”)"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "cùng gốc từ tiếng Ả Rập: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1095,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"hộp tìm kiếm nhỏ từ mọi chương trình\"], [\"Ctrl+Alt+G\", \"trong hộp thoại Lưu/Mở: đi tới thư mục của kết quả\"], [\"Enter\", \"mở tệp\"], [\"Ctrl+Enter\", \"mở thư mục chứa tệp\"], [\"↓\", \"tới kết quả (khi ô trống: lịch sử)\"], [\"Ctrl+C\", \"sao chép tệp\"], [\"Ctrl+Shift+C\", \"sao chép đường dẫn\"], [\"F2\", \"đổi tên\"], [\"Delete\", \"vào Thùng rác\"], [\"F4\", \"mọi chỗ khớp trong tệp\"], [\"Ctrl+H\", \"lịch sử\"], [\"Ctrl+T\", \"hình thu nhỏ\"], [\"Ctrl+,\", \"cài đặt\"], [\"F1\", \"thẻ này\"]]",
   "helpKeysH": "Bàn phím",
   "helpMore": "Mọi cách tìm kiếm…",
-  "helpSub": "Nhấp vào một ví dụ để đưa nó vào ô tìm kiếm. Mỗi bộ lọc cũng có cách viết bằng tiếng Ả Rập.",
+  "helpSub": "Nhấp vào một ví dụ để đưa nó vào ô tìm kiếm.",
+  "helpSubArab": "Mỗi bộ lọc cũng có cách viết bằng tiếng Ả Rập.",
   "kLabel": "Phím tắt",
   "offline": "ổ đĩa chưa kết nối",
   "qsNone": "Không có kết quả nào để chuyển hộp thoại tới. Hãy đổi tìm kiếm, hoặc nhấn Esc để hủy.",
@@ -1093,6 +1118,7 @@
   "sPhoneRow": "Tìm từ điện thoại (mạng gia đình)",
   "sPhoneSub": "Tìm tệp trên PC này từ trình duyệt điện thoại của bạn khi dùng cùng Wi-Fi. Chỉ đọc, và chỉ trong mạng gia đình của bạn.",
   "sPhoneWait": "Đang kiểm tra mạng…",
-  "updChecking": "Đang kiểm tra bản cập nhật…"
+  "updChecking": "Đang kiểm tra bản cập nhật…",
+  "sReadPrograms": "Đọc cả bên trong tệp chương trình và tệp hệ thống"
  }
 }
