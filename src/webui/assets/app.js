@@ -234,6 +234,7 @@
       sSearch: "البحث والفهرسة", sHideSystem: "إخفاء ملفات النظام", sHideSystemSub: "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
       sContentIndex: "فهرسة محتوى المستندات في الخلفية", sContentIndexSub: "بحث أسرع داخل الملفات، ويشمل النص في الصور والملفات الممسوحة",
       sReadCloud: "قراءة محتوى الملفات الموجودة على السحابة فقط (يُنزّلها من الإنترنت)",
+      sReadPrograms: "اقرأ داخل ملفات البرامج والنظام أيضاً",
       sAutoIndex: "تحديث الفهرس تلقائياً عند تغيّر الملفات", reindex: "تحديث الفهرس الآن",
       sAnywhere: "البحث من أي مكان", sHotkey: (k) => `${k} يفتح خانة البحث الصغيرة؛ عند إيقافه يفتح هذه النافذة`,
       sHotkeyKeys: "اختصار فتح البحث", sHotkeyKeysSub: "يعمل من أي برنامج. اختر غيره إن كان برنامج آخر يستعمله.",
@@ -317,6 +318,7 @@
       sSearch: "Search and indexing", sHideSystem: "Hide system files", sHideSystemSub: "The Windows folder, temporary and cache files",
       sContentIndex: "Index document contents in the background", sContentIndexSub: "Faster search inside files, text in pictures and scans included",
       sReadCloud: "Read contents of cloud-only files (downloads them)",
+      sReadPrograms: "Also read inside program and system files",
       sAutoIndex: "Update the index automatically when files change", reindex: "Update the index now",
       sAnywhere: "Search from anywhere", sHotkey: (k) => `${k} opens the small search box; when off, it opens this window.`,
       sHotkeyKeys: "Shortcut to open the search", sHotkeyKeysSub: "Works in any program. Pick another if another program uses it.",
@@ -1529,7 +1531,7 @@
           b.addEventListener("click", () => setPref("compact", !compactOn()));
           return h("div", { class: "srow" }, h("label", { for: "set-compact" }, h("span", null, T.compact), h("small", { id: "set-compact-d" }, T.compactSub)), b);
         })()),
-      section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("read_cloud_files", T.sReadCloud), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
+      section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("read_cloud_files", T.sReadCloud), sw("read_program_files", T.sReadPrograms), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
       section(T.sAnywhere, sw("hotkey_quick", T.sHotkey(hotkeyText())), hotkeyRow(st), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
       ...[phoneSection(st, section)].filter(Boolean),
       section(T.sStartup, sw("autostart", T.sAutostart)),

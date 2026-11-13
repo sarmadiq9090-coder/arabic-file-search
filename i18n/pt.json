@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} de {} de {y} d.H.",
   "{lead} Checked {checked} of {total} documents…": "{lead} Verificados {checked} de {total} documentos…",
-  "{}, {d} {} {y}": "{}, {d} de {} de {y}"
+  "{}, {d} {} {y}": "{}, {d} de {} de {y}",
+  "Also read inside program and system files": "Ler também o conteúdo de arquivos de programas e do sistema",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Nomes de arquivos prontos · lendo os documentos das suas pastas: {checked} de {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Nomes de arquivos e suas pastas prontos · lendo outros documentos: {checked} de {total}"
  },
  "js": {
   "ph": "Pesquisar nomes de arquivo…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "Pesquisar pelo celular (rede doméstica)",
   "sPhoneSub": "Pesquise os arquivos deste computador pelo navegador do celular, na mesma rede Wi-Fi. Somente leitura, e só na sua rede doméstica.",
   "sPhoneWait": "Verificando a rede…",
-  "updChecking": "Verificando se há atualizações…"
+  "updChecking": "Verificando se há atualizações…",
+  "sReadPrograms": "Ler também o conteúdo de arquivos de programas e do sistema"
  }
 }

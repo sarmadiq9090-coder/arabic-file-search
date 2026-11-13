@@ -786,7 +786,10 @@
   "toman": "تومان",
   "{d} {} {y} AH": "{d} {} {y} ھ",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total} میں سے {checked} دستاویزات جانچی گئیں…",
-  "{}, {d} {} {y}": "{}، {d} {} {y}ء"
+  "{}, {d} {} {y}": "{}، {d} {} {y}ء",
+  "Also read inside program and system files": "پروگرام اور سسٹم فائلوں کے اندر بھی پڑھیں",
+  "File names ready · reading inside your folders: {checked} of {mine}": "فائلوں کے نام تیار · آپ کے فولڈرز کی دستاویزات پڑھی جا رہی ہیں: {mine} میں سے {checked}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "فائلوں کے نام اور آپ کے فولڈرز تیار · دیگر دستاویزات پڑھی جا رہی ہیں: {total} میں سے {checked}"
  },
  "js": {
   "ph": "فائلوں کے نام تلاش کریں…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "فون سے تلاش (گھریلو نیٹ ورک)",
   "sPhoneSub": "اسی Wi-Fi پر اپنے فون کے براؤزر سے اس PC کی فائلیں تلاش کریں۔ صرف پڑھنے کے لیے، اور صرف آپ کے گھریلو نیٹ ورک پر۔",
   "sPhoneWait": "نیٹ ورک کی جانچ ہو رہی ہے…",
-  "updChecking": "اپ ڈیٹس کی جانچ ہو رہی ہے…"
+  "updChecking": "اپ ڈیٹس کی جانچ ہو رہی ہے…",
+  "sReadPrograms": "پروگرام اور سسٹم فائلوں کے اندر بھی پڑھیں"
  }
 }

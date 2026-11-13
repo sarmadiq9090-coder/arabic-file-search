@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} {y} H",
   "{lead} Checked {checked} of {total} documents…": "{lead} Menyemak {checked} daripada {total} dokumen…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Baca juga kandungan fail program dan sistem",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Nama fail sedia · membaca dokumen dalam folder anda: {checked} daripada {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Nama fail dan folder anda sedia · membaca dokumen lain: {checked} daripada {total}"
  },
  "js": {
   "ph": "Cari nama fail…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "Cari dari telefon (rangkaian rumah)",
   "sPhoneSub": "Cari fail PC ini daripada pelayar telefon anda pada Wi-Fi yang sama. Baca sahaja, dan hanya pada rangkaian rumah anda.",
   "sPhoneWait": "Menyemak rangkaian…",
-  "updChecking": "Menyemak kemas kini…"
+  "updChecking": "Menyemak kemas kini…",
+  "sReadPrograms": "Baca juga kandungan fail program dan sistem"
  }
 }

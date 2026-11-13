@@ -786,7 +786,10 @@
   "toman": "토만",
   "{d} {} {y} AH": "히즈라력 {y}년 {} {d}일",
   "{lead} Checked {checked} of {total} documents…": "{lead} 문서 {total}개 중 {checked}개 확인함…",
-  "{}, {d} {} {y}": "{}, {y}년 {} {d}일"
+  "{}, {d} {} {y}": "{}, {y}년 {} {d}일",
+  "Also read inside program and system files": "프로그램 및 시스템 파일 내용도 읽기",
+  "File names ready · reading inside your folders: {checked} of {mine}": "파일 이름 준비됨 · 내 폴더의 문서 읽는 중: {checked}/{mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "파일 이름과 내 폴더 준비됨 · 기타 문서 읽는 중: {checked}/{total}"
  },
  "js": {
   "ph": "파일 이름 검색…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "휴대폰에서 검색(홈 네트워크)",
   "sPhoneSub": "같은 Wi-Fi에 연결된 휴대폰 브라우저에서 이 PC의 파일을 검색합니다. 읽기 전용이며 홈 네트워크에서만 작동합니다.",
   "sPhoneWait": "네트워크를 확인하는 중…",
-  "updChecking": "업데이트를 확인하는 중…"
+  "updChecking": "업데이트를 확인하는 중…",
+  "sReadPrograms": "프로그램 및 시스템 파일 내용도 읽기"
  }
 }

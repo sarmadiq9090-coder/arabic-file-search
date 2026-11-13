@@ -786,7 +786,10 @@
   "toman": "ତୋମାନ",
   "{d} {} {y} AH": "{d} {} {y} ହିଜରୀ",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total}ଟିରୁ {checked}ଟି ଡକ୍ୟୁମେଣ୍ଟ ଯାଞ୍ଚ କରାଗଲା…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "ପ୍ରୋଗ୍ରାମ୍ ଓ ସିଷ୍ଟମ୍ ଫାଇଲ୍ ଭିତରେ ମଧ୍ୟ ପଢ଼ନ୍ତୁ",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ଫାଇଲ୍ ନାମ ପ୍ରସ୍ତୁତ · ଆପଣଙ୍କ ଫୋଲ୍ଡରର ଡକ୍ୟୁମେଣ୍ଟ ପଢ଼ାଯାଉଛି: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ଫାଇଲ୍ ନାମ ଓ ଆପଣଙ୍କ ଫୋଲ୍ଡର ପ୍ରସ୍ତୁତ · ଅନ୍ୟ ଡକ୍ୟୁମେଣ୍ଟ ପଢ଼ାଯାଉଛି: {checked} / {total}"
  },
  "js": {
   "ph": "ଫାଇଲ୍ ନାମରେ ସନ୍ଧାନ କରନ୍ତୁ…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "ଫୋନରୁ ସନ୍ଧାନ (ଘରୋଇ ନେଟୱର୍କ)",
   "sPhoneSub": "ସେହି Wi-Fi ରେ ଥିବା ଆପଣଙ୍କ ଫୋନର ବ୍ରାଉଜରରୁ ଏହି PC ର ଫାଇଲ୍ ସନ୍ଧାନ କରନ୍ତୁ। କେବଳ ପଢ଼ିବା ପାଇଁ, ଏବଂ କେବଳ ଆପଣଙ୍କ ଘରୋଇ ନେଟୱର୍କରେ।",
   "sPhoneWait": "ନେଟୱର୍କ ଯାଞ୍ଚ କରାଯାଉଛି…",
-  "updChecking": "ଅପଡେଟ୍ ଯାଞ୍ଚ କରାଯାଉଛି…"
+  "updChecking": "ଅପଡେଟ୍ ଯାଞ୍ଚ କରାଯାଉଛି…",
+  "sReadPrograms": "ପ୍ରୋଗ୍ରାମ୍ ଓ ସିଷ୍ଟମ୍ ଫାଇଲ୍ ଭିତରେ ମଧ୍ୟ ପଢ଼ନ୍ତୁ"
  }
 }

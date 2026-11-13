@@ -2,6 +2,10 @@
 
 # سجل التغييرات
 
+## Unreleased
+
+- **قراءة المستندات أسرع وأخفّ (فهرسة المحتوى)**: كانت 1.0.0 تقرأ في الخلفية داخل كل ملف نصي وصورة على كل الأقراص، ومنها مئات آلاف ملفات البرامج والنظام (json وxml وjs وhtml…) التي لا يبحث أحد داخلها، فيبدو العدّاد بلا نهاية («312,888 من 1,425,028»). الآن لا تُقرأ في الخلفية ملفات Program Files وProgramData وWindows وAppData وسلة المحذوفات ومجلدات المطوّرين (node_modules و.git و.cargo و__pycache__ وsite-packages وtarget\debug|release…)، ولا تُقرأ الصور (OCR) إلا في مجلداتك (سطح المكتب، المستندات، التنزيلات، OneDrive). أسماء هذه الملفات تبقى مفهرسة وتظهر في البحث بالاسم كما كانت، وما قُرئ منها سابقاً يبقى محفوظاً. البحث داخل المستندات يتخطّاها أيضاً إلا إذا فعّلت «اقرأ داخل ملفات البرامج والنظام أيضاً» في الإعدادات (مطفأ افتراضياً)، أو أظهرت ملفات النظام، أو حصرت البحث في مجلد منها. وشريط الحالة يعدّ مجلداتك أولاً: «تُقرأ مستندات مجلداتك: X من Y»، ثم «أسماء الملفات ومجلداتك جاهزة · تُقرأ بقية المستندات». / **Faster, lighter content indexing:** 1.0.0 read inside every text file and image on every drive in the background, hundreds of thousands of them program and system assets nobody searches inside, so the count looked endless. Now files under Program Files, ProgramData, Windows, AppData, the Recycle Bin and developer folders (node_modules, .git, .cargo, __pycache__, site-packages, target\debug|release…) are not read in the background, and images (OCR) only in your folders (Desktop, Documents, Downloads, OneDrive). Their names are still indexed and found as before, and texts already read stay stored. Searches inside documents skip them too unless "Also read inside program and system files" is on in Settings (off by default), system files are shown, or the search is limited to such a folder. The status bar counts your folders first ("reading inside your folders: X of Y"), then "File names and your folders ready · reading other documents".
+
 ## 1.0.0 — 2026-11-13
 
 الإصدار 1.0.0. كل سطر بالعربية أولاً ثم بالإنجليزية بعد «/». / InstaFind 1.0.0. Each line: Arabic first, then English after "/".

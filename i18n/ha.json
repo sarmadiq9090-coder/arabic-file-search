@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} {y} (Hijira)",
   "{lead} Checked {checked} of {total} documents…": "{lead} An duba takardu {checked} cikin {total}…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Karanta cikin fayilolin shirye-shirye da na tsarin ma",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Sunayen fayiloli sun shirya · ana karanta takardun manyan fayilolinka: {checked} cikin {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Sunayen fayiloli da manyan fayilolinka sun shirya · ana karanta sauran takardu: {checked} cikin {total}"
  },
  "js": {
   "ph": "Bincika sunayen fayiloli…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "Bincike daga waya (hanyar sadarwa ta gida)",
   "sPhoneSub": "Bincika fayilolin wannan kwamfuta daga burauzar wayarka a kan Wi-Fi ɗaya. Karantawa kawai, kuma a hanyar sadarwa ta gidanka kawai.",
   "sPhoneWait": "Ana duba hanyar sadarwa…",
-  "updChecking": "Ana duba sabuntawa…"
+  "updChecking": "Ana duba sabuntawa…",
+  "sReadPrograms": "Karanta cikin fayilolin shirye-shirye da na tsarin ma"
  }
 }

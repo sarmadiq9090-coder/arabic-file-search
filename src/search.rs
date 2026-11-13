@@ -1572,10 +1572,12 @@ fn search_documents(
 ) {
     let scope_lower = scope.to_lowercase();
     let q = &q.for_documents();
+    // Program and system files only when asked (their stored texts stay).
+    let programs = content_cache::programs_searched(q.show_system, scope);
     let candidates: Vec<u32> = entries
         .par_iter()
         .enumerate()
-        .filter(|(_, e)| content_cache::is_document(e) && q.kind_ok(e) && q.system_ok(e))
+        .filter(|(_, e)| content_cache::is_document(e) && q.kind_ok(e) && q.system_ok(e) && content_cache::searched_inside(&e.path, programs))
         .filter(|(_, e)| in_scope(&e.path, &scope_lower))
         .map(|(i, _)| i as u32)
         .collect();

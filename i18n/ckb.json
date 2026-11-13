@@ -786,7 +786,10 @@
   "toman": "تمەن",
   "{d} {} {y} AH": "{d} {} {y}ی کۆچی",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} لە {total} بەڵگەنامە پشکنران…",
-  "{}, {d} {} {y}": "{}، {d} {} {y}ی زایینی"
+  "{}, {d} {} {y}": "{}، {d} {} {y}ی زایینی",
+  "Also read inside program and system files": "ناوەڕۆکی فایلەکانی بەرنامە و سیستەمیش بخوێنەوە",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ناوی فایلەکان ئامادەن · بەڵگەنامەکانی فۆڵدەرەکانت دەخوێنرێنەوە: {checked} لە {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ناوی فایلەکان و فۆڵدەرەکانت ئامادەن · بەڵگەنامەکانی تر دەخوێنرێنەوە: {checked} لە {total}"
  },
  "js": {
   "ph": "گەڕان بە ناوی فایل…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "گەڕان لە مۆبایلەوە (تۆڕی ماڵەوە)",
   "sPhoneSub": "لە وێبگەڕی مۆبایلەکەتەوە لەسەر هەمان Wi-Fi لە فایلەکانی ئەم کۆمپیوتەرە بگەڕێ. تەنها بۆ خوێندنەوەیە، و تەنها لەسەر تۆڕی ماڵەوەت.",
   "sPhoneWait": "پشکنینی تۆڕ…",
-  "updChecking": "پشکنین بۆ نوێکردنەوە…"
+  "updChecking": "پشکنین بۆ نوێکردنەوە…",
+  "sReadPrograms": "ناوەڕۆکی فایلەکانی بەرنامە و سیستەمیش بخوێنەوە"
  }
 }

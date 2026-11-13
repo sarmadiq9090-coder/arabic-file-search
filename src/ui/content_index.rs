@@ -120,7 +120,7 @@ impl App {
             // Only the documents are needed. Letting go of the index at once
             // matters: while another holder shares it, every change found by
             // the drive watcher has to copy the whole index.
-            let docs: Vec<Entry> = index
+            let mut docs: Vec<Entry> = index
                 .entries
                 .iter()
                 .filter(|e| content_cache::is_document(e))
@@ -137,7 +137,24 @@ impl App {
             let Some(cache) = shared() else { return };
             let started = Instant::now();
             let threads = content_cache::warm_threads();
-            content_cache::warm(&docs, cache, progress, cancel, threads, &idle_priority);
+            // Not program and system files, unless the user asked (see
+            // `warm_wanted`): the wanted ones are moved to the front of
+            // `docs` (the warm-up sorts them itself), which stays whole for
+            // `evict_missing`.
+            let everything = content_cache::read_programs();
+            let mut wanted = 0;
+            for i in 0..docs.len() {
+                if content_cache::warm_wanted(&docs[i], everything) {
+                    docs.swap(wanted, i);
+                    wanted += 1;
+                }
+            }
+            log(&format!(
+                "content index: {wanted} of {} documents to read inside{}",
+                docs.len(),
+                if everything { " (program and system files too)" } else { "" }
+            ));
+            content_cache::warm(&docs[..wanted], cache, progress, cancel, threads, &idle_priority);
             if index_settled && !cancel.load(Ordering::Relaxed) {
                 let indexed: std::collections::HashSet<&str> = docs.iter().map(|e| &*e.path).collect();
                 let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64);
@@ -193,6 +210,21 @@ impl App {
         if on {
             self.start_warm();
         }
+    }
+
+    /// The switch «اقرأ داخل ملفات البرامج والنظام أيضاً»: on, the content
+    /// index reads the files in program, system and developer-cache folders
+    /// and every image too, and searches inside documents look in them; off
+    /// (the default), only their names are indexed, and what was read stays
+    /// stored. The warm-up starts over with the new choice.
+    pub(super) fn toggle_read_programs(&self) {
+        let on = !self.menu_read_programs.checked();
+        self.menu_read_programs.set_checked(on);
+        self.state.borrow_mut().settings.read_program_files = on;
+        self.save_settings();
+        content_cache::set_read_programs(on);
+        log(&format!("program and system files: {}", if on { "read inside" } else { "names only" }));
+        self.start_warm();
     }
 
     /// The Options menu switch. Off: no background indexing, and document

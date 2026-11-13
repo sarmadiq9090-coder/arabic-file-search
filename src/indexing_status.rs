@@ -15,8 +15,9 @@ pub enum Indexing {
     /// not known until the scan ends).
     Names { found: usize },
     /// Document texts are going into the content index: `checked` of the
-    /// `total` documents that were not in it yet.
-    Contents { checked: usize, total: usize },
+    /// `total` documents that were not in it yet, the first `mine` of them
+    /// in the user's own folders (0: not told apart).
+    Contents { checked: usize, total: usize, mine: usize },
 }
 
 impl Indexing {
@@ -25,7 +26,7 @@ impl Indexing {
         match self {
             Indexing::Idle => false,
             Indexing::Names { .. } => true,
-            Indexing::Contents { checked, total } => checked < total,
+            Indexing::Contents { checked, total, .. } => checked < total,
         }
     }
 
@@ -61,7 +62,17 @@ pub fn progress_text(lang: Lang, state: Indexing, num: &dyn Fn(usize) -> String)
     }
     Some(match state {
         Indexing::Names { found } => trf!(in lang; "جارٍ الفهرسة… عدد الملفات حتى الآن: {}", "Indexing… {} files so far", num(found)),
-        Indexing::Contents { checked, total } => {
+        // The user's folders first, then the rest, each counted on its own:
+        // one count of everything read as if it would never end.
+        Indexing::Contents { checked, total, mine } if mine > 0 && mine < total && checked >= mine => {
+            let (checked, total) = (num(checked.min(total) - mine), num(total - mine));
+            trf!(in lang; "أسماء الملفات ومجلداتك جاهزة · تُقرأ بقية المستندات: {checked} من {total}", "File names and your folders ready · reading other documents: {checked} of {total}")
+        }
+        Indexing::Contents { checked, mine, .. } if mine > 0 => {
+            let (checked, mine) = (num(checked.min(mine)), num(mine));
+            trf!(in lang; "أسماء الملفات جاهزة · تُقرأ مستندات مجلداتك: {checked} من {mine}", "File names ready · reading inside your folders: {checked} of {mine}")
+        }
+        Indexing::Contents { checked, total, .. } => {
             let (checked, total) = (num(checked.min(total)), num(total));
             trf!(in lang; "أسماء الملفات جاهزة · تُقرأ محتويات المستندات: {checked} من {total}", "File names ready · reading inside documents: {checked} of {total}")
         }
@@ -216,7 +227,7 @@ mod tests {
 
     #[test]
     fn content_progress_reads_as_in_the_user_study() {
-        let s = Indexing::Contents { checked: 36_000, total: 432_000 };
+        let s = Indexing::Contents { checked: 36_000, total: 432_000, mine: 0 };
         // The names are all in by now: say so, and what is still being read.
         assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("أسماء الملفات جاهزة · تُقرأ محتويات المستندات: 36,000 من 432,000"));
         assert_eq!(progress_text(Lang::En, s, &num).as_deref(), Some("File names ready · reading inside documents: 36,000 of 432,000"));
@@ -224,6 +235,26 @@ mod tests {
             let t = progress_text(lang, s, &num).unwrap();
             assert!(!t.contains("Indexing…") && !t.contains("الفهرسة…"), "{t}");
         }
+    }
+
+    #[test]
+    fn content_progress_counts_the_users_folders_first() {
+        let s = |checked| Indexing::Contents { checked, total: 1_000_000, mine: 40_000 };
+        assert_eq!(progress_text(Lang::En, s(12_000), &num).as_deref(), Some("File names ready · reading inside your folders: 12,000 of 40,000"));
+        assert_eq!(progress_text(Lang::Ar, s(12_000), &num).as_deref(), Some("أسماء الملفات جاهزة · تُقرأ مستندات مجلداتك: 12,000 من 40,000"));
+        assert_eq!(
+            progress_text(Lang::En, s(40_000), &num).as_deref(),
+            Some("File names and your folders ready · reading other documents: 0 of 960,000")
+        );
+        assert_eq!(progress_text(Lang::Ar, s(52_000), &num).as_deref(), Some("أسماء الملفات ومجلداتك جاهزة · تُقرأ بقية المستندات: 12,000 من 960,000"));
+        assert_eq!(progress_text(Lang::En, s(1_000_000), &num), None);
+        // Only the user's folders to read: no "other documents" part.
+        let only = Indexing::Contents { checked: 7, total: 9, mine: 9 };
+        assert_eq!(progress_text(Lang::En, only, &num).as_deref(), Some("File names ready · reading inside your folders: 7 of 9"));
+        assert_eq!(progress_text(Lang::En, Indexing::Contents { checked: 9, total: 9, mine: 9 }, &num), None);
+        // Counts that ran past (threads finish out of order) never underflow.
+        let past = Indexing::Contents { checked: 2_000_000, total: 1_000_000, mine: 40_000 };
+        assert!(!past.running());
     }
 
     #[test]
@@ -252,7 +283,7 @@ mod tests {
 
     #[test]
     fn nothing_is_said_when_idle_or_finished() {
-        for s in [Indexing::Idle, Indexing::Contents { checked: 5, total: 5 }, Indexing::Contents { checked: 0, total: 0 }] {
+        for s in [Indexing::Idle, Indexing::Contents { checked: 5, total: 5, mine: 0 }, Indexing::Contents { checked: 0, total: 0, mine: 0 }] {
             assert!(!s.running(), "{s:?}");
             assert_eq!(progress_text(Lang::En, s, &num), None);
             assert_eq!(no_results_text(Lang::Ar, s), None);
@@ -263,14 +294,14 @@ mod tests {
 
     #[test]
     fn checked_never_shows_above_total() {
-        let s = Indexing::Contents { checked: 12, total: 10 };
+        let s = Indexing::Contents { checked: 12, total: 10, mine: 0 };
         assert!(!s.running());
-        assert_eq!(progress_text(Lang::En, Indexing::Contents { checked: 9, total: 10 }, &num).as_deref(), Some("File names ready · reading inside documents: 9 of 10"));
+        assert_eq!(progress_text(Lang::En, Indexing::Contents { checked: 9, total: 10, mine: 0 }, &num).as_deref(), Some("File names ready · reading inside documents: 9 of 10"));
     }
 
     #[test]
     fn empty_result_while_indexing_says_incomplete() {
-        let s = Indexing::Contents { checked: 36_000, total: 432_000 };
+        let s = Indexing::Contents { checked: 36_000, total: 432_000, mine: 0 };
         assert_eq!(no_results_text(Lang::Ar, s), Some("لا نتائج حتى الآن — قد تكون النتائج ناقصة أثناء الفهرسة."));
         assert_eq!(no_results_text(Lang::En, Indexing::Names { found: 0 }), Some("No results yet — results may be incomplete while indexing."));
         // The search inside documents that found nothing in its first minute.
@@ -294,7 +325,7 @@ mod tests {
         );
         assert!(popup_note(Lang::Ar, s, true, &num).unwrap().starts_with("قد تكون النتائج ناقصة أثناء الفهرسة — جارٍ الفهرسة…"));
         // The names are all in while the content index fills: only the progress.
-        let c = Indexing::Contents { checked: 10, total: 20 };
+        let c = Indexing::Contents { checked: 10, total: 20, mine: 0 };
         assert!(!c.names_incomplete() && s.names_incomplete());
         assert_eq!(popup_note(Lang::En, c, true, &num).as_deref(), Some("File names ready · reading inside documents: 10 of 20"));
     }
@@ -303,7 +334,7 @@ mod tests {
     fn the_counts_use_the_given_digits() {
         // The window can show Arabic-Indic digits (Options); the formatter is passed in.
         let indic = |n: usize| group_digits(n).chars().map(|c| if c.is_ascii_digit() { char::from_u32(c as u32 - 48 + 0x0660).unwrap() } else { c }).collect::<String>();
-        let s = Indexing::Contents { checked: 36_000, total: 432_000 };
+        let s = Indexing::Contents { checked: 36_000, total: 432_000, mine: 0 };
         assert_eq!(progress_text(Lang::Ar, s, &indic).as_deref(), Some("أسماء الملفات جاهزة · تُقرأ محتويات المستندات: ٣٦,٠٠٠ من ٤٣٢,٠٠٠"));
     }
 
@@ -312,7 +343,7 @@ mod tests {
         // The status bar and the popup take the paragraph direction from the
         // first strong letter: the Arabic texts must not start with a digit
         // or a Latin letter, or they would lay out left to right.
-        let s = Indexing::Contents { checked: 1, total: 2 };
+        let s = Indexing::Contents { checked: 1, total: 2, mine: 0 };
         let texts = [
             progress_text(Lang::Ar, s, &num).unwrap(),
             no_results_text(Lang::Ar, s).unwrap().to_string(),

@@ -786,7 +786,10 @@
   "toman": "تومان",
   "{d} {} {y} AH": "{d} {} {y} هـ ق",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} له {total} اسنادو څخه وکتل شول…",
-  "{}, {d} {} {y}": "{}، {d} {} {y} ز"
+  "{}, {d} {} {y}": "{}، {d} {} {y} ز",
+  "Also read inside program and system files": "د پروګرامونو او سیسټم دوتنو دننه هم ولوله",
+  "File names ready · reading inside your folders: {checked} of {mine}": "د دوتنو نومونه چمتو دي · ستاسو د پوښیو اسناد لوستل کېږي: {checked} له {mine} څخه",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "د دوتنو نومونه او ستاسو پوښۍ چمتو دي · نور اسناد لوستل کېږي: {checked} له {total} څخه"
  },
  "js": {
   "ph": "د دوتنو نومونه ولټوئ…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "له تلیفون څخه لټون (د کور شبکه)",
   "sPhoneSub": "په همغه Wi-Fi کې د خپل تلیفون له براوزر څخه د دې کمپیوټر دوتنې ولټوئ. یوازې د لوستلو لپاره، او یوازې ستاسو د کور په شبکه کې.",
   "sPhoneWait": "شبکه کتل کېږي…",
-  "updChecking": "اوسمهالونه کتل کېږي…"
+  "updChecking": "اوسمهالونه کتل کېږي…",
+  "sReadPrograms": "د پروګرامونو او سیسټم دوتنو دننه هم ولوله"
  }
 }

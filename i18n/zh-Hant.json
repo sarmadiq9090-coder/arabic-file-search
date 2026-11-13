@@ -786,7 +786,10 @@
   "toman": "托曼",
   "{d} {} {y} AH": "伊斯蘭曆{y}年{}{d}日",
   "{lead} Checked {checked} of {total} documents…": "{lead} 已檢查 {checked}/{total} 份文件…",
-  "{}, {d} {} {y}": "{}，{y}年{}{d}日"
+  "{}, {d} {} {y}": "{}，{y}年{}{d}日",
+  "Also read inside program and system files": "也讀取程式和系統檔案的內容",
+  "File names ready · reading inside your folders: {checked} of {mine}": "檔案名稱已就緒 · 正在讀取你的資料夾中的文件：{checked}/{mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "檔案名稱和你的資料夾已就緒 · 正在讀取其他文件：{checked}/{total}"
  },
  "js": {
   "ph": "搜尋檔案名稱…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "從手機搜尋（家用網路）",
   "sPhoneSub": "在同一個 Wi-Fi 下，從手機瀏覽器搜尋這台電腦的檔案。唯讀，且僅限您的家用網路。",
   "sPhoneWait": "正在檢查網路…",
-  "updChecking": "正在檢查更新…"
+  "updChecking": "正在檢查更新…",
+  "sReadPrograms": "也讀取程式和系統檔案的內容"
  }
 }

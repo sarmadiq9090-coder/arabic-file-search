@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} {y} Hijriyada",
   "{lead} Checked {checked} of {total} documents…": "{lead} La baaray {checked} ka mid ah {total} dukumenti…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Sidoo kale akhri gudaha faylasha barnaamijyada iyo nidaamka",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Magacyada faylasha waa diyaar · dukumentiyada galalkaaga ayaa la akhrinayaa: {checked} ka mid ah {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Magacyada faylasha iyo galalkaagu waa diyaar · dukumentiyada kale ayaa la akhrinayaa: {checked} ka mid ah {total}"
  },
  "js": {
   "ph": "Ka raadi magacyada faylasha…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "Ka raadi taleefanka (shabakadda guriga)",
   "sPhoneSub": "Ka raadi faylasha kombiyuutarkan biraawsarka taleefankaaga oo ku jira isla Wi-Fi-ga. Akhris keliya, oo shabakadda gurigaaga oo keliya.",
   "sPhoneWait": "Shabakadda ayaa la hubinayaa…",
-  "updChecking": "Cusboonaysiinta ayaa la hubinayaa…"
+  "updChecking": "Cusboonaysiinta ayaa la hubinayaa…",
+  "sReadPrograms": "Sidoo kale akhri gudaha faylasha barnaamijyada iyo nidaamka"
  }
 }

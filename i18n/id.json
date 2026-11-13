@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} {y} H",
   "{lead} Checked {checked} of {total} documents…": "{lead} Diperiksa {checked} dari {total} dokumen…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Baca juga isi file program dan sistem",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Nama file siap · membaca dokumen di folder Anda: {checked} dari {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Nama file dan folder Anda siap · membaca dokumen lain: {checked} dari {total}"
  },
  "js": {
   "ph": "Cari nama file…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "Cari dari ponsel (jaringan rumah)",
   "sPhoneSub": "Cari file PC ini dari browser ponsel Anda di Wi-Fi yang sama. Hanya baca, dan hanya di jaringan rumah Anda.",
   "sPhoneWait": "Memeriksa jaringan…",
-  "updChecking": "Memeriksa pembaruan…"
+  "updChecking": "Memeriksa pembaruan…",
+  "sReadPrograms": "Baca juga isi file program dan sistem"
  }
 }

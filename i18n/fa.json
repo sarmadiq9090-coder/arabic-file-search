@@ -786,7 +786,10 @@
   "toman": "تومان",
   "{d} {} {y} AH": "{d} {} {y} ق",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} از {total} سند بررسی شد…",
-  "{}, {d} {} {y}": "{}، {d} {} {y} م"
+  "{}, {d} {} {y}": "{}، {d} {} {y} م",
+  "Also read inside program and system files": "محتوای فایل‌های برنامه و سیستم را هم بخوان",
+  "File names ready · reading inside your folders: {checked} of {mine}": "نام فایل‌ها آماده است · در حال خواندن اسناد پوشه‌های شما: {checked} از {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "نام فایل‌ها و پوشه‌های شما آماده است · در حال خواندن سایر اسناد: {checked} از {total}"
  },
  "js": {
   "ph": "جستجوی نام فایل‌ها…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "جستجو از تلفن (شبکه خانگی)",
   "sPhoneSub": "فایل‌های این رایانه را از مرورگر تلفن خود در همان Wi-Fi جستجو کنید. فقط‌خواندنی است و فقط در شبکه خانگی شما.",
   "sPhoneWait": "در حال بررسی شبکه…",
-  "updChecking": "در حال بررسی به‌روزرسانی…"
+  "updChecking": "در حال بررسی به‌روزرسانی…",
+  "sReadPrograms": "محتوای فایل‌های برنامه و سیستم را هم بخوان"
  }
 }

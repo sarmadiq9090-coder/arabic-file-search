@@ -786,7 +786,10 @@
   "toman": "โทมัน",
   "{d} {} {y} AH": "{d} {} ฮ.ศ. {y}",
   "{lead} Checked {checked} of {total} documents…": "{lead} ตรวจสอบเอกสารแล้ว {checked} จาก {total}…",
-  "{}, {d} {} {y}": "{}ที่ {d} {} ค.ศ. {y}"
+  "{}, {d} {} {y}": "{}ที่ {d} {} ค.ศ. {y}",
+  "Also read inside program and system files": "อ่านภายในไฟล์โปรแกรมและไฟล์ระบบด้วย",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ชื่อไฟล์พร้อมแล้ว · กำลังอ่านเอกสารในโฟลเดอร์ของคุณ: {checked} จาก {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ชื่อไฟล์และโฟลเดอร์ของคุณพร้อมแล้ว · กำลังอ่านเอกสารอื่น: {checked} จาก {total}"
  },
  "js": {
   "ph": "ค้นหาชื่อไฟล์…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "ค้นหาจากโทรศัพท์ (เครือข่ายภายในบ้าน)",
   "sPhoneSub": "ค้นหาไฟล์ในพีซีเครื่องนี้จากเบราว์เซอร์ของโทรศัพท์ที่ใช้ Wi-Fi เดียวกัน อ่านได้อย่างเดียว และใช้ได้เฉพาะในเครือข่ายภายในบ้านของคุณ",
   "sPhoneWait": "กำลังตรวจสอบเครือข่าย…",
-  "updChecking": "กำลังตรวจหาการอัปเดต…"
+  "updChecking": "กำลังตรวจหาการอัปเดต…",
+  "sReadPrograms": "อ่านภายในไฟล์โปรแกรมและไฟล์ระบบด้วย"
  }
 }

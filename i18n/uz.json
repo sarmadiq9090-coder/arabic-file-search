@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "hijriy {y}-yil {d}-{}",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} / {total} hujjat tekshirildi…",
-  "{}, {d} {} {y}": "{}, {y}-yil {d}-{}"
+  "{}, {d} {} {y}": "{}, {y}-yil {d}-{}",
+  "Also read inside program and system files": "Dastur va tizim fayllari ichini ham oʻqish",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Fayl nomlari tayyor · jildlaringizdagi hujjatlar oʻqilmoqda: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Fayl nomlari va jildlaringiz tayyor · boshqa hujjatlar oʻqilmoqda: {checked} / {total}"
  },
  "js": {
   "ph": "Fayl nomlarida qidiring…",
@@ -1093,6 +1096,7 @@
   "sPhoneRow": "Telefondan qidirish (uy tarmogʻi)",
   "sPhoneSub": "Xuddi shu Wi-Fi tarmogʻidagi telefoningiz brauzeridan bu kompyuter fayllarini qidiring. Faqat oʻqish uchun va faqat uy tarmogʻingizda.",
   "sPhoneWait": "Tarmoq tekshirilmoqda…",
-  "updChecking": "Yangilanishlar tekshirilmoqda…"
+  "updChecking": "Yangilanishlar tekshirilmoqda…",
+  "sReadPrograms": "Dastur va tizim fayllari ichini ham oʻqish"
  }
 }
