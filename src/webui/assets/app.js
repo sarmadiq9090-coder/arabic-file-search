@@ -286,9 +286,11 @@
     return svg;
   }
 
-  // Phone numbers, dates, versions and times («0770-123-4567», «2026-11-12»,
-  // «12/11/2026», «2.0.1», «10:30»): groups of digits joined by one - / . : or ,
-  // (the runs of src/bidi_layout.rs `digit_runs`). After an Arabic letter the
+  // Phone numbers, dates, versions, times and ranges («0770-123-4567»,
+  // «2026-11-12», «12/11/2026», «2.0.1», «10:30», «2024–2026»): groups of
+  // digits joined by one - / . : , or one of the hyphens and dashes U+2010–2013,
+  // the minus sign U+2212 or the division slash U+2215 (the runs of
+  // src/bidi_layout.rs `digit_runs`, the same joiners). After an Arabic letter the
   // bidi algorithm takes their digits for Arabic numbers, which "-" does not
   // join, so a right-to-left line showed "4567-123-0770" and "12-11-2026".
   // Each run goes in a left-to-right isolate that also overrides the
@@ -296,7 +298,7 @@
   // "٢٠٢٦-١١-١٢" reversed, ٠–٩ being Arabic numbers in any context. A run is
   // only digits and separators, so the override changes nothing else. The
   // text itself is unchanged.
-  const DIGIT_RUN = /[0-9\u0660-\u0669\u06F0-\u06F9]+(?:[-/.:,][0-9\u0660-\u0669\u06F0-\u06F9]+)+/g;
+  const DIGIT_RUN = /[0-9\u0660-\u0669\u06F0-\u06F9]+(?:[-/.:,\u2010-\u2013\u2212\u2215][0-9\u0660-\u0669\u06F0-\u06F9]+)+/g;
   // Appends text in pieces to `el`, the matched parts in <mark>, each digit
   // run in a <bdi class="run" dir="ltr"> (a match may start or end inside one).
   function fill(el, pieces) {

@@ -159,9 +159,14 @@ fn is_digit(c: char) -> bool {
 }
 
 /// What joins the groups of digits of a phone number (0770-123-4567), a
-/// date (2026-11-12, 12/11/2026), a version (2.0.1) or a time (10:30).
+/// date (2026-11-12, 12/11/2026), a version (2.0.1), a time (10:30) or a
+/// range (2024–2026). Besides the ASCII ones: the hyphens U+2010 and U+2011
+/// (non-breaking), the figure dash U+2012, the en dash U+2013 (the usual
+/// range dash, which Word puts in by itself), the minus sign U+2212 and the
+/// division slash U+2215. The same list as `DIGIT_RUN` in
+/// `webui/assets/app.js`.
 fn is_joiner(c: char) -> bool {
-    matches!(c, '-' | '/' | '.' | ':' | ',')
+    matches!(c, '-' | '/' | '.' | ':' | ',' | '\u{2010}' | '\u{2011}' | '\u{2012}' | '\u{2013}' | '\u{2212}' | '\u{2215}')
 }
 
 /// Byte ranges of the digit runs of `text`: two or more groups of digits,
@@ -230,16 +235,26 @@ pub fn digit_marks(text: &str, rtl: bool) -> Marks {
         // run into the right-to-left words after it, gluing them to the run.
         let close = rtl && before.is_none_or(|c| c != BidiClass::L);
         let run = &text[s..e];
-        // W2 and W4: every digit European, or every digit Arabic and only
-        // common separators. `arabic`: digits 0–9 count as Arabic numbers.
-        let in_order = |arabic: bool| {
+        // W2, W4 and W7. `arabic`: digits 0–9 count as Arabic numbers;
+        // `after_l`: a left-to-right letter (or the start of a left-to-right
+        // line) comes first, so European digits become left-to-right letters
+        // (W7) and any separator between them follows (N1). Otherwise
+        // European digits are joined only by a European separator (-, the
+        // minus sign) or a common one (/ . : ,), W4, and Arabic numbers only
+        // by a common one.
+        // The dashes U+2010–U+2013 and the division slash are neither: in
+        // «2024–2026» after an Arabic word the en dash split the range in two
+        // and the line showed "2026–2024".
+        let in_order = |arabic: bool, after_l: bool| {
             let an: Vec<bool> = run.chars().filter(|&c| is_digit(c)).map(|c| arabic || bidi_class(c) == BidiClass::AN).collect();
-            an.iter().all(|&a| !a) || (an.iter().all(|&a| a) && run.chars().filter(|&c| is_joiner(c)).all(|c| bidi_class(c) == BidiClass::CS))
+            let joined_by = |ok: &dyn Fn(BidiClass) -> bool| run.chars().filter(|&c| is_joiner(c)).all(|c| ok(bidi_class(c)));
+            (an.iter().all(|&a| !a) && (after_l || joined_by(&|k| matches!(k, BidiClass::ES | BidiClass::CS))))
+                || (an.iter().all(|&a| a) && joined_by(&|k| k == BidiClass::CS))
         };
         let fine = match before {
-            Some(c) => in_order(c == BidiClass::AL),
+            Some(c) => in_order(c == BidiClass::AL, c == BidiClass::L),
             // The algorithm's European digits, and Windows' Arabic ones.
-            None => in_order(false) && (!rtl || in_order(true)),
+            None => in_order(false, !rtl) && (!rtl || in_order(true, false)),
         };
         if fine {
             continue;
@@ -548,6 +563,16 @@ mod tests {
         assert_eq!(runs_of("Invoice 2026-11-12 v2.0.1"), ["2026-11-12", "2.0.1"]);
         assert_eq!(runs_of("2026-11-12"), ["2026-11-12"]);
         assert_eq!(runs_of("a2026-11-12b"), ["2026-11-12"]);
+        // Ranges and dates with the typographic dashes and slashes.
+        assert_eq!(runs_of("التقرير السنوي 2024\u{2013}2026.pdf"), ["2024\u{2013}2026"]);
+        for j in ['\u{2010}', '\u{2011}', '\u{2012}', '\u{2013}', '\u{2212}', '\u{2215}'] {
+            let run = format!("12{j}11{j}2026");
+            assert_eq!(runs_of(&format!("تاريخ {run} من")), [run.as_str()], "U+{:04X}", j as u32);
+        }
+        // Not joiners: the em dash, a dash with spaces, two dashes.
+        for none in ["2024\u{2014}2026", "2024 \u{2013} 2026", "2024\u{2013}\u{2013}2026", "\u{2013}5", "5\u{2212}"] {
+            assert_eq!(runs_of(none), Vec::<&str>::new(), "{none}");
+        }
         // Not runs: no digits, a lone number, a separator with no digits on
         // one side, two separators, a space, the extension's dot.
         for none in ["", "تقرير", "report.pdf", "7", "ملف 1234", "-5", "5-", "1--2", "1- 2", "1 2", "2026.xlsx", "تقرير 2026.xlsx", "1+2", "١٢٣"] {
@@ -591,7 +616,11 @@ mod tests {
 
     #[test]
     fn each_kind_of_run_reads_as_typed() {
-        for run in ["0770-123-4567", "2026-11-12", "12/11/2026", "2.0.1", "10:30", "1,250", "٢٠٢٦-١١-١٢", "١٢/١١/٢٠٢٦", "۲۰۲۶-۱۱-۱۲", "2026-١١-12", "1/2-3:4.5,6"] {
+        for run in [
+            "0770-123-4567", "2026-11-12", "12/11/2026", "2.0.1", "10:30", "1,250", "٢٠٢٦-١١-١٢", "١٢/١١/٢٠٢٦", "۲۰۲۶-۱۱-۱۲", "2026-١١-12", "1/2-3:4.5,6",
+            "2024\u{2013}2026", "2024\u{2010}2026", "0770\u{2011}123\u{2011}4567", "2024\u{2012}2026", "5\u{2212}3", "12\u{2215}11\u{2215}2026", "٢٠٢٤\u{2013}٢٠٢٦", "۲۰۲۴\u{2013}۲۰۲۶",
+            "2024\u{2013}11-12",
+        ] {
             for text in [format!("بتاريخ {run} من"), format!("Report {run} done"), format!("{run} تقرير"), format!("تقرير {run}"), run.to_string(), format!("שלום {run} עולם")] {
                 for rtl in [true, false] {
                     let shown = ordered_digits(&text, rtl);
@@ -599,6 +628,50 @@ mod tests {
                     assert_eq!(shown.replace([LRM, RLM], ""), text);
                 }
             }
+        }
+    }
+
+    /// The round-2 PC test: «2024–2026» with an EN DASH still showed as
+    /// "2026–2024" in both looks. The dash is a neutral (ON), not a
+    /// separator, so even European digits are not joined by it in a
+    /// right-to-left line.
+    #[test]
+    fn a_range_with_an_en_dash_reads_as_typed() {
+        let range = "2024\u{2013}2026";
+        let reversed = "2026\u{2013}2024";
+        for text in ["التقرير السنوي 2024\u{2013}2026.pdf", "2024\u{2013}2026 تقرير", "שנים 2024\u{2013}2026"] {
+            assert!(seen(text, true).contains(reversed), "{text}: the bug");
+            assert!(!digit_marks(text, true).is_empty(), "{text}");
+            assert!(seen(&ordered_digits(text, true), true).contains(range), "{text}: {:?}", seen(&ordered_digits(text, true), true));
+            let (listed, _) = list_name(text, false, true);
+            assert!(seen(&listed, true).contains(range), "{text}");
+        }
+        // The English list with an Arabic name, too.
+        let text = "التقرير السنوي 2024\u{2013}2026.pdf";
+        assert!(seen(text, false).contains(reversed), "the bug in the English list");
+        assert!(seen(&ordered_digits(text, false), false).contains(range));
+        // After a Latin word the digits are left-to-right letters (W7): nothing to do.
+        assert_eq!(digit_marks("Report 2024\u{2013}2026", true), Vec::new());
+        assert_eq!(digit_marks("Report 2024\u{2013}2026", false), Vec::new());
+        assert_eq!(digit_marks(range, false), Vec::new());
+        // With no letter before it, a right-to-left line needs the marks.
+        assert!(seen(range, true).contains(reversed));
+        assert!(seen(&ordered_digits(range, true), true).contains(range));
+        // A path shows it in order as well.
+        let path = "C:\\التقارير\\التقرير السنوي 2024\u{2013}2026.pdf";
+        assert!(seen(&ltr_path(path, false), true).contains(range));
+    }
+
+    /// The new look finds the runs with `DIGIT_RUN` in app.js: the same
+    /// joiners, the same runs.
+    #[test]
+    fn the_new_look_joins_digits_with_the_same_characters() {
+        let js = include_str!("webui/assets/app.js");
+        let line = js.lines().find(|l| l.contains("const DIGIT_RUN")).expect("DIGIT_RUN in app.js");
+        assert!(line.contains(r"(?:[-/.:,\u2010-\u2013\u2212\u2215][0-9\u0660-\u0669\u06F0-\u06F9]+)+"), "{line}");
+        let in_js = |c: char| c.is_ascii() && "-/.:,".contains(c) || ('\u{2010}'..='\u{2013}').contains(&c) || c == '\u{2212}' || c == '\u{2215}';
+        for c in (0u32..0x3000).filter_map(char::from_u32) {
+            assert_eq!(is_joiner(c), in_js(c), "U+{:04X}", c as u32);
         }
     }
 
@@ -736,7 +809,10 @@ mod tests {
 
     #[test]
     fn random_text_keeps_every_run_in_order() {
-        const PIECES: &[&str] = &["ب", "تقرير", "a", "Word", "ש", "1", "23", "٤", "٥٦", "۷", "-", "/", ".", ":", ",", " ", "%", "+", "#", "\u{200F}", "\u{200E}", "\u{0651}", "😀"];
+        const PIECES: &[&str] = &[
+            "ب", "تقرير", "a", "Word", "ש", "1", "23", "٤", "٥٦", "۷", "-", "/", ".", ":", ",", " ", "%", "+", "#", "\u{200F}", "\u{200E}", "\u{0651}", "😀",
+            "\u{2010}", "\u{2011}", "\u{2012}", "\u{2013}", "\u{2014}", "\u{2212}", "\u{2215}",
+        ];
         let mut x = 0x9E37_79B9_7F4A_7C15u64;
         let mut next = |m: usize| {
             x ^= x << 13;
