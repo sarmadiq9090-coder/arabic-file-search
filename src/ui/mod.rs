@@ -810,7 +810,7 @@ pub fn run() {
     if crate::store::is_packaged() {
         autostart::apply_store_default();
     } else {
-        autostart::apply_default();
+        autostart::apply_default(updated || moved);
     }
     if let Some(line) = crate::store::startup_log_line() {
         startup::log(&line);

@@ -7,6 +7,10 @@
 /// "Programs" folder Windows itself uses; no admin rights needed).
 pub const INSTALL_SUBDIR: &str = "Programs\\InstaFind";
 
+/// The permanent place under the program's older name, still found on
+/// some PCs: a copy there counts as installed too.
+pub const OLD_INSTALL_SUBDIR: &str = "Programs\\Bahth";
+
 /// The file name of a moved copy: the same name winget, Scoop and the
 /// updater use, whatever the downloaded file was called ("bahth (1).exe").
 pub const EXE_NAME: &str = "bahth.exe";
@@ -67,6 +71,9 @@ impl Folders {
         ];
         let installed = [
             local.as_deref().map(install_dir),
+            // The permanent place under its older name (copies moved or
+            // unpacked there by hand before the program was InstaFind).
+            under(local.clone(), OLD_INSTALL_SUBDIR),
             under(local.clone(), "Microsoft\\WinGet"),
             under(local.clone(), "Microsoft\\WindowsApps"),
             under(profile.clone(), "scoop"),

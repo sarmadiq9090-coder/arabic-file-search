@@ -183,10 +183,16 @@ pub fn is_enabled() -> bool {
 
 /// Turns starting with Windows on or off for the current user. The entry
 /// points at this exe, which the updater keeps at the same path, except
-/// that a copy in Downloads or a temp folder keeps an entry that starts
-/// another copy which still exists (the one it was moved to:
-/// `crate::run_entry::target`).
+/// that a copy in Downloads or a temp folder, or one in a folder of the
+/// user's own while an installed copy exists, keeps an entry that starts
+/// that other copy (`crate::run_entry::target`).
+/// (The user's choice: `run_entry::Why::User`.)
 pub fn set_enabled(on: bool) -> bool {
+    set_enabled_for(on, crate::run_entry::Why::User)
+}
+
+/// [`set_enabled`] for `why` (`run_entry::target`).
+fn set_enabled_for(on: bool, why: crate::run_entry::Why) -> bool {
     if crate::store::is_packaged() {
         if let Some(own) = open(OWN_KEY, true) {
             set_string(&own, CHOSEN, "1");
@@ -201,8 +207,7 @@ pub fn set_enabled(on: bool) -> bool {
         let Ok(exe) = std::env::current_exe() else { return false };
         let current = exe.to_string_lossy();
         let existing = get_string(&key, VALUE);
-        let target =
-            crate::run_entry::target(&current, existing.as_deref(), &folders(), &|p| std::path::Path::new(p).is_file());
+        let target = crate::run_entry::target(&current, existing.as_deref(), &folders(), &|p| std::path::Path::new(p).is_file(), why);
         unblock();
         set_string(&key, VALUE, &command(std::path::Path::new(target)))
     } else {
@@ -226,15 +231,19 @@ pub fn point_to(exe: &std::path::Path) -> bool {
 }
 
 /// On by default: the first run turns it on once; after that only the user's
-/// choice counts. A stale path (the exe moved) is refreshed.
-pub fn apply_default() {
+/// choice counts. A stale path (the exe moved) is refreshed, but only toward
+/// the copy that counts as installed (`crate::run_entry::target`): a copy
+/// run once from Downloads, a temp folder or a folder of the user's own does
+/// not take the entry from an installed copy that exists. `took_over`: this
+/// copy has just replaced the one that ran.
+pub fn apply_default(took_over: bool) {
     let own = open(OWN_KEY, false);
     let chosen = own.as_ref().is_some_and(|k| has_value(k, CHOSEN));
     // 0.8.1 turns it on once more, for those who had it off without meaning to.
     let reset_done = own.as_ref().is_some_and(|k| has_value(k, RESET_081));
     drop(own);
     if !chosen || !reset_done || is_enabled() {
-        set_enabled(true);
+        set_enabled_for(true, if took_over { crate::run_entry::Why::TookOver } else { crate::run_entry::Why::Refresh });
     }
     if !reset_done && let Some(own) = open(OWN_KEY, true) {
         set_string(&own, RESET_081, "1");
