@@ -90,7 +90,7 @@ line), merge to main. The job tags `vX.Y.Z`, uploads the exes and starts `packag
 
 Must not break:
 - Asset names `bahth.exe` (x64; every installed copy since 0.3.0 looks for it), `bahth-x86.exe`,
-  `bahth-arm64.exe` (`src/update.rs`); `SHA256SUMS.txt` is an additional asset, keep it. Releases stay non-draft, non-prerelease, marked latest.
+  `bahth-arm64.exe` (`src/update.rs`); `SHA256SUMS.txt` is an additional asset, keep it; once signing keys exist, each exe also gets `<exe>.minisig` (docs/specs/signing.md), and a release waits for the owner's approval of the `sign` job (Environment `release`). Releases stay non-draft, non-prerelease, marked latest.
 - The repository URL `sarmadiq9090-coder/arabic-file-search` (hard-coded in `src/update.rs`, the
   manifests, and the Scoop bucket users added).
 - Data in `%LOCALAPPDATA%\BahthSari` and `HKCU\Software\BahthSari`.
@@ -103,6 +103,7 @@ Must not break:
   also points users at this bucket).
 - `releases/*.md` (read by `release-notes.yml` and by `build.yml`'s release job).
 - `packaging/` (`update-manifests.py`, winget and Chocolatey sources used by `packaging.yml`).
+- `keys/` (public signing keys, must match `update::TRUSTED_PUBLIC_KEYS`; never a `.key` file).
 - `docs/media/`, `docs/quick-shots/` (linked from README), `vendor/native-windows-gui`
   (patched crate, see vendor/README.md), `assets/` (icon used by `build.rs`).
 
