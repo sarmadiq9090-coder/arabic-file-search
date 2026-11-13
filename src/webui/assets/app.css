@@ -109,6 +109,10 @@ html[dir="rtl"] .field input { text-align: right; }
 .apps .btn { unicode-bidi: plaintext; }
 .switched { margin: 0 20px 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; border: 1px solid var(--sky-line); background: var(--sky-soft); border-radius: var(--radius); padding: 8px 12px; }
 .switched > span { flex: 1; min-width: 12ch; font-weight: 500; }
+/* The Store's one-time rating question: a calm row above the status line
+   (the list shrinks from the bottom, so no result moves under the mouse). */
+.rating { flex: none; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 20px; border-top: 1px solid var(--line); background: var(--surface); }
+.rating > span { flex: 1; min-width: 16ch; }
 .chipwrap { position: relative; }
 .chip { height: 32px; display: inline-flex; align-items: center; gap: 7px; padding-inline: 12px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
 .chip svg.i { width: 16px; height: 16px; color: var(--muted); }

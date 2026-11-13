@@ -276,6 +276,9 @@ pub enum Request {
     OpenWith { list: List, seq: u64, ver: u64, id: u32 },
     /// Windows' Properties window for the file of row `id`.
     Properties { list: List, seq: u64, ver: u64, id: u32 },
+    /// The answer to the Store rating row ([`Outbound::Rating`]): rate now
+    /// (`rate`, opens the Store's review page) or not now.
+    Rating { rate: bool },
 }
 
 /// Why a message was refused.
@@ -567,6 +570,10 @@ pub enum Outbound {
         on: bool,
         text: String,
     },
+    /// The Microsoft Store build's one-time rating question is due
+    /// (`crate::rating`): a calm row under the results, never a dialog,
+    /// never taking the focus; the answer is [`Request::Rating`].
+    Rating,
 }
 
 /// The script that hands `msg` to the page.
@@ -1490,6 +1497,9 @@ mod tests {
         // A folder, never a path, from the page.
         assert_eq!(req(r#""op":"switch_to","path":"C:\\Windows""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"switch_cancel""#), Ok(Request::SwitchCancel {}));
+        assert_eq!(req(r#""op":"rating","rate":true"#), Ok(Request::Rating { rate: true }));
+        assert_eq!(req(r#""op":"rating""#), Err(Rejected::Malformed));
+        assert_eq!(serde_json::to_string(&Outbound::Rating).unwrap(), r#"{"type":"rating"}"#);
         assert_eq!(req(r#""op":"open_with","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::OpenWith { list: List::Results, seq: 2, ver: 3, id: 1 }));
         assert_eq!(req(r#""op":"properties","list":"recent","seq":0,"ver":3,"id":1"#), Ok(Request::Properties { list: List::Recent, seq: 0, ver: 3, id: 1 }));
         // Only Windows' own two verbs, never one the page names.

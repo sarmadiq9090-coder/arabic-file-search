@@ -109,7 +109,7 @@ function fakeProgram(cfg) {
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id", "name"],
     save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], options_menu: [], report_problem: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], thumbs: ["seq", "ver", "ids"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
-    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
+    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], rating: ["rate"], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
@@ -363,6 +363,9 @@ const SHOTS = [
   // "Clear history and recent files" (the classic label): on with opened files and no searches; it clears the files too.
   ["history-clear-ar-light", "ar", "light", [["click", "#hist-btn"]], { noSearches: true, expect: { menu: true, clearItem: "مسح السجل والملفات الأخيرة|on" } }],
   ["history-cleared-en-light", "en", "light", [["click", "#hist-btn"], ["click", "#hist-clear"], ["wait", 50], ["click", "#hist-btn"]], { expect: { lastSent: "clear_recent", recentRows: 0, clearItem: "Clear history and recent files|off" } }],
+  // The Store build's rating question: a row above the status line that keeps the focus in the box; one answer.
+  ["rating-ar-light", "ar", "light", [["type", "تقرير"], ["eval", "window.__instafind.recv({ type: 'rating' })"], ["wait", 50]], { expect: { rating: true, focus: "q" } }],
+  ["rating-later-en-dark", "en", "dark", [["type", "report"], ["eval", "window.__instafind.recv({ type: 'rating' })"], ["click", "#rate-later"], ["wait", 50]], { expect: { rating: false, lastSent: "rating" } }],
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
@@ -510,6 +513,7 @@ const SHOTS = [
         bannerSlim: document.getElementById("banner").classList.contains("slim") && document.getElementById("banner").getBoundingClientRect().height <= 48,
         dlgName: !!document.querySelector("#dlg-h .fname"),
         qswitch: visible(document.getElementById("qswitch")),
+        rating: visible(document.getElementById("rating")),
         clearItem: (() => { const it = document.getElementById("hist-clear"); return it ? `${it.textContent}|${it.getAttribute("aria-disabled") === "true" ? "off" : "on"}` : null; })(),
         recentRows: document.querySelectorAll("#recent .row").length,
         inside: document.getElementById("chip-content").getAttribute("aria-pressed") === "true",

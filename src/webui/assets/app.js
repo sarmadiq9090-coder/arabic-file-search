@@ -50,6 +50,7 @@
       mOpen: "فتح الملف", mReveal: "فتح المجلد الذي يحتويه", mCopyFile: "نسخ الملف", mCopyPath: "نسخ المسار", mCopyAll: "نسخ مسارات كل النتائج",
       mSizes: "أحجام المجلدات هنا…", mReplace: "استبدال نص في الملفات…", exportBtn: "تصدير النتائج", reindexBtn: "تحديث الفهرس",
       mScope: "البحث في هذا المجلد", mRename: "تغيير الاسم", mRecycle: "نقل إلى سلة المحذوفات", mMatches: "عرض كل التطابقات داخل الملف",
+      rateText: "هل يفيدك InstaFind؟ تقييمك في المتجر يساعد غيرك على إيجاده.", rateOk: "قيّم InstaFind في المتجر", rateLater: "ليس الآن", rateRegion: "التقييم في المتجر",
       mSwitch: "فتح مجلدها في نافذة الحفظ/الفتح", qsCancel: "إلغاء النقل", mOpenWith: "فتح باستخدام…", mProps: "خصائص",
       // dialogs
       renameH: "تغيير الاسم", renameLabel: "الاسم الجديد", renameOk: "تغيير الاسم", cancel: "إلغاء", close: "إغلاق",
@@ -114,6 +115,7 @@
       mOpen: "Open file", mReveal: "Open containing folder", mCopyFile: "Copy file", mCopyPath: "Copy path", mCopyAll: "Copy paths of all results",
       mSizes: "Folder sizes here…", mReplace: "Replace text in files…", exportBtn: "Export results", reindexBtn: "Update index",
       mScope: "Search in this folder", mRename: "Rename", mRecycle: "Move to Recycle Bin", mMatches: "Show all matches in the file",
+      rateText: "Is InstaFind useful to you? A rating in the Store helps others find it.", rateOk: "Rate InstaFind in the Store", rateLater: "Not now", rateRegion: "Rate in the Store",
       mSwitch: "Open its folder in the Save/Open dialog", qsCancel: "Cancel the move", mOpenWith: "Open with…", mProps: "Properties",
       renameH: "Rename", renameLabel: "New name", renameOk: "Rename", cancel: "Cancel", close: "Close",
       recycleH: "Move to the Recycle Bin", recycleQ: ["Move “", "” to the Recycle Bin?"], recycleQDir: ["Move the folder “", "” and everything in it to the Recycle Bin?"],
@@ -485,6 +487,16 @@
       }
     },
     apps(m) { S.apps = { seq: m.seq, apps: m.apps || [] }; renderApps(); },
+    // The Store build's one-time rating question (the program decides when):
+    // a row above the status line, never a dialog, never taking the focus.
+    rating() {
+      const bar = $("rating");
+      const answer = (rate) => { bar.hidden = true; bar.replaceChildren(); send({ op: "rating", rate }); };
+      bar.replaceChildren(h("span", null, T.rateText),
+        btn("primary small", I.star, T.rateOk, () => answer(true), { id: "rate-ok" }),
+        btn("small", I.x, T.rateLater, () => answer(false), { id: "rate-later" }));
+      bar.hidden = false;
+    },
     quick_switch(m) {
       S.qswitch = m.on ? m.text || "" : "";
       renderQswitch();

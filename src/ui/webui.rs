@@ -805,6 +805,16 @@ mod imp {
             true
         }
 
+        /// The Store rating question in the page (`super::super::rating`):
+        /// false when there is no page on screen to show it.
+        pub(in super::super) fn webui_ask_rating(&self) -> bool {
+            if !self.webui.ready.get() || !self.webui_visible() {
+                return false;
+            }
+            self.webui_send(&Outbound::Rating);
+            true
+        }
+
         /// A Save/Open dialog started waiting for a result (`Some`, with the
         /// hint), or stopped waiting: the page says so and Enter, Esc and its
         /// result menu follow (`Outbound::QuickSwitch`).
@@ -1033,6 +1043,8 @@ mod imp {
                     }
                 }
                 Request::Search { seq, q, kind, size, date, content, sort, desc } => {
+                    // (The rating question waits while the user types.)
+                    self.note_typing();
                     self.webui.page_query.replace(q.clone());
                     {
                         let s = &mut self.state.borrow_mut().settings;
@@ -1110,6 +1122,10 @@ mod imp {
                         self.webui_note_use(list, &path);
                         if !shell::open(&path) {
                             self.webui_warn(trf!("تعذر فتح الملف: {}", "Could not open the file: {}", path));
+                        } else if !self.webui_is_dir(list, seq, ver, id, &path) {
+                            // A file opened: counts toward the Store rating
+                            // question, as in the classic window (folders don't).
+                            self.count_file_open();
                         }
                     }
                 }
@@ -1291,6 +1307,7 @@ mod imp {
                     }
                     self.webui_send_history();
                 }
+                Request::Rating { rate } => self.rating_answer(rate),
                 Request::OpenWith { list, seq, ver, id } => self.webui_verb(list, seq, ver, id, "openas"),
                 Request::Properties { list, seq, ver, id } => self.webui_verb(list, seq, ver, id, "properties"),
                 Request::SwitchTo { list, seq, ver, id } => {
@@ -2047,6 +2064,10 @@ mod imp {
         }
 
         pub(in super::super) fn webui_take_search(&self, _q: &str, _how: super::Handover) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_ask_rating(&self) -> bool {
             false
         }
 
