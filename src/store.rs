@@ -136,12 +136,19 @@ pub fn enable_on_first_run(user_chose: bool, state: StartupState) -> bool {
 #[cfg_attr(not(windows), allow(dead_code))]
 pub const ACTIVATION_KIND_STARTUP_TASK: i32 = 1020;
 
-/// Shown instead of the update check in the Store version.
+/// InstaFind's page in the Microsoft Store app, offered by the update item
+/// of the Store version (the page has the Update button when one is due).
+pub fn store_page_uri() -> String {
+    format!("ms-windows-store://pdp/?ProductId={}", crate::rating::STORE_PRODUCT_ID)
+}
+
+/// Shown instead of the update check in the Store version, with the offer
+/// to open InstaFind's page in the Store ([`store_page_uri`]).
 #[cfg(any(windows, test))]
 pub fn update_message() -> String {
     trf!(
-        "التحديثات تأتي من Microsoft Store.\nيحدّث المتجر InstaFind تلقائياً، أو افتح Microsoft Store ◂ المكتبة ◂ «الحصول على التحديثات».\n\nالإصدار الحالي: {}",
-        "Updates come from Microsoft Store.\nThe Store updates InstaFind automatically, or open Microsoft Store ▸ Library ▸ “Get updates”.\n\nCurrent version: {}",
+        "التحديثات تأتي من Microsoft Store.\nيحدّث المتجر InstaFind تلقائياً، أو افتح Microsoft Store ◂ المكتبة ◂ «الحصول على التحديثات».\n\nالإصدار الحالي: {}\n\nهل تريد فتح صفحة InstaFind في Microsoft Store الآن؟",
+        "Updates come from Microsoft Store.\nThe Store updates InstaFind automatically, or open Microsoft Store ▸ Library ▸ “Get updates”.\n\nCurrent version: {}\n\nOpen InstaFind's page in Microsoft Store now?",
         env!("CARGO_PKG_VERSION")
     )
 }
@@ -285,14 +292,27 @@ mod win {
         })
     }
 
+    /// Where Windows really keeps the data folder of the Store version
+    /// ([`virtualized_data_dir`]); `None` for the portable program. The
+    /// program itself keeps using `%LOCALAPPDATA%\BahthSari`, but the file
+    /// watcher and the indexer see the real path, so they must leave it out
+    /// too (the log and the index would feed back as changes, and the
+    /// history would match every search inside documents).
+    pub fn real_data_dir() -> Option<&'static str> {
+        static DIR: OnceLock<Option<String>> = OnceLock::new();
+        DIR.get_or_init(|| {
+            let family = family_from_full_name(package_full_name()?)?;
+            let local = std::env::var("LOCALAPPDATA").ok().filter(|l| !l.is_empty())?;
+            Some(virtualized_data_dir(&local, &family))
+        })
+        .as_deref()
+    }
+
     /// One line for `log.txt` at startup: package, startup task and where
     /// the data really is. `None` for the portable program.
     pub fn startup_log_line() -> Option<String> {
         let full = package_full_name()?;
-        let data = family_from_full_name(full)
-            .zip(std::env::var("LOCALAPPDATA").ok())
-            .map(|(family, local)| virtualized_data_dir(&local, &family))
-            .unwrap_or_default();
+        let data = real_data_dir().unwrap_or_default();
         Some(format!(
             "store: packaged as {full}; startup task {:?}; at sign-in {}; data under {data}; command {EXECUTION_ALIAS}",
             startup_state(),
@@ -374,6 +394,8 @@ mod tests {
         // Tests run in Arabic (i18n::detect).
         let m = update_message();
         assert!(m.contains("Microsoft Store") && m.contains("التحديثات") && m.contains(env!("CARGO_PKG_VERSION")), "{m}");
+        assert!(m.trim_end().ends_with('؟'), "the message asks whether to open the Store: {m}");
+        assert_eq!(store_page_uri(), "ms-windows-store://pdp/?ProductId=9MTK4KMFQ657");
         let m = startup_refused_message(StartupState::DisabledByUser);
         // Named as Settings ▸ Apps ▸ Startup lists it: the manifest's
         // StartupTask DisplayName, from identity.json's displayName.

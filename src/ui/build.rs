@@ -518,11 +518,8 @@ impl NativeUi<AppUi> for App {
                         }
                     } else if app.on_lang_item(handle) || app.on_feedback_item(handle) || app.on_rating_item(handle) {
                     } else if handle == app.menu_update {
-                        if crate::store::is_packaged() {
-                            app.show_store_update_note();
-                        } else {
-                            app.check_for_update(true);
-                        }
+                        // The Store version is told where its updates come from.
+                        app.check_for_update(true);
                     } else if handle == app.menu_digits {
                         app.toggle_digits();
                     } else if handle == app.menu_content_index {

@@ -24,7 +24,9 @@ impl App {
         // update it, never the program itself (that would break their
         // records of the file, or cannot work at all).
         if let Some(pm) = crate::update::managed_by() {
-            if manual {
+            if manual && pm == crate::update::PackageManager::Store {
+                self.show_store_update_note();
+            } else if manual {
                 log(&format!("update: skipped, installed with {}", pm.name()));
                 self.set_status(&trf!("يُحدَّث عبر {}.", "Updated by {}.", pm.name()));
                 self.modal_info(title(), &crate::update::managed_message(pm));
@@ -208,9 +210,22 @@ impl App {
     }
 
     /// Options ▸ Updates in the Microsoft Store version: the Store, not the
-    /// program, installs new versions.
+    /// program, installs new versions, so nothing is downloaded; the user
+    /// is offered InstaFind's page in the Store instead.
     pub(super) fn show_store_update_note(&self) {
+        log("update: Microsoft Store version; offering the Store page");
         self.set_status(tr!("التحديثات تأتي من Microsoft Store.", "Updates come from Microsoft Store."));
-        nwg::modal_info_message(&self.window, title(), &crate::store::update_message());
+        let text = crate::store::update_message();
+        let params = nwg::MessageParams {
+            title: title(),
+            content: &text,
+            buttons: nwg::MessageButtons::YesNo,
+            icons: nwg::MessageIcons::Info,
+        };
+        if self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) == nwg::MessageChoice::Yes
+            && !super::shell::open(&crate::store::store_page_uri())
+        {
+            self.set_status(tr!("تعذر فتح Microsoft Store.", "Could not open Microsoft Store."));
+        }
     }
 }

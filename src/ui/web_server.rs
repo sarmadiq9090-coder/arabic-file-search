@@ -505,7 +505,10 @@ impl App {
     /// the server runs.
     fn update_web_indicator(&self) {
         let on = self.web.server.borrow().is_some();
-        self.web.menu_item.set_checked(on);
+        // Not built in the Microsoft Store version (`build_web_ui`).
+        if !self.web.menu_item.handle.blank() {
+            self.web.menu_item.set_checked(on);
+        }
         let base = format!("{} ({HOTKEY_TEXT})", title());
         let tip = if on { format!("{base} — {}", tr!("البحث من الهاتف يعمل", "Phone search is on")) } else { base };
         self.tray.set_tip(&tip);

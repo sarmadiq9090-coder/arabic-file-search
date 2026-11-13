@@ -754,7 +754,7 @@ mod win {
             let var = |k: &str| std::env::var(k).ok();
             let started = std::env::current_exe().ok();
             let resolved = original_exe().ok().map(Path::to_path_buf);
-            if crate::rating::is_packaged() {
+            if crate::store::is_packaged() {
                 return Some(PackageManager::Store);
             }
             started
