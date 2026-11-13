@@ -364,6 +364,18 @@ ol.lines .lt { text-align: start; overflow-wrap: anywhere; }
 .dlg input:focus { outline: none; border-color: var(--link); box-shadow: 0 0 0 4px var(--ring); }
 .dlg .sub { color: var(--muted); margin: 0; font-size: 12.5px; }
 .dlg-btns { display: flex; gap: 8px; justify-content: flex-end; }
+/* «كيف أبحث؟»: examples to click, then the keys */
+.dlg.help { width: min(760px, 100%); max-height: min(720px, 92vh); }
+.dlg h4 { margin: 4px 0 0; font-size: 13px; color: var(--muted); font-weight: 600; }
+.hx-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px; }
+.hx { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 10px; align-items: center; text-align: start; padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.hx:hover, .hx:focus-visible { border-color: var(--link); }
+.hx code { font: 500 12.5px/1.4 var(--font); background: var(--surface); border: 1px solid var(--line-2); border-radius: 7px; padding: 3px 8px; justify-self: start; unicode-bidi: plaintext; }
+.hx span { color: var(--muted); }
+.hk-list { display: grid; grid-template-columns: max-content 1fr max-content 1fr; gap: 6px 12px; margin: 0; font-size: 13px; align-items: center; }
+.hk-list dd { margin: 0; color: var(--muted); }
+@media (max-width: 700px) { .hk-list { grid-template-columns: max-content 1fr; } }
+.tip.more { grid-template-columns: 1fr; }
 
 @media (forced-colors: active) {
   .row[aria-selected="true"], .sg[aria-selected="true"] { outline: 2px solid Highlight; }

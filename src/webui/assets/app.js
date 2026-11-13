@@ -84,6 +84,16 @@
       sFloating: "خانة بحث شفافة فوق الساعة", sTray: "أيقونة بجانب الساعة",
       sStartup: "التشغيل", sAutostart: "التشغيل مع ويندوز (في الخلفية)",
       sAbout: "حول البرنامج", version: (v) => `بحث سريع (InstaFind) — الإصدار ${v}`,
+      // «كيف أبحث؟» (the ? button and F1): examples to click, and the keys.
+      helpH: "كيف أبحث؟", helpKey: "كيف أبحث؟ (F1)", helpMore: "كل طرق البحث…", helpSub: "انقر مثالاً ليُكتب في خانة البحث. تعمل الأمثلة بالعربية والإنجليزية، والأرقام العربية مقبولة.",
+      helpEx: [["تقرير المبيعات", "الاسم فيه الكلمتان معاً"], ['"عقد إيجار"', "العبارة كما هي"], ["تقرير .pdf", "ملفات PDF فقط (أو ext:pdf)"], ["ext:docx,xlsx", "أكثر من نوع"],
+        ["صورة|فيديو", "إحدى الكلمتين"], ["عقد -قديم", "دون ما فيه «قديم» (أو !قديم)"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"],
+        ["dm:2026-05", "عُدّلت في أيار 2026"], ["كلمة:عقد", "الكلمة كاملة: «عقد» لا «العقود»"], ['"عقد إيجار"~5', "الكلمتان وبينهما 5 كلمات على الأكثر"], ["مجلد: صور", "المجلدات فقط"],
+        ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["تقريب: تقريز", "يتحمّل خطأً إملائياً"], ["size:>1gb", "بالإنجليزية أيضاً: أكبر من 1 غيغابايت"], ["dm:thisweek", "بالإنجليزية أيضاً: هذا الأسبوع"]],
+      helpInside: "للبحث داخل المستندات (PDF وWord وExcel والصور): اضغط «داخل المستندات» ثم Enter.",
+      helpKeysH: "لوحة المفاتيح",
+      helpKeys: (hk) => [[hk, "خانة البحث الصغيرة من أي برنامج"], ["Ctrl+Alt+G", "في نافذة حفظ أو فتح: الانتقال إلى مجلد نتيجة"], ["Enter", "فتح الملف"], ["Ctrl+Enter", "فتح مجلده"], ["↓", "إلى النتائج (وفي خانة فارغة: السجل)"],
+        ["Ctrl+C", "نسخ الملف"], ["Ctrl+Shift+C", "نسخ المسار"], ["F2", "تغيير الاسم"], ["Delete", "إلى سلة المحذوفات"], ["F4", "كل التطابقات داخل الملف"], ["Ctrl+H", "السجل"], ["Ctrl+T", "المصغرات"], ["Ctrl+,", "الإعدادات"], ["F1", "هذه البطاقة"]],
     },
     en: {
       ph: "Search file names…", phContent: "Search inside documents, then press Enter…", type: "Type", size: "Size", date: "Date",
@@ -150,6 +160,15 @@
       sFloating: "Search box above the clock", sTray: "Icon in the notification area",
       sStartup: "Startup", sAutostart: "Start with Windows (in the background)",
       sAbout: "About", version: (v) => `InstaFind — version ${v}`,
+      helpH: "How to search", helpKey: "How to search (F1)", helpMore: "All the ways to search…", helpSub: "Click an example to put it in the search box. Every filter also has an Arabic spelling.",
+      helpEx: [["sales report", "names with both words"], ['"lease agreement"', "the exact phrase"], ["report .pdf", "PDF files only (or ext:pdf)"], ["ext:docx,xlsx", "several types"],
+        ["photo|video", "either word"], ["contract -old", "without “old” (or !old)"], ["size:>10mb", "bigger than 10 MB"], ["dm:thisweek", "changed this week"],
+        ["dm:2026-05", "changed in May 2026"], ["ww:contract", "whole word only"], ['"lease contract"~5', "both words within 5 words"], ["folder: photos", "folders only"],
+        ["root: كتاب", "same Arabic root: مكتبة، الكاتب"], ["fuzzy: reprot", "tolerates a typo"], ["حجم:>1ج", "in Arabic too: bigger than 1 GB"], ["احمد", "also finds «أحمد»"]],
+      helpInside: "To search inside documents (PDF, Word, Excel, pictures): press “Inside documents”, then Enter.",
+      helpKeysH: "Keyboard",
+      helpKeys: (hk) => [[hk, "the small search box from any program"], ["Ctrl+Alt+G", "in a Save/Open dialog: go to a result's folder"], ["Enter", "open the file"], ["Ctrl+Enter", "open its folder"], ["↓", "to the results (in an empty box: history)"],
+        ["Ctrl+C", "copy the file"], ["Ctrl+Shift+C", "copy the path"], ["F2", "rename"], ["Delete", "to the Recycle Bin"], ["F4", "all matches in the file"], ["Ctrl+H", "history"], ["Ctrl+T", "thumbnails"], ["Ctrl+,", "settings"], ["F1", "this card"]],
     },
   }[LANG];
   const SORTS = ["best", "name", "path", "size", "date"];
@@ -253,6 +272,7 @@
     pane: [["rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }], ["path", { d: "M14 5v14" }]],
     flag: [["path", { d: "M5 21V4M5 4h11l-2 4 2 4H5" }]],
     info: [["circle", { cx: "12", cy: "12", r: "9" }], ["path", { d: "M12 11v6M12 7.5v.5" }]],
+    help: [["circle", { cx: "12", cy: "12", r: "9" }], ["path", { d: "M9.6 9.3a2.5 2.5 0 1 1 3.4 2.4c-.6.3-1 .8-1 1.5v.4M12 16.8v.2" }]],
   };
 
   // File-type badge: colour by family, the extension as its label.
@@ -1133,6 +1153,7 @@
   function dialog(title, body, buttons, tag) {
     // (Opened from the right-click menu: back to where the focus was before it.)
     dlgFor = tag; dlgBack = document.activeElement && document.activeElement.closest("#ctx") ? ctxBack : document.activeElement;
+    $("dlg").className = "dlg";
     $("dlg-h").replaceChildren(...[].concat(title));
     $("dlg-body").replaceChildren(...body);
     $("dlg-btns").replaceChildren(...buttons);
@@ -1142,6 +1163,25 @@
     $("veil").hidden = true; dlgFor = "";
     (dlgBack && dlgBack.isConnected ? dlgBack : q).focus();
   }
+  // «كيف أبحث؟» (the ? button, F1): examples that go in the box when
+  // clicked, and the keys. Static text only.
+  function helpCard() {
+    closeMenus();
+    const ex = h("div", { class: "hx-list" }, ...T.helpEx.map(([c, d], i) => {
+      const b = h("button", { class: "hx", type: "button", id: "hx" + i }, h("code", { dir: "auto" }, c), h("span", null, d));
+      b.addEventListener("click", () => { closeDialog(); closeSettings(); q.value = c; onInput(); q.focus(); });
+      return b;
+    }));
+    const keys = h("dl", { class: "hk-list" }, ...T.helpKeys(hotkeyText()).flatMap(([k, d]) => [h("dt", null, h("kbd", null, k)), h("dd", null, d)]));
+    dialog(T.helpH, [h("p", { class: "sub" }, T.helpSub), ex, h("p", { class: "sub" }, T.helpInside), h("h4", null, T.helpKeysH), keys],
+      [btn("", I.x, T.close, closeDialog, { id: "help-close" })], "help");
+    $("dlg").classList.add("help");
+    $("hx0").focus();
+  }
+  // The global hotkey's name (Settings can change it).
+  function hotkeyText() { return "Ctrl+Alt+F"; }
+  $("help-btn").addEventListener("click", helpCard);
+
   // The dialogs name the list their row was in when they opened (`at`).
   function renameDialog(r, listName, at = listAt(listName)) {
     const name = plainName(r);
@@ -1350,6 +1390,7 @@
     const ctrl = e.ctrlKey || e.metaKey;
     if (ctrl && (e.key === "k" || e.key === "K" || e.key === "f" || e.key === "F") || e.key === "F3") { closeSettings(); q.focus(); q.select(); e.preventDefault(); return; }
     if (ctrl && (e.key === "h" || e.key === "H")) { openHistory(); e.preventDefault(); return; }
+    if (e.key === "F1") { helpCard(); e.preventDefault(); return; }
     if (ctrl && e.key === ",") { S.view === "settings" ? closeSettings() : openSettings(); e.preventDefault(); return; }
     if (ctrl && (e.key === "t" || e.key === "T")) { toggleGrid(); e.preventDefault(); return; }
     // Zoom (the browser's own keys are off): Ctrl and + / - / 0, kept for next time.
@@ -1419,7 +1460,8 @@
   for (const el of document.querySelectorAll("[data-i18n-placeholder]")) el.placeholder = T[el.dataset.i18nPlaceholder];
   for (const el of document.querySelectorAll("[data-i18n-label]")) el.setAttribute("aria-label", T[el.dataset.i18nLabel]);
   for (const el of document.querySelectorAll("[data-i18n-title]")) el.title = T[el.dataset.i18nTitle];
-  $("tips").replaceChildren(...T.tips.map(([c, s]) => h("div", { class: "tip" }, h("code", { dir: "auto" }, c), h("span", null, s))));
+  $("tips").replaceChildren(...T.tips.map(([c, s]) => h("div", { class: "tip" }, h("code", { dir: "auto" }, c), h("span", null, s))),
+    h("div", { class: "tip more" }, btn("small", I.help, T.helpMore, helpCard, { id: "help-more" })));
   setView("empty");
   applyView();
   applyZoom();
