@@ -815,11 +815,9 @@ pub mod pool {
                 return None;
             }
             let cap = self.decks.len();
-            let slot = self.started.fetch_update(Ordering::AcqRel, Ordering::Acquire, |s| (s < cap).then_some(s + 1)).ok()?;
-            if self.helpers.fetch_update(Ordering::AcqRel, Ordering::Acquire, |h| (h < self.global_cap).then_some(h + 1)).is_err() {
-                // The process has enough walk threads; this slot stays unused.
-                return None;
-            }
+            let slot = super::bump_below(&self.started, cap)?;
+            // When the process has enough walk threads, this slot stays unused.
+            super::bump_below(self.helpers, self.global_cap)?;
             Some(slot)
         }
     }
@@ -969,6 +967,22 @@ pub mod pool {
     #[cfg(test)]
     pub fn helpers_now() -> usize {
         HELPERS.load(Ordering::Acquire)
+    }
+}
+
+/// Adds one to `n` if it is below `cap` and returns the old value, else None.
+/// A compare-exchange loop rather than `fetch_update`, which newer Rust
+/// deprecates (renamed `try_update`) and older Rust lacks the new name of.
+fn bump_below(n: &std::sync::atomic::AtomicUsize, cap: usize) -> Option<usize> {
+    let mut cur = n.load(Ordering::Acquire);
+    loop {
+        if cur >= cap {
+            return None;
+        }
+        match n.compare_exchange_weak(cur, cur + 1, Ordering::AcqRel, Ordering::Acquire) {
+            Ok(old) => return Some(old),
+            Err(now) => cur = now,
+        }
     }
 }
 
@@ -1398,3 +1412,4 @@ mod tests {
         }
     }
 }
+
