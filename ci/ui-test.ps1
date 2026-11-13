@@ -573,6 +573,9 @@ if ($main) {
 Check-Crash 'close to tray'
 if (Test-Path (Join-Path $data 'log.txt')) { Copy-Item (Join-Path $data 'log.txt') (Join-Path $Out 'log-en.txt') }
 Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force
+# Wait until every copy has really exited (a killed process keeps the
+# single-instance lock until it is gone), then a moment more.
+[void](Wait-Until { -not (Get-Process bahth* -ErrorAction SilentlyContinue) } 15)
 Start-Sleep -Seconds 2
 
 # ---------------------------------------------------------------- Arabic interface
