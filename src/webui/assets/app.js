@@ -28,7 +28,7 @@
       tips: [["تقرير .pdf", "ملفات PDF فقط"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"], ['"عقد إيجار"', "العبارة كما هي"], ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["hgjrvdv", "لوحة المفاتيح الخطأ ← «التقرير»"]],
       kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد", kMenu: "المزيد",
       open: "فتح", openFolder: "فتح المجلد", copyPath: "نسخ المسار", more: "إجراءات أخرى",
-      fType: "النوع", fSize: "الحجم", fMod: "تاريخ التعديل", fMatches: "التطابقات", folder: "مجلد", file: "ملف", fileOf: (x) => `ملف ${x}`,
+      fDetails: "تفاصيل الملف", kLabel: "اختصارات لوحة المفاتيح", fType: "النوع", fSize: "الحجم", fMod: "تاريخ التعديل", fMatches: "التطابقات", folder: "مجلد", file: "ملف", fileOf: (x) => `ملف ${x}`,
       // Counts read «label: n» (no noun that must agree with the number), as the classic window.
       nres: (n) => (n === 0 ? "لا نتائج" : `عدد النتائج: ${num(n)}`),
       nMatches: (n) => `عدد التطابقات: ${num(n)}`,
@@ -115,7 +115,7 @@
       tips: [["report .pdf", "PDF files only"], ["size:>10mb", "Bigger than 10 MB"], ["dm:thisweek", "Changed this week"], ['"lease agreement"', "Exact phrase"], ["root: كتاب", "Arabic root: مكتبة، الكاتب"], ["احمد", "Also finds «أحمد»"]],
       kNav: "Move", kOpen: "Open", kFolder: "Folder", kMenu: "More",
       open: "Open", openFolder: "Open folder", copyPath: "Copy path", more: "More actions",
-      fType: "Type", fSize: "Size", fMod: "Modified", fMatches: "Matches", folder: "Folder", file: "File", fileOf: (x) => `${x} file`,
+      fDetails: "File details", kLabel: "Keyboard shortcuts", fType: "Type", fSize: "Size", fMod: "Modified", fMatches: "Matches", folder: "Folder", file: "File", fileOf: (x) => `${x} file`,
       nres: (n) => (n === 0 ? "No results" : n === 1 ? "1 result" : `${num(n)} results`),
       nMatches: (n) => (n === 1 ? "1 match" : `${num(n)} matches`),
       count: (n, ms) => (n ? `Found ${T.nres(n)} in ${num(ms)} ms` : T.nres(0)),
@@ -703,7 +703,7 @@
   function setPref(key, on) { PREF[key] = on; savePref(); applyView(); renderChips(); if (S.view === "settings") renderSettings(); }
   function viewButtons() {
     const b = (id, ic, on, label, click) => {
-      const el = btn("icon view", ic, null, click, { id, "aria-pressed": String(on), "aria-label": label, title: label });
+      const el = btn("icon view", ic, null, click, { id, role: "switch", "aria-checked": String(on), "aria-label": label, title: label });
       return el;
     };
     const tools = [
@@ -713,7 +713,7 @@
     return h("span", { class: "viewbtns" }, ...tools,
       b("view-grid", I.grid, gridOn(), T.grid, () => toggleGrid()),
       b("view-compact", I.rows, compactOn(), T.compact, () => setPref("compact", !compactOn())),
-      b("view-preview", I.pane, previewOn(), previewOn() ? T.hidePreview : T.showPreview, () => setPref("preview", !previewOn())));
+      b("view-preview", I.pane, previewOn(), T.showPreview, () => setPref("preview", !previewOn())));
   }
   window.addEventListener("resize", () => { if (typeof PREF.compact !== "boolean") { applyView(); renderChips(); } });
   function renderApps() {
@@ -902,10 +902,12 @@
     // A document found by its text: a small icon, so its matching lines show.
     pv.classList.toggle("doc", !!r.snippet);
     const kind = r.folder ? T.folder : r.ext ? T.fileOf(r.ext.toUpperCase()) : T.file;
-    const facts = h("dl", { class: "facts" }, h("dt", null, T.fType), h("dd", null, kind));
-    if (!r.folder) facts.append(h("dt", null, T.fSize), h("dd", { class: "num" }, size(r.size)));
-    facts.append(h("dt", null, T.fMod), h("dd", { class: "num", title: fullDate(r.mtime) }, fullDate(r.mtime)));
-    if (r.matches) facts.append(h("dt", null, T.fMatches), h("dd", { class: "num" }, T.nMatches(r.matches)));
+    // A named list, each label with its value in one item (what a screen reader reads as a row).
+    const fact = (k, v, attrs) => h("div", { class: "fact", role: "listitem" }, h("span", { class: "k" }, k), h("span", Object.assign({ class: "v" }, attrs), v));
+    const facts = h("div", { class: "facts", role: "list", "aria-label": T.fDetails }, fact(T.fType, kind));
+    if (!r.folder) facts.append(fact(T.fSize, size(r.size), { class: "v num" }));
+    facts.append(fact(T.fMod, fullDate(r.mtime), { class: "v num", title: fullDate(r.mtime) }));
+    if (r.matches) facts.append(fact(T.fMatches, T.nMatches(r.matches), { class: "v num" }));
     const open = btn("primary", I.open, T.open + " ", () => act("open", S.rows[S.sel]), { disabled: r.gone });
     open.append(h("kbd", null, "Enter"));
     const parts = [
@@ -1036,7 +1038,7 @@
   }
   function renderChips() {
     const wraps = chipDefs().map((d) => {
-      const chip = h("button", { class: "chip" + (d.on ? " on" : "") + (d.end ? " end" : ""), id: "chip-" + d.id, type: "button", "aria-pressed": d.toggle || d.on ? String(!!d.on) : null, "aria-haspopup": d.items ? "menu" : null, "aria-expanded": d.items ? "false" : null }, icon(d.ic));
+      const chip = h("button", { class: "chip" + (d.on ? " on" : "") + (d.end ? " end" : ""), id: "chip-" + d.id, type: "button", "aria-pressed": !d.toggle && d.on ? "true" : null, role: d.toggle ? "switch" : null, "aria-checked": d.toggle ? String(!!d.on) : null, "aria-haspopup": d.items ? "menu" : null, "aria-expanded": d.items ? "false" : null }, icon(d.ic));
       if (d.id === "scope" && S.scope) chip.append(h("span", null, `${T.lookIn}: `), pathEl(S.scope, 48));
       else chip.append(h("span", null, d.on && d.value ? d.value : d.label));
       if (d.items) {
@@ -1180,13 +1182,13 @@
   // clicked, and the keys. Static text only.
   function helpCard() {
     closeMenus();
-    const ex = h("div", { class: "hx-list" }, ...T.helpEx.map(([c, d], i) => {
+    const ex = h("div", { class: "hx-list", role: "list", "aria-label": T.helpH }, ...T.helpEx.map(([c, d], i) => {
       const b = h("button", { class: "hx", type: "button", id: "hx" + i }, h("code", { dir: "auto" }, c), h("span", null, d));
       b.addEventListener("click", () => { closeDialog(); closeSettings(); q.value = c; onInput(); q.focus(); });
-      return b;
+      return h("div", { role: "listitem" }, b);
     }));
-    const keys = h("dl", { class: "hk-list" }, ...T.helpKeys(hotkeyText()).flatMap(([k, d]) => [h("dt", null, h("kbd", null, k)), h("dd", null, d)]));
-    dialog(T.helpH, [h("p", { class: "sub" }, T.helpSub), ex, h("p", { class: "sub" }, T.helpInside), h("h4", null, T.helpKeysH), keys],
+    const keys = h("dl", { class: "hk-list", "aria-labelledby": "hk-h" }, ...T.helpKeys(hotkeyText()).flatMap(([k, d]) => [h("dt", null, h("kbd", null, k)), h("dd", null, d)]));
+    dialog(T.helpH, [h("p", { class: "sub" }, T.helpSub), ex, h("p", { class: "sub" }, T.helpInside), h("h4", { id: "hk-h" }, T.helpKeysH), keys],
       [btn("", I.x, T.close, closeDialog, { id: "help-close" })], "help");
     $("dlg").classList.add("help");
     $("hx0").focus();
@@ -1293,7 +1295,8 @@
       const on = !!st[key];
       const b = h("button", { class: "sw", type: "button", role: "switch", "aria-checked": String(on), id: "set-" + key, "aria-label": label }, h("span", { class: "knob" }));
       b.addEventListener("click", () => send({ op: "set", key, on: !on }));
-      return h("div", { class: "srow" }, h("label", { for: "set-" + key }, h("span", null, label), sub ? h("small", null, sub) : null), b);
+      if (sub) b.setAttribute("aria-describedby", "set-" + key + "-d");
+      return h("div", { class: "srow" }, h("label", { for: "set-" + key }, h("span", null, label), sub ? h("small", { id: "set-" + key + "-d" }, sub) : null), b);
     };
     const section = (title, ...rows) => h("section", { class: "sbox" }, h("h3", null, title), ...rows);
     const langBtn = (code, label) => {
@@ -1312,9 +1315,9 @@
       section(T.sDisplay, sw("digits", T.sDigits),
         (() => {
           const on = compactOn();
-          const b = h("button", { class: "sw", type: "button", role: "switch", "aria-checked": String(on), id: "set-compact", "aria-label": T.compact }, h("span", { class: "knob" }));
+          const b = h("button", { class: "sw", type: "button", role: "switch", "aria-checked": String(on), id: "set-compact", "aria-label": T.compact, "aria-describedby": "set-compact-d" }, h("span", { class: "knob" }));
           b.addEventListener("click", () => setPref("compact", !compactOn()));
-          return h("div", { class: "srow" }, h("label", { for: "set-compact" }, h("span", null, T.compact), h("small", null, T.compactSub)), b);
+          return h("div", { class: "srow" }, h("label", { for: "set-compact" }, h("span", null, T.compact), h("small", { id: "set-compact-d" }, T.compactSub)), b);
         })()),
       section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("read_cloud_files", T.sReadCloud), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
       section(T.sAnywhere, sw("hotkey_quick", T.sHotkey(hotkeyText())), hotkeyRow(st), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
@@ -1323,10 +1326,11 @@
       // "Check for updates" and "Report a problem", each with its own button
       // in view (the release standard), before the Options menu's rest.
       section(T.sHelp,
-        h("div", { class: "srow" }, h("label", { for: "check-updates" }, h("span", null, T.sUpdRow), h("small", { class: "num" }, digits((st.store ? T.sUpdSubStore : T.sUpdSub)(st.version)))),
-          btn("", I.refresh, st.store ? T.updBtnStore : T.updBtn, () => send({ op: "check_updates" }), { id: "check-updates" })),
-        h("div", { class: "srow" }, h("label", { for: "report-problem" }, h("span", null, T.sReportRow), h("small", null, T.sReportSub)), btn("", I.flag, T.reportBtn, () => send({ op: "report_problem" }), { id: "report-problem" }))),
-      section(T.sMore, h("div", { class: "srow" }, h("label", { for: "options-menu" }, h("span", null, T.sMoreRow), h("small", null, T.sMoreSub)), btn("", I.dots, T.moreBtn, () => send({ op: "options_menu" }), { id: "options-menu" }))),
+        // (A button is named by its own text; the card's words describe it.)
+        h("div", { class: "srow" }, h("div", { class: "slbl" }, h("span", null, T.sUpdRow), h("small", { class: "num", id: "check-updates-d" }, digits((st.store ? T.sUpdSubStore : T.sUpdSub)(st.version)))),
+          btn("", I.refresh, st.store ? T.updBtnStore : T.updBtn, () => send({ op: "check_updates" }), { id: "check-updates", "aria-describedby": "check-updates-d" })),
+        h("div", { class: "srow" }, h("div", { class: "slbl" }, h("span", null, T.sReportRow), h("small", { id: "report-problem-d" }, T.sReportSub)), btn("", I.flag, T.reportBtn, () => send({ op: "report_problem" }), { id: "report-problem", "aria-describedby": "report-problem-d" }))),
+      section(T.sMore, h("div", { class: "srow" }, h("div", { class: "slbl" }, h("span", null, T.sMoreRow), h("small", { id: "options-menu-d" }, T.sMoreSub)), btn("", I.dots, T.moreBtn, () => send({ op: "options_menu" }), { id: "options-menu", "aria-describedby": "options-menu-d" }))),
       section(T.sAbout, h("p", { class: "num" }, digits(T.version(st.version))), h("p", { class: "muted" }, trustText())),
     );
   }
@@ -1335,9 +1339,9 @@
   function phoneSection(st, section) {
     const ph = st.phone;
     if (!ph) return null;
-    const b = h("button", { class: "sw", type: "button", role: "switch", "aria-checked": String(!!ph.on), id: "set-phone", "aria-label": T.sPhoneRow }, h("span", { class: "knob" }));
+    const b = h("button", { class: "sw", type: "button", role: "switch", "aria-checked": String(!!ph.on), id: "set-phone", "aria-label": T.sPhoneRow, "aria-describedby": "set-phone-d" }, h("span", { class: "knob" }));
     b.addEventListener("click", () => send({ op: "set", key: "phone", on: !ph.on }));
-    const rows = [h("div", { class: "srow" }, h("label", { for: "set-phone" }, h("span", null, T.sPhoneRow), h("small", null, T.sPhoneSub)), b)];
+    const rows = [h("div", { class: "srow" }, h("label", { for: "set-phone" }, h("span", null, T.sPhoneRow), h("small", { id: "set-phone-d" }, T.sPhoneSub)), b)];
     // (It turns itself off after two hours with no request.)
     if (ph.running && ph.url) {
       const qr = qrSvg(ph.link || ph.url);
@@ -1349,7 +1353,7 @@
     if (ph.running && ph.note) rows.push(h("p", { class: "pnote" }, ph.note));
     const btns = h("div", { class: "srow pbtns" });
     if (ph.on && !ph.running && ph.allow) btns.append(btn("primary", I.globe, T.sPhoneAllow, () => send({ op: "phone_allow" }), { id: "phone-allow" }));
-    btns.append(h("small", null, T.sPhoneMoreSub), btn("", I.dots, T.sPhoneMore, () => send({ op: "phone_window" }), { id: "phone-more" }));
+    btns.append(h("small", { id: "phone-more-d" }, T.sPhoneMoreSub), btn("", I.dots, T.sPhoneMore, () => send({ op: "phone_window" }), { id: "phone-more", "aria-describedby": "phone-more-d" }));
     rows.push(btns);
     return section(T.sPhone, ...rows);
   }
@@ -1555,7 +1559,7 @@
   window.addEventListener("blur", () => { dragged = false; press = null; });
   $("recent").addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) openCtx(+r.dataset.i, null, "recent", { left: e.clientX, top: e.clientY }); });
   $("sugg").addEventListener("click", (e) => { const s = e.target.closest(".sg"); if (s) applySuggestion(S.sugg[+s.dataset.k]); });
-  $("tips").addEventListener("click", (e) => { const c = e.target.closest("code"); if (c) { q.value = c.textContent; q.focus(); runSearch(); } });
+  $("tips").addEventListener("click", (e) => { const c = e.target.closest(".tq"); if (c) { q.value = c.textContent; q.focus(); runSearch(); } });
   $("cols").addEventListener("click", (e) => {
     const b = e.target.closest(".colbtn");
     if (!b) return;
@@ -1641,8 +1645,8 @@
   for (const el of document.querySelectorAll("[data-i18n-placeholder]")) el.placeholder = T[el.dataset.i18nPlaceholder];
   for (const el of document.querySelectorAll("[data-i18n-label]")) el.setAttribute("aria-label", T[el.dataset.i18nLabel]);
   for (const el of document.querySelectorAll("[data-i18n-title]")) el.title = T[el.dataset.i18nTitle];
-  $("tips").replaceChildren(...T.tips.map(([c, s]) => h("div", { class: "tip" }, h("code", { dir: "auto" }, c), h("span", null, s))),
-    h("div", { class: "tip more" }, btn("small", I.help, T.helpMore, helpCard, { id: "help-more" })));
+  $("tips").replaceChildren(...T.tips.map(([c, s], i) => h("div", { class: "tip", role: "listitem" }, h("button", { class: "tq", type: "button", dir: "auto", "aria-describedby": "tip-d" + i }, c), h("span", { id: "tip-d" + i }, s))));
+  $("tips").after(h("div", { class: "tips-more" }, btn("small", I.help, T.helpMore, helpCard, { id: "help-more" })));
   setView("empty");
   applyView();
   applyZoom();

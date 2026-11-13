@@ -431,6 +431,9 @@ const SHOTS = [
   // Off by itself after two hours with no request: Settings says so.
   ["phone-idle-off-ar-light", "ar", "light", [["key", "Control+,"], ["eval", "document.getElementById('set-phone').scrollIntoView()"]], { phoneIdle: true, expect: { settings: true, phoneQr: false, phoneIdle: true } }],
   ["phone-store-en-light", "en", "light", [["key", "Control+,"]], { store: true, expect: { settings: true, phoneRow: false } }],
+  // «جرّب هذه»: each example is a button in a named list; clicking one searches for it.
+  ["tip-click-ar-light", "ar", "light", [["click", "#tips .tq"], ["wait", 100]], { expect: { q: "تقرير .pdf", view: "view-results", uia: true } }],
+  ["uia-settings-en-dark", "en", "dark", [["key", "Control+,"]], { phoneOn: true, expect: { settings: true, uia: true, a11y: true } }],
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
@@ -578,7 +581,7 @@ const SHOTS = [
         termsAr: document.getElementById("cols").textContent.includes("تاريخ التعديل") && document.getElementById("status-text").textContent.startsWith("عدد النتائج: "),
         // Arabic counts read «label: n», never «n نتيجة/ملف» (no noun to agree with the number).
         countsAr: !/[0-9٠-٩] ?(نتيجة|نتائج|ملف|مستند|تطابق)/.test(document.body.innerText),
-        dateTime: /[0-9٠-٩]{1,2}:[0-9٠-٩]{2}/.test([...document.querySelectorAll(".facts dd")].map((d) => d.textContent).join(" ")),
+        dateTime: /[0-9٠-٩]{1,2}:[0-9٠-٩]{2}/.test([...document.querySelectorAll(".facts .v")].map((d) => d.textContent).join(" ")),
         actbar: visible(document.getElementById("actbar")) ? document.querySelectorAll("#actbar .btn").length : 0,
         labels: [...document.querySelectorAll(".hbtn .hlbl")].every((l) => visible(l) && l.textContent.trim()),
         rowH: [...document.querySelectorAll("#list .row")].every((r) => r.getBoundingClientRect().height <= 36),
@@ -614,12 +617,31 @@ const SHOTS = [
         hkOn: (document.querySelector('.hkrow [aria-checked="true"]') || {}).id || null,
         helpEx: document.querySelectorAll(".dlg.help .hx").length || null,
         helpKeys: [...document.querySelectorAll(".dlg.help .hk-list kbd")].some((k) => k.textContent === "F1"),
-        reportSays: (() => { const l = document.querySelector('label[for="report-problem"] small'); if (!l || !visible(l)) return null; const t = l.textContent; return [/email|البريد/.test(t) ? "email" : "", /public|عامة/.test(t) ? "public" : ""].filter(Boolean).join("+"); })(),
+        reportSays: (() => { const l = document.getElementById("report-problem-d"); if (!l || !visible(l)) return null; const t = l.textContent; return [/email|البريد/.test(t) ? "email" : "", /public|عامة/.test(t) ? "public" : ""].filter(Boolean).join("+"); })(),
         updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent : null; })(),
         trustStore: [...document.querySelectorAll('[data-i18n="trust"], .settings .muted')].filter(visible).every((el) => el.textContent.includes("Microsoft Store") && !el.textContent.includes("GitHub") && !/phone|الهاتف/.test(el.textContent)),
         clearItem: (() => { const it = document.getElementById("hist-clear"); return it ? `${it.textContent}|${it.getAttribute("aria-disabled") === "true" ? "off" : "on"}` : null; })(),
         recentRows: document.querySelectorAll("#recent .row").length,
-        inside: document.getElementById("chip-content").getAttribute("aria-pressed") === "true",
+        inside: document.getElementById("chip-content").getAttribute("aria-checked") === "true",
+        // Real-PC UIA findings: buttons named by their text (the card describes them), named lists
+        // whose items hold each label with its value, clickable examples as buttons, switches as switches.
+        uia: (() => {
+          const bad = [];
+          for (const id of ["check-updates", "report-problem", "options-menu"]) {
+            const b = document.getElementById(id);
+            if (b && (document.querySelector(`label[for="${id}"]`) || !document.getElementById(b.getAttribute("aria-describedby") || "-"))) bad.push(id + " named by a label or not described");
+          }
+          for (const l of document.querySelectorAll('[role="list"]')) {
+            if (!l.closest("[hidden]") && !(l.getAttribute("aria-label") || l.getAttribute("aria-labelledby"))) bad.push("unnamed list " + (l.id || l.className));
+            for (const c of l.children) if (c.getAttribute("role") !== "listitem") bad.push("list child not an item in " + (l.id || l.className));
+          }
+          if (document.querySelector(".facts dd, .facts dt")) bad.push("facts as dt/dd");
+          if (document.querySelector(".tips code, .tips [role=listitem] :not(button):not(span)")) bad.push("tips example not a button");
+          for (const el of document.querySelectorAll(".sw, #chip-content, .viewbtns .view")) if (el.getAttribute("role") !== "switch" || !/^(true|false)$/.test(el.getAttribute("aria-checked"))) bad.push("not a switch: " + el.id);
+          if (document.querySelector(".status .keys[aria-hidden]")) bad.push("key hints hidden");
+          if (bad.length) window.__fakeErrors.push("uia: " + bad.join("; "));
+          return !bad.length;
+        })(),
         ctxFirst: (() => { const it = document.querySelector("#ctx:not([hidden]) [role=menuitem] span"); return it ? it.textContent : null; })(),
       };
     }, lang);
