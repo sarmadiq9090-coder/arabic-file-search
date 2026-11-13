@@ -103,6 +103,8 @@ mod thumb_cache;
 #[cfg(any(windows, test))]
 mod update;
 #[cfg(any(windows, test))]
+mod walk;
+#[cfg(any(windows, test))]
 mod watch_pace;
 #[cfg(any(windows, test))]
 mod winrt_guard;

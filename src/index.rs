@@ -10,8 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::time::UNIX_EPOCH;
 
 use crate::normalize::name_key;
@@ -156,14 +155,21 @@ pub struct Applied {
 
 impl Index {
     /// Scans all `roots` in parallel and returns the finished index.
+    #[cfg(test)]
     pub fn build(roots: &[String], progress: &ScanProgress) -> Index {
-        Index { entries: walk_all(roots, 500_000, progress), roots: roots.to_vec(), built_at: now_secs() }
+        Index::build_measured(roots, progress).0
+    }
+
+    /// [`Index::build`], with what the walk did (for the log).
+    pub fn build_measured(roots: &[String], progress: &ScanProgress) -> (Index, crate::walk::Stats) {
+        let (entries, stats) = walk_all(roots, 500_000, progress);
+        (Index { entries, roots: roots.to_vec(), built_at: now_secs() }, stats)
     }
 
     /// Everything below `dir` (not `dir` itself), sorted, with the same rules
     /// as a full scan. Used for folders that appear with unknown contents.
     pub fn scan_subtree(dir: &str, progress: &ScanProgress) -> Vec<Entry> {
-        walk_all(&[dir.to_string()], 0, progress)
+        walk_all(&[dir.to_string()], 0, progress).0
     }
 
     pub fn load(path: &Path) -> Option<Index> {
@@ -515,19 +521,13 @@ pub fn remove_stale_tmp(path: &Path, older_than: std::time::Duration) -> usize {
     removed
 }
 
-/// Walks `roots` in parallel; the result is sorted with names filled in.
-fn walk_all(roots: &[String], capacity: usize, progress: &ScanProgress) -> Vec<Entry> {
-    let out: Mutex<Vec<Entry>> = Mutex::new(Vec::with_capacity(capacity));
-    rayon::scope(|s| {
-        for root in roots {
-            let out = &out;
-            s.spawn(move |s| walk(s, PathBuf::from(root), out, progress));
-        }
-    });
-    let mut entries = out.into_inner().unwrap_or_default();
+/// Walks `roots` in parallel (`crate::walk`); the result is sorted with
+/// names filled in, so it does not depend on the order the walk found them.
+fn walk_all(roots: &[String], capacity: usize, progress: &ScanProgress) -> (Vec<Entry>, crate::walk::Stats) {
+    let (mut entries, stats) = crate::walk::walk(roots, capacity, progress);
     sort_by_path(&mut entries);
     fill_norm_names(&mut entries);
-    entries
+    (entries, stats)
 }
 
 fn sort_by_path(entries: &mut [Entry]) {
@@ -554,40 +554,6 @@ fn merge_by_path(a: Vec<Entry>, b: Vec<Entry>) -> Vec<Entry> {
         merged.extend(if take_a { a.next() } else { b.next() });
     }
     merged
-}
-
-fn walk<'s>(s: &rayon::Scope<'s>, dir: PathBuf, out: &'s Mutex<Vec<Entry>>, progress: &'s ScanProgress) {
-    if progress.cancel.load(Ordering::Relaxed) {
-        return;
-    }
-    let Ok(rd) = fs::read_dir(&dir) else { return };
-    let mut local = Vec::new();
-    for ent in rd.flatten() {
-        // On Windows file_type() and metadata() come straight from the
-        // directory listing, so they cost no extra system call.
-        let Ok(ft) = ent.file_type() else { continue };
-        // Symlinks and junctions are skipped to avoid loops and duplicates.
-        if ft.is_symlink() {
-            continue;
-        }
-        let path = ent.path();
-        let Some(path_str) = path.to_str() else { continue };
-        let (size, mtime) = match ent.metadata() {
-            Ok(m) => (
-                if ft.is_dir() { 0 } else { m.len() },
-                m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs() as i64),
-            ),
-            Err(_) => (0, 0),
-        };
-        local.push(Entry { path: path_str.into(), size, mtime, is_dir: ft.is_dir(), norm_name: Box::default() });
-        if ft.is_dir() && !ent.file_name().to_str().is_some_and(skip_dir) {
-            s.spawn(move |s| walk(s, path, out, progress));
-        }
-    }
-    progress.files.fetch_add(local.len(), Ordering::Relaxed);
-    if let Ok(mut v) = out.lock() {
-        v.append(&mut local);
-    }
 }
 
 pub fn now_secs() -> i64 {
@@ -624,6 +590,7 @@ pub fn list_drives() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::Ordering;
 
     #[test]
     fn skipped_dirs() {

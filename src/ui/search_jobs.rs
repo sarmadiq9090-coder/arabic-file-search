@@ -132,10 +132,11 @@ impl App {
             let started = std::time::Instant::now();
             // `None` after a panic (logged by the hook): the scan still ends,
             // keeping the index there was, instead of indexing forever.
-            let idx = crate::crash_log::catch(|| Index::build(&index::list_drives(), &p));
-            if let Some(idx) = &idx {
-                log(&format!("index build: {} entries in {} ms", idx.entries.len(), started.elapsed().as_millis()));
-            }
+            let built = crate::crash_log::catch(|| Index::build_measured(&index::list_drives(), &p));
+            let idx = built.map(|(idx, walk)| {
+                log(&format!("index build: {} entries in {} ms ({walk})", idx.entries.len(), started.elapsed().as_millis()));
+                idx
+            });
             // A scan stopped half-way (the program is closing) has only part
             // of the files: it must not replace the saved index.
             if let Some(idx) = idx.as_ref().filter(|_| !p.cancel.load(Ordering::Relaxed)) {
