@@ -11,7 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use winapi::um::winuser::{
-    GWL_EXSTYLE, GetWindowLongW, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongW, SetWindowPos, WS_EX_LAYOUTRTL as EX_LAYOUTRTL,
+    ES_CENTER, ES_RIGHT, GWL_EXSTYLE, GWL_STYLE, GetWindowLongW, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongW, SetWindowPos, WS_EX_LAYOUTRTL as EX_LAYOUTRTL,
     WS_EX_LEFTSCROLLBAR, WS_EX_RIGHT, WS_EX_RTLREADING,
 };
 
@@ -50,6 +50,10 @@ pub struct ReportUi {
     what_label: nwg::Label,
     what: nwg::TextBox,
     preview_label: nwg::Label,
+    /// Holds the preview: its children are not mirrored in the Arabic
+    /// window (WS_EX_NOINHERITLAYOUT), so the English report reads left to
+    /// right, aligned left.
+    preview_frame: nwg::Frame,
     preview: nwg::TextBox,
     copy_btn: nwg::Button,
     open_btn: nwg::Button,
@@ -153,21 +157,36 @@ impl App {
             .position((12, 156))
             .size((616, 24))
             .build(&mut r.preview_label)?;
-        nwg::TextBox::builder()
+        // The report is technical English and reads left to right, aligned
+        // left, also in the Arabic window. Taking the right-to-left styles
+        // off the box after it was made was not enough (an edit box keeps
+        // the layout it was created with: on a real PC the text still sat
+        // on the right), so the box is created inside a frame whose
+        // children are not mirrored, with no right-to-left style at all.
+        const WS_EX_NOINHERITLAYOUT: u32 = 0x0010_0000;
+        nwg::Frame::builder()
             .parent(p)
+            .flags(nwg::FrameFlags::VISIBLE)
+            .ex_flags(crate::i18n::rtl_only(WS_EX_NOINHERITLAYOUT))
+            .position((12, 182))
+            .size((616, 300))
+            .build(&mut r.preview_frame)?;
+        nwg::TextBox::builder()
+            .parent(&r.preview_frame)
             .font(f)
             .readonly(true)
             .flags(nwg::TextBoxFlags::VISIBLE | nwg::TextBoxFlags::VSCROLL | nwg::TextBoxFlags::AUTOVSCROLL | nwg::TextBoxFlags::TAB_STOP)
-            .position((12, 182))
+            .ex_flags(0)
+            .position((0, 0))
             .size((616, 300))
             .build(&mut r.preview)?;
-        // The report is in English and reads left to right, also in the
-        // Arabic window.
         if let Some(h) = r.preview.handle.hwnd() {
             unsafe {
                 let ex = GetWindowLongW(h, GWL_EXSTYLE) as u32;
                 let rtl = EX_LAYOUTRTL | WS_EX_RTLREADING | WS_EX_RIGHT | WS_EX_LEFTSCROLLBAR;
                 SetWindowLongW(h, GWL_EXSTYLE, (ex & !rtl) as i32);
+                let style = GetWindowLongW(h, GWL_STYLE) as u32;
+                SetWindowLongW(h, GWL_STYLE, (style & !(ES_RIGHT | ES_CENTER)) as i32);
                 SetWindowPos(h, std::ptr::null_mut(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
             }
         }
