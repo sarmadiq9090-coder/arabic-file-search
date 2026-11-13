@@ -34,7 +34,7 @@
 
 1. نزّل [`bahth.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe) من [أحدث إصدار](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest). ملف واحد، لا يحتاج تثبيتاً.
    - لأجهزة ARM64 (مثل Snapdragon) نزّل [`bahth-arm64.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-arm64.exe)، ولويندوز 32 بت نزّل [`bahth-x86.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-x86.exe). كل نسخة تحدّث نفسها بنسختها.
-2. ضعه في مجلد دائم، مثلاً `%LOCALAPPDATA%\Programs\Bahth\` (هذا المسار تستعمله إضافات `integrations/`)، ثم شغّله.
+2. شغّله. إن شغّلته من مجلد التنزيلات يعرض عليك مرة واحدة نقل نفسه إلى `%LOCALAPPDATA%\Programs\InstaFind\` (هذا المسار تبحث فيه إضافات `integrations/`، ومعه `Programs\Bahth\` القديم)، أو ضعه أنت في مجلد دائم.
 3. إن ظهر تحذير SmartScreen لأن الملف غير موقّع رقمياً: «مزيد من المعلومات» ← «تشغيل على أي حال».
 
 أو ثبّته بأمر واحد عبر [Scoop](https://scoop.sh):
@@ -208,7 +208,7 @@ InstaFind is a free file search tool for Windows, written in Rust. It indexes al
 
 1. Download [`bahth.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe) from the [latest release](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest). It is a single file; nothing to install.
    - On ARM64 PCs (e.g. Snapdragon) download [`bahth-arm64.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-arm64.exe); on 32-bit Windows, [`bahth-x86.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-x86.exe). Each one updates itself with its own build.
-2. Put it in a permanent folder, for example `%LOCALAPPDATA%\Programs\Bahth\` (the path the `integrations/` plugins expect), and run it.
+2. Run it. Started from Downloads, it offers once to move itself to `%LOCALAPPDATA%\Programs\InstaFind\` (where the `integrations/` plugins look, along with the older `Programs\Bahth\`); or put it in a permanent folder yourself.
 3. If SmartScreen warns because the file is not code-signed: **More info → Run anyway**.
 
 Or install it with [Scoop](https://scoop.sh):
