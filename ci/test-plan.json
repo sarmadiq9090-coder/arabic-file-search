@@ -1,0 +1,13 @@
+{
+  "torture-test": {
+    "groups": [
+      "names",
+      "tree",
+      "churn",
+      "state",
+      "instances",
+      "content",
+      "soak"
+    ]
+  }
+}
