@@ -634,3 +634,61 @@ fn word_final_hamza_spellings_find_each_other() {
     assert_eq!(marked("شاطئ.txt", "شاطيء"), ["شاطئ"]);
     assert_eq!(marked("لا شئ هنا", "شيء"), ["شئ"]);
 }
+
+// ------------------------------------- a query without the hamza, in documents
+
+/// A query typed without the hamza («مسوول», «ريس», «شوون») found «مسئول»,
+/// «رئيس» and «شئون» in file names (their keys hold those spellings) but not
+/// inside documents, whose text is kept as it is. A search inside documents
+/// now adds those spellings to the query.
+#[test]
+fn query_without_hamza_finds_the_seat_in_documents() {
+    let text = "اجتماع مسئول الحسابات مع رئيس القسم حول شئون الموظفين وسؤال المدير ومسؤول المخزن";
+    for (q, word) in [
+        ("مسوول", "مسئول"),
+        ("المسوول الحسابات", "مسئول"),
+        ("ريس", "رئيس"),
+        ("الريس", "رئيس"),
+        ("شوون", "شئون"),
+        ("سوال", "وسؤال"),
+        ("مسيول", "مسئول"),
+    ] {
+        let s = match_text(text, &at(q)).unwrap_or_else(|| panic!("{q}"));
+        assert!(s.contains(word), "{q}: {s}");
+    }
+    // Every occurrence counts, whatever its spelling.
+    assert_eq!(all_matches(text, &at("مسوول"), 50).0, 2);
+    assert_eq!(all_matches("رئيس ورييس وريس", &at("ريس"), 50).0, 3);
+    // ww:, proximity and exclusions too.
+    assert!(match_text(text, &at("ww:ريس")).is_some());
+    assert!(match_text(text, &at(r#""ريس القسم"~1"#)).is_some());
+    assert!(match_text(text, &at("القسم -ريس")).is_none());
+    // و and ي stay different letters where no hamza can be.
+    for w in ["سيارة", "بيوت", "تقرير", "كبير", "مدير", "سؤال", "report"] {
+        assert_eq!(crate::normalize::document_forms(&normalize(w)), (Vec::new(), Vec::new()), "{w}");
+    }
+    assert!(match_text("سيارة جديدة", &at("سوارة")).is_none());
+    // The same lines are listed when a result is opened.
+    let hit = content_hit(0, text, &at("ريس").for_documents()).unwrap();
+    assert_eq!(hit.count, 1);
+    // A search over documents uses them.
+    let (hits, _) = search_many(3, text, "مسوول", HitLimits::DEFAULT);
+    assert_eq!(hits.len(), 3);
+    assert!(hits.iter().all(|h| h.count == 2));
+}
+
+/// The document spellings stay few whatever the query: each change on its
+/// own, then all of them, never one per combination.
+#[test]
+fn document_forms_are_capped() {
+    let q = at("مسوولين شوونهم ريس وو شيء").for_documents();
+    for t in &q.terms {
+        assert!(t.alts.len() + t.ends.len() <= 2 + 1 + MAX_TERM_DOCUMENT_FORMS, "{t:?}");
+    }
+    let many = "مسوول ".repeat(40);
+    let (forms, ends) = crate::normalize::document_forms(&many);
+    assert!(forms.len() + ends.len() <= crate::normalize::MAX_DOCUMENT_FORMS);
+    // Names are not searched with them: name search stays as it was.
+    assert_eq!(at("ريس").terms[0].alts, ["ريس"]);
+    assert!(at("ريس").terms[0].ends.is_empty());
+}

@@ -60,8 +60,8 @@ impl Term {
         self.find_word(hay).is_some()
     }
 
-    /// Adds the spellings its alternatives may have in a document
-    /// ([`crate::normalize::document_forms`]), at
+    /// Adds the spellings its alternatives may have in a document when the
+    /// query left a hamza out ([`crate::normalize::document_forms`]), at
     /// most [`MAX_TERM_DOCUMENT_FORMS`] in all.
     fn add_document_forms(&mut self) {
         let mut room = MAX_TERM_DOCUMENT_FORMS;
@@ -1100,10 +1100,10 @@ impl Query {
 
     /// This query for matching document text: each term (also `ww:` and
     /// proximity words) and exclusion also has the spellings its words may
-    /// have in a document, «شيء» finding «شئ»
-    /// ([`crate::normalize::document_forms`]). A file name has those as extra
-    /// forms in its key, and a stored text is kept as it is, so they are
-    /// added to the query once per search instead.
+    /// have in a document when the query left a hamza out, «مسوول» finding
+    /// «مسئول» and «ريس» «رئيس» ([`crate::normalize::document_forms`]). A file
+    /// name has those as extra forms in its key, and a stored text is kept as
+    /// it is, so they are added to the query once per search instead.
     pub(crate) fn for_documents(&self) -> Query {
         let mut q = self.clone();
         let near = q.near.iter_mut().flat_map(|n| n.words.iter_mut());
