@@ -283,6 +283,9 @@ pub enum Request {
     /// [`crate::settings::Hotkey::ALL`]; refused by Windows when another
     /// program has it, then the old one stays).
     Hotkey { key: crate::settings::Hotkey },
+    /// Use colour theme `key` for the main window from now on (one of
+    /// [`crate::settings::Theme::ALL`]); the page has already applied it.
+    Theme { key: crate::settings::Theme },
     /// Search from phone: allow the network this PC is on now (Windows
     /// does not mark it private, or it is not the home network).
     PhoneAllow {},
@@ -441,6 +444,8 @@ pub struct SettingsOut {
     pub hotkey: &'static str,
     pub hotkey_taken: bool,
     pub hotkeys: Vec<[&'static str; 2]>,
+    /// The colour theme (`Theme::code`: auto, light, dark, midnight, kiwi).
+    pub theme: &'static str,
     /// Search from phone; `None` in the Microsoft Store version (it has none).
     pub phone: Option<PhoneOut>,
 }
@@ -1559,6 +1564,11 @@ mod tests {
         assert_eq!(req(r#""op":"hotkey","key":"win_alt_f""#), Ok(Request::Hotkey { key: crate::settings::Hotkey::WinAltF }));
         assert_eq!(req(r#""op":"hotkey","key":"alt_f4""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"hotkey""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"theme","key":"midnight""#), Ok(Request::Theme { key: crate::settings::Theme::Midnight }));
+        assert_eq!(req(r#""op":"theme","key":"auto""#), Ok(Request::Theme { key: crate::settings::Theme::Auto }));
+        assert_eq!(req(r#""op":"theme","key":"sepia""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"theme","key":"dark","x":1"#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"theme""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"set","key":"phone","on":true"#), Ok(Request::Set { key: Setting::Phone, on: true }));
         assert_eq!(req(r#""op":"phone_allow""#), Ok(Request::PhoneAllow {}));
         assert_eq!(req(r#""op":"phone_window""#), Ok(Request::PhoneWindow {}));
@@ -1991,12 +2001,13 @@ mod tests {
             hotkey: "ctrl_alt_f",
             hotkey_taken: true,
             hotkeys: hotkeys(),
+            theme: "kiwi",
             phone: None,
         });
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.starts_with(r#"{"type":"settings","lang":"ar","next_lang":"en""#), "{json}");
         assert!(json.contains(r#""version":"1.0.0","store":true,"checking_updates":true,"hotkey":"ctrl_alt_f","hotkey_taken":true,"hotkeys":[["ctrl_alt_f","Ctrl+Alt+F"],["ctrl_alt_space","Ctrl+Alt+Space"],"#), "{json}");
-        assert!(json.ends_with(r#""phone":null}"#), "{json}");
+        assert!(json.ends_with(r#""theme":"kiwi","phone":null}"#), "{json}");
         let json = serde_json::to_string(&Outbound::Renamed { list: List::Recent, seq: 0, ver: 3, id: 1, name: "a".into() }).unwrap();
         assert_eq!(json, r#"{"type":"renamed","list":"recent","seq":0,"ver":3,"id":1,"name":"a"}"#);
     }
