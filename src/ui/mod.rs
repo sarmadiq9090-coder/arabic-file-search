@@ -214,6 +214,8 @@ struct MemoryWatch {
     lined: Cell<Option<std::time::Instant>>,
     /// After shedding: when to watch the drives again.
     resume_at: Cell<Option<std::time::Instant>>,
+    /// When the idle trim last ran (`memory.rs`).
+    trimmed: Cell<Option<std::time::Instant>>,
 }
 
 #[derive(Default)]

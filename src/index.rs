@@ -65,6 +65,17 @@ pub struct Index {
     pub built_at: i64,
 }
 
+impl Index {
+    /// Lets go of the entry list's spare room (a scan or a merge can leave
+    /// up to as much again). For the idle trim; the entries stay.
+    #[cfg_attr(not(windows), allow(dead_code))] // the Windows UI
+    pub fn shrink(&mut self) {
+        if self.entries.capacity() > self.entries.len() + self.entries.len() / 16 {
+            self.entries.shrink_to_fit();
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct CacheFile {
     version: u32,

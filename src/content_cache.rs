@@ -894,6 +894,13 @@ impl ContentCache {
     }
 
     /// Documents with a cached result; cheaper than [`stats`](Self::stats).
+    /// Lets go of the map's spare room (left by the warm-up's inserts). For
+    /// the idle trim: the map itself stays.
+    #[cfg_attr(not(windows), allow(dead_code))] // the Windows UI
+    pub fn shrink(&self) {
+        self.lock().map.shrink_to_fit();
+    }
+
     pub fn documents(&self) -> usize {
         self.lock().map.len()
     }

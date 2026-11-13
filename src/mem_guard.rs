@@ -14,8 +14,21 @@
 //! the content index (measured: about 260, plus the warm-up's own list at
 //! about 180) and [`BASE_BYTES`] for the program itself.
 //!
+//! The idle trim ([`idle_trim_due`]): after [`TRIM_IDLE`] with no search and
+//! no input in the program's windows, once the background document reading
+//! has ended, the window lets go of what is cheap to rebuild (thumbnail and
+//! folder-size caches, spare capacity) and gives the heap's free memory back
+//! to Windows. The index and the content index's map stay, so the next
+//! search is as fast as ever. What it can give back is mostly what the
+//! scan, the load and the warm-up left free in the heap: the warm-up's list
+//! (about 180 of the 450 bytes per document) and the temporary copies of
+//! the index. What stays is about 230 bytes per entry, 260 per document and
+//! the program itself.
+//!
 //! Free of Win32, so it is tested on every platform.
 
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 pub const ENTRY_BYTES: u64 = 300;
@@ -32,6 +45,56 @@ const MB: u64 = 1024 * 1024;
 const GB: u64 = 1024 * MB;
 /// The sizes whose passing is logged, once each.
 const WARN_AT: [u64; 3] = [GB, 2 * GB, 4 * GB];
+/// How long without a search or input in the program's windows before the
+/// idle trim.
+pub const TRIM_IDLE: Duration = Duration::from_secs(120);
+/// While the program stays idle, how often the trim may run again (the
+/// drive watcher's batches allocate meanwhile).
+pub const TRIM_AGAIN: Duration = Duration::from_secs(30 * 60);
+
+/// When the program started counting activity, and the last activity in
+/// milliseconds after it.
+static ORIGIN: OnceLock<Instant> = OnceLock::new();
+static LAST_ACTIVE_MS: AtomicU64 = AtomicU64::new(0);
+
+fn origin() -> Instant {
+    *ORIGIN.get_or_init(Instant::now)
+}
+
+/// Notes the user's activity now (any thread): input in one of the
+/// program's windows, which is also how every search the user runs starts.
+/// A search the program runs on its own (results refreshed after a change
+/// on disk) is not activity: on a busy PC it would put the trim off for ever.
+pub fn mark_active() {
+    let ms = origin().elapsed().as_millis();
+    LAST_ACTIVE_MS.fetch_max(u64::try_from(ms).unwrap_or(u64::MAX), Ordering::Relaxed);
+}
+
+/// The last activity ([`mark_active`]); the start if none yet.
+pub fn last_active() -> Instant {
+    origin() + Duration::from_millis(LAST_ACTIVE_MS.load(Ordering::Relaxed))
+}
+
+/// Whether the idle trim should run `now`: nothing was searched or typed
+/// for [`TRIM_IDLE`] since `last_active`, the background work is `quiet`
+/// (the content index's warm-up ended, no scan, load or search running),
+/// and it has not run since that activity, or not for [`TRIM_AGAIN`].
+pub fn idle_trim_due(now: Instant, last_active: Instant, quiet: bool, last_trim: Option<Instant>) -> bool {
+    quiet
+        && now.saturating_duration_since(last_active) >= TRIM_IDLE
+        && last_trim.is_none_or(|t| t < last_active || now.saturating_duration_since(t) >= TRIM_AGAIN)
+}
+
+/// The log line after an idle trim.
+pub fn trim_line(before: u64, after: u64, entries: usize, documents: usize) -> String {
+    let freed = before.saturating_sub(after);
+    format!(
+        "memory: idle trim: private {} MB -> {} MB ({} MB given back; entries {entries}, documents {documents})",
+        before / MB,
+        after / MB,
+        freed / MB
+    )
+}
 
 /// One sample of the process.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -169,6 +232,45 @@ mod tests {
     #[test]
     fn sampling_and_lines_are_spaced() {
         assert_eq!((SAMPLE_EVERY.as_secs(), LINE_EVERY.as_secs()), (30, 600));
+    }
+
+    #[test]
+    fn idle_trim_waits_for_two_quiet_minutes_and_runs_once() {
+        let t = Instant::now();
+        let idle = |s| t + Duration::from_secs(s);
+        // Not before two minutes, nor while the background is busy.
+        assert!(!idle_trim_due(idle(119), t, true, None));
+        assert!(!idle_trim_due(idle(600), t, false, None));
+        assert!(idle_trim_due(idle(120), t, true, None));
+        // Once per idle spell…
+        let trimmed = Some(idle(120));
+        assert!(!idle_trim_due(idle(150), t, true, trimmed));
+        assert!(!idle_trim_due(idle(120) + TRIM_AGAIN - Duration::from_secs(1), t, true, trimmed));
+        // …again after half an hour of it, or after the next activity.
+        assert!(idle_trim_due(idle(120) + TRIM_AGAIN, t, true, trimmed));
+        let active = idle(200);
+        assert!(!idle_trim_due(active + Duration::from_secs(60), active, true, trimmed));
+        assert!(idle_trim_due(active + TRIM_IDLE, active, true, trimmed));
+        // A clock that went back never trims early.
+        assert!(!idle_trim_due(t, idle(10), true, None));
+    }
+
+    #[test]
+    fn activity_is_noted_from_any_thread() {
+        let before = last_active();
+        std::thread::spawn(mark_active).join().unwrap();
+        let after = last_active();
+        assert!(after >= before);
+        assert!(Instant::now().saturating_duration_since(after) < Duration::from_secs(60));
+    }
+
+    #[test]
+    fn the_trim_line() {
+        assert_eq!(
+            trim_line(656 * MB, 340 * MB, 1_000_000, 300_000),
+            "memory: idle trim: private 656 MB -> 340 MB (316 MB given back; entries 1000000, documents 300000)"
+        );
+        assert!(trim_line(300 * MB, 310 * MB, 1, 1).contains("(0 MB given back"));
     }
 
     #[test]
