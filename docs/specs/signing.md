@@ -132,12 +132,15 @@ after every check (`linux-test`, `windows`, `smoke`, `ui`, `newlook`) has passed
 |---|---|---|
 | `version` | `contents: read` | Reads the version, and says whether its tag is new. Releasing is skipped unless it is. |
 | `sign` | Environment **`release`** (owner approval, branch `main`), with `MINISIGN_SECRET_KEY` and `MINISIGN_PASSWORD`. `contents: read` | Runs **no repository code** (no checkout). It reads `keys/minisign-{primary,backup}.pub` at the commit through the API (only a 404 counts as "not committed"; any other API error fails). **No `MINISIGN_SECRET_KEY`** and no public key: it logs a warning, signs nothing and passes, so releases are published unsigned as before. **Secret, no public key yet**: it signs, checks against the public half recreated from the secret (`minisign -R`), and warns that apps do not check signatures yet. **Public keys but no secret**: it fails, since apps with those keys would refuse an unsigned update. To sign, it downloads the three smoke-tested exes and installs minisign 0.12 from a pinned URL with a pinned SHA-256 (the archive was verified with its author's key). It runs `minisign -S -t "instafind <tag>"` for each exe and checks each with `minisign -V -H` (pre-hashed only, as the app requires) against the public keys, including the exact trusted comment. Finally it uploads artifact `bahth-minisig`. |
-| `release` | `contents: write`, `actions: write` | Deletes any stale draft of the tag left by a failed run, then writes `SHA256SUMS.txt` (the three exes, plus their `.minisig` files when signed) and creates the release as a **draft** with the three exes and `SHA256SUMS.txt`. If signed, it uploads the three `.minisig` files. It checks that the draft has exactly the expected non-empty assets, then publishes it (`--draft=false --latest`) and starts `packaging.yml` and `store.yml`. |
+| `release` | `contents: write`, `actions: write` | First checks that the tag is still free (another run may have published this version while this one waited; then it publishes nothing). Deletes any stale draft of the tag **for this commit** left by a failed run, then writes `SHA256SUMS.txt` (the three exes, plus their `.minisig` files when signed) and creates the release as a **draft** with the three exes, their `.minisig` files when signed, and `SHA256SUMS.txt`. From then on it handles the draft by its id, never by its tag. It checks that the draft targets this commit, has exactly the expected assets, and that each asset has the SHA-256 of this run's file, then publishes it as *latest* and starts `packaging.yml` and `store.yml`. |
 
 Draft safety: `releases/latest`, which every installed copy asks for, never
 returns a draft, and the updater also ignores drafts. A half-made release is never
 offered. If `release` fails after creating the draft, re-run the failed jobs: the
-stale draft is deleted first.
+stale draft is deleted first. `version`, `sign` and `release` each have a
+concurrency group (`release-<ref>-<job>`, nothing cancelled), so two runs of one
+version (two pushes on release day) never do the same step at once, and one run
+never deletes or publishes the other's draft.
 
 Compatibility: asset names are unchanged (`bahth.exe`, `bahth-x86.exe`,
 `bahth-arm64.exe`, `SHA256SUMS.txt`). The `.minisig` files are extra assets that old clients

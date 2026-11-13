@@ -266,10 +266,22 @@ jobs:
   # Releasing is version -> sign -> release, and starts only when every
   # check above passed on this commit and main has a Cargo.toml version with
   # no tag yet.
+  #
+  # Two pushes to main on release day can both find the version untagged.
+  # Each of the three jobs has its own concurrency group, so two runs never
+  # do the same step at once and nothing in progress is cancelled. (One group
+  # shared by the three jobs would not do: a run's `version` arriving while
+  # another run's `release` is pending would cancel that `release`.) The
+  # `release` job checks again that the tag is free, touches only the draft
+  # of its own commit, and publishes it only once its target and every asset
+  # are this run's.
   version:
     needs: [linux-test, windows, smoke, ui, newlook]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ github.ref }}-version
+      cancel-in-progress: false
     outputs:
       tag: ${{ steps.v.outputs.tag }}
       new: ${{ steps.v.outputs.new }}
@@ -308,6 +320,9 @@ jobs:
     if: needs.version.outputs.new == 'true'
     runs-on: ubuntu-latest
     environment: release
+    concurrency:
+      group: release-${{ github.ref }}-sign
+      cancel-in-progress: false
     permissions:
       contents: read # read keys/*.pub through the API
     outputs:
@@ -448,6 +463,9 @@ jobs:
     needs: [version, sign]
     if: needs.version.outputs.new == 'true'
     runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ github.ref }}-release
+      cancel-in-progress: false
     permissions:
       contents: write
       actions: write
@@ -458,23 +476,39 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+      # Another run may have published this version while this one waited
+      # for its turn (or for approval): then there is nothing left to do.
+      - name: Is the tag still free?
+        id: free
+        run: |
+          rc=0
+          git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null || rc=$?
+          case "$rc" in
+            0) echo "::notice::$TAG was published by another run while this one waited, so this run publishes nothing."
+               echo "free=false" >> "$GITHUB_OUTPUT" ;;
+            2) echo "free=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::Could not read the tags of origin (git ls-remote exit $rc)"; exit 1 ;;
+          esac
       # Publishes the very exes the smoke tests ran.
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - if: steps.free.outputs.free == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: bahth-*exe
           merge-multiple: true
-      - if: needs.sign.outputs.signed == 'true'
+      - if: steps.free.outputs.free == 'true' && needs.sign.outputs.signed == 'true'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: bahth-minisig
-      # A failed earlier run can leave a draft of this tag behind: remove it so
-      # "Re-run failed jobs" just works.
-      - name: Remove stale drafts of this tag
+      # A failed earlier run of this commit can leave a draft of this tag
+      # behind: remove it so "Re-run failed jobs" just works. Only drafts of
+      # this commit: a draft of another commit belongs to another run.
+      - if: steps.free.outputs.free == 'true'
+        name: Remove stale drafts of this tag
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
-            --jq ".[] | select(.draft and .tag_name == \"${TAG}\") | .id" |
+            --jq ".[] | select(.draft and .tag_name == \"${TAG}\" and .target_commitish == \"${GITHUB_SHA}\") | .id" |
             while read -r id; do
               echo "Deleting stale draft release ${id}"
               gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${id}"
@@ -483,8 +517,12 @@ jobs:
       # copies ask for `releases/latest`, which never returns a draft, so
       # nobody is offered a half-uploaded release. Assets: the three exes,
       # their .minisig files when signed, and SHA256SUMS.txt (the official
-      # checksums of every other asset).
-      - name: Publish the release
+      # checksums of every other asset). The draft is then handled by its id,
+      # never by its tag (gh finds a draft by tag, and another run's draft
+      # may have the same one), and published only when it targets this
+      # commit and each of its assets has the SHA-256 of this run's file.
+      - if: steps.free.outputs.free == 'true'
+        name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -495,32 +533,59 @@ jobs:
           for f in "${exes[@]}" "${sigs[@]}"; do test -s "$f"; done
           sha256sum "${exes[@]}" "${sigs[@]}" > SHA256SUMS.txt
           test -s SHA256SUMS.txt
+          files=("${exes[@]}" "${sigs[@]}" SHA256SUMS.txt)
           notes="releases/$TAG-notes.md"
           [ -f "$notes" ] || notes=/dev/null
           title=$(head -1 "$notes" | sed 's/^# *//')
           [ -n "$title" ] || title="$TAG"
-          gh release create "$TAG" "${exes[@]}" SHA256SUMS.txt --draft --target "$GITHUB_SHA" --title "$title" --notes-file "$notes"
-          if [ "${#sigs[@]}" -gt 0 ]; then gh release upload "$TAG" "${sigs[@]}"; fi
-          # Every expected file, non-empty, and nothing else.
-          want=$(printf '%s\n' "${exes[@]}" "${sigs[@]}" SHA256SUMS.txt | LC_ALL=C sort | paste -sd ' ' -)
-          got=$(gh release view "$TAG" --json assets --jq '[.assets[] | select(.size > 0) | .name] | sort | join(" ")')
-          if [ "$got" != "$want" ]; then
-            echo "::error::The draft release has [$got], expected [$want]. The draft was left unpublished; re-run the failed jobs."
+          gh release create "$TAG" "${files[@]}" --draft --target "$GITHUB_SHA" --title "$title" --notes-file "$notes"
+          fail() {
+            echo "::error::$1 The draft was left unpublished; re-run the failed jobs."
             exit 1
-          fi
-          gh release edit "$TAG" --draft=false --latest
+          }
+          # This run's draft: of this tag and this commit, and only one.
+          ids=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.draft and .tag_name == \"${TAG}\" and .target_commitish == \"${GITHUB_SHA}\") | .id")
+          [ "$(printf '%s\n' "$ids" | grep -c .)" = 1 ] || fail "Expected one draft of $TAG for $GITHUB_SHA, found [${ids//$'\n'/ }]."
+          id=$ids
+          rel=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${id}")
+          field() { jq -r "$1" <<<"$rel"; }
+          [ "$(field .draft)" = true ] || fail "Release $id is no longer a draft."
+          [ "$(field .tag_name)" = "$TAG" ] || fail "Draft $id has the tag $(field .tag_name), expected $TAG."
+          [ "$(field .target_commitish)" = "$GITHUB_SHA" ] || fail "Draft $id targets $(field .target_commitish), expected $GITHUB_SHA."
+          # Every expected file and nothing else...
+          want=$(printf '%s\n' "${files[@]}" | LC_ALL=C sort | paste -sd ' ' -)
+          got=$(field '[.assets[] | .name] | sort | join(" ")')
+          [ "$got" = "$want" ] || fail "Draft $id has [$got], expected [$want]."
+          # ...each one byte for byte the file this run built.
+          mkdir -p "$RUNNER_TEMP/uploaded"
+          while read -r aid name; do
+            gh api -H "Accept: application/octet-stream" \
+              "repos/${GITHUB_REPOSITORY}/releases/assets/${aid}" > "$RUNNER_TEMP/uploaded/$name"
+            up=$(sha256sum < "$RUNNER_TEMP/uploaded/$name" | cut -d' ' -f1)
+            local_sum=$(sha256sum < "$name" | cut -d' ' -f1)
+            [ "$up" = "$local_sum" ] || fail "$name in draft $id has SHA-256 $up, this run's file has $local_sum."
+            echo "$name: $up"
+          done < <(field '.assets[] | "\(.id) \(.name)"')
+          # Publishing creates the tag at the target: it must still be free.
+          rc=0
+          git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null || rc=$?
+          [ "$rc" = 2 ] || fail "The tag $TAG exists now (or the tags could not be read: exit $rc)."
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${id}" -F draft=false -f make_latest=true --jq '.html_url'
       # Package managers: packaging.yml rewrites the Scoop, winget and
       # Chocolatey manifests and commits them to main (and pushes to
       # Chocolatey/winget when their secrets exist). A release made with
       # GITHUB_TOKEN does not fire its `release` event, so start it here.
-      - name: Update package manifests
+      - if: steps.free.outputs.free == 'true'
+        name: Update package manifests
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run packaging.yml --ref main -f tag="$TAG"
       # Microsoft Store: store.yml packs this release's exes into the
       # .msixbundle for Partner Center (artifact `store-package`; nothing is
       # uploaded to the Store). Started here for the same GITHUB_TOKEN reason.
-      - name: Build the Store package
+      - if: steps.free.outputs.free == 'true'
+        name: Build the Store package
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run store.yml --ref main -f tag="$TAG"
