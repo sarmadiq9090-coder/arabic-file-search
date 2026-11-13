@@ -837,7 +837,9 @@
    [
     "\"contrato de alquiler\"",
     "Frase exacta"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Raíz árabe: مكتبة، الكاتب"
@@ -846,6 +848,10 @@
     "احمد",
     "También encuentra «أحمد»"
    ]
+  ],
+  "tipFold": [
+   "cancion",
+   "También encuentra «canción»"
   ],
   "kNav": "Mover",
   "kOpen": "Abrir",
@@ -1049,12 +1055,14 @@
     "solo carpetas"
    ],
    [
-    "root: كتاب",
-    "misma raíz árabe: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: imforme",
     "tolera un error de escritura"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "misma raíz árabe: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1079,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"el cuadro de búsqueda pequeño desde cualquier programa\"], [\"Ctrl+Alt+G\", \"en un cuadro Guardar/Abrir: ir a la carpeta de un resultado\"], [\"Enter\", \"abrir el archivo\"], [\"Ctrl+Enter\", \"abrir su carpeta\"], [\"↓\", \"a los resultados (con el cuadro vacío: historial)\"],\n        [\"Ctrl+C\", \"copiar el archivo\"], [\"Ctrl+Shift+C\", \"copiar la ruta\"], [\"F2\", \"cambiar el nombre\"], [\"Delete\", \"a la Papelera de reciclaje\"], [\"F4\", \"todas las coincidencias en el archivo\"], [\"Ctrl+H\", \"historial\"], [\"Ctrl+T\", \"miniaturas\"], [\"Ctrl+,\", \"configuración\"], [\"F1\", \"esta tarjeta\"]]",
   "helpKeysH": "Teclado",
   "helpMore": "Todas las formas de buscar…",
-  "helpSub": "Haga clic en un ejemplo para ponerlo en el cuadro de búsqueda. Cada filtro también tiene una escritura en árabe.",
+  "helpSub": "Haga clic en un ejemplo para ponerlo en el cuadro de búsqueda.",
+  "helpSubArab": "Cada filtro también tiene una escritura en árabe.",
   "kLabel": "Métodos abreviados de teclado",
   "offline": "unidad no conectada",
   "qsNone": "No hay ningún resultado a cuya carpeta llevar el cuadro de diálogo. Cambie la búsqueda o presione Esc para cancelar.",

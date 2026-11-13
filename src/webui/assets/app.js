@@ -179,7 +179,9 @@
       recent: "ملفات فتحتها مؤخراً", recentNone: "الملفات التي تفتحها تظهر هنا.", tryThese: "جرّب هذه",
       trust: "ملفاتك وفهرسها يبقيان على جهازك ولا نجمع بيانات استخدام. يتصل البرنامج بالإنترنت فقط ليتحقق من التحديثات (GitHub) ولأسعار العملات؛ والبحث من الهاتف يعمل داخل شبكة بيتك فقط.",
       trustStore: "ملفاتك وفهرسها يبقيان على جهازك ولا نجمع بيانات استخدام. يتصل البرنامج بالإنترنت فقط لأسعار العملات، وتصله التحديثات من Microsoft Store.",
-      tips: [["تقرير .pdf", "ملفات PDF فقط"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"], ['"عقد إيجار"', "العبارة كما هي"], ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["hgjrvdv", "لوحة المفاتيح الخطأ ← «التقرير»"]],
+      tips: [["تقرير .pdf", "ملفات PDF فقط"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"], ['"عقد إيجار"', "العبارة كما هي"]],
+      tipsArab: [["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["hgjrvdv", "لوحة المفاتيح الخطأ ← «التقرير»"]],
+      tipFold: ["cafe", "يجد «café» أيضاً"],
       kNav: "تنقل", kOpen: "فتح", kFolder: "المجلد", kMenu: "المزيد",
       open: "فتح", openFolder: "فتح المجلد", copyPath: "نسخ المسار", more: "إجراءات أخرى",
       fDetails: "تفاصيل الملف", kLabel: "اختصارات لوحة المفاتيح", fType: "النوع", fSize: "الحجم", fMod: "تاريخ التعديل", fMatches: "التطابقات", folder: "مجلد", file: "ملف", fileOf: (x) => `ملف ${x}`,
@@ -246,11 +248,12 @@
       sPhoneIdle: "توقّف وحده بعد ساعتين دون أي طلب من الهاتف، للأمان. شغّله من جديد حين تحتاجه.", sPhoneAllow: "السماح بهذه الشبكة", sPhoneMore: "إعدادات أخرى…", sPhoneMoreSub: "المنفذ، والسماح بتنزيل الملفات، ورمز ورابط جديدان",
       sAbout: "حول البرنامج", version: (v) => `بحث سريع (InstaFind) — الإصدار ${v}`,
       // «كيف أبحث؟» (the ? button and F1): examples to click, and the keys.
-      helpH: "كيف أبحث؟", helpKey: "كيف أبحث؟ (F1)", helpMore: "كل طرق البحث…", helpSub: "انقر مثالاً ليُكتب في خانة البحث. تعمل الأمثلة بالعربية والإنجليزية، والأرقام العربية مقبولة.",
+      helpH: "كيف أبحث؟", helpKey: "كيف أبحث؟ (F1)", helpMore: "كل طرق البحث…", helpSub: "انقر مثالاً ليُكتب في خانة البحث. تعمل الأمثلة بالعربية والإنجليزية، والأرقام العربية مقبولة.", helpSubArab: "",
       helpEx: [["تقرير المبيعات", "الاسم فيه الكلمتان معاً"], ['"عقد إيجار"', "العبارة كما هي"], ["تقرير .pdf", "ملفات PDF فقط (أو ext:pdf)"], ["ext:docx,xlsx", "أكثر من نوع"],
         ["صورة|فيديو", "إحدى الكلمتين"], ["عقد -قديم", "دون ما فيه «قديم» (أو !قديم)"], ["حجم:>10م", "أكبر من 10 ميغابايت"], ["تاريخ:هذا_الأسبوع", "عُدّلت هذا الأسبوع"],
         ["dm:2026-05", "عُدّلت في أيار 2026"], ["كلمة:عقد", "الكلمة كاملة: «عقد» لا «العقود»"], ['"عقد إيجار"~5', "الكلمتان وبينهما 5 كلمات على الأكثر"], ["مجلد: صور", "المجلدات فقط"],
-        ["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["تقريب: تقريز", "يتحمّل خطأً إملائياً"], ["size:>1gb", "بالإنجليزية أيضاً: أكبر من 1 غيغابايت"], ["dm:thisweek", "بالإنجليزية أيضاً: هذا الأسبوع"]],
+        ["تقريب: تقريز", "يتحمّل خطأً إملائياً"]],
+      helpExArab: [["جذر: كتاب", "مكتبة، الكاتب، كتابات"], ["size:>1gb", "بالإنجليزية أيضاً: أكبر من 1 غيغابايت"], ["dm:thisweek", "بالإنجليزية أيضاً: هذا الأسبوع"]],
       helpInside: "للبحث داخل المستندات (PDF وWord وExcel والصور): اضغط «داخل المستندات» ثم Enter.",
       helpKeysH: "لوحة المفاتيح",
       helpKeys: (hk) => [[hk, "خانة البحث الصغيرة من أي برنامج"], ["Ctrl+Alt+G", "في نافذة حفظ أو فتح: الانتقال إلى مجلد نتيجة"], ["Enter", "فتح الملف"], ["Ctrl+Enter", "فتح مجلده"], ["↓", "إلى النتائج (وفي خانة فارغة: السجل)"],
@@ -267,7 +270,12 @@
       recent: "Recently opened files", recentNone: "Files you open show up here.", tryThese: "Try these",
       trust: "Your files and their index stay on your PC; no usage data is collected. InstaFind goes online only to check for updates (GitHub) and fetch exchange rates; phone search works only on your home network.",
       trustStore: "Your files and their index stay on your PC; no usage data is collected. InstaFind goes online only to fetch exchange rates, and its updates come from the Microsoft Store.",
-      tips: [["report .pdf", "PDF files only"], ["size:>10mb", "Bigger than 10 MB"], ["dm:thisweek", "Changed this week"], ['"lease agreement"', "Exact phrase"], ["root: كتاب", "Arabic root: مكتبة، الكاتب"], ["احمد", "Also finds «أحمد»"]],
+      tips: [["report .pdf", "PDF files only"], ["size:>10mb", "Bigger than 10 MB"], ["dm:thisweek", "Changed this week"], ['"lease agreement"', "Exact phrase"]],
+      // (Shown only in a language written in Arabic script: see ARAB_SCRIPT.)
+      tipsArab: [["root: كتاب", "Arabic root: مكتبة، الكاتب"], ["احمد", "Also finds «أحمد»"]],
+      // (Latin, Cyrillic and Japanese only, FOLD_SCRIPT: a word of the language
+      // typed without its accents, ё or katakana, that finds it written with them.)
+      tipFold: ["cafe", "Also finds “café”"],
       kNav: "Move", kOpen: "Open", kFolder: "Folder", kMenu: "More",
       open: "Open", openFolder: "Open folder", copyPath: "Copy path", more: "More actions",
       fDetails: "File details", kLabel: "Keyboard shortcuts", fType: "Type", fSize: "Size", fMod: "Modified", fMatches: "Matches", folder: "Folder", file: "File", fileOf: (x) => `${x} file`,
@@ -328,11 +336,12 @@
       sPhoneQrLabel: "QR code that opens phone search", sPhoneOff: "Off. Turn it on to see the address and the PIN.", sPhoneWait: "Checking the network…",
       sPhoneIdle: "It turned itself off after two hours with no request from a phone, to be safe. Turn it on again when you need it.", sPhoneAllow: "Allow this network", sPhoneMore: "More settings…", sPhoneMoreSub: "The port, downloading files, and a new PIN and link",
       sAbout: "About", version: (v) => `InstaFind — version ${v}`,
-      helpH: "How to search", helpKey: "How to search (F1)", helpMore: "All the ways to search…", helpSub: "Click an example to put it in the search box. Every filter also has an Arabic spelling.",
+      helpH: "How to search", helpKey: "How to search (F1)", helpMore: "All the ways to search…", helpSub: "Click an example to put it in the search box.", helpSubArab: "Every filter also has an Arabic spelling.",
       helpEx: [["sales report", "names with both words"], ['"lease agreement"', "the exact phrase"], ["report .pdf", "PDF files only (or ext:pdf)"], ["ext:docx,xlsx", "several types"],
         ["photo|video", "either word"], ["contract -old", "without “old” (or !old)"], ["size:>10mb", "bigger than 10 MB"], ["dm:thisweek", "changed this week"],
         ["dm:2026-05", "changed in May 2026"], ["ww:contract", "whole word only"], ['"lease contract"~5', "both words within 5 words"], ["folder: photos", "folders only"],
-        ["root: كتاب", "same Arabic root: مكتبة، الكاتب"], ["fuzzy: reprot", "tolerates a typo"], ["حجم:>1ج", "in Arabic too: bigger than 1 GB"], ["احمد", "also finds «أحمد»"]],
+        ["fuzzy: reprot", "tolerates a typo"]],
+      helpExArab: [["root: كتاب", "same Arabic root: مكتبة، الكاتب"], ["حجم:>1ج", "in Arabic too: bigger than 1 GB"], ["احمد", "also finds «أحمد»"]],
       helpInside: "To search inside documents (PDF, Word, Excel, pictures): press “Inside documents”, then Enter.",
       helpKeysH: "Keyboard",
       helpKeys: (hk) => [[hk, "the small search box from any program"], ["Ctrl+Alt+G", "in a Save/Open dialog: go to a result's folder"], ["Enter", "open the file"], ["Ctrl+Enter", "open its folder"], ["↓", "to the results (in an empty box: history)"],
@@ -340,6 +349,15 @@
     },
   });
   const SORTS = ["best", "name", "path", "size", "date"];
+  // The examples ("Try these", the help card) that make sense in the
+  // interface's script (src/i18n.rs LOCALES, ISO 15924): the Arabic ones
+  // (roots, hamza and alef spellings, Arabic filters) only in a language
+  // written in Arabic script; the accent fold (cafe → café, елка → ёлка,
+  // かめら → カメラ) in a Latin, Cyrillic or Japanese one; the rest everywhere.
+  const SCRIPT = typeof I18N.script === "string" ? I18N.script : LANG === "ar" ? "Arab" : "Latn";
+  const ARAB_SCRIPT = SCRIPT === "Arab", FOLD_SCRIPT = ["Latn", "Cyrl", "Jpan"].includes(SCRIPT);
+  const tipList = () => ARAB_SCRIPT ? [...T.tips, ...T.tipsArab] : FOLD_SCRIPT ? [...T.tips, T.tipFold] : T.tips;
+  const helpExList = () => ARAB_SCRIPT ? [...T.helpEx, ...T.helpExArab] : FOLD_SCRIPT ? [...T.helpEx, T.tipFold] : T.helpEx;
   // The privacy line: the Store version's updates come from the Store, not GitHub.
   function trustText() { return S.store ? T.trustStore : T.trust; }
 
@@ -1370,13 +1388,13 @@
   // clicked, and the keys. Static text only.
   function helpCard() {
     closeMenus();
-    const ex = h("div", { class: "hx-list", role: "list", "aria-label": T.helpH }, ...T.helpEx.map(([c, d], i) => {
+    const ex = h("div", { class: "hx-list", role: "list", "aria-label": T.helpH }, ...helpExList().map(([c, d], i) => {
       const b = h("button", { class: "hx", type: "button", id: "hx" + i }, h("code", { dir: "auto" }, c), h("span", null, d));
       b.addEventListener("click", () => { closeDialog(); closeSettings(); q.value = c; onInput(); q.focus(); });
       return h("div", { role: "listitem" }, b);
     }));
     const keys = h("dl", { class: "hk-list", "aria-labelledby": "hk-h" }, ...T.helpKeys(hotkeyText()).flatMap(([k, d]) => [h("dt", null, h("kbd", null, k)), h("dd", null, d)]));
-    dialog(T.helpH, [h("p", { class: "sub" }, T.helpSub), ex, h("p", { class: "sub" }, T.helpInside), h("h4", { id: "hk-h" }, T.helpKeysH), keys],
+    dialog(T.helpH, [h("p", { class: "sub" }, ARAB_SCRIPT && T.helpSubArab ? `${T.helpSub} ${T.helpSubArab}` : T.helpSub), ex, h("p", { class: "sub" }, T.helpInside), h("h4", { id: "hk-h" }, T.helpKeysH), keys],
       [btn("", I.x, T.close, closeDialog, { id: "help-close" })], "help");
     $("dlg").classList.add("help");
     $("hx0").focus();
@@ -1862,7 +1880,7 @@
   for (const el of document.querySelectorAll("[data-i18n-placeholder]")) el.placeholder = T[el.dataset.i18nPlaceholder];
   for (const el of document.querySelectorAll("[data-i18n-label]")) el.setAttribute("aria-label", T[el.dataset.i18nLabel]);
   for (const el of document.querySelectorAll("[data-i18n-title]")) el.title = T[el.dataset.i18nTitle];
-  $("tips").replaceChildren(...T.tips.map(([c, s], i) => h("div", { class: "tip", role: "listitem" }, h("button", { class: "tq", type: "button", dir: "auto", "aria-describedby": "tip-d" + i }, c), h("span", { id: "tip-d" + i }, s))));
+  $("tips").replaceChildren(...tipList().map(([c, s], i) => h("div", { class: "tip", role: "listitem" }, h("button", { class: "tq", type: "button", dir: "auto", "aria-describedby": "tip-d" + i }, c), h("span", { id: "tip-d" + i }, s))));
   $("tips").after(h("div", { class: "tips-more" }, btn("small", I.help, T.helpMore, helpCard, { id: "help-more" })));
   setView("empty");
   applyView();

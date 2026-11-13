@@ -837,7 +837,9 @@
    [
     "\"heshiis kiro\"",
     "Weedh sax ah"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Xididka Carabiga: مكتبة، الكاتب"
@@ -846,6 +848,10 @@
     "احمد",
     "Sidoo kale wuxuu helaa «أحمد»"
    ]
+  ],
+  "tipFold": [
+   "cafe",
+   "Sidoo kale wuxuu helaa “café”"
   ],
   "kNav": "U dhaqaaq",
   "kOpen": "Fur",
@@ -1049,12 +1055,14 @@
     "galalka oo keliya"
    ],
    [
-    "root: كتاب",
-    "isla xididka Carabiga: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: warbxiin",
     "wuu u dulqaataa khalad qoraal"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "isla xididka Carabiga: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1079,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"sanduuqa raadinta yar ee barnaamij kasta\"], [\"Ctrl+Alt+G\", \"daaqadda Save/Open: u gudub galka natiijada\"], [\"Enter\", \"fur faylka\"], [\"Ctrl+Enter\", \"fur galkiisa\"], [\"↓\", \"natiijooyinka (sanduuq madhan: taariikhda)\"], [\"Ctrl+C\", \"koobiyee faylka\"], [\"Ctrl+Shift+C\", \"koobiyee dariiqa\"], [\"F2\", \"magac u beddel\"], [\"Delete\", \"u dir Qashin-qubka\"], [\"F4\", \"dhammaan isku-ekaanshaha faylka\"], [\"Ctrl+H\", \"taariikhda\"], [\"Ctrl+T\", \"sawirrada yaryar\"], [\"Ctrl+,\", \"dejinta\"], [\"F1\", \"kaarkan\"]]",
   "helpKeysH": "Kiiboodhka",
   "helpMore": "Dhammaan siyaabaha raadinta…",
-  "helpSub": "Guji tusaale si loogu qoro sanduuqa raadinta. Shaandhayn kasta waxay sidoo kale leedahay higaad Carabi ah.",
+  "helpSub": "Guji tusaale si loogu qoro sanduuqa raadinta.",
+  "helpSubArab": "Shaandhayn kasta waxay sidoo kale leedahay higaad Carabi ah.",
   "kLabel": "Furayaasha gaagaaban ee kiiboodhka",
   "offline": "darawalka lama xiriirin",
   "qsNone": "Ma jirto natiijo loo raro daaqadda. Beddel raadinta, ama riix Esc si aad u joojiso.",

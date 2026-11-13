@@ -837,7 +837,9 @@
    [
     "\"icarə müqaviləsi\"",
     "Dəqiq ifadə"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Ərəb kökü: مكتبة، الكاتب"
@@ -846,6 +848,10 @@
     "احمد",
     "«أحمد» sözünü də tapır"
    ]
+  ],
+  "tipFold": [
+   "uzum",
+   "«üzüm» də tapılır"
   ],
   "kNav": "Keçid",
   "kOpen": "Aç",
@@ -1049,12 +1055,14 @@
     "yalnız qovluqlar"
    ],
    [
-    "root: كتاب",
-    "eyni ərəb kökü: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: hesbat",
     "bir yazı səhvinə dözür"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "eyni ərəb kökü: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1079,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"istənilən proqramdan kiçik axtarış qutusu\"], [\"Ctrl+Alt+G\", \"Saxla/Aç pəncərəsində: nəticənin qovluğuna keç\"], [\"Enter\", \"faylı aç\"], [\"Ctrl+Enter\", \"onun qovluğunu aç\"], [\"↓\", \"nəticələrə (boş qutuda: tarixçə)\"],\n        [\"Ctrl+C\", \"faylı kopyala\"], [\"Ctrl+Shift+C\", \"yolu kopyala\"], [\"F2\", \"adını dəyiş\"], [\"Delete\", \"Zibil qutusuna\"], [\"F4\", \"fayldakı bütün uyğunluqlar\"], [\"Ctrl+H\", \"tarixçə\"], [\"Ctrl+T\", \"miniatürlər\"], [\"Ctrl+,\", \"parametrlər\"], [\"F1\", \"bu kart\"]]",
   "helpKeysH": "Klaviatura",
   "helpMore": "Bütün axtarış üsulları…",
-  "helpSub": "Axtarış qutusuna yazmaq üçün nümunəyə klikləyin. Hər filtrin ərəbcə yazılışı da var.",
+  "helpSub": "Axtarış qutusuna yazmaq üçün nümunəyə klikləyin.",
+  "helpSubArab": "Hər filtrin ərəbcə yazılışı da var.",
   "kLabel": "Klaviatura qısayolları",
   "offline": "disk qoşulmayıb",
   "qsNone": "Pəncərəni qovluğuna köçürmək üçün nəticə yoxdur. Axtarışı dəyişin və ya ləğv etmək üçün Esc basın.",

@@ -86,12 +86,14 @@
         "folders only"
       ],
       [
-        "root: كتاب",
-        "same Arabic root: مكتبة، الكاتب"
-      ],
-      [
         "fuzzy: reprot",
         "tolerates a typo"
+      ]
+    ],
+    "helpExArab": [
+      [
+        "root: كتاب",
+        "same Arabic root: مكتبة، الكاتب"
       ],
       [
         "حجم:>1ج",
@@ -108,7 +110,8 @@
     "helpKeys": "FN:(hk) => [[hk, \"the small search box from any program\"], [\"Ctrl+Alt+G\", \"in a Save/Open dialog: go to a result's folder\"], [\"Enter\", \"open the file\"], [\"Ctrl+Enter\", \"open its folder\"], [\"↓\", \"to the results (in an empty box: history)\"],\n        [\"Ctrl+C\", \"copy the file\"], [\"Ctrl+Shift+C\", \"copy the path\"], [\"F2\", \"rename\"], [\"Delete\", \"to the Recycle Bin\"], [\"F4\", \"all matches in the file\"], [\"Ctrl+H\", \"history\"], [\"Ctrl+T\", \"thumbnails\"], [\"Ctrl+,\", \"settings\"], [\"F1\", \"this card\"]]",
     "helpKeysH": "Keyboard",
     "helpMore": "All the ways to search…",
-    "helpSub": "Click an example to put it in the search box. Every filter also has an Arabic spelling.",
+    "helpSub": "Click an example to put it in the search box.",
+    "helpSubArab": "Every filter also has an Arabic spelling.",
     "hidePreview": "Hide the preview",
     "history": "History",
     "historyKey": "History (Ctrl+H)",
@@ -263,6 +266,10 @@
     "switchedText": "This is InstaFind's new look.",
     "tagHead": "Nothing gets lost silently",
     "tagTail": ": when we find nothing, we tell you where we looked and what to try.",
+    "tipFold": [
+      "cafe",
+      "Also finds “café”"
+    ],
     "tips": [
       [
         "report .pdf",
@@ -279,7 +286,9 @@
       [
         "\"lease agreement\"",
         "Exact phrase"
-      ],
+      ]
+    ],
+    "tipsArab": [
       [
         "root: كتاب",
         "Arabic root: مكتبة، الكاتب"
@@ -393,12 +402,14 @@
         "المجلدات فقط"
       ],
       [
-        "جذر: كتاب",
-        "مكتبة، الكاتب، كتابات"
-      ],
-      [
         "تقريب: تقريز",
         "يتحمّل خطأً إملائياً"
+      ]
+    ],
+    "helpExArab": [
+      [
+        "جذر: كتاب",
+        "مكتبة، الكاتب، كتابات"
       ],
       [
         "size:>1gb",
@@ -416,6 +427,7 @@
     "helpKeysH": "لوحة المفاتيح",
     "helpMore": "كل طرق البحث…",
     "helpSub": "انقر مثالاً ليُكتب في خانة البحث. تعمل الأمثلة بالعربية والإنجليزية، والأرقام العربية مقبولة.",
+    "helpSubArab": "",
     "hidePreview": "إخفاء المعاينة",
     "history": "السجل",
     "historyKey": "السجل (Ctrl+H)",
@@ -570,6 +582,10 @@
     "switchedText": "هذا هو الشكل الجديد لبحث سريع.",
     "tagHead": "لا شيء يضيع بصمت",
     "tagTail": ": إذا لم نجد شيئاً نقول لك أين بحثنا وماذا تجرّب.",
+    "tipFold": [
+      "cafe",
+      "يجد «café» أيضاً"
+    ],
     "tips": [
       [
         "تقرير .pdf",
@@ -586,7 +602,9 @@
       [
         "\"عقد إيجار\"",
         "العبارة كما هي"
-      ],
+      ]
+    ],
+    "tipsArab": [
       [
         "جذر: كتاب",
         "مكتبة، الكاتب، كتابات"

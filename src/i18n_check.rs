@@ -935,6 +935,37 @@ fn i18n_language_files_are_sound() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
+/// The quoted word of an example's description («école», “café”, „Straße“, 「カメラ」).
+fn quoted(desc: &str) -> Option<&str> {
+    let open = desc.find(['«', '“', '„', '「'])?;
+    let rest = &desc[open + desc[open..].chars().next()?.len_utf8()..];
+    let end = rest.find(['»', '”', '“', '」'])?;
+    Some(rest[..end].trim_matches(|c: char| c.is_whitespace() || c == '\u{a0}'))
+}
+
+/// "Try these" in a Latin, Cyrillic or Japanese interface shows `tipFold`:
+/// a word typed plainly that finds it written with accents, ё or katakana.
+/// It must be true: the search's own folding (normalize.rs) makes the two
+/// the same, in English, Arabic and every language file that has one.
+#[test]
+fn i18n_fold_examples_are_true() {
+    let js = js_tables();
+    let mut tips = vec![("en".to_string(), js["en"]["tipFold"].clone()), ("ar".to_string(), js["ar"]["tipFold"].clone())];
+    for (code, text) in super::FILES {
+        let f: Value = serde_json::from_str(text).unwrap();
+        if let Some(t) = f["js"].get("tipFold") {
+            tips.push((code.to_string(), t.clone()));
+        }
+    }
+    assert!(tips.len() > 10, "{}", tips.len());
+    for (code, t) in tips {
+        let (Some(typed), Some(desc)) = (t[0].as_str(), t[1].as_str()) else { panic!("{code}: tipFold is not [typed, description]") };
+        let found = quoted(desc).unwrap_or_else(|| panic!("{code}: no quoted word in {desc:?}"));
+        assert_ne!(typed, found, "{code}");
+        assert_eq!(crate::normalize::normalize(typed), crate::normalize::normalize(found), "{code}: {typed:?} does not find {found:?}");
+    }
+}
+
 #[test]
 fn i18n_checker_reads_app_js_functions() {
     let en = "FN:(n) => (n === 0 ? \"No results\" : `${num(n)} results`)";

@@ -837,7 +837,9 @@
    [
     "\"mkataba wa kukodisha\"",
     "Kifungu kamili"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Mzizi wa Kiarabu: مكتبة، الكاتب"
@@ -846,6 +848,10 @@
     "احمد",
     "Hupata pia «أحمد»"
    ]
+  ],
+  "tipFold": [
+   "cafe",
+   "Hupata pia “café”"
   ],
   "kNav": "Sogeza",
   "kOpen": "Fungua",
@@ -1049,12 +1055,14 @@
     "folda tu"
    ],
    [
-    "root: كتاب",
-    "mzizi uleule wa Kiarabu: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: ripito",
     "huvumilia kosa la kuandika"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "mzizi uleule wa Kiarabu: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1079,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"kisanduku kidogo cha utafutaji kutoka programu yoyote\"], [\"Ctrl+Alt+G\", \"katika dirisha la Hifadhi/Fungua: nenda kwenye folda ya tokeo\"], [\"Enter\", \"fungua faili\"], [\"Ctrl+Enter\", \"fungua folda yake\"], [\"↓\", \"kwenye matokeo (kisanduku kikiwa tupu: historia)\"],\n        [\"Ctrl+C\", \"nakili faili\"], [\"Ctrl+Shift+C\", \"nakili njia\"], [\"F2\", \"badilisha jina\"], [\"Delete\", \"kwenye Pipa la Kuchakata\"], [\"F4\", \"yote yanayolingana ndani ya faili\"], [\"Ctrl+H\", \"historia\"], [\"Ctrl+T\", \"vijipicha\"], [\"Ctrl+,\", \"mipangilio\"], [\"F1\", \"kadi hii\"]]",
   "helpKeysH": "Kibodi",
   "helpMore": "Njia zote za kutafuta…",
-  "helpSub": "Bofya mfano ili uuweke kwenye kisanduku cha utafutaji. Kila kichujio kina pia tahajia ya Kiarabu.",
+  "helpSub": "Bofya mfano ili uuweke kwenye kisanduku cha utafutaji.",
+  "helpSubArab": "Kila kichujio kina pia tahajia ya Kiarabu.",
   "kLabel": "Njia za mkato za kibodi",
   "offline": "diski haijaunganishwa",
   "qsNone": "Hakuna tokeo la kuhamishia dirisha kwenye folda yake. Badilisha utafutaji, au bonyeza Esc ili kughairi.",

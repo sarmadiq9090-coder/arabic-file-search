@@ -837,7 +837,9 @@
    [
     "\"yarjejeniyar haya\"",
     "Ainihin jumla"
-   ],
+   ]
+  ],
+  "tipsArab": [
    [
     "root: كتاب",
     "Tushen kalmar Larabci: مكتبة، الكاتب"
@@ -846,6 +848,10 @@
     "احمد",
     "Yana samun «أحمد» ma"
    ]
+  ],
+  "tipFold": [
+   "cafe",
+   "Yana samo “café” ma"
   ],
   "kNav": "Motsa",
   "kOpen": "Buɗe",
@@ -1049,12 +1055,14 @@
     "manyan fayiloli kawai"
    ],
    [
-    "root: كتاب",
-    "tushen Larabci ɗaya: مكتبة، الكاتب"
-   ],
-   [
     "fuzzy: rahtoo",
     "yana jure kuskuren rubutu"
+   ]
+  ],
+  "helpExArab": [
+   [
+    "root: كتاب",
+    "tushen Larabci ɗaya: مكتبة، الكاتب"
    ],
    [
     "حجم:>1ج",
@@ -1071,7 +1079,8 @@
   "helpKeys": "FN:(hk) => [[hk, \"ƙaramin akwatin bincike daga kowane shiri\"], [\"Ctrl+Alt+G\", \"a taga Ajiye/Buɗe: je zuwa babban fayil ɗin sakamako\"], [\"Enter\", \"buɗe fayil ɗin\"], [\"Ctrl+Enter\", \"buɗe babban fayil ɗinsa\"], [\"↓\", \"zuwa sakamako (a akwati maras komai: tarihi)\"],\n        [\"Ctrl+C\", \"kwafi fayil ɗin\"], [\"Ctrl+Shift+C\", \"kwafi hanyar\"], [\"F2\", \"sake suna\"], [\"Delete\", \"zuwa Kwandon Shara\"], [\"F4\", \"duk abubuwan da suka dace a cikin fayil\"], [\"Ctrl+H\", \"tarihi\"], [\"Ctrl+T\", \"ƙananan hotuna\"], [\"Ctrl+,\", \"saituna\"], [\"F1\", \"wannan katin\"]]",
   "helpKeysH": "Allon madannai",
   "helpMore": "Duk hanyoyin bincike…",
-  "helpSub": "Danna misali don saka shi a akwatin bincike. Kowane matattara yana da rubutun Larabci ma.",
+  "helpSub": "Danna misali don saka shi a akwatin bincike.",
+  "helpSubArab": "Kowane matattara yana da rubutun Larabci ma.",
   "kLabel": "Gajerun hanyoyin madannai",
   "offline": "faifai ba a haɗa shi ba",
   "qsNone": "Babu sakamakon da za a matsar da taga zuwa babban fayil ɗinsa. Canza binciken, ko danna Esc don soke.",

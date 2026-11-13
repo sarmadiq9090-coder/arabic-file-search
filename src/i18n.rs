@@ -447,7 +447,8 @@ pub fn fill(t: &str, en: &str, values: &[String]) -> String {
 }
 
 /// What the page needs of the language, as JSON for its data block:
-/// its code, direction, the translations of app.js's texts (`{}` for
+/// its code, direction, script (the page shows the Arabic search examples
+/// only in an Arabic-script language), the translations of app.js's texts (`{}` for
 /// Arabic and English, which app.js has itself) and the languages to offer.
 pub fn page_data(l: &'static Locale) -> String {
     let js = if std::ptr::eq(l, locale()) { table().map(|t| t.js.clone()) } else { load(l).map(|t| t.js) };
@@ -458,6 +459,7 @@ pub fn page_data(l: &'static Locale) -> String {
     let data = serde_json::json!({
         "code": l.code,
         "rtl": l.rtl,
+        "script": l.script,
         "js": js.unwrap_or_else(|| serde_json::json!({})),
         "langs": langs,
     });
@@ -808,7 +810,10 @@ mod tests {
         let d: serde_json::Value = serde_json::from_str(&page_data(&LOCALES[0])).unwrap();
         assert_eq!(d["code"], "ar");
         assert_eq!(d["rtl"], true);
+        assert_eq!(d["script"], "Arab");
         assert_eq!(d["js"], serde_json::json!({}));
+        let en: serde_json::Value = serde_json::from_str(&page_data(&LOCALES[1])).unwrap();
+        assert_eq!(en["script"], "Latn");
         assert_eq!(d["langs"][1]["code"], "en");
         assert_eq!(d["langs"][1]["machine"], false);
         assert!(!page_data(&LOCALES[1]).contains('<'));

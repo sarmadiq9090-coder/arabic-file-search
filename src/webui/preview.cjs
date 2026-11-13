@@ -61,9 +61,11 @@ const LANG_FILES = Object.fromEntries(fs.readdirSync(I18N_DIR).filter((f) => f.e
 const LANGS = [{ code: "ar", native: "العربية", english: "Arabic", rtl: true, machine: false }, { code: "en", native: "English", english: "English", rtl: false, machine: false },
   ...Object.entries(LANG_FILES).map(([code, f]) => ({ code, native: f.meta.name_native, english: f.meta.name_en, rtl: !!f.meta.rtl, machine: true })).sort((a, b) => a.native.toLowerCase() < b.native.toLowerCase() ? -1 : 1)];
 const dirOf = (lang) => (LANGS.find((l) => l.code === lang) || {}).rtl ? "rtl" : "ltr";
+// The language's script (src/i18n.rs LOCALES): the page shows the Arabic examples only in Arabic script.
+const scriptOf = (lang) => lang === "ar" ? "Arab" : lang === "en" ? "Latn" : LANG_FILES[lang].meta.script;
 function page(lang) {
   if (lang !== "ar" && lang !== "en" && !LANG_FILES[lang]) throw new Error(`no i18n/${lang}.json`);
-  const data = { code: lang, rtl: dirOf(lang) === "rtl", js: (LANG_FILES[lang] || {}).js || {}, langs: LANGS };
+  const data = { code: lang, rtl: dirOf(lang) === "rtl", script: scriptOf(lang), js: (LANG_FILES[lang] || {}).js || {}, langs: LANGS };
   return fs.readFileSync(path.join(ASSETS, "index.html"), "utf8")
     .replace("{{LANG}}", lang).replace("{{DIR}}", dirOf(lang))
     .replace("{{CSP}}", CSP.replace("; frame-ancestors 'none'", "")).replace("{{TOKEN}}", "00112233445566778899aabbccddeeff")
@@ -473,10 +475,10 @@ const SHOTS = [
   ["pv-name-en-ui-ar-name-en-light", "en", "light", [["type", "فاتورة"]], { expect: { pvNameSide: "right" } }],
   ["pv-name-en-dark", "en", "dark", [["type", "report"]], { expect: { pvNameSide: "left" } }],
   // «كيف أبحث؟»: the ? button and F1 open the card; an example clicked goes in the box and searches.
-  ["help-ar-light", "ar", "light", [["click", "#help-btn"]], { expect: { dialog: true, helpEx: 16, helpKeys: true, a11y: true } }],
-  ["help-f1-en-dark", "en", "dark", [["key", "F1"]], { expect: { dialog: true, helpEx: 16, helpKeys: true, focus: "hx0" } }],
+  ["help-ar-light", "ar", "light", [["click", "#help-btn"]], { expect: { dialog: true, helpEx: 16, helpArab: true, helpKeys: true, a11y: true } }],
+  ["help-f1-en-dark", "en", "dark", [["key", "F1"]], { expect: { dialog: true, helpEx: 14, helpArab: false, helpKeys: true, focus: "hx0" } }],
   ["help-example-ar-dark", "ar", "dark", [["key", "F1"], ["click", "#hx6"], ["wait", 100]], { expect: { dialog: false, q: "حجم:>10م", lastSent: "search", focus: "q" } }],
-  ["help-more-en-light", "en", "light", [["click", "#help-more"]], { width: 900, height: 640, expect: { dialog: true, helpEx: 16 } }],
+  ["help-more-en-light", "en", "light", [["click", "#help-more"]], { width: 900, height: 640, expect: { dialog: true, helpEx: 14 } }],
   // Ctrl+Alt+F taken by another program: Settings says so and offers other keys; a pick is used at once.
   ["hotkey-taken-ar-light", "ar", "light", [["key", "Control+,"]], { hotkeyTaken: true, expect: { settings: true, hkTaken: true, hkKbd: "Ctrl+Alt+F", a11y: true } }],
   ["hotkey-pick-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#hk-ctrl_alt_space"], ["wait", 50]], { hotkeyTaken: true, expect: { settings: true, lastSent: "hotkey", hkTaken: false, hkKbd: "Ctrl+Alt+Space", hkOn: "hk-ctrl_alt_space" } }],
@@ -492,6 +494,14 @@ const SHOTS = [
   ["phone-store-en-light", "en", "light", [["key", "Control+,"]], { store: true, expect: { settings: true, phoneRow: false } }],
   // «جرّب هذه»: each example is a button in a named list; clicking one searches for it.
   ["tip-click-ar-light", "ar", "light", [["click", "#tips .tq"], ["wait", 100]], { expect: { q: "تقرير .pdf", view: "view-results", uia: true } }],
+  // The Arabic examples (root:, hamza and alef forms) only in an Arabic-script interface;
+  // English gets the accent fold instead («cafe» finds «café»). (Every screen also checks
+  // that a non-Arabic-script page shows no Arabic script in «Try these» or the help card.)
+  ["tips-ar-dark", "ar", "dark", [], { expect: { tipsArab: true, tipRoot: true, tips: 6 } }],
+  ["tips-en-light", "en", "light", [], { expect: { tipsArab: false, tipRoot: false, tips: 5, tipFold: true } }],
+  ["tips-fa-light", "fa", "light", [], { expect: { tipRoot: true, tips: 6, tipFold: false } }],
+  ["tips-hi-dark", "hi", "dark", [], { expect: { tipsArab: false, tips: 4 } }],
+  ["help-de-light", "de", "light", [["key", "F1"]], { expect: { dialog: true, helpEx: 14, helpArab: false } }],
   ["uia-settings-en-dark", "en", "dark", [["key", "Control+,"]], { phoneOn: true, expect: { settings: true, uia: true, a11y: true } }],
   // Translated languages (i18n/*.json): direction, fonts, the language list
   // (scrolling, each name in its own script, machine translations marked)
@@ -565,6 +575,12 @@ const SHOTS = [
       // (A language whose script IBM Plex lacks starts with a Windows font instead.)
       if (getComputedStyle(document.body).fontFamily.startsWith('"IF Sans"') && [...document.fonts].filter((f) => f.status === "loaded").length < 2) bad.push("fonts not loaded");
       if (document.documentElement.dir !== wantDir) bad.push("page direction");
+      // «Try these» and the help card: no Arabic script unless the language is written in it.
+      const ARABIC = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+      const pageScript = (() => { try { return JSON.parse(document.getElementById("i18n").textContent).script; } catch (e) { return null; } })();
+      if (!pageScript) bad.push("no script in the page data");
+      if (pageScript !== "Arab") for (const el of document.querySelectorAll("#tips, .dlg.help .hx-list, .dlg.help .sub"))
+        if (ARABIC.test(el.textContent)) bad.push(`Arabic script in a ${pageScript} page: ${el.textContent.slice(0, 80)}`);
       if (getComputedStyle(document.body).direction !== wantDir) bad.push("body direction");
       // Every path: left to right, its folder names placed left to right in order.
       for (const p of document.querySelectorAll(".path")) {
@@ -731,6 +747,11 @@ const SHOTS = [
         hkKbd: document.getElementById("hk-kbd").textContent,
         hkOn: (document.querySelector('.hkrow [aria-checked="true"]') || {}).id || null,
         helpEx: document.querySelectorAll(".dlg.help .hx").length || null,
+        helpArab: /[\u0600-\u06FF]/.test((document.querySelector(".dlg.help .hx-list") || {}).textContent || ""),
+        tips: document.querySelectorAll("#tips .tq").length,
+        tipsArab: /[\u0600-\u06FF]/.test(document.getElementById("tips").textContent),
+        tipRoot: [...document.querySelectorAll("#tips .tq")].some((b) => /^(root|جذر):/.test(b.textContent)),
+        tipFold: [...document.querySelectorAll("#tips .tq")].some((b) => ["cafe", "strasse", "елка", "かめら"].includes(b.textContent)),
         helpKeys: [...document.querySelectorAll(".dlg.help .hk-list kbd")].some((k) => k.textContent === "F1"),
         reportSays: (() => { const l = document.getElementById("report-problem-d"); if (!l || !visible(l)) return null; const t = l.textContent; return [/email|البريد/.test(t) ? "email" : "", /public|عامة/.test(t) ? "public" : ""].filter(Boolean).join("+"); })(),
         updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent + (b.getAttribute("aria-disabled") === "true" ? "|busy" : "|ready") : null; })(),
