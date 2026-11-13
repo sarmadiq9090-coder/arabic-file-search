@@ -69,7 +69,7 @@ impl App {
         match failed {
             Ok(()) => {}
             Err(e) => {
-                nwg::modal_error_message(&self.window, title(), &trf!(
+                self.modal_error(title(), &trf!(
                     "تعذرت إعادة التشغيل تلقائياً ({e}).\nأغلق البرنامج وافتحه من جديد.",
                     "The program could not restart itself ({e}).\nClose the program and open it again."
                 ));
