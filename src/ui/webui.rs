@@ -63,6 +63,10 @@ mod imp {
     /// buttons are): WebView2 lays the page out right to left itself.
     const WS_EX_NOINHERITLAYOUT: u32 = 0x0010_0000;
 
+    /// Microsoft's free WebView2 download page, offered by the classic
+    /// window's line when WebView2 is not installed.
+    const WEBVIEW2_DOWNLOAD: &str = "https://developer.microsoft.com/microsoft-edge/webview2/";
+
     /// A page that has not said hello this long after it was created or
     /// reloaded is taken as failed (a blank window).
     const PAGE_TIMEOUT: Duration = Duration::from_secs(20);
@@ -306,18 +310,39 @@ mod imp {
                 return;
             }
             if show && !self.webui.note.is_built() {
+                // Not installed at all: the line offers Microsoft's free
+                // download page, opened in the browser on a click.
+                let missing = !available();
                 let mut label = nwg::Label::default();
                 let built = nwg::Label::builder()
                     .parent(&self.window)
                     .font(Some(&self.font))
                     .v_align(nwg::VTextAlign::Center)
-                    .text(tr!(
-                        "يعمل البرنامج بالشكل البسيط لأن مكوّن WebView2 في ويندوز لا يعمل.",
-                        "Running in the simple look because Windows' WebView2 component is not working."
-                    ))
+                    .text(if missing {
+                        tr!(
+                            "يعمل البرنامج بالشكل البسيط لأن مكوّن WebView2 غير مثبّت. انقر هنا لتنزيله مجاناً من Microsoft.",
+                            "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft."
+                        )
+                    } else {
+                        tr!(
+                            "يعمل البرنامج بالشكل البسيط لأن مكوّن WebView2 في ويندوز لا يعمل.",
+                            "Running in the simple look because Windows' WebView2 component is not working."
+                        )
+                    })
                     .build(&mut label);
                 match built {
-                    Ok(()) => self.webui.note.set(label),
+                    Ok(()) => {
+                        if missing {
+                            let at = label.handle;
+                            // (Kept bound for the run, as the line itself.)
+                            let _ = self.bind_main_events(move |evt, _data, handle| {
+                                if evt == nwg::Event::OnLabelClick && handle == at && !shell::open(WEBVIEW2_DOWNLOAD) {
+                                    log("webui: could not open the WebView2 download page");
+                                }
+                            });
+                        }
+                        self.webui.note.set(label);
+                    }
                     Err(e) => log(&format!("webui: the note could not be shown: {e}")),
                 }
             }
