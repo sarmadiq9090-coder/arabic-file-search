@@ -376,6 +376,12 @@ const SHOTS = [
   ["updates-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#check-updates"], ["wait", 50]], { expect: { settings: true, lastSent: "check_updates", updBtn: "التحقق من التحديثات…" } }],
   ["updates-store-en-dark", "en", "dark", [["key", "Control+,"]], { store: true, expect: { settings: true, updBtn: "Updates from Microsoft Store…", trustStore: true } }],
   ["trust-store-ar-light", "ar", "light", [], { store: true, expect: { trustStore: true } }],
+  // Accessibility: the recent files from the keyboard (Tab, arrows, Enter), named menus, the box's name
+  // following its hint, and every focusable control with a name.
+  ["recent-keys-ar-light", "ar", "light", [["focus", "#recent"], ["key", "ArrowDown"], ["key", "Enter"], ["wait", 50]], { expect: { lastSent: "open", recentActive: "rr1", opens: 1 } }],
+  ["recent-menu-en-dark", "en", "dark", [["focus", "#recent"], ["key", "Shift+F10"]], { expect: { menu: true, a11y: true } }],
+  ["a11y-content-en-light", "en", "light", [["click", "#chip-content"]], { expect: { qName: "Search inside documents, then press Enter…", a11y: true } }],
+  ["a11y-results-ar-light", "ar", "light", [["type", "تقرير"], ["click", "#chip-sort"]], { expect: { menu: true, a11y: true } }],
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
@@ -530,6 +536,15 @@ const SHOTS = [
         dlgName: !!document.querySelector("#dlg-h .fname"),
         qswitch: visible(document.getElementById("qswitch")),
         rating: visible(document.getElementById("rating")),
+        recentActive: document.getElementById("recent").getAttribute("aria-activedescendant"),
+        qName: document.getElementById("q").getAttribute("aria-label"),
+        // Every visible menu, list and focusable control has a name a screen reader can say.
+        a11y: (() => {
+          const named = (el) => (el.getAttribute("aria-label") || "").trim() || (el.getAttribute("aria-labelledby") && document.getElementById(el.getAttribute("aria-labelledby"))?.textContent.trim()) || (el.textContent || "").trim();
+          const bad = [...document.querySelectorAll('[role=menu], [role=listbox], [role=separator][tabindex], button, input, [role=switch]')].filter(visible).filter((el) => !named(el));
+          if (bad.length) window.__fakeErrors.push("no accessible name: " + bad.map((el) => el.id || el.className).join(", "));
+          return !bad.length;
+        })(),
         updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent : null; })(),
         trustStore: [...document.querySelectorAll('[data-i18n="trust"], .settings .muted')].filter(visible).every((el) => el.textContent.includes("Microsoft Store") && !el.textContent.includes("GitHub")),
         clearItem: (() => { const it = document.getElementById("hist-clear"); return it ? `${it.textContent}|${it.getAttribute("aria-disabled") === "true" ? "off" : "on"}` : null; })(),

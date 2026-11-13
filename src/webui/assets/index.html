@@ -15,7 +15,7 @@
 </head>
 <body>
 <div class="win" id="win">
-  <div class="head">
+  <div class="head" role="search">
     <label class="field" id="field">
       <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
       <input id="q" role="combobox" aria-expanded="false" aria-controls="list" aria-autocomplete="list" dir="auto" autocomplete="off" spellcheck="false" data-i18n-placeholder="ph" data-i18n-label="ph">
@@ -26,7 +26,7 @@
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
         <span class="hlbl" data-i18n="history"></span>
       </button>
-      <div class="menu pop" id="hist" role="menu" hidden></div>
+      <div class="menu pop" id="hist" role="menu" aria-labelledby="hist-btn" hidden></div>
     </span>
     <button class="hbtn" id="set-btn" type="button" aria-pressed="false" data-i18n-label="settings" data-i18n-title="settingsKey">
       <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
@@ -38,7 +38,8 @@
   <div class="switched" id="switched" role="status" hidden></div>
   <div class="switched qswitch" id="qswitch" role="status" hidden></div>
 
-  <div class="banner" id="banner" role="status" hidden>
+  <!-- (Not a live region: its numbers change every second while indexing.) -->
+  <div class="banner" id="banner" role="region" aria-labelledby="banner-title" hidden>
     <span class="t num" id="banner-title"></span>
     <span class="s" id="banner-sub"></span>
     <div class="bar" id="banner-bar"><i></i></div>
@@ -57,7 +58,7 @@
     <div class="home">
       <section class="recent">
         <div class="sec-h"><span data-i18n="recent"></span></div>
-        <div class="list" id="recent" role="listbox" data-i18n-label="recent"></div>
+        <div class="list" id="recent" role="listbox" tabindex="0" data-i18n-label="recent"></div>
         <p class="hint" id="recent-none" data-i18n="recentNone" hidden></p>
       </section>
       <section>
@@ -73,7 +74,7 @@
       <div class="blob"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg></div>
       <h2 id="nores-h"></h2>
       <p class="sub" id="nores-sub"></p>
-      <div class="sugg" id="sugg" role="listbox"></div>
+      <div class="sugg" id="sugg" role="listbox" aria-labelledby="nores-h"></div>
       <p class="tagline"><b data-i18n="tagHead"></b><span data-i18n="tagTail"></span></p>
     </div></div>
   </div>
@@ -89,7 +90,7 @@
     <span class="grow"></span>
     <span class="keys" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="kNav"></span></span><span><kbd>Enter</kbd> <span data-i18n="kOpen"></span></span><span><kbd>Ctrl+Enter</kbd> <span data-i18n="kFolder"></span></span><span><kbd>Shift+F10</kbd> <span data-i18n="kMenu"></span></span><span><kbd>Ctrl+Alt+F</kbd></span></span>
   </footer>
-  <div class="menu ctx" id="ctx" role="menu" hidden></div>
+  <div class="menu ctx" id="ctx" role="menu" data-i18n-label="more" hidden></div>
   <div class="veil" id="veil" hidden>
     <div class="dlg" id="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-h">
       <h3 id="dlg-h"></h3>

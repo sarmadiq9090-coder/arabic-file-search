@@ -167,6 +167,10 @@ html[dir="rtl"] .field input { text-align: right; }
 .row { position: relative; display: grid; grid-template-columns: 44px var(--c-name, 1fr) var(--w-size, 96px) var(--w-date, 128px) auto; align-items: center; min-height: 56px; padding-inline: 12px 16px; cursor: default; }
 .row:hover { background: var(--hover); }
 .row[aria-selected="true"] { background: var(--sel); }
+/* The recent files show their selection only while they have the keyboard. */
+#recent:not(:focus-within) .row[aria-selected="true"] { background: none; }
+#recent:not(:focus-within) .row[aria-selected="true"]::before { display: none; }
+#recent:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 10px; }
 .row[aria-selected="true"]::before { content: ""; position: absolute; inset-block: 8px; inset-inline-start: 0; width: 3px; border-radius: 3px; background: var(--sel-bar); }
 .row .nm { min-width: 0; }
 .row .n1 { font-weight: 500; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; gap: 8px; align-items: center; }

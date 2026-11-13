@@ -323,6 +323,12 @@ impl App {
             let cue = shell::wide(tr!("ابحث...", "Search..."));
             SendMessageW(edit, winapi::um::commctrl::EM_SETCUEBANNER, 1, cue.as_ptr() as LPARAM);
         }
+        // What a screen reader says for the box (its text is what is typed,
+        // and the hint above is only a cue banner, which it does not read).
+        super::accessible::set_name(
+            edit,
+            tr!("بحث سريع: اكتب اسم ملف أو برنامج أو إعداد، ثم Enter", "Quick search: type the name of a file, an app or a setting, then press Enter"),
+        );
         self.popup.hwnd.set(hwnd as usize);
         self.popup.edit.set(edit as usize);
         self.popup.post_to.store(hwnd as usize, Ordering::Relaxed);

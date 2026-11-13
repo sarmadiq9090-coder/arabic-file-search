@@ -29,6 +29,7 @@
 //! - `format`, `shell`: text formatting and Windows shell helpers
 //! - `webui`: the new main window (WebView2), opt-in while it is built
 
+mod accessible;
 mod app_matches;
 mod autostart;
 mod build;

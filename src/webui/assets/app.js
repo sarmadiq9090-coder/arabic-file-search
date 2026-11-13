@@ -162,7 +162,7 @@
     rows: [], total: 0, ms: 0, done: true, sel: 0, asked: 0, running: false, isContent: false, contentFor: null,
     progress: "", warnings: [], files: 0, state: "ready", stateText: "",
     recent: [], sugg: [], ssel: 0, view: "empty", note: "", notice: "", resultsScope: "",
-    matches: null, history: { recent: [], saved: [] }, settings: null, apps: { seq: -1, apps: [] },
+    matches: null, history: { recent: [], saved: [] }, settings: null, apps: { seq: -1, apps: [] }, rsel: 0,
     // Ctrl+Alt+G: a Save/Open dialog waits for a result's folder (its hint), "" when none.
     qswitch: "",
   };
@@ -516,9 +516,10 @@
     notice(m) {
       S.notice = m.text; S.noticeWarn = !!m.warn; renderStatus();
       clearTimeout(handlers.noticeTimer);
-      // A problem stays until the next key or click, and is read out.
-      if (m.warn) $("live").textContent = m.text;
-      else handlers.noticeTimer = setTimeout(() => { S.notice = ""; renderStatus(); }, 3500);
+      // Read out ("Path copied.", "Could not…"); a problem stays until the
+      // next key or click.
+      $("live").textContent = m.text;
+      if (!m.warn) handlers.noticeTimer = setTimeout(() => { S.notice = ""; renderStatus(); }, 3500);
     },
   };
   Object.defineProperty(window, "__instafind", { value: Object.freeze({ recv: (m) => { const f = handlers[m && m.type]; if (f) f(m); } }) });
@@ -749,7 +750,9 @@
   function renderCols() {
     const col = (key, label, cls) => {
       const on = S.sort === key;
-      const b = h("button", { class: "colbtn" + (on ? " sorted" : "") + (cls ? " " + cls : ""), type: "button", "aria-pressed": String(on) }, h("span", null, label));
+      // Its name says what a press does and how the list is ordered now.
+      const name = `${T.sortBy}: ${label}${on ? ` (${S.desc ? T.desc : T.asc})` : ""}`;
+      const b = h("button", { class: "colbtn" + (on ? " sorted" : "") + (cls ? " " + cls : ""), type: "button", "aria-pressed": String(on), "aria-label": name }, h("span", null, label));
       if (on) b.append(icon(S.desc ? I.down : I.up, "i caret"));
       b.dataset.sort = key;
       return b;
@@ -879,6 +882,21 @@
     const el = $("recent");
     el.replaceChildren(...S.recent.map((r, i) => rowEl(r, i, "recent")));
     $("recent-none").hidden = S.recent.length > 0;
+    // (Not a tab stop while it lists nothing.)
+    el.tabIndex = S.recent.length ? 0 : -1;
+    selectRecent(Math.min(S.rsel || 0, Math.max(0, S.recent.length - 1)));
+  }
+  // The recent files from the keyboard too (Tab to them, then the arrows):
+  // the selected one is what Enter, Ctrl+Enter, F2, Delete and the menu act on.
+  function selectRecent(i, scroll = false) {
+    const el = $("recent");
+    S.rsel = i;
+    for (const r of el.querySelectorAll('.row[aria-selected="true"]')) r.setAttribute("aria-selected", "false");
+    const row = $("rr" + i);
+    if (!row) { el.removeAttribute("aria-activedescendant"); return; }
+    row.setAttribute("aria-selected", "true");
+    el.setAttribute("aria-activedescendant", row.id);
+    if (scroll) row.scrollIntoView({ block: "nearest" });
   }
   const SUGG_ICON = { query: I.bulb, all_kinds: I.filter, all_drives: I.folder, contents: I.text, web: I.globe };
   function renderNoResults() {
@@ -981,7 +999,7 @@
       }
       const wrap = h("span", { class: "chipwrap" + (d.end ? " end" : "") }, chip);
       if (d.items) {
-        const menu = h("div", { class: "menu", role: "menu", id: "menu-" + d.id, hidden: true });
+        const menu = h("div", { class: "menu", role: "menu", id: "menu-" + d.id, "aria-label": d.label, hidden: true });
         d.items.forEach((label, i) => { const it = h("div", { role: "menuitemradio", tabindex: "-1", "aria-checked": String(i === d.cur) }, label); it.dataset.k = i; menu.append(it); });
         wrap.append(menu);
       }
@@ -996,7 +1014,8 @@
     $("chips").replaceChildren(...wraps, viewButtons());
     updatePlaceholder();
   }
-  function updatePlaceholder() { q.placeholder = S.content ? T.phContent : T.ph; }
+  // (The box's accessible name follows its hint: names or inside documents.)
+  function updatePlaceholder() { q.placeholder = S.content ? T.phContent : T.ph; q.setAttribute("aria-label", q.placeholder); }
   function setFilter(key, i) {
     S[key] = i;
     if (key === "kind") S.kindLabel = S.kinds[i] || "";
@@ -1255,6 +1274,22 @@
   list.addEventListener("contextmenu", (e) => { const r = e.target.closest(".row"); e.preventDefault(); if (r) { focusList(); select(+r.dataset.i, false); openCtx(+r.dataset.i, null, "results", { left: e.clientX, top: e.clientY }); } });
   list.addEventListener("scroll", () => { if (list.scrollTop + list.clientHeight > list.scrollHeight - FIRST_PAGE_GUARD) askMore(); });
   $("recent").addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) act("open", S.recent[+r.dataset.i], "recent"); });
+  $("recent").addEventListener("keydown", (e) => {
+    const r = S.recent[S.rsel], ctrl = e.ctrlKey || e.metaKey;
+    if (!r) return;
+    const moves = { ArrowDown: 1, ArrowUp: -1, Home: -1e9, End: 1e9 };
+    if (e.key in moves) selectRecent(Math.max(0, Math.min(S.recent.length - 1, S.rsel + moves[e.key])), true);
+    else if (e.key === "Enter" && e.altKey) act("properties", r, "recent");
+    else if (e.key === "Enter") act(ctrl ? "reveal" : "open", r, "recent");
+    else if (e.key === "F2") renameDialog(r, "recent");
+    else if (e.key === "Delete" && !ctrl && !e.shiftKey && !e.altKey) recycleDialog(r, "recent");
+    else if (ctrl && (e.key === "c" || e.key === "C")) act(e.shiftKey ? "copy" : "copy_file", r, "recent");
+    else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) openCtx(S.rsel, $("rr" + S.rsel), "recent");
+    // Typing goes on in the search box.
+    else if (!ctrl && !e.altKey && e.key.length === 1) { q.focus(); return; }
+    else return;
+    e.preventDefault(); e.stopPropagation();
+  });
   // Dragging a row out (to Explorer, a mail, a chat) is the program's own
   // drag of the file, as in the classic list: a press on a row that moves a
   // few pixels with the button down asks for it (once per press). (The
