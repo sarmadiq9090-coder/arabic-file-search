@@ -61,7 +61,7 @@ pub fn progress_text(lang: Lang, state: Indexing, num: &dyn Fn(usize) -> String)
     }
     Some(match state {
         Indexing::Names { found } => match lang {
-            Lang::Ar => format!("جارٍ الفهرسة… {} ملف حتى الآن", num(found)),
+            Lang::Ar => format!("جارٍ الفهرسة… عدد الملفات حتى الآن: {}", num(found)),
             Lang::En => format!("Indexing… {} files so far", num(found)),
         },
         Indexing::Contents { checked, total } => {
@@ -157,7 +157,7 @@ pub fn content_search_text(lang: Lang, state: Indexing, checked: usize, total: u
     let lead = no_results_text(lang, state)?;
     let (checked, total) = (num(checked.min(total)), num(total));
     Some(match lang {
-        Lang::Ar => format!("{lead} تم فحص {checked} من {total} مستند…"),
+        Lang::Ar => format!("{lead} المستندات المفحوصة: {checked} من {total}…"),
         Lang::En => format!("{lead} Checked {checked} of {total} documents…"),
     })
 }
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn name_scan_has_no_total_yet() {
         let s = Indexing::Names { found: 120_500 };
-        assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("جارٍ الفهرسة… 120,500 ملف حتى الآن"));
+        assert_eq!(progress_text(Lang::Ar, s, &num).as_deref(), Some("جارٍ الفهرسة… عدد الملفات حتى الآن: 120,500"));
         assert_eq!(progress_text(Lang::En, s, &num).as_deref(), Some("Indexing… 120,500 files so far"));
         // A scan that has found nothing yet is still running.
         assert!(Indexing::Names { found: 0 }.running());
@@ -276,7 +276,7 @@ mod tests {
         );
         assert_eq!(
             content_search_text(Lang::Ar, s, 36_000, 432_000, &num).as_deref(),
-            Some("لا نتائج حتى الآن — قد تكون النتائج ناقصة أثناء الفهرسة. تم فحص 36,000 من 432,000 مستند…")
+            Some("لا نتائج حتى الآن — قد تكون النتائج ناقصة أثناء الفهرسة. المستندات المفحوصة: 36,000 من 432,000…")
         );
     }
 

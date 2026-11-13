@@ -1314,7 +1314,7 @@ impl App {
         drop(st);
         if !was && !now {
             self.popup_error(&trf!(
-                "قائمة المثبّتة ممتلئة ({} عنصراً). ألغِ تثبيت عنصر أولاً.",
+                "قائمة المثبّتة ممتلئة (الحد الأقصى: {}). ألغِ تثبيت عنصر أولاً.",
                 "The pinned list is full ({} items). Unpin one first.",
                 crate::history::MAX_PINS
             ));

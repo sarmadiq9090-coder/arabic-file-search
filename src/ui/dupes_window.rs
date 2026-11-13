@@ -453,7 +453,7 @@ impl App {
                 let n = paths.len();
                 *d.scope.borrow_mut() = Some(Scope::Paths(Arc::new(paths)));
                 d.scope_label.set_text(&trf!(
-                    "النطاق: نتائج البحث الحالية ({} نتيجة)",
+                    "النطاق: نتائج البحث الحالية (عدد النتائج: {})",
                     "Scope: the current search results ({} results)",
                     fmt_num(n)
                 ));
@@ -606,7 +606,7 @@ impl App {
                 let text = match p.stage.load(Ordering::Relaxed) {
                     0 => tr!("جارٍ التجميع حسب الحجم…", "Grouping by size…").to_string(),
                     STAGE_CHECK => trf!(
-                        "التحقق من أن نسخة من كل ملف ما زالت موجودة… ({} ملف)",
+                        "التحقق من أن نسخة من كل ملف ما زالت موجودة… (عدد الملفات: {})",
                         "Checking that a copy of every file is still there… ({} files)",
                         fmt_num(n)
                     ),
@@ -617,7 +617,7 @@ impl App {
                         fmt_num(total)
                     ),
                     _ => trf!(
-                        "مقارنة المحتوى كاملاً: {} من {} ملف ({}%)",
+                        "مقارنة المحتوى كاملاً: الملفات {} من {} ({}%)",
                         "Comparing whole contents: {} of {} files ({}%)",
                         fmt_num(n),
                         fmt_num(total),
@@ -667,7 +667,7 @@ impl App {
             tr!("لا توجد ملفات مكررة.", "No duplicate files found.").to_string()
         } else {
             trf!(
-                "{} مجموعة، {} ملف — المساحة المهدرة: {}",
+                "عدد المجموعات: {}، عدد الملفات: {} — المساحة المهدرة: {}",
                 "{} groups, {} files — wasted space: {}",
                 fmt_num(report.groups.len()),
                 fmt_num(report.file_count()),
@@ -678,7 +678,7 @@ impl App {
             text += tr!(" — بالاسم والحجم فقط، لم يُقارَن المحتوى", " — by name and size only; contents were not compared");
         }
         if report.unreadable > 0 {
-            text += &trf!(" (تعذرت قراءة {} ملف)", " ({} files could not be read)", fmt_num(report.unreadable));
+            text += &trf!(" (ملفات تعذرت قراءتها: {})", " ({} files could not be read)", fmt_num(report.unreadable));
         }
         d.summary.set_text(&text);
         text
@@ -693,7 +693,7 @@ impl App {
                 let Some(group) = report.groups.get(g) else { return String::new() };
                 match col {
                     0 => trf!(
-                        "المجموعة {}: {} نسخ",
+                        "المجموعة {}: عدد النسخ: {}",
                         "Group {}: {} copies",
                         fmt_num(g + 1),
                         fmt_num(group.copies())
@@ -799,7 +799,7 @@ impl App {
         let shown: Vec<&str> = paths.iter().take(10).map(String::as_str).collect();
         let more = if paths.len() > 10 { trf!("\n… و{} غيرها", "\n… and {} more", paths.len() - 10) } else { String::new() };
         let mut text = trf!(
-            "نقل {} ملف إلى سلة المحذوفات؟\n\n{}{}",
+            "نقل الملفات إلى سلة المحذوفات؟ (عددها: {})\n\n{}{}",
             "Move {} files to the Recycle Bin?\n\n{}{}",
             fmt_num(paths.len()),
             shown.join("\n"),
@@ -899,10 +899,10 @@ impl App {
         let totals = self.dupes_show_report();
         let left = plan.delete.len().saturating_sub(gone.len());
         let mut msg = if left == 0 {
-            trf!("نُقل {} ملف إلى سلة المحذوفات.", "Moved {} files to the Recycle Bin.", fmt_num(gone.len()))
+            trf!("نُقلت الملفات إلى سلة المحذوفات (عددها: {}).", "Moved {} files to the Recycle Bin.", fmt_num(gone.len()))
         } else {
             trf!(
-                "نُقل {} ملف إلى سلة المحذوفات، ولم يُحذف {}.",
+                "نُقلت الملفات إلى سلة المحذوفات (عددها: {})، ولم يُحذف منها: {}.",
                 "Moved {} files to the Recycle Bin; {} were not deleted.",
                 fmt_num(gone.len()),
                 fmt_num(left)
@@ -910,7 +910,7 @@ impl App {
         };
         if !plan.kept.is_empty() {
             msg += &trf!(
-                " تُرك {} ملف حفاظاً على آخر نسخة.",
+                " ملفات تُركت حفاظاً على آخر نسخة: {}.",
                 " {} files were left alone to keep the last copy.",
                 fmt_num(plan.kept.len())
             );
@@ -924,7 +924,7 @@ impl App {
                 &d.window,
                 title(),
                 &trf!(
-                    "لم يُحذف {} ملف، حتى لا تُحذف آخر نسخة:\n\n{}{}\n\nاضغط «بحث» لتحديث القائمة.",
+                    "ملفات لم تُحذف حتى لا تُحذف آخر نسخة (عددها: {}):\n\n{}{}\n\nاضغط «بحث» لتحديث القائمة.",
                     "{} files were not deleted, so that the last copy is not lost:\n\n{}{}\n\nPress Search to refresh the list.",
                     fmt_num(plan.kept.len()),
                     shown.join("\n"),

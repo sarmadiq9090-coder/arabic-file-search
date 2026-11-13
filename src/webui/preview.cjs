@@ -130,7 +130,7 @@ function fakeProgram(cfg) {
     return r;
   };
   const status = cfg.indexing
-    ? { type: "status", state: "names", files: 36000, text: ar ? "جارٍ الفهرسة… 36,000 ملف حتى الآن" : "Indexing… 36,000 files so far" }
+    ? { type: "status", state: "names", files: 36000, text: ar ? "جارٍ الفهرسة… عدد الملفات حتى الآن: 36,000" : "Indexing… 36,000 files so far" }
     : { type: "status", state: "ready", files: 1204331, text: null };
   const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1", store: !!cfg.store };
   const history = {
@@ -176,12 +176,12 @@ function fakeProgram(cfg) {
       send(results(m, { content: true, running: true, total: 0, rows: [] }));
       setTimeout(() => {
         shown.list = order(found, m.sort, m.desc);
-        send({ type: "progress", seq: m.seq, total: found.length, done: false, text: ar ? "جارٍ البحث داخل المستندات… تم فحص 1,840 من 4,210 — وجدت 3" : "Searching inside documents… checked 1,840 of 4,210 — found 3" });
+        send({ type: "progress", seq: m.seq, total: found.length, done: false, text: ar ? "جارٍ البحث داخل المستندات… تم فحص 1,840 من 4,210 — عدد النتائج: 3" : "Searching inside documents… checked 1,840 of 4,210 — found 3" });
         setTimeout(() => {
           // Put in order at the end: a new version, as in the program.
           shown.ver = nextVer();
           send(results(m, { content: true, running: cfg.keepRunning, suggestions: found.length ? [] : [{ kind: "web", label: ar ? "ابحث في الويب" : "Search the web", q: "" }] }));
-          if (!cfg.keepRunning) send({ type: "progress", seq: m.seq, total: found.length, done: true, text: ar ? "انتهى البحث داخل 4,210 مستند: وجدت 3 ملف. (من الفهرس: 4,102)" : "Searched 4,210 documents: found 3 files. (4,102 from the index)" });
+          if (!cfg.keepRunning) send({ type: "progress", seq: m.seq, total: found.length, done: true, text: ar ? "انتهى البحث. المستندات المفحوصة: 4,210، عدد النتائج: 3. (من الفهرس: 4,102)" : "Searched 4,210 documents: found 3 files. (4,102 from the index)" });
         }, 40);
       }, 40);
     } else if (m.op === "search") {
@@ -259,13 +259,13 @@ const SHOTS = [
   ["main-en-dark", "en", "dark", [["type", "report"], ["key", "ArrowDown"]]],
   ["empty-ar-light", "ar", "light", []],
   ["empty-en-dark", "en", "dark", []],
-  ["nores-ar-dark", "ar", "dark", [["chip", "kind", 1], ["type", "عقد الايجار 2024"]]],
+  ["nores-ar-dark", "ar", "dark", [["chip", "kind", 1], ["type", "عقد الايجار 2024"]], { expect: { countsAr: true } }],
   ["nores-en-light", "en", "light", [["type", "lease 2024"]]],
-  ["indexing-ar-light", "ar", "light", [["type", "تقرير"]], { indexing: true }],
-  ["content-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 250], ["key", "ArrowDown"], ["key", "ArrowUp"], ["wait", 250]], { expect: { content: true, rows: 3 } }],
+  ["indexing-ar-light", "ar", "light", [["type", "تقرير"]], { indexing: true, expect: { countsAr: true } }],
+  ["content-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 250], ["key", "ArrowDown"], ["key", "ArrowUp"], ["wait", 250]], { expect: { content: true, rows: 3, countsAr: true } }],
   ["content-en-dark", "en", "dark", [["click", "#chip-content"], ["type", "lease agreement"], ["key", "Enter"], ["wait", 250], ["wait", 250]], { expect: { content: true, rows: 3 } }],
   ["content-running-ar-dark", "ar", "dark", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 250]], { keepRunning: true, expect: { stop: true } }],
-  ["matches-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 300], ["key", "F4"], ["wait", 150]], { expect: { dialog: true, dlgName: true } }],
+  ["matches-ar-light", "ar", "light", [["click", "#chip-content"], ["type", "عقد الإيجار"], ["key", "Enter"], ["wait", 300], ["key", "F4"], ["wait", 150]], { expect: { dialog: true, dlgName: true, countsAr: true } }],
   // Enter in the box moves to the list (as the classic window); Enter there opens.
   ["enter-en-light", "en", "light", [["type", "report"], ["key", "Enter"]], { expect: { focus: "list", opens: 0 } }],
   ["enter-twice-en-light", "en", "light", [["type", "report"], ["key", "Enter"], ["key", "Enter"]], { expect: { opens: 1 } }],
@@ -291,7 +291,7 @@ const SHOTS = [
   ["narrow-ar-light", "ar", "light", [["type", "تقرير"], ["key", "ArrowDown"]], { width: 820, expect: { actbar: 4, labels: false } }],
   ["actbar-no-preview-en-light", "en", "light", [["type", "report"], ["click", "#view-preview"], ["click", "#actbar .btn:nth-child(3)"], ["wait", 50]], { expect: { actbar: 4, lastSent: "copy" } }],
   // The classic window's terms, and the date with its time in the preview.
-  ["terms-ar-light", "ar", "light", [["type", "تقرير"]], { expect: { termsAr: true, dateTime: true } }],
+  ["terms-ar-light", "ar", "light", [["type", "تقرير"]], { expect: { countsAr: true, termsAr: true, dateTime: true } }],
   // Zoom with Ctrl and + / 0; off switches readable; paths 13.5 px.
   ["zoom-en-light", "en", "light", [["type", "report"], ["key", "Control+="], ["key", "Control+="]], { expect: { zoom: "1.25", pathPx: true } }],
   ["zoom-reset-en-light", "en", "light", [["key", "Control+="], ["key", "Control+0"]], { expect: { zoom: "1" } }],
@@ -526,7 +526,9 @@ const SHOTS = [
         linesTop: (() => { const l = document.querySelector(".preview .pv-lines, .preview .snip"); return !!l && l.getBoundingClientRect().top < innerHeight * 0.75; })(),
         zoom: document.documentElement.style.zoom || "1",
         pathPx: [...document.querySelectorAll("#list .row .n2")].every((p) => parseFloat(getComputedStyle(p).fontSize) >= 13.5),
-        termsAr: document.getElementById("cols").textContent.includes("تاريخ التعديل") && document.getElementById("status-text").textContent.startsWith("وجدت"),
+        termsAr: document.getElementById("cols").textContent.includes("تاريخ التعديل") && document.getElementById("status-text").textContent.startsWith("عدد النتائج: "),
+        // Arabic counts read «label: n», never «n نتيجة/ملف» (no noun to agree with the number).
+        countsAr: !/[0-9٠-٩] ?(نتيجة|نتائج|ملف|مستند|تطابق)/.test(document.body.innerText),
         dateTime: /[0-9٠-٩]{1,2}:[0-9٠-٩]{2}/.test([...document.querySelectorAll(".facts dd")].map((d) => d.textContent).join(" ")),
         actbar: visible(document.getElementById("actbar")) ? document.querySelectorAll("#actbar .btn").length : 0,
         labels: [...document.querySelectorAll(".hbtn .hlbl")].every((l) => visible(l) && l.textContent.trim()),

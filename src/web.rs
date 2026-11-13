@@ -711,9 +711,9 @@ autocomplete=\"off\" autofocus><button type=\"submit\">{}</button></form>",
     let total = hits.len();
     let shown = total.min(MAX_RESULTS);
     let summary = if total > shown {
-        trf!("{total} نتيجة (تظهر أول {shown})", "{total} results (showing the first {shown})")
+        trf!("عدد النتائج: {total} (تظهر أول {shown})", "{total} results (showing the first {shown})")
     } else {
-        trf!("{total} نتيجة", "{total} results")
+        trf!("عدد النتائج: {total}", "{total} results")
     };
     let _ = write!(body, "<p class=\"i\">{}</p><ul>", esc(&summary));
     for e in hits.iter().take(shown).filter_map(|&i| index.entries.get(i as usize)) {
@@ -1892,7 +1892,7 @@ mod tests {
         ]);
         for q in ["مسئول", "مسؤول", "مسوول"] {
             let page = search_page(q, &s.index(), false, false);
-            assert!(page.contains(&trf!("{} نتيجة", "{} results", 3)), "{q}: {page}");
+            assert!(page.contains(&trf!("عدد النتائج: {}", "{} results", 3)), "{q}: {page}");
             for name in ["مسؤول المبيعات.docx", "مسئول الحسابات.xlsx", "مسوول المخزن.txt"] {
                 assert!(page.contains(name), "{q}: {name}");
             }

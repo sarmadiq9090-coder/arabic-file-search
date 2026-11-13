@@ -1342,7 +1342,7 @@ pub fn content_text(s: &ContentState, lang: Lang) -> String {
             (c, Lang::En) => format!(" ({} from the index)", n(c)),
         };
         let mut t = match lang {
-            Lang::Ar => format!("انتهى البحث داخل {} مستند: وجدت {} ملف.{cached}", n(s.total), n(s.found)),
+            Lang::Ar => format!("انتهى البحث. المستندات المفحوصة: {}، عدد النتائج: {}.{cached}", n(s.total), n(s.found)),
             Lang::En => format!("Searched {} documents: found {} files.{cached}", n(s.total), n(s.found)),
         };
         // Documents not in the index yet were not searched.
@@ -1361,7 +1361,7 @@ pub fn content_text(s: &ContentState, lang: Lang) -> String {
     }
     let (checked, total, found) = (n(s.checked.min(s.total)), n(s.total), n(s.found));
     match lang {
-        Lang::Ar => format!("جارٍ البحث داخل المستندات… تم فحص {checked} من {total} — وجدت {found}"),
+        Lang::Ar => format!("جارٍ البحث داخل المستندات… تم فحص {checked} من {total} — عدد النتائج: {found}"),
         Lang::En => format!("Searching inside documents… checked {checked} of {total} — found {found}"),
     }
 }
@@ -1868,7 +1868,7 @@ mod tests {
         let s = |found, done, indexing| ContentState { checked: 1200, total: 4000, found, cached: 0, done, indexing, ocr_arabic_missing: false };
         assert_eq!(content_text(&s(3, false, Indexing::Idle), Lang::En), "Searching inside documents… checked 1,200 of 4,000 — found 3");
         assert!(content_text(&s(0, false, Indexing::Names { found: 9 }), Lang::Ar).contains("قد تكون النتائج ناقصة"));
-        assert_eq!(content_text(&s(2, true, Indexing::Idle), Lang::Ar), "انتهى البحث داخل 4,000 مستند: وجدت 2 ملف.");
+        assert_eq!(content_text(&s(2, true, Indexing::Idle), Lang::Ar), "انتهى البحث. المستندات المفحوصة: 4,000، عدد النتائج: 2.");
         let done = ContentState { cached: 50, ocr_arabic_missing: true, ..s(0, true, Indexing::Names { found: 1 }) };
         let t = content_text(&done, Lang::En);
         assert!(t.starts_with("Searched 4,000 documents: found 0 files. (50 from the index) Results may be incomplete"), "{t}");

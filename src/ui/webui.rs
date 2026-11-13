@@ -1172,7 +1172,7 @@ mod imp {
                         // Not borrowed while the clipboard notifies its previous owner.
                         Some((n, text)) => {
                             if shell::copy_text(&self.webui.parts.window, &text) {
-                                self.webui_notice(trf!("تم نسخ {} مسار.", "Copied {} paths.", crate::indexing_status::group_digits(n)));
+                                self.webui_notice(trf!("تم نسخ المسارات. عددها: {}.", "Copied {} paths.", crate::indexing_status::group_digits(n)));
                             } else {
                                 self.webui_warn(shell::copy_failed_text());
                             }
