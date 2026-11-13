@@ -114,6 +114,7 @@ scoop install instafind
 
 ### الراحة
 - **واجهة عربية أو إنجليزية**: تتبع لغة ويندوز، وتُغيَّر من «خيارات ← Language / اللغة».
+- **لغات أخرى للواجهة (ترجمة آلية تُراجَع، وتُعلَّم «(ترجمة آلية)» في قائمة اللغات)**: الكردية (السورانية والكرمانجية)، الفارسية، الأردية، البشتوية، الأويغورية، السريانية (الآشورية)، التركية، الأذربيجانية، الأوزبكية، الفرنسية، الإسبانية، البرتغالية (البرازيل)، الألمانية، الروسية، الأوكرانية، الأمازيغية (تيفيناغ)، السواحيلية، الهوسا، الصومالية، الهندية، المراثية، البنغالية، البنجابية، الغوجاراتية، الأوديا، التاميلية، التيلوغوية، الكنادية، المالايالامية، الإندونيسية، الملايوية، الفيتنامية، التايلاندية، الصينية (المبسطة والتقليدية)، اليابانية، الكورية. تظهر اللغة في القائمة حين تُضاف ترجمتها (`i18n/`).
 - **يعمل مع ويندوز** في الخلفية، وEsc أو زر الإغلاق يخفيانه إلى الأيقونة بجانب الساعة (للخروج: «خروج» من قائمة الأيقونة)، ونسخة واحدة فقط منه.
 - تواريخ نسبية («أمس»، «قبل 5 دقائق»)، وخيار الأرقام العربية، وأيقونات أنواع الملفات.
 - أي خطأ داخلي يُسجَّل في `log.txt` و`crash.txt` ولا يُغلق البرنامج.
@@ -287,6 +288,7 @@ InstaFind's second includes starting the command-line tool and loading the index
 
 #### Comfort
 - **English or Arabic interface**: follows the Windows display language; switch in **Options → Language / اللغة**.
+- **More interface languages** (machine translations under review, marked "(machine translation)" in the language list): Kurdish (Sorani, Kurmanji), Persian, Urdu, Pashto, Uyghur, Syriac (Assyrian Neo-Aramaic), Turkish, Azerbaijani, Uzbek, French, Spanish, Portuguese (Brazil), German, Russian, Ukrainian, Tamazight (Tifinagh), Swahili, Hausa, Somali, Hindi, Marathi, Bengali, Punjabi, Gujarati, Odia, Tamil, Telugu, Kannada, Malayalam, Indonesian, Malay, Vietnamese, Thai, Chinese (Simplified, Traditional), Japanese, Korean. A language is offered once its translation file is in `i18n/`.
 - **Starts with Windows** in the background; Esc or the close button hides it to the tray (quit with *Exit* in the tray menu), single instance.
 - Relative dates, optional Arabic digits, file-type icons.
 - Internal errors are written to `log.txt` and `crash.txt` instead of closing the app.
