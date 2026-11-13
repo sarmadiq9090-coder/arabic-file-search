@@ -205,9 +205,14 @@ impl<T> Drop for Com<T> {
     }
 }
 
-/// Writes the shortcut `lnk` to `target` (the Start menu lists it at once).
+/// Writes the shortcut `lnk` to `target` (the Start menu lists it at once),
+/// creating its folder first: a user's Start menu Programs folder may not
+/// exist yet, and `IPersistFile::Save` does not create it.
 /// COM is already initialised on the UI thread (`ui::run`).
 fn create_shortcut(target: &Path, lnk: &Path) -> Result<(), String> {
+    if let Some(dir) = lnk.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+    }
     use std::ptr::null_mut;
     use winapi::shared::minwindef::TRUE;
     use winapi::shared::winerror::{FAILED, HRESULT};
