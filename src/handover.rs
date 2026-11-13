@@ -387,6 +387,39 @@ pub enum SecondStart {
     ReplaceProcess(&'static str),
 }
 
+/// Whether the running copy behind the program's window is really this
+/// program, before it is ended or its file replaced: it answered
+/// [`IDENTIFY_MESSAGE`], its file is named `bahth…`, or its version
+/// resource names bahth or InstaFind (`resource_names`: its ProductName,
+/// InternalName, OriginalFilename). Another program with the same window
+/// title is only brought to the front.
+#[cfg_attr(not(windows), allow(dead_code))] // older_copy (Windows)
+pub fn is_this_program(answered: bool, exe: Option<&str>, resource_names: &[String]) -> bool {
+    let file_name = exe.map(|e| e.rsplit(['\\', '/']).next().unwrap_or(e).to_lowercase());
+    answered
+        || file_name.is_some_and(|n| n.starts_with("bahth"))
+        || resource_names.iter().any(|n| {
+            let n = n.trim().to_lowercase();
+            n == "bahth" || n == "bahth.exe" || n == "instafind"
+        })
+}
+
+/// Before a running copy is replaced: `None` when it may be, else why it
+/// is only brought to the front. `theirs` / `mine`: the PE machine types of
+/// its file and of this one (`None` when unknown); a 32-bit or x64 build
+/// never takes the place of another CPU's build, so the updater keeps
+/// fetching the right one.
+#[cfg_attr(not(windows), allow(dead_code))] // older_copy (Windows)
+pub fn replace_refused(is_this_program: bool, theirs: Option<u16>, mine: Option<u16>) -> Option<&'static str> {
+    if !is_this_program {
+        return Some("the window with the program's title is not this program's");
+    }
+    match (theirs, mine) {
+        (Some(t), Some(m)) if t != m => Some("the running copy is built for another CPU type"),
+        _ => None,
+    }
+}
+
 /// Whether two exe paths name the same file (case, `/`, `\\?\`). The image
 /// of a copy that was updated in place may be `bahth.exe.old`: the same
 /// install as `bahth.exe`.
@@ -916,5 +949,28 @@ mod tests {
     #[test]
     fn the_running_window_is_looked_for_in_both_languages() {
         assert_eq!(window_titles("InstaFind", "بحث سريع"), ["InstaFind", "بحث سريع"]);
+    }
+
+    #[test]
+    fn only_this_program_is_replaced() {
+        let none: [String; 0] = [];
+        assert!(is_this_program(true, None, &none));
+        assert!(is_this_program(false, Some("C:\\Users\\a\\Downloads\\BAHTH-x86.exe"), &none));
+        assert!(is_this_program(false, Some("C:/tools/bahth.exe.old"), &none));
+        assert!(is_this_program(false, Some("C:\\x\\renamed.exe"), &["InstaFind".to_string()]));
+        assert!(is_this_program(false, Some("C:\\x\\renamed.exe"), &[" bahth.exe ".to_string()]));
+        assert!(!is_this_program(false, Some("C:\\x\\other.exe"), &["Other app".to_string()]));
+        assert!(!is_this_program(false, Some("C:\\bahthdir\\other.exe"), &none));
+        assert!(!is_this_program(false, None, &none));
+        assert!(!is_this_program(false, Some("C:\\x\\notinstafind.exe"), &["InstaFind helper".to_string()]));
+    }
+
+    #[test]
+    fn another_cpu_build_is_never_replaced() {
+        assert_eq!(replace_refused(true, Some(0x8664), Some(0x8664)), None);
+        assert_eq!(replace_refused(true, None, Some(0x8664)), None);
+        assert!(replace_refused(true, Some(0x8664), Some(0x014c)).is_some());
+        assert!(replace_refused(true, Some(0xaa64), Some(0x8664)).is_some());
+        assert!(replace_refused(false, Some(0x8664), Some(0x8664)).is_some());
     }
 }
