@@ -1,11 +1,13 @@
 //! «نقل البرنامج إلى مكان دائم»: InstaFind is one portable exe, and most
 //! people run it straight from Downloads (or from inside a zip, which is a
 //! temp folder). Once, when that is so, the program offers to copy itself to
-//! `%LOCALAPPDATA%\Programs\InstaFind\bahth.exe`, add a Start-menu shortcut,
-//! point "start with Windows" at the new place when it is on, and restart
-//! from there. Settings, history and the index live in
-//! `%LOCALAPPDATA%\BahthSari` and stay as they are. Copies installed by
-//! winget, Scoop or Chocolatey, or in Program Files, are never offered (see
+//! `%LOCALAPPDATA%\Programs\InstaFind\bahth.exe`, add shortcuts in the
+//! Start menu and on the desktop, point "start with Windows" at the new
+//! place when it is on, and restart from there. A copy already there (moved
+//! by 1.0.0) gets its desktop shortcut once, at its first start of 1.0.1.
+//! Settings, history and the index live in `%LOCALAPPDATA%\BahthSari` and
+//! stay as they are. Copies installed by winget, Scoop or Chocolatey, or in
+//! Program Files, are never offered and get no desktop shortcut (see
 //! `crate::relocate`).
 
 use std::io;
@@ -16,7 +18,7 @@ use winapi::um::winuser::{IDYES, MB_ICONERROR, MB_ICONQUESTION, MB_OK, MB_RIGHT,
 use super::format::ltr_path;
 use super::startup::log;
 use super::{App, autostart, shell, title};
-use crate::relocate::{self, Folders, Place};
+use crate::relocate::{self, DesktopShortcut, Folders, Place};
 
 /// The folders the exe's place is compared with, as Windows reports them now.
 fn folders() -> Folders {
@@ -25,15 +27,25 @@ fn folders() -> Folders {
 
 /// The Downloads folder, also when the user moved it (its Properties ▸ Location).
 fn downloads_folder() -> Option<String> {
+    known_folder(&winapi::um::knownfolders::FOLDERID_Downloads)
+}
+
+/// This user's desktop, also when it was moved or redirected (to OneDrive,
+/// say), which `%USERPROFILE%\Desktop` would miss.
+fn desktop_folder() -> Option<PathBuf> {
+    known_folder(&winapi::um::knownfolders::FOLDERID_Desktop).filter(|d| !d.trim().is_empty()).map(PathBuf::from)
+}
+
+/// A known folder's path as the shell reports it now.
+fn known_folder(id: &winapi::shared::guiddef::GUID) -> Option<String> {
     use std::ptr::null_mut;
     use winapi::shared::winerror::SUCCEEDED;
     use winapi::um::combaseapi::CoTaskMemFree;
-    use winapi::um::knownfolders::FOLDERID_Downloads;
     use winapi::um::shlobj::SHGetKnownFolderPath;
     let mut p = null_mut();
     // SAFETY: `p` receives a string the shell allocated; it is freed below
     // even when the call fails.
-    let hr = unsafe { SHGetKnownFolderPath(&FOLDERID_Downloads, 0, null_mut(), &mut p) };
+    let hr = unsafe { SHGetKnownFolderPath(id, 0, null_mut(), &mut p) };
     if p.is_null() {
         return None;
     }
@@ -42,15 +54,59 @@ fn downloads_folder() -> Option<String> {
     SUCCEEDED(hr).then_some(s)
 }
 
+/// The names a desktop shortcut of the program may have: [`title`] in
+/// either language (the language may have changed since it was made).
+fn desktop_shortcuts(desktop: &Path) -> [PathBuf; 2] {
+    [super::TITLE_EN, super::TITLE].map(|n| desktop.join(format!("{n}.lnk")))
+}
+
+/// Writes `<desktop>\<title>.lnk` to `target` (replacing one of that name)
+/// and logs how it went; a failure is not shown to the user.
+fn add_desktop_shortcut(target: &Path, why: &str) {
+    let Some(desktop) = desktop_folder() else {
+        log(&format!("{why}: desktop shortcut failed: no desktop folder"));
+        return;
+    };
+    let lnk = desktop.join(format!("{}.lnk", title()));
+    match create_shortcut(target, &lnk) {
+        Ok(()) => log(&format!("{why}: desktop shortcut added: {}", lnk.display())),
+        Err(e) => log(&format!("{why}: desktop shortcut failed ({}): {e}", lnk.display())),
+    }
+}
+
 /// The Start menu's Programs folder of this user.
 fn start_menu_folder() -> Option<PathBuf> {
     std::env::var_os("APPDATA").map(|a| PathBuf::from(a).join("Microsoft\\Windows\\Start Menu\\Programs"))
 }
 
 impl App {
+    /// A copy in the permanent place from before 1.0.1 (moved by 1.0.0)
+    /// gets the desktop shortcut the move now adds: once, and only when
+    /// the desktop has none (`relocate::desktop_shortcut_at_start`).
+    fn desktop_shortcut_once(&self) {
+        let done = self.state.borrow().settings.desktop_shortcut_done;
+        if done {
+            return;
+        }
+        let packaged = crate::store::is_packaged();
+        let (Ok(exe), Some(local)) = (std::env::current_exe(), std::env::var_os("LOCALAPPDATA")) else { return };
+        let in_place = !packaged && relocate::in_permanent_place(&exe.to_string_lossy(), &local.to_string_lossy());
+        // Asks the shell only for a copy that may need the shortcut.
+        let desktop = if in_place { desktop_folder() } else { None };
+        let exists = desktop.as_deref().is_some_and(|d| desktop_shortcuts(d).iter().any(|l| l.exists()));
+        match relocate::desktop_shortcut_at_start(done, packaged, in_place, exists) {
+            DesktopShortcut::Skip => return,
+            DesktopShortcut::MarkDone => log("desktop shortcut: one is there already"),
+            DesktopShortcut::Create => add_desktop_shortcut(&exe, "desktop shortcut"),
+        }
+        self.state.borrow_mut().settings.desktop_shortcut_done = true;
+        self.save_settings();
+    }
+
     /// Once (the first time it applies), offers to move a copy that runs
     /// from Downloads or a temp folder to a permanent place.
     pub(super) fn offer_move(&self) {
+        self.desktop_shortcut_once();
         // The Store installs and updates its copy itself (WindowsApps).
         if crate::store::is_packaged() || self.state.borrow().settings.move_asked {
             return;
@@ -82,8 +138,8 @@ impl App {
         };
         let shown_dir = ltr_path(&dir.to_string_lossy());
         let text = trf!(
-            "{where_now}\n\nهل تريد نقل البرنامج إلى مكان دائم؟ سيُنسخ إلى:\n{shown_dir}\nوتُضاف له أيقونة في قائمة «ابدأ»، ثم يُعاد تشغيله من هناك. إعداداتك وفهرسك يبقيان كما هما.{autostart_line}",
-            "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}"
+            "{where_now}\n\nهل تريد نقل البرنامج إلى مكان دائم؟ سيُنسخ إلى:\n{shown_dir}\nوتُضاف له أيقونة في قائمة «ابدأ» وعلى سطح المكتب، ثم يُعاد تشغيله من هناك. إعداداتك وفهرسك يبقيان كما هما.{autostart_line}",
+            "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}"
         );
         log(&format!("move offer: running from {place:?} ({})", exe.display()));
         if !self.move_message(&text, MB_YESNO | MB_ICONQUESTION) {
@@ -104,13 +160,18 @@ impl App {
                 return;
             }
         };
-        // Both are extras: the moved copy works without them.
+        // All three are extras: the moved copy works without them.
         if let Some(menu) = start_menu_folder() {
             let lnk = menu.join(format!("{}.lnk", title()));
             if let Err(e) = create_shortcut(&target, &lnk) {
                 log(&format!("move offer: Start-menu shortcut failed: {e}"));
             }
         }
+        // Made once: the moved copy does not add it again, and never
+        // brings it back after the user deletes it.
+        add_desktop_shortcut(&target, "move offer");
+        self.state.borrow_mut().settings.desktop_shortcut_done = true;
+        self.save_settings();
         if !autostart::point_to(&target) {
             log("move offer: could not point start-with-Windows at the new place");
         }

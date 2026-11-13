@@ -1,7 +1,8 @@
 //! The first-run offer to move a portable copy that runs from Downloads or a
 //! temp folder to a permanent place: which kind of folder the exe is in, and
-//! where it goes. Platform-independent and unit-tested; the copying, the
-//! Start-menu shortcut and the restart are in `ui/relocate.rs`.
+//! where it goes, and when a copy gets its desktop shortcut.
+//! Platform-independent and unit-tested; the copying, the Start-menu and
+//! desktop shortcuts and the restart are in `ui/relocate.rs`.
 
 /// Where a moved copy lives, under `%LOCALAPPDATA%` (the per-user
 /// "Programs" folder Windows itself uses; no admin rights needed).
@@ -145,6 +146,50 @@ pub fn classify(exe: &str, folders: &Folders) -> Place {
         Place::Temp
     } else {
         Place::Elsewhere
+    }
+}
+
+/// Whether the exe at `exe` runs from the permanent place the move makes:
+/// right in `%LOCALAPPDATA%\Programs\InstaFind` (or `Programs\Bahth`, its
+/// older name), not in a folder below it.
+pub fn in_permanent_place(exe: &str, local_app_data: &str) -> bool {
+    if local_app_data.trim().is_empty() {
+        return false;
+    }
+    let exe = exe.trim().replace('/', "\\");
+    let Some((dir, _)) = exe.rsplit_once('\\') else { return false };
+    let dir = normalize(dir);
+    let local = local_app_data.trim_end_matches(['\\', '/']);
+    [install_dir(local), format!("{local}\\{OLD_INSTALL_SUBDIR}")].iter().any(|d| normalize(d) == dir)
+}
+
+/// What a start does about the desktop shortcut (1.0.1). The move adds one
+/// itself; a copy that was already in the permanent place before (moved by
+/// 1.0.0) gets one once, at its first start that sees `done` unset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DesktopShortcut {
+    /// Nothing to do, and `done` stays as it is: already handled, the Store
+    /// copy (packaged), or a copy outside the permanent place (winget,
+    /// Scoop, Chocolatey, Program Files, or a portable copy left in
+    /// Downloads or a temp folder, which a shortcut would not outlive).
+    Skip,
+    /// Create it, then set `done` (whether or not that worked).
+    Create,
+    /// One is there already: just set `done`, so it is never made again,
+    /// even after the user deletes it.
+    MarkDone,
+}
+
+/// The decision of [`DesktopShortcut`] for a start: `done` is the settings
+/// flag, `packaged` the Store copy, `in_place` [`in_permanent_place`], and
+/// `exists` whether the desktop already has the shortcut.
+pub fn desktop_shortcut_at_start(done: bool, packaged: bool, in_place: bool, exists: bool) -> DesktopShortcut {
+    if done || packaged || !in_place {
+        DesktopShortcut::Skip
+    } else if exists {
+        DesktopShortcut::MarkDone
+    } else {
+        DesktopShortcut::Create
     }
 }
 
@@ -294,5 +339,75 @@ mod tests {
         assert!(!is_specific("\\\\server\\share\\"));
         assert!(is_specific("\\\\server\\share\\dl\\"));
         assert!(is_specific("d:\\تنزيلات\\"));
+    }
+
+    #[test]
+    fn the_permanent_place_is_recognised() {
+        let local = "C:\\Users\\Sara\\AppData\\Local";
+        for exe in [
+            "C:\\Users\\Sara\\AppData\\Local\\Programs\\InstaFind\\bahth.exe",
+            "c:\\users\\SARA\\appdata\\local\\programs\\instafind\\BAHTH.EXE",
+            "\\\\?\\C:\\Users\\Sara\\AppData\\Local\\Programs\\InstaFind\\bahth.exe",
+            "C:/Users/Sara/AppData/Local/Programs/InstaFind/bahth.exe",
+            // The older name of the place.
+            "C:\\Users\\Sara\\AppData\\Local\\Programs\\Bahth\\bahth.exe",
+        ] {
+            assert!(in_permanent_place(exe, local), "{exe}");
+            assert!(in_permanent_place(exe, "C:\\Users\\Sara\\AppData\\Local\\"), "{exe}");
+        }
+        for exe in [
+            "C:\\Users\\Sara\\Downloads\\bahth.exe",
+            "C:\\Users\\Sara\\AppData\\Local\\Temp\\Temp1_bahth.zip\\bahth.exe",
+            "C:\\Users\\Sara\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Sarmad.InstaFind_x\\bahth.exe",
+            "C:\\Users\\Sara\\scoop\\apps\\instafind\\current\\bahth.exe",
+            "C:\\ProgramData\\chocolatey\\lib\\instafind\\tools\\bahth.exe",
+            "C:\\Program Files\\InstaFind\\bahth.exe",
+            "C:\\Program Files\\WindowsApps\\FastKiwi.InstaFind_1.0.0.0_x64__abc\\bahth.exe",
+            "C:\\Users\\Sara\\AppData\\Local\\Microsoft\\WindowsApps\\bahth.exe",
+            // Below or beside the place, or a look-alike name.
+            "C:\\Users\\Sara\\AppData\\Local\\Programs\\InstaFind\\old\\bahth.exe",
+            "C:\\Users\\Sara\\AppData\\Local\\Programs\\InstaFind2\\bahth.exe",
+            "C:\\Users\\Sara\\AppData\\Local\\Programs\\bahth.exe",
+            // Another user's permanent place.
+            "C:\\Users\\Ali\\AppData\\Local\\Programs\\InstaFind\\bahth.exe",
+            "bahth.exe",
+        ] {
+            assert!(!in_permanent_place(exe, local), "{exe}");
+        }
+        // No LOCALAPPDATA: never.
+        assert!(!in_permanent_place("\\Programs\\InstaFind\\bahth.exe", ""));
+        assert!(!in_permanent_place("C:\\Programs\\InstaFind\\bahth.exe", "  "));
+    }
+
+    #[test]
+    fn the_desktop_shortcut_is_added_once_and_only_in_place() {
+        use DesktopShortcut::*;
+        // A copy moved by 1.0.0, first start of 1.0.1: made once.
+        assert_eq!(desktop_shortcut_at_start(false, false, true, false), Create);
+        // One is there already (made by hand, or by the move): just remembered.
+        assert_eq!(desktop_shortcut_at_start(false, false, true, true), MarkDone);
+        // Handled before: never again, even after the user deleted it.
+        assert_eq!(desktop_shortcut_at_start(true, false, true, false), Skip);
+        assert_eq!(desktop_shortcut_at_start(true, false, true, true), Skip);
+        // The Store copy, and copies outside the permanent place (package
+        // managers, Program Files, a portable copy left in Downloads or temp).
+        for exists in [false, true] {
+            assert_eq!(desktop_shortcut_at_start(false, true, true, exists), Skip);
+            assert_eq!(desktop_shortcut_at_start(false, false, false, exists), Skip);
+            assert_eq!(desktop_shortcut_at_start(false, true, false, exists), Skip);
+        }
+        // With the real places of a typical user.
+        let local = "C:\\Users\\Sara\\AppData\\Local";
+        let at = |exe: &str| desktop_shortcut_at_start(false, false, in_permanent_place(exe, local), false);
+        assert_eq!(at(&format!("{}\\{EXE_NAME}", install_dir(local))), Create);
+        for exe in [
+            "C:\\Users\\Sara\\Downloads\\bahth.exe",
+            "C:\\Users\\Sara\\AppData\\Local\\Temp\\Temp1_bahth.zip\\bahth.exe",
+            "C:\\Users\\Sara\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Sarmad.InstaFind_x\\bahth.exe",
+            "C:\\Users\\Sara\\scoop\\apps\\instafind\\current\\bahth.exe",
+            "C:\\Program Files\\InstaFind\\bahth.exe",
+        ] {
+            assert_eq!(at(exe), Skip, "{exe}");
+        }
     }
 }

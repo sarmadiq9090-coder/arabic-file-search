@@ -1381,7 +1381,7 @@
     "{status} (showing the first {} results only; add a word or pick a folder to narrow the search.)": "{status} (تُعرض أول النتائج فقط، وعددها: {}؛ أضف كلمة أو اختر مجلداً لتضييق البحث.)",
     "{total} results": "عدد النتائج: {total}",
     "{total} results (showing the first {shown})": "عدد النتائج: {total} (تظهر أول {shown})",
-    "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nهل تريد نقل البرنامج إلى مكان دائم؟ سيُنسخ إلى:\n{shown_dir}\nوتُضاف له أيقونة في قائمة «ابدأ»، ثم يُعاد تشغيله من هناك. إعداداتك وفهرسك يبقيان كما هما.{autostart_line}",
+    "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\nهل تريد نقل البرنامج إلى مكان دائم؟ سيُنسخ إلى:\n{shown_dir}\nوتُضاف له أيقونة في قائمة «ابدأ» وعلى سطح المكتب، ثم يُعاد تشغيله من هناك. إعداداتك وفهرسك يبقيان كما هما.{autostart_line}",
     "{}\r\nMatches: {}\r\n": "{}\r\nعدد التطابقات: {}\r\n",
     "{} bytes": "{} بايت",
     "{} files restored.": "أُرجعت الملفات. عددها: {}.",

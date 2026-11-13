@@ -51,6 +51,11 @@ pub struct Settings {
     /// The user was offered once to move a copy that runs from Downloads or
     /// a temp folder to a permanent place (`crate::relocate`).
     pub move_asked: bool,
+    /// The desktop shortcut was made, or tried, once (1.0.1): by the move,
+    /// or at the first start of a copy already in the permanent place
+    /// (`crate::relocate::desktop_shortcut_at_start`). Never made again
+    /// after that, so a shortcut the user deleted stays deleted.
+    pub desktop_shortcut_done: bool,
     /// Files opened from search results (window or quick popup), counted
     /// only until the Store rating question was asked (`crate::rating`).
     /// Kept on this computer only.
@@ -210,7 +215,7 @@ impl FloatPos {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Off, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_trying: 0, new_ui_default: false, new_ui_only: false, hotkey: Hotkey::CtrlAltF }
+        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Off, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, desktop_shortcut_done: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_trying: 0, new_ui_default: false, new_ui_only: false, hotkey: Hotkey::CtrlAltF }
     }
 }
 
@@ -281,6 +286,7 @@ impl Settings {
                 "tray_icon" => s.tray_icon = value != "0",
                 "floating_asked" => s.floating_asked = value == "1",
                 "move_asked" => s.move_asked = value == "1",
+                "desktop_shortcut_done" => s.desktop_shortcut_done = value == "1",
                 "file_opens" => s.file_opens = value.parse().unwrap_or(0),
                 "rating_asked" => s.rating_asked = value == "1",
                 "new_ui" => s.new_ui = value == "1",
@@ -298,7 +304,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let cols: Vec<String> = self.columns.iter().map(i32::to_string).collect();
         format!(
-            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\nnew_ui_failed={}\nnew_ui_default={}\nread_cloud_files={}\nnew_ui_only={}\nnew_ui_trying={}\nhotkey={}\n",
+            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\nnew_ui_failed={}\nnew_ui_default={}\nread_cloud_files={}\nnew_ui_only={}\nnew_ui_trying={}\nhotkey={}\ndesktop_shortcut_done={}\n",
             self.width,
             self.height,
             self.maximized as u8,
@@ -327,7 +333,8 @@ impl Settings {
             self.read_cloud_files as u8,
             self.new_ui_only as u8,
             self.new_ui_trying,
-            self.hotkey.code()
+            self.hotkey.code(),
+            self.desktop_shortcut_done as u8
         )
     }
 
@@ -377,7 +384,7 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, read_cloud_files: true, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, file_opens: 7, rating_asked: true, new_ui: true, new_ui_failed: true, new_ui_trying: 2, new_ui_default: true, new_ui_only: true, hotkey: Hotkey::WinAltF };
+        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, read_cloud_files: true, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, desktop_shortcut_done: true, file_opens: 7, rating_asked: true, new_ui: true, new_ui_failed: true, new_ui_trying: 2, new_ui_default: true, new_ui_only: true, hotkey: Hotkey::WinAltF };
         assert_eq!(Settings::parse(&s.to_text()), s);
         for mode in [FloatingMode::Fade, FloatingMode::Hidden, FloatingMode::Off] {
             let s = Settings { floating_mode: mode, ..Settings::default() };
@@ -460,6 +467,10 @@ mod tests {
         assert_eq!((s.floating_mode, s.hotkey_opens, s.tray_icon, s.floating_asked), (FloatingMode::Off, HotkeyOpens::Main, false, true));
         // The move offer is made once; older settings files have not had it.
         assert!(!d.move_asked && !Settings::parse("floating_asked=1").move_asked && Settings::parse("move_asked=1").move_asked);
+        // So is the desktop shortcut; files of 1.0.0 and older have not had it.
+        assert!(!d.desktop_shortcut_done && !Settings::parse("move_asked=1").desktop_shortcut_done);
+        assert!(Settings::parse("desktop_shortcut_done=1").desktop_shortcut_done && !Settings::parse("desktop_shortcut_done=yes").desktop_shortcut_done);
+        assert!(d.to_text().contains("desktop_shortcut_done=0\n"));
         // The Store rating counter starts at zero and the question is not asked yet.
         assert_eq!((d.file_opens, d.rating_asked), (0, false));
         let s = Settings::parse("file_opens=5\nrating_asked=1");

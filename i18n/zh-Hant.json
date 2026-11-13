@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind 正從暫存資料夾執行（可能是直接從 zip 檔案中執行），Windows 隨時可能清空該資料夾。",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind 正從「下載」資料夾執行。如果檔案被刪除或資料夾被清理，程式將無法繼續運作。",
   "\nStarting with Windows will use the new place.": "\n開機啟動將使用新位置。",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\n要將程式移到固定位置嗎？程式會複製到：\n{shown_dir}\n加入「開始」功能表，並從該處重新啟動。您的設定和索引會保持不變。{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\n要將程式移到固定位置嗎？程式會複製到：\n{shown_dir}\n加入「開始」功能表和桌面，並從該處重新啟動。您的設定和索引會保持不變。{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "無法將程式複製到固定位置：\n{e}\n\n程式會繼續從目前位置執行。",
   "the new copy did not start": "新複本無法啟動",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "程式已複製到固定位置，但無法從該處重新啟動（{e}）。\n請從「開始」功能表開啟。",

@@ -317,7 +317,7 @@
   "InstaFind is running from a temporary folder (perhaps from inside a zip file), which Windows may empty at any time.": "InstaFind가 임시 폴더(zip 파일 안일 수 있음)에서 실행 중이며, Windows가 언제든지 이 폴더를 비울 수 있습니다.",
   "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "InstaFind가 다운로드 폴더에서 실행 중입니다. 파일이 삭제되거나 폴더가 정리되면 프로그램이 작동하지 않습니다.",
   "\nStarting with Windows will use the new place.": "\nWindows 시작 시 실행에도 새 위치가 사용됩니다.",
-  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\n프로그램을 고정된 위치로 옮기시겠습니까? 다음 위치로 복사되고:\n{shown_dir}\n시작 메뉴에 추가된 후 그곳에서 다시 시작됩니다. 설정과 인덱스는 그대로 유지됩니다.{autostart_line}",
+  "{where_now}\n\nMove the program to a permanent place? It is copied to:\n{shown_dir}\nadded to the Start menu and the desktop, and restarted from there. Your settings and index stay as they are.{autostart_line}": "{where_now}\n\n프로그램을 고정된 위치로 옮기시겠습니까? 다음 위치로 복사되고:\n{shown_dir}\n시작 메뉴와 바탕 화면에 추가된 후 그곳에서 다시 시작됩니다. 설정과 인덱스는 그대로 유지됩니다.{autostart_line}",
   "Could not copy the program to the permanent place:\n{e}\n\nThe program keeps working from where it is.": "프로그램을 고정된 위치로 복사할 수 없습니다:\n{e}\n\n프로그램은 현재 위치에서 계속 작동합니다.",
   "the new copy did not start": "새 복사본이 시작되지 않았습니다",
   "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "프로그램을 고정된 위치로 복사했지만 그곳에서 다시 시작할 수 없습니다({e}).\n시작 메뉴에서 여세요.",
