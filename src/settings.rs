@@ -165,7 +165,7 @@ impl FloatPos {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Fade, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_trying: 0, new_ui_default: false, new_ui_only: false }
+        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Off, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_trying: 0, new_ui_default: false, new_ui_only: false }
     }
 }
 
@@ -381,8 +381,9 @@ mod tests {
     #[test]
     fn quick_search_settings() {
         let d = Settings::default();
-        // 0.8 defaults: a fading box, the hotkey opens the quick search, a tray icon, Alt+Space off.
-        assert_eq!((d.floating_mode, d.hotkey_opens, d.alt_space, d.tray_icon, d.floating_asked), (FloatingMode::Fade, HotkeyOpens::Quick, false, true, false));
+        // 1.0 defaults: no box above the clock until the user turns it on (no
+        // first-run question), the hotkey opens the quick search, a tray icon, Alt+Space off.
+        assert_eq!((d.floating_mode, d.hotkey_opens, d.alt_space, d.tray_icon, d.floating_asked), (FloatingMode::Off, HotkeyOpens::Quick, false, true, false));
         assert_eq!(d.floating_pos, None);
         // Settings files from before 0.8 get the defaults.
         assert_eq!(Settings::parse("width=900\nhide_system=1\n"), Settings { width: 900, ..d.clone() });

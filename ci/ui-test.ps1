@@ -303,10 +303,11 @@ Remove-Item 'HKCU:\Software\BahthSari' -Recurse -Force -ErrorAction SilentlyCont
 # look (ci/newlook-test.ps1 tests it) and new_ui=0 in settings.txt is
 # ignored; BAHTH_CLASSIC=1 (below) is the tests' own way to the classic
 # window, without the "WebView2 is not working" line. settings.txt holds
-# nothing else, so the first-run questions still come. (key=value, ASCII,
-# no BOM: how the program reads it.)
+# Since 1.0 the box above the clock is an option, never a first-run question
+# (it is off for a new user), so the test turns it on here as a user would
+# in Settings. (key=value, ASCII, no BOM: how the program reads it.)
 New-Item -ItemType Directory -Force $data | Out-Null
-[IO.File]::WriteAllText((Join-Path $data 'settings.txt'), "new_ui=0`nnew_ui_default=1`n", (New-Object Text.ASCIIEncoding))
+[IO.File]::WriteAllText((Join-Path $data 'settings.txt'), "new_ui=0`nnew_ui_default=1`nfloating_mode=fade`nfloating_asked=1`n", (New-Object Text.ASCIIEncoding))
 $docs = Join-Path $env:USERPROFILE 'Documents\InstaFind UI test'
 New-Item -ItemType Directory -Force $docs | Out-Null
 Set-Content -LiteralPath (Join-Path $docs 'تقرير مالي ٢٠٢٦.txt') -Value 'الميزانية السنوية للشركة' -Encoding UTF8
@@ -328,18 +329,13 @@ Record 'start' 'core' 'main window appears' ($null -ne $main) ("{0:N0} ms" -f $m
 Record 'start' 'probe' 'window within 3 seconds' ($ms -lt 3000) ("{0:N0} ms" -f $ms)
 Shot 'first-start'
 
-# The one-time question about the box above the clock.
-$dlg = Wait-Until { Visible-Window $p.Id '#32770' } 40
-Record 'first run' 'probe' 'asks about the search box above the clock' ($null -ne $dlg)
-if ($dlg) {
-    Note 'first run' 'question text' ((Get-Children $dlg.Handle | Where-Object { $_.Class -eq 'Static' -and $_.Text } | ForEach-Object Text) -join ' ')
-    Shot 'first-run-question'
-    $yes = [U]::GetDlgItem($dlg.Handle, 6)
-    if ($yes -ne [IntPtr]::Zero) { [void][U]::PostMessage($yes, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero) } else { Focus-Window $dlg.Handle; [U]::Chord($VK.ENTER) }
-    $box = Wait-Until { Visible-Window $p.Id 'InstaFindFloatingBox' } 10
-    Record 'floating box' 'core' 'appears after answering Yes' ($null -ne $box)
-    Shot 'floating-box'
-}
+# No first-run question any more: the box above the clock is an option.
+$dlg = Wait-Until { Visible-Window $p.Id '#32770' } 15
+Record 'first run' 'core' 'no first-run question about the box above the clock' ($null -eq $dlg) $(if ($dlg) { (Get-Children $dlg.Handle | Where-Object { $_.Class -eq 'Static' -and $_.Text } | ForEach-Object Text) -join ' ' } else { '' })
+if ($dlg) { Shot 'unexpected-dialog'; [void][U]::PostMessage($dlg.Handle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) }
+$box = Wait-Until { Visible-Window $p.Id 'InstaFindFloatingBox' } 10
+Record 'floating box' 'core' 'appears when turned on in the settings' ($null -ne $box)
+Shot 'floating-box'
 Check-Crash 'first start'
 
 # ---------------------------------------------------------------- index

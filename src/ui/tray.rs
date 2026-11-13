@@ -445,27 +445,14 @@ impl App {
         }
     }
 
+    /// The floating box is an option, never a question (owner, 2026-11-13):
+    /// no dialog at first start. It stays off until the user turns it on in
+    /// Settings › "Search from anywhere" (or Options › "Search from
+    /// anywhere"); a choice made earlier is kept.
     fn ask_floating_once(&self) {
         self.state.borrow_mut().settings.floating_asked = true;
         self.save_settings();
-        let params = nwg::MessageParams {
-            title: title(),
-            content: tr!(
-                "هل تريد خانة بحث صغيرة فوق شريط المهام؟ يمكنك تغيير ذلك لاحقاً من «خيارات».",
-                "Show a small search box just above the taskbar? You can change this later in Options."
-            ),
-            buttons: nwg::MessageButtons::YesNo,
-            icons: nwg::MessageIcons::Question,
-        };
-        // Over the new main window when it is the one on screen.
-        let yes = self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) == nwg::MessageChoice::Yes;
-        log(&format!("first run: floating box {}", if yes { "on" } else { "off" }));
-        self.set_floating_mode(if yes { FloatingMode::Fade } else { FloatingMode::Off });
-        if yes {
-            self.set_status(&trf!(
-                "خانة البحث فوق الساعة: انقرها أو اضغط {HOTKEY_TEXT}. اسحبها من حافتها العليا لتنقلها.",
-                "The search box is above the clock: click it or press {HOTKEY_TEXT}. Drag its top edge to move it."
-            ));
-        }
+        log("first run: floating box off (no question; it is an option in Settings)");
+        self.set_floating_mode(FloatingMode::Off);
     }
 }

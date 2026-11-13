@@ -8,7 +8,7 @@
 #      (screenshot only, never fails the job).
 #   0. Before A (the only look since 1.0): with no settings.txt at all the
 #      new look opens, and the one-time markers (new_ui=1, new_ui_default=1,
-#      new_ui_only=1) are saved; the first-run question over it is answered No.
+#      new_ui_only=1) are saved, and no first-run question comes over it.
 #   B. Settings of a classic user of 0.10.x (new_ui=0, new_ui_default=1, as
 #      after "Back to the classic look"): the new look opens, the move is
 #      saved (new_ui=1, new_ui_only=1), and neither its settings page nor
@@ -410,10 +410,10 @@ try {
     Start-Program
     $win = Wait-Until { New-Look $script:proc.Id } 40
     Record 'core' 'a new user (no settings.txt) gets the new look' ($null -ne $win) $(if ($win) { "'$($win.Text)' after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { 'no new window' })
-    # The first-run question about the box above the clock comes over it.
+    # No first-run question (since 1.0 the box above the clock is an option).
     $asked = Wait-Until { @(Get-Windows $script:proc.Id | Where-Object { $_.Visible -and $_.Class -eq '#32770' }).Count -gt 0 } 20
-    Record 'probe' 'the first-run question shows over the new look' ([bool]$asked)
-    if ($asked) { Full-Shot 'first-run-question'; [void](Dismiss-Dialogs $script:proc.Id); Start-Sleep -Seconds 2 }
+    Record 'core' 'no first-run question over the new look' (-not $asked)
+    if ($asked) { Full-Shot 'unexpected-dialog'; [void](Dismiss-Dialogs $script:proc.Id); Start-Sleep -Seconds 2 }
     $s = Read-Settings
     Record 'core' 'the one-time markers are saved (new_ui=1, new_ui_default=1, new_ui_only=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_default') -eq '1') -and ((Setting $s 'new_ui_only') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default') new_ui_only=$(Setting $s 'new_ui_only')")
     Record 'core' 'the classic window stays hidden (new user)' ($null -eq (Classic $script:proc.Id))
