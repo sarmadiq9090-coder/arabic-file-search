@@ -92,7 +92,7 @@ impl NativeUi<AppUi> for App {
             .flags({
                 // Started with Windows: wait in the tray until called. The
                 // new main window, when used, shows itself instead.
-                let visible = if std::env::args().any(|a| a == autostart::STARTUP_ARG) || super::webui::wanted(settings.new_ui) {
+                let visible = if autostart::launched_at_sign_in() || super::webui::wanted(settings.new_ui) {
                     nwg::WindowFlags::empty()
                 } else {
                     nwg::WindowFlags::VISIBLE
@@ -374,7 +374,11 @@ impl NativeUi<AppUi> for App {
         nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[3])?;
 
         nwg::MenuItem::builder()
-            .text(&trf!("التحقق من التحديثات (الإصدار {})", "Check for updates (version {})", env!("CARGO_PKG_VERSION")))
+            .text(&if crate::store::is_packaged() {
+                trf!("التحديثات من Microsoft Store (الإصدار {})", "Updates from Microsoft Store (version {})", env!("CARGO_PKG_VERSION"))
+            } else {
+                trf!("التحقق من التحديثات (الإصدار {})", "Check for updates (version {})", env!("CARGO_PKG_VERSION"))
+            })
             .parent(&app.options_menu)
             .build(&mut app.menu_update)?;
         super::feedback::build(&app.options_menu, &mut app.feedback_menu, [&mut app.menu_feedback_bug, &mut app.menu_feedback_idea, &mut app.menu_feedback_talk])?;
@@ -516,10 +520,11 @@ impl NativeUi<AppUi> for App {
                                 tr!("لن يعمل البرنامج تلقائياً مع ويندوز.", "The program will not start with Windows.")
                             });
                         } else {
-                            app.set_status(tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting."));
+                            app.set_status(&autostart::change_failed_message());
                         }
                     } else if app.on_lang_item(handle) || app.on_feedback_item(handle) || app.on_rating_item(handle) {
                     } else if handle == app.menu_update {
+                        // The Store version is told where its updates come from.
                         app.check_for_update(true);
                     } else if handle == app.menu_digits {
                         app.toggle_digits();

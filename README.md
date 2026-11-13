@@ -48,7 +48,7 @@ scoop install instafind
 
 - **التحديث تلقائي**: يتحقق البرنامج مرة يومياً من GitHub ويعرض تثبيت الإصدار الجديد بنقرة ثم يعيد التشغيل، ويمكن التحقق يدوياً من «خيارات…». من لديه 0.3.1 أو أحدث يصله كل تحديث وحده.
 - **المتطلبات**: ويندوز 10 أو 11، بنسخ 64 بت وARM64 و32 بت (Rust لم تعد تدعم الأقدم). البحث داخل الصور يحتاج حزمة اللغة العربية في ويندوز لقراءة النص العربي.
-- **الخصوصية**: ملفاتك وفهرسها يبقيان على جهازك، ولا يجمع البرنامج أي بيانات استخدام. الاتصالان الوحيدان بالإنترنت هما التحقق من التحديثات على GitHub، وتنزيل أسعار صرف العملات لتحويل العملات (من open.er-api.com، مرة كل 12 ساعة تقريباً)، والبحث من الهاتف مطفأ ما لم تشغّله، والملاحظات وتقارير الأخطاء لا تُرسل إلا حين تضغط أنت (انظر [الملاحظات والبلاغات](#الملاحظات-والبلاغات)).
+- **الخصوصية**: ملفاتك وفهرسها يبقيان على جهازك، ولا يجمع البرنامج أي بيانات استخدام. الاتصالان الوحيدان بالإنترنت هما التحقق من التحديثات على GitHub (نسخة Microsoft Store يحدّثها المتجر فلا تتحقق)، وتنزيل أسعار صرف العملات لتحويل العملات (من open.er-api.com، مرة كل 12 ساعة تقريباً)، والبحث من الهاتف مطفأ ما لم تشغّله، والملاحظات وتقارير الأخطاء لا تُرسل إلا حين تضغط أنت (انظر [الملاحظات والبلاغات](#الملاحظات-والبلاغات)).
 - **بيانات البرنامج** في `%LOCALAPPDATA%\BahthSari\` (الفهرس والسجل والإعدادات)، وتفضيلاته في `HKCU\Software\BahthSari`. لإزالته: أطفئ «التشغيل مع ويندوز» من «خيارات…»، ثم احذف `bahth.exe` وذلك المجلد.
 
 ## السرعة
@@ -222,7 +222,7 @@ The first run indexes your drives in the background (a minute or more, depending
 
 - **Automatic updates**: once a day the app checks GitHub, offers the new version with one click and restarts. You can also check from **Options…**. Version 0.3.1 and later update themselves.
 - **Requirements**: Windows 10 or 11: x64, ARM64 or 32-bit (Rust no longer supports older versions). Text recognition in images needs the Windows language pack for each OCR language.
-- **Privacy**: your files and their index stay on your PC, and the app collects no usage data. The only internet connections are the update check against GitHub and the exchange-rate download for currency conversion (from open.er-api.com, about every 12 hours); phone search is off unless you turn it on; feedback and crash reports are sent only when you click (see [Feedback](#feedback)).
+- **Privacy**: your files and their index stay on your PC, and the app collects no usage data. The only internet connections are the update check against GitHub (the Microsoft Store version is updated by the Store and does not check) and the exchange-rate download for currency conversion (from open.er-api.com, about every 12 hours); phone search is off unless you turn it on; feedback and crash reports are sent only when you click (see [Feedback](#feedback)).
 - **Data** lives in `%LOCALAPPDATA%\BahthSari\` (index, log, settings) and `HKCU\Software\BahthSari`. To remove the app, turn off *Start with Windows* in **Options…**, then delete `bahth.exe` and that folder.
 
 ### Speed

@@ -89,6 +89,8 @@ mod run_entry;
 #[cfg(any(windows, test))]
 mod search;
 #[cfg(any(windows, test))]
+mod store;
+#[cfg(any(windows, test))]
 mod suggest;
 #[cfg(any(windows, test))]
 mod system_files;

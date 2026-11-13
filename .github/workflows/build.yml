@@ -309,3 +309,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.v.outputs.tag }}
         run: gh workflow run packaging.yml --ref main -f tag="$TAG"
+      # Microsoft Store: store.yml packs this release's exes into the
+      # .msixbundle for Partner Center (artifact `store-package`; nothing is
+      # uploaded to the Store). Started here for the same GITHUB_TOKEN reason.
+      - if: steps.v.outputs.new == 'true'
+        name: Build the Store package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: gh workflow run store.yml --ref main -f tag="$TAG"

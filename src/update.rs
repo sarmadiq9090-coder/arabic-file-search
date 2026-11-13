@@ -688,6 +688,11 @@ mod win {
     /// Asks GitHub for the latest release. Some(..) only when it is newer than
     /// this build and has a `bahth.exe` asset.
     pub fn check_latest() -> Result<Option<Release>, String> {
+        // Microsoft Store version: the Store updates it (src/store.rs), so
+        // no release is ever offered and nothing is downloaded.
+        if crate::store::is_packaged() {
+            return Ok(None);
+        }
         match check_latest_api() {
             Ok(r) => Ok(r),
             // The API limits calls per address; the web page does not. A
@@ -749,7 +754,7 @@ mod win {
             let var = |k: &str| std::env::var(k).ok();
             let started = std::env::current_exe().ok();
             let resolved = original_exe().ok().map(Path::to_path_buf);
-            if crate::rating::is_packaged() {
+            if crate::store::is_packaged() {
                 return Some(PackageManager::Store);
             }
             started

@@ -24,7 +24,9 @@ impl App {
         // update it, never the program itself (that would break their
         // records of the file, or cannot work at all).
         if let Some(pm) = crate::update::managed_by() {
-            if manual {
+            if manual && pm == crate::update::PackageManager::Store {
+                self.show_store_update_note();
+            } else if manual {
                 log(&format!("update: skipped, installed with {}", pm.name()));
                 self.set_status(&trf!("يُحدَّث عبر {}.", "Updated by {}.", pm.name()));
                 self.modal_info(title(), &crate::update::managed_message(pm));
@@ -62,6 +64,10 @@ impl App {
     }
 
     pub(super) fn maybe_check_for_update(&self) {
+        // The Store updates its own copy; no check against GitHub.
+        if crate::store::is_packaged() {
+            return;
+        }
         let last = self.state.borrow().settings.update_check;
         if crate::update::should_check_now(last, index::now_secs().max(0) as u64) {
             self.check_for_update(false);
@@ -200,6 +206,26 @@ impl App {
         if total > 0 && self.update_busy.get() {
             let done = self.update_progress.0.load(Ordering::Relaxed);
             self.set_status(&trf!("جارٍ تنزيل التحديث… {}٪", "Downloading the update… {}%", (done * 100 / total).min(100)));
+        }
+    }
+
+    /// Options ▸ Updates in the Microsoft Store version: the Store, not the
+    /// program, installs new versions, so nothing is downloaded; the user
+    /// is offered InstaFind's page in the Store instead.
+    pub(super) fn show_store_update_note(&self) {
+        log("update: Microsoft Store version; offering the Store page");
+        self.set_status(tr!("التحديثات تأتي من Microsoft Store.", "Updates come from Microsoft Store."));
+        let text = crate::store::update_message();
+        let params = nwg::MessageParams {
+            title: title(),
+            content: &text,
+            buttons: nwg::MessageButtons::YesNo,
+            icons: nwg::MessageIcons::Info,
+        };
+        if self.with_modal_owner(|owner| nwg::modal_message(nwg::ControlHandle::Hwnd(owner), &params)) == nwg::MessageChoice::Yes
+            && !super::shell::open(&crate::store::store_page_uri())
+        {
+            self.set_status(tr!("تعذر فتح Microsoft Store.", "Could not open Microsoft Store."));
         }
     }
 }

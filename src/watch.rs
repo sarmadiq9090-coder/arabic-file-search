@@ -76,7 +76,7 @@ impl Watcher {
         F: Fn(Vec<Change>) + Send + Clone + 'static,
     {
         let stop = unsafe { CreateEventW(null_mut(), TRUE, FALSE, null()) };
-        let own = own_dir();
+        let own = own_dirs();
         let threads = roots
             .iter()
             .map(|root| {
@@ -108,10 +108,15 @@ impl Drop for Watcher {
 }
 
 /// `%LOCALAPPDATA%\bahthsari\` in lower case: the index and log are written
-/// there, and watching them would feed every save back as a change.
-fn own_dir() -> String {
-    let dir = crate::index::cache_path().parent().map(|p| p.to_string_lossy().to_lowercase()).unwrap_or_default();
-    format!("{}\\", dir.trim_end_matches('\\'))
+/// there, and watching them would feed every save back as a change. In the
+/// Microsoft Store version Windows keeps that folder under the package
+/// (`store::real_data_dir`), the path the watcher sees, so that one too.
+fn own_dirs() -> Vec<String> {
+    let dir = crate::index::cache_path().parent().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+    std::iter::once(dir.as_str())
+        .chain(crate::store::real_data_dir())
+        .map(|d| format!("{}\\", d.to_lowercase().trim_end_matches('\\')))
+        .collect()
 }
 
 fn wide(s: &str) -> Vec<u16> {
@@ -183,7 +188,7 @@ enum Outcome {
     Lost,
 }
 
-fn watch_root(root: &str, stop: HANDLE, own: &str, sink: &dyn Fn(Vec<Change>)) {
+fn watch_root(root: &str, stop: HANDLE, own: &[String], sink: &dyn Fn(Vec<Change>)) {
     let window = message_window();
     let mut needs_rescan = false;
     loop {
@@ -230,7 +235,7 @@ fn watch_dir(
     dir: HANDLE,
     stop: HANDLE,
     window: HWND,
-    own: &str,
+    own: &[String],
     sink: &dyn Fn(Vec<Change>),
     needs_rescan: &mut bool,
 ) -> Outcome {
@@ -366,7 +371,7 @@ fn watch_dir(
 /// Turns the FILE_NOTIFY_INFORMATION records in `data` into changes with full
 /// paths. A rename's old name waits in `old_name` for its new name, which
 /// may come in the next buffer.
-fn parse(data: &[u8], root: &str, own: &str, old_name: &mut Option<String>, out: &mut Vec<Change>) {
+fn parse(data: &[u8], root: &str, own: &[String], old_name: &mut Option<String>, out: &mut Vec<Change>) {
     // FILE_NOTIFY_INFORMATION: three DWORDs (next entry offset, action, name
     // length in bytes), then the UTF-16 name. Read field by field with bounds
     // checks, never through a struct reference: an offset that is out of
@@ -422,8 +427,11 @@ fn parse(data: &[u8], root: &str, own: &str, old_name: &mut Option<String>, out:
 
 /// Adds `c` unless it is about a path the index leaves out; a rename
 /// across that border becomes an add or a remove.
-fn push(out: &mut Vec<Change>, own: &str, c: Change) {
-    let ignored = |p: &str| skipped_path(p) || p.to_lowercase().starts_with(own);
+fn push(out: &mut Vec<Change>, own: &[String], c: Change) {
+    let ignored = |p: &str| skipped_path(p) || {
+        let p = p.to_lowercase();
+        own.iter().any(|dir| p.starts_with(dir.as_str()))
+    };
     let c = match c {
         Change::Renamed(old, new) => match (ignored(&old), ignored(&new)) {
             (true, true) => return,
@@ -511,7 +519,7 @@ mod tests {
 
     fn run(data: &[u8], old: &mut Option<String>) -> Vec<Change> {
         let mut out = Vec::new();
-        parse(data, r"C:\", r"c:\own\", old, &mut out);
+        parse(data, r"C:\", &[r"c:\own\".to_string()], old, &mut out);
         out
     }
 
@@ -537,6 +545,18 @@ mod tests {
         assert_eq!(old.as_deref(), Some(r"C:\x"));
         let got = run(&record(FILE_ACTION_RENAMED_NEW_NAME, &utf16("y"), true), &mut old);
         assert_eq!(got, vec![Change::Renamed(r"C:\x".into(), r"C:\y".into())]);
+    }
+
+    #[test]
+    fn every_own_folder_is_left_out() {
+        // The Store version: the usual folder and the package's real one.
+        let own = [r"c:\users\u\appdata\local\bahthsari\".to_string(), r"c:\users\u\appdata\local\packages\f.i_p\localcache\local\bahthsari\".to_string()];
+        let mut d = record(FILE_ACTION_MODIFIED, &utf16(r"Users\u\AppData\Local\Packages\F.I_p\LocalCache\Local\BahthSari\log.txt"), false);
+        d.extend(record(FILE_ACTION_MODIFIED, &utf16(r"Users\u\AppData\Local\BahthSari\index.bin"), false));
+        d.extend(record(FILE_ACTION_ADDED, &utf16(r"Users\u\AppData\Local\Packages\F.I_p\LocalCache\Local\BahthSariX.txt"), true));
+        let mut out = Vec::new();
+        parse(&d, r"C:\", &own, &mut None, &mut out);
+        assert_eq!(out, vec![Change::Added(r"C:\Users\u\AppData\Local\Packages\F.I_p\LocalCache\Local\BahthSariX.txt".into())]);
     }
 
     #[test]

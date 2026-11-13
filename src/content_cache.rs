@@ -481,22 +481,26 @@ pub fn is_document(e: &Entry) -> bool {
         && e.size > 0
         && e.size <= extract::MAX_FILE_SIZE
         && extract::is_supported(&e.ext())
-        && !in_folder(&e.path, own_data_dir())
+        && !own_data_dirs().iter().any(|dir| in_folder(&e.path, dir))
 }
 
-/// The program's own data folder (`%LOCALAPPDATA%\BahthSari\`, with the
+/// The program's own data folders (`%LOCALAPPDATA%\BahthSari\`, with the
 /// trailing separator): its history and logs hold what was just searched for,
-/// so they would match every content search.
-fn own_data_dir() -> &'static str {
-    static DIR: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    DIR.get_or_init(|| {
+/// so they would match every content search. In the Microsoft Store version
+/// Windows keeps that folder under the package (`store::real_data_dir`),
+/// which is where the indexer finds the files, so that one too.
+fn own_data_dirs() -> &'static [String] {
+    static DIRS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    DIRS.get_or_init(|| {
         #[cfg(windows)]
         {
             let dir = crate::index::cache_path().with_file_name("");
-            dir.to_string_lossy().into_owned()
+            std::iter::once(dir.to_string_lossy().into_owned())
+                .chain(crate::store::real_data_dir().map(|d| format!("{}\\", d.trim_end_matches('\\'))))
+                .collect()
         }
         #[cfg(not(windows))]
-        String::new()
+        Vec::new()
     })
 }
 

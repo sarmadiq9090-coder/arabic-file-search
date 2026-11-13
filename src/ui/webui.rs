@@ -1383,7 +1383,8 @@ mod imp {
                     if autostart::set_enabled(on) {
                         self.menu_autostart.set_checked(on);
                     } else {
-                        self.webui_warn(tr!("تعذر تغيير إعداد التشغيل مع ويندوز.", "Could not change the start-with-Windows setting."));
+                        // The Store version says where the user can change it.
+                        self.webui_warn(autostart::change_failed_message());
                     }
                 }
                 Setting::ContentIndex => {
@@ -1683,9 +1684,10 @@ mod imp {
         }
     }
 
-    /// Started with Windows: wait in the tray until called.
+    /// Started with Windows (the `Run` entry's `--startup`, or the Store
+    /// version's startup task): wait in the tray until called.
     fn started_hidden() -> bool {
-        std::env::args().any(|a| a == autostart::STARTUP_ARG)
+        autostart::launched_at_sign_in()
     }
 
     /// Puts window `to` where `from` is, with its size, so a switch of
