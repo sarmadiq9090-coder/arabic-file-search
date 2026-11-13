@@ -490,6 +490,10 @@ pub enum Outbound {
     History {
         recent: Vec<String>,
         saved: Vec<SavedOut>,
+        /// "Clear history and recent files" has something to clear: recent
+        /// searches, opened files, quick-search launches or web searches
+        /// (`History::clear_activity`).
+        clearable: bool,
     },
     /// The folder searched now, "" for all drives; `search`: run the
     /// current search again in it.
@@ -612,6 +616,7 @@ pub fn history(h: &History) -> Outbound {
             .enumerate()
             .map(|(i, s)| SavedOut { id: i as u32, name: s.name.clone(), content: s.content, scoped: !s.scope.is_empty() })
             .collect(),
+        clearable: !h.activity_is_empty(),
     }
 }
 
@@ -1822,12 +1827,20 @@ mod tests {
             h.add_recent(&format!("بحث {i}"));
         }
         h.add_saved(crate::history::SavedSearch { name: "عقود".into(), query: "عقد".into(), kind: 1, scope: "D:\\".into(), content: true });
-        let Outbound::History { recent, saved } = history(&h) else { panic!() };
+        let Outbound::History { recent, saved, clearable } = history(&h) else { panic!() };
         assert_eq!(recent.len(), RECENT_SEARCHES);
+        assert!(clearable);
         assert_eq!(saved, [SavedOut { id: 0, name: "عقود".into(), content: true, scoped: true }]);
         // The saved search's folder is not sent to the page.
         let json = serde_json::to_string(&history(&h)).unwrap();
         assert!(!json.contains("D:\\\\"), "{json}");
+        // Only opened files, no searches: still something to clear.
+        let mut opened = History::default();
+        assert!(matches!(history(&opened), Outbound::History { clearable: false, .. }));
+        opened.record_open("C:\\ملف.txt", 1_700_000_000);
+        assert!(matches!(history(&opened), Outbound::History { clearable: true, .. }));
+        opened.clear_activity();
+        assert!(matches!(history(&opened), Outbound::History { clearable: false, .. }));
     }
 
     #[test]

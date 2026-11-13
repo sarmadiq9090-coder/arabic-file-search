@@ -60,7 +60,7 @@
       gone: "نُقل إلى سلة المحذوفات",
       // history
       history: "السجل", historyKey: "السجل (Ctrl+H)", savedH: "البحوث المحفوظة", recentH: "عمليات البحث الأخيرة", recentEmpty: "لا توجد عمليات بحث سابقة بعد",
-      saveCurrent: "حفظ البحث الحالي", clearRecent: "مسح عمليات البحث الأخيرة", clearSaved: "حذف كل البحوث المحفوظة",
+      saveCurrent: "حفظ البحث الحالي", clearRecent: "مسح السجل والملفات الأخيرة", clearSaved: "حذف كل البحوث المحفوظة",
       savedInside: "داخل المستندات", savedScoped: "في مجلد",
       // settings
       settings: "الإعدادات", settingsKey: "الإعدادات (Ctrl+,)", back: "رجوع إلى البحث",
@@ -122,7 +122,7 @@
       matchesNone: "Every line that matches the search shows here.",
       gone: "Moved to the Recycle Bin",
       history: "History", historyKey: "History (Ctrl+H)", savedH: "Saved searches", recentH: "Recent searches", recentEmpty: "No recent searches yet",
-      saveCurrent: "Save the current search", clearRecent: "Clear recent searches", clearSaved: "Delete all saved searches",
+      saveCurrent: "Save the current search", clearRecent: "Clear history and recent files", clearSaved: "Delete all saved searches",
       savedInside: "inside documents", savedScoped: "in a folder",
       settings: "Settings", settingsKey: "Settings (Ctrl+,)", back: "Back to search",
       sLang: "Language", sLangNote: "The interface changes language after the program restarts.", restart: "Restart now",
@@ -424,7 +424,7 @@
       if (dlgFor === "matches:" + m.id) showMatches(m.id);
     },
     recent(m) { S.recent = m.rows || []; S.recentVer = m.ver || 0; renderRecent(); },
-    history(m) { S.history = { recent: m.recent || [], saved: m.saved || [] }; if (!$("hist").hidden) renderHistory(); },
+    history(m) { S.history = { recent: m.recent || [], saved: m.saved || [], clearable: !!m.clearable }; if (!$("hist").hidden) renderHistory(); },
     scope(m) {
       S.scope = m.path || "";
       renderChips();
@@ -1110,8 +1110,8 @@
   // ---------- history ----------
   function renderHistory() {
     const menu = $("hist");
-    const item = (cls, ic, label, sub, onClick, disabled) => {
-      const it = h("div", { role: "menuitem", tabindex: "-1", class: cls, "aria-disabled": disabled ? "true" : null }, icon(ic), h("bdi", { class: "lbl" }, label), sub ? h("span", { class: "sub" }, sub) : null);
+    const item = (cls, ic, label, sub, onClick, disabled, id) => {
+      const it = h("div", { role: "menuitem", tabindex: "-1", class: cls, id, "aria-disabled": disabled ? "true" : null }, icon(ic), h("bdi", { class: "lbl" }, label), sub ? h("span", { class: "sub" }, sub) : null);
       if (!disabled) it.addEventListener("click", () => { closeMenus(); onClick(); });
       return it;
     };
@@ -1125,7 +1125,8 @@
     for (const r of S.history.recent) kids.push(item("", I.clock, r, null, () => { closeSettings(); q.value = r; runSearch(); q.focus(); }));
     kids.push(h("div", { class: "sep", role: "separator" }));
     kids.push(item("act", I.star, T.saveCurrent, null, () => send({ op: "save_search", q: S.q, kind: S.kind, content: S.content }), !S.q.trim()));
-    kids.push(item("act", I.x, T.clearRecent, null, () => send({ op: "clear_recent" }), !S.history.recent.length));
+    // Also the opened files and the quick search's launches, as the classic menu.
+    kids.push(item("act", I.x, T.clearRecent, null, () => send({ op: "clear_recent" }), !S.history.clearable, "hist-clear"));
     kids.push(item("act", I.trash, T.clearSaved, null, () => send({ op: "clear_saved" }), !S.history.saved.length));
     menu.replaceChildren(...kids);
   }

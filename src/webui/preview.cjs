@@ -137,7 +137,9 @@ function fakeProgram(cfg) {
     type: "history",
     recent: ar ? ["تقرير المبيعات", "عقد الإيجار", "فاتورة الكهرباء .pdf", "صور العيد"] : ["sales report", "lease agreement", "electricity bill .pdf", "holiday photos"],
     saved: [{ id: 0, name: ar ? "عقود العمل" : "Work contracts", content: true, scoped: true }, { id: 1, name: ar ? "تقارير هذا الشهر" : "Reports this month", content: false, scoped: false }],
+    clearable: true,
   };
+  if (cfg.noSearches) history.recent = [];
   let shown = { seq: 0, ver: 0, list: [], term: "" };
   const SORT = { name: (a, b) => a.name.localeCompare(b.name), path: (a, b) => (a.dir + a.name).localeCompare(b.dir + b.name), size: (a, b) => a.size - b.size, date: (a, b) => a.mtime - b.mtime };
   const order = (list, sort, desc) => { if (sort === "best") return list; const s = [...list].sort(SORT[sort]); return desc ? s.reverse() : s; };
@@ -237,7 +239,8 @@ function fakeProgram(cfg) {
       send({ type: "quick_switch", on: false, text: "" });
       if (m.op === "switch_cancel") send({ type: "notice", text: ar ? "أُلغي نقل نافذة الحفظ/الفتح." : "Save/Open dialog switch cancelled.", warn: false });
     } else if (m.op === "save_search" || m.op === "clear_recent" || m.op === "clear_saved") {
-      if (m.op === "clear_recent") history.recent = [];
+      // As History::clear_activity: the opened files go too.
+      if (m.op === "clear_recent") { history.recent = []; history.clearable = false; recentVer = nextVer(); send({ type: "recent", ver: recentVer, rows: [] }); }
       send({ ...history });
     }
   } } });
@@ -357,6 +360,9 @@ const SHOTS = [
   ["ctx-open-with-ar-light", "ar", "light", [["type", "تقرير"], ["rclick", "#r1"], ["click", "#ctx [data-op=open_with]"], ["wait", 50]], { expect: { lastSent: "open_with" } }],
   ["ctx-properties-en-dark", "en", "dark", [["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:last-child"], ["wait", 10], ["wait", 50]], { expect: { lastSent: "properties" } }],
   ["alt-enter-en-light", "en", "light", [["type", "report"], ["key", "Alt+Enter"], ["wait", 50]], { expect: { lastSent: "properties", opens: 0 } }],
+  // "Clear history and recent files" (the classic label): on with opened files and no searches; it clears the files too.
+  ["history-clear-ar-light", "ar", "light", [["click", "#hist-btn"]], { noSearches: true, expect: { menu: true, clearItem: "مسح السجل والملفات الأخيرة|on" } }],
+  ["history-cleared-en-light", "en", "light", [["click", "#hist-btn"], ["click", "#hist-clear"], ["wait", 50], ["click", "#hist-btn"]], { expect: { lastSent: "clear_recent", recentRows: 0, clearItem: "Clear history and recent files|off" } }],
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
@@ -385,7 +391,7 @@ const SHOTS = [
       if (!file.startsWith(ASSETS) || !fs.existsSync(file)) return route.fulfill({ status: 404, headers, body: "" });
       route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || "application/octet-stream", headers, body: fs.readFileSync(file) });
     });
-    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched });
+    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches });
     await pg.goto(ORIGIN + "/");
     await pg.waitForFunction(() => document.querySelector("#menu-kind") && document.querySelector("#menu-kind").children.length > 0);
     for (const [what, a, b] of steps) {
@@ -504,6 +510,8 @@ const SHOTS = [
         bannerSlim: document.getElementById("banner").classList.contains("slim") && document.getElementById("banner").getBoundingClientRect().height <= 48,
         dlgName: !!document.querySelector("#dlg-h .fname"),
         qswitch: visible(document.getElementById("qswitch")),
+        clearItem: (() => { const it = document.getElementById("hist-clear"); return it ? `${it.textContent}|${it.getAttribute("aria-disabled") === "true" ? "off" : "on"}` : null; })(),
+        recentRows: document.querySelectorAll("#recent .row").length,
         inside: document.getElementById("chip-content").getAttribute("aria-pressed") === "true",
         ctxFirst: (() => { const it = document.querySelector("#ctx:not([hidden]) [role=menuitem] span"); return it ? it.textContent : null; })(),
       };

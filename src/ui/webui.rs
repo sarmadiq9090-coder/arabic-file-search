@@ -1363,18 +1363,26 @@ mod imp {
             self.webui_send_history();
         }
 
-        /// Forgets the recent searches, or deletes the saved ones.
+        /// "Clear history and recent files" (`recent`), as the classic
+        /// History menu: the recent searches, the opened files (the page's
+        /// «ملفات فتحتها مؤخراً» and the quick search's), the quick-search
+        /// launches and the web searches they hold. Or deletes the saved
+        /// searches.
         fn webui_clear_history(&self, recent: bool) {
             {
                 let mut st = self.state.borrow_mut();
                 if recent {
-                    st.history.recent.clear();
+                    st.history.clear_activity();
                 } else {
                     st.history.saved.clear();
                 }
                 st.history.save();
             }
             self.webui_send_history();
+            if recent {
+                self.webui_send_recent();
+                self.webui_notice(tr!("مُسح السجل والملفات الأخيرة.", "History and recent files cleared."));
+            }
         }
 
         // ------------------------------------------------------------ files
