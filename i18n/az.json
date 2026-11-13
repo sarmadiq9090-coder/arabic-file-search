@@ -786,7 +786,10 @@
   "toman": "tümən",
   "{d} {} {y} AH": "{d} {} {y} h.",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} / {total} sənəd yoxlanıldı…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Proqram və sistem fayllarının içini də oxu",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Fayl adları hazırdır · qovluqlarınızdakı sənədlər oxunur: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Fayl adları və qovluqlarınız hazırdır · digər sənədlər oxunur: {checked} / {total}"
  },
  "js": {
   "ph": "Fayl adlarında axtarın…",
@@ -1115,6 +1118,7 @@
   "sPhoneRow": "Telefondan axtarış (ev şəbəkəsi)",
   "sPhoneSub": "Eyni Wi-Fi şəbəkəsindəki telefonunuzun brauzerindən bu kompüterin fayllarında axtarın. Yalnız oxumaq üçündür və yalnız ev şəbəkənizdə işləyir.",
   "sPhoneWait": "Şəbəkə yoxlanılır…",
-  "updChecking": "Yeniləmələr yoxlanılır…"
+  "updChecking": "Yeniləmələr yoxlanılır…",
+  "sReadPrograms": "Proqram və sistem fayllarının içini də oxu"
  }
 }

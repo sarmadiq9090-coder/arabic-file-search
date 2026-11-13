@@ -786,7 +786,10 @@
   "toman": "తోమాన్",
   "{d} {} {y} AH": "{d} {} {y} హిజ్రీ",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total} లో {checked} పత్రాలు తనిఖీ చేయబడ్డాయి…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "ప్రోగ్రామ్ మరియు సిస్టమ్ ఫైల్‌ల లోపల కూడా చదువు",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ఫైల్ పేర్లు సిద్ధం · మీ ఫోల్డర్‌లలోని పత్రాలను చదువుతోంది: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ఫైల్ పేర్లు మరియు మీ ఫోల్డర్‌లు సిద్ధం · ఇతర పత్రాలను చదువుతోంది: {checked} / {total}"
  },
  "js": {
   "ph": "ఫైల్ పేర్లలో శోధించు…",
@@ -1111,6 +1114,7 @@
   "sPhoneRow": "ఫోన్ నుండి శోధించు (ఇంటి నెట్‌వర్క్)",
   "sPhoneSub": "అదే Wi-Fiలో ఉన్న మీ ఫోన్ బ్రౌజర్ నుండి ఈ PC ఫైల్‌లను శోధించండి. చదవడానికి మాత్రమే, మరియు మీ ఇంటి నెట్‌వర్క్‌లో మాత్రమే.",
   "sPhoneWait": "నెట్‌వర్క్ తనిఖీ చేయబడుతోంది…",
-  "updChecking": "నవీకరణల కోసం తనిఖీ చేస్తోంది…"
+  "updChecking": "నవీకరణల కోసం తనిఖీ చేస్తోంది…",
+  "sReadPrograms": "ప్రోగ్రామ్ మరియు సిస్టమ్ ఫైల్‌ల లోపల కూడా చదువు"
  }
 }

@@ -786,7 +786,10 @@
   "toman": "トマン",
   "{d} {} {y} AH": "ヒジュラ暦{y}年{}{d}日",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total} 件中 {checked} 件のドキュメントを確認しました…",
-  "{}, {d} {} {y}": "{}、{y}年{}{d}日"
+  "{}, {d} {} {y}": "{}、{y}年{}{d}日",
+  "Also read inside program and system files": "プログラム ファイルとシステム ファイルの中も読み取る",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ファイル名の準備完了 · あなたのフォルダー内のドキュメントを読み取り中: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ファイル名とあなたのフォルダーの準備完了 · その他のドキュメントを読み取り中: {checked} / {total}"
  },
  "js": {
   "ph": "ファイル名を検索…",
@@ -1115,6 +1118,7 @@
   "sPhoneRow": "スマートフォンから検索 (ホーム ネットワーク)",
   "sPhoneSub": "同じ Wi-Fi につないだスマートフォンのブラウザーから、この PC のファイルを検索します。読み取り専用で、ホーム ネットワークでのみ使えます。",
   "sPhoneWait": "ネットワークを確認しています…",
-  "updChecking": "更新プログラムを確認しています…"
+  "updChecking": "更新プログラムを確認しています…",
+  "sReadPrograms": "プログラム ファイルとシステム ファイルの中も読み取る"
  }
 }

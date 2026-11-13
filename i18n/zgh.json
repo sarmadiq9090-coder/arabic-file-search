@@ -786,7 +786,10 @@
   "toman": "ⵜⵓⵎⴰⵏ",
   "{d} {} {y} AH": "{d} {} {y} (ⴰⵀⵉⵊⵔⵉ)",
   "{lead} Checked {checked} of {total} documents…": "{lead} ⵜⵜⵓⵙⵏⵇⴷⵏ {checked} ⵙⴳ {total} ⵏ ⵉⵙⵎⵍⵉⵢⵏ…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "ⵖⵔ ⴰⵡⴷ ⴰⵏⵙⴰ ⵏ ⵉⴼⵓⵢⵍⴰ ⵏ ⵉⵖⴰⵡⴰⵙⵏ ⴷ ⵓⵏⴳⵔⴰⵡ",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ⵉⵙⵎⴰⵡⵏ ⵏ ⵉⴼⵓⵢⵍⴰ ⵡⵊⴷⵏ · ⵜⵖⵓⵔⵉ ⵏ ⵉⵙⵎⵍⵉⵢⵏ ⵏ ⵉⴽⵓⵔⴰⵎ ⵏⵏⴽ: {checked} ⵙⴳ {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ⵉⵙⵎⴰⵡⵏ ⵏ ⵉⴼⵓⵢⵍⴰ ⴷ ⵉⴽⵓⵔⴰⵎ ⵏⵏⴽ ⵡⵊⴷⵏ · ⵜⵖⵓⵔⵉ ⵏ ⵉⵙⵎⵍⵉⵢⵏ ⵢⴰⴹⵏ: {checked} ⵙⴳ {total}"
  },
  "js": {
   "ph": "ⵔⵣⵓ ⵙ ⵉⵙⵎ ⵏ ⵓⴼⴰⵢⵍⵓ…",
@@ -1111,6 +1114,7 @@
   "sPhoneRow": "ⴰⵔⵣⵣⵓ ⵙⴳ ⵓⵜⵉⵍⵉⴼⵓⵏ (ⴰⵥⵟⵟⴰ ⵏ ⵜⴷⴷⴰⵔⵜ)",
   "sPhoneSub": "ⵔⵣⵓ ⴳ ⵉⴼⵓⵢⵍⴰ ⵏ ⵓⵙⵓⵏⵖⵓ ⴰⴷ ⵙⴳ ⵉⵎⵉⵏⵉⴳ ⵏ ⵓⵜⵉⵍⵉⴼⵓⵏ ⵏⵏⴽ ⴳ Wi-Fi ⵏⵏⴰ. ⵉ ⵜⵖⵓⵔⵉ ⴽⴰ, ⴷ ⵖⴰⵙ ⴳ ⵓⵥⵟⵟⴰ ⵏ ⵜⴷⴷⴰⵔⵜ ⵏⵏⴽ.",
   "sPhoneWait": "ⴰⵙⵏⵇⴷ ⵏ ⵓⵥⵟⵟⴰ…",
-  "updChecking": "ⴰⵙⵏⵇⴷ ⵏ ⵉⵙⵎⴰⵢⵏⵓⵜⵏ…"
+  "updChecking": "ⴰⵙⵏⵇⴷ ⵏ ⵉⵙⵎⴰⵢⵏⵓⵜⵏ…",
+  "sReadPrograms": "ⵖⵔ ⴰⵡⴷ ⴰⵏⵙⴰ ⵏ ⵉⴼⵓⵢⵍⴰ ⵏ ⵉⵖⴰⵡⴰⵙⵏ ⴷ ⵓⵏⴳⵔⴰⵡ"
  }
 }

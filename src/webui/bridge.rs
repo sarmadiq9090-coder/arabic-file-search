@@ -129,6 +129,8 @@ pub enum Setting {
     ContentIndex,
     /// Read cloud-only files too, which downloads them.
     ReadCloudFiles,
+    /// Read inside program and system files too.
+    ReadProgramFiles,
     /// Update the index when files change.
     AutoIndex,
     /// Leave Windows' own files out of the results.
@@ -428,6 +430,7 @@ pub struct SettingsOut {
     pub autostart: bool,
     pub content_index: bool,
     pub read_cloud_files: bool,
+    pub read_program_files: bool,
     pub auto_index: bool,
     pub hide_system: bool,
     pub hotkey_quick: bool,
@@ -1543,6 +1546,7 @@ mod tests {
         assert_eq!(req(r#""op":"clear_recent""#), Ok(Request::ClearRecent {}));
         assert_eq!(req(r#""op":"set","key":"hide_system","on":false"#), Ok(Request::Set { key: Setting::HideSystem, on: false }));
         assert_eq!(req(r#""op":"set","key":"read_cloud_files","on":true"#), Ok(Request::Set { key: Setting::ReadCloudFiles, on: true }));
+        assert_eq!(req(r#""op":"set","key":"read_program_files","on":true"#), Ok(Request::Set { key: Setting::ReadProgramFiles, on: true }));
         assert_eq!(req(r#""op":"set","key":"run_command","on":true"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"set","key":"digits""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"lang","lang":"en""#), Ok(Request::Lang { lang: LangCode(Locale::of(Lang::En)) }));
@@ -1980,7 +1984,7 @@ mod tests {
         assert!(s.contains(r#"a\"b</script>"#));
         assert!(matches!(status(true, Indexing::Idle, 0, Lang::Ar), Outbound::Status { state: "loading", .. }));
         assert!(matches!(status(false, Indexing::Names { found: 5 }, 0, Lang::Ar), Outbound::Status { state: "names", text: Some(_), .. }));
-        assert!(matches!(status(false, Indexing::Contents { checked: 3, total: 3 }, 9, Lang::Ar), Outbound::Status { state: "ready", text: None, files: 9 }));
+        assert!(matches!(status(false, Indexing::Contents { checked: 3, total: 3, mine: 0 }, 9, Lang::Ar), Outbound::Status { state: "ready", text: None, files: 9 }));
         assert_eq!(kinds(Lang::En)[1], "Documents");
         assert_eq!(kinds(Lang::Ar)[1], "مستندات");
         let settings = Outbound::Settings(SettingsOut {
@@ -1990,6 +1994,7 @@ mod tests {
             autostart: true,
             content_index: true,
             read_cloud_files: false,
+            read_program_files: false,
             auto_index: true,
             hide_system: true,
             hotkey_quick: true,

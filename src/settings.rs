@@ -28,6 +28,10 @@ pub struct Settings {
     /// the like) too, which makes Windows download them. Off unless the user
     /// switches it on: the program never downloads anything on its own.
     pub read_cloud_files: bool,
+    /// Read inside program, system and developer-cache files too
+    /// (`content_cache::warm_wanted`). Off: their names are indexed, but the
+    /// content index and searches inside documents leave their insides out.
+    pub read_program_files: bool,
     /// Keep the index current by watching the drives for changes.
     pub auto_index: bool,
     /// Leave Windows system files (the Windows folder, temp and cache
@@ -264,7 +268,7 @@ impl FloatPos {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Off, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, desktop_shortcut_done: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_trying: 0, new_ui_default: false, new_ui_only: false, hotkey: Hotkey::CtrlAltF, theme: Theme::Auto }
+        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, read_program_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Off, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, desktop_shortcut_done: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_trying: 0, new_ui_default: false, new_ui_only: false, hotkey: Hotkey::CtrlAltF, theme: Theme::Auto }
     }
 }
 
@@ -325,6 +329,7 @@ impl Settings {
                 "content_index" => s.content_index = value != "0",
                 // Only an explicit 1 downloads anything.
                 "read_cloud_files" => s.read_cloud_files = value == "1",
+                "read_program_files" => s.read_program_files = value == "1",
                 "auto_index" => s.auto_index = value != "0",
                 "hide_system" => s.hide_system = value != "0",
                 "crash_seen" => s.crash_seen = value.parse().unwrap_or(0),
@@ -354,7 +359,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let cols: Vec<String> = self.columns.iter().map(i32::to_string).collect();
         format!(
-            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\nnew_ui_failed={}\nnew_ui_default={}\nread_cloud_files={}\nnew_ui_only={}\nnew_ui_trying={}\nhotkey={}\ndesktop_shortcut_done={}\ntheme={}\n",
+            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\nnew_ui_failed={}\nnew_ui_default={}\nread_cloud_files={}\nnew_ui_only={}\nnew_ui_trying={}\nhotkey={}\ndesktop_shortcut_done={}\ntheme={}\nread_program_files={}\n",
             self.width,
             self.height,
             self.maximized as u8,
@@ -385,7 +390,8 @@ impl Settings {
             self.new_ui_trying,
             self.hotkey.code(),
             self.desktop_shortcut_done as u8,
-            self.theme.code()
+            self.theme.code(),
+            self.read_program_files as u8
         )
     }
 
@@ -435,7 +441,7 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, read_cloud_files: true, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, desktop_shortcut_done: true, file_opens: 7, rating_asked: true, new_ui: true, new_ui_failed: true, new_ui_trying: 2, new_ui_default: true, new_ui_only: true, hotkey: Hotkey::WinAltF, theme: Theme::Kiwi };
+        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, read_cloud_files: true, read_program_files: true, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, desktop_shortcut_done: true, file_opens: 7, rating_asked: true, new_ui: true, new_ui_failed: true, new_ui_trying: 2, new_ui_default: true, new_ui_only: true, hotkey: Hotkey::WinAltF, theme: Theme::Kiwi };
         assert_eq!(Settings::parse(&s.to_text()), s);
         for mode in [FloatingMode::Fade, FloatingMode::Hidden, FloatingMode::Off] {
             let s = Settings { floating_mode: mode, ..Settings::default() };
@@ -516,6 +522,11 @@ mod tests {
         let on = Settings { read_cloud_files: true, ..d.clone() };
         assert_eq!(Settings::parse(&on.to_text()), on);
         assert!(Settings::default().to_text().contains("read_cloud_files=0\n"));
+        // Program and system files are read inside only when switched on with a 1.
+        assert!(!d.read_program_files && Settings::parse("read_program_files=1").read_program_files);
+        assert!(!Settings::parse("read_program_files=yes").read_program_files);
+        let on = Settings { read_program_files: true, ..d.clone() };
+        assert_eq!(Settings::parse(&on.to_text()), on);
         // Automatic indexing is on unless explicitly turned off.
         assert!(d.auto_index && Settings::parse("auto_index=yes").auto_index && !Settings::parse("auto_index=0").auto_index);
         // System files are hidden unless explicitly shown.
@@ -657,7 +668,7 @@ mod tests {
     #[test]
     fn random_text_parses_into_valid_settings() {
         const PIECES: &[&str] = &[
-            "width", "height", "maximized", "columns", "kind", "sort_col", "update_check", "content_index", "read_cloud_files", "floating_mode",
+            "width", "height", "maximized", "columns", "kind", "sort_col", "update_check", "content_index", "read_cloud_files", "read_program_files", "floating_mode",
             "floating_pos", "hotkey_opens", "fade", "off", "main", "=", "\n",
             "\r\n", ",", " ", "-", "1", "0", "99999999999999999999", "٣", "\u{FEFF}", "\u{0}", "ب", "😀", "\u{200F}",
         ];

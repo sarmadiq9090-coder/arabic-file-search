@@ -786,7 +786,10 @@
   "toman": "tumen",
   "{d} {} {y} AH": "{d} {} {y} (Koçî)",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} ji {total} belgeyan hatin kontrolkirin…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Naveroka pelên bername û pergalê jî bixwîne",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Navên pelan amade ne · belgeyên peldankên te tên xwendin: {checked} ji {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Navên pelan û peldankên te amade ne · belgeyên din tên xwendin: {checked} ji {total}"
  },
  "js": {
   "ph": "Li navên pelan bigere…",
@@ -1115,6 +1118,7 @@
   "sPhoneRow": "Lêgerîn ji telefonê (tora malê)",
   "sPhoneSub": "Ji geroka telefona xwe ya li ser heman Wi-Fi di pelên vê komputerê de bigere. Tenê ji bo xwendinê ye, û tenê li ser tora mala te.",
   "sPhoneWait": "Tor tê kontrolkirin…",
-  "updChecking": "Li rojanekirinan tê kontrolkirin…"
+  "updChecking": "Li rojanekirinan tê kontrolkirin…",
+  "sReadPrograms": "Naveroka pelên bername û pergalê jî bixwîne"
  }
 }

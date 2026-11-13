@@ -786,7 +786,10 @@
   "toman": "तोमान",
   "{d} {} {y} AH": "{d} {} {y} हिजरी",
   "{lead} Checked {checked} of {total} documents…": "{lead} {total} पैकी {checked} दस्तऐवज तपासले…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "प्रोग्राम आणि सिस्टम फाइल्सच्या आतही वाचा",
+  "File names ready · reading inside your folders: {checked} of {mine}": "फाइल नावे तयार · तुमच्या फोल्डरमधील दस्तऐवज वाचत आहे: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "फाइल नावे आणि तुमचे फोल्डर तयार · इतर दस्तऐवज वाचत आहे: {checked} / {total}"
  },
  "js": {
   "ph": "फाइलच्या नावांमध्ये शोधा…",
@@ -1111,6 +1114,7 @@
   "sPhoneRow": "फोनवरून शोधा (घरगुती नेटवर्क)",
   "sPhoneSub": "त्याच Wi-Fi वरील तुमच्या फोनच्या ब्राउझरमधून या PC च्या फाइल्स शोधा. फक्त वाचण्यासाठी, आणि फक्त तुमच्या घरगुती नेटवर्कवर.",
   "sPhoneWait": "नेटवर्क तपासत आहे…",
-  "updChecking": "अद्यतने तपासत आहे…"
+  "updChecking": "अद्यतने तपासत आहे…",
+  "sReadPrograms": "प्रोग्राम आणि सिस्टम फाइल्सच्या आतही वाचा"
  }
 }

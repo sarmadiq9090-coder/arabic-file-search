@@ -148,6 +148,115 @@ pub fn is_system_path(path: &str) -> bool {
     parts.any(|p| any_eq(p, CACHE_DIRS))
 }
 
+/// Program and system folders at a drive root, beside [`ROOT_DIRS`]: their
+/// files are installed programs, not the user's documents.
+const PROGRAM_ROOT_DIRS: &[&str] = &["program files", "program files (x86)", "program files (arm)"];
+
+/// Folders, at any depth, that hold programs, package caches or build output:
+/// thousands of small text files (code, json, xml…) nobody searches inside.
+const PROGRAM_DIRS: &[&str] = &[
+    "appdata",
+    "program files",
+    "program files (x86)",
+    "programdata",
+    "$recycle.bin",
+    "node_modules",
+    "bower_components",
+    ".git",
+    ".svn",
+    ".hg",
+    "__pycache__",
+    "site-packages",
+    "dist-packages",
+    ".venv",
+    ".tox",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".vs",
+    ".vscode",
+    ".idea",
+    ".gradle",
+    ".m2",
+    ".nuget",
+    ".npm",
+    ".pnpm-store",
+    ".yarn",
+    ".cargo",
+    ".rustup",
+    ".cache",
+    "steamapps",
+];
+
+/// Build folders (`target`, `obj`, `bin`) count when a `debug` or `release`
+/// folder is right inside them, so a user's own "Target" folder still counts.
+const BUILD_DIRS: &[&str] = &["target", "obj", "bin"];
+const BUILD_KINDS: &[&str] = &["debug", "release"];
+
+/// The user's own Office files under `AppData\<Local|Roaming>\Microsoft`.
+const OFFICE_USER_DIRS: &[&str] = &["office", "outlook", "word", "excel", "powerpoint"];
+
+/// True when `path` is inside a program, system or developer-cache folder,
+/// whose files the content index does not read unless the user asks
+/// ("Also read inside program and system files"): everything in
+/// [`ROOT_DIRS`] and `Program Files*` at a drive root, profile templates
+/// (`Users\Default`…) and dot-folders directly in a profile
+/// (`Users\<name>\.cargo`…), and at any depth `AppData` (except the user's
+/// own Office files under `AppData\…\Microsoft\<Office|Outlook|Word|Excel|PowerPoint>`)
+/// and the folders in [`PROGRAM_DIRS`], or `target|obj|bin\<debug|release>`.
+/// `path` may be a file or a folder (a search's scope). File names there
+/// are still indexed and found by name. Never allocates.
+pub fn is_program_path(path: &str) -> bool {
+    let mut b = path.as_bytes();
+    if b.len() >= 4 && is_sep(b[0]) && matches!(b[1], b'?' | b'\\' | b'/') && matches!(b[2], b'?' | b'.') && is_sep(b[3]) {
+        b = &b[4..];
+    }
+    let drive = b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && is_sep(b[2]);
+    let rest = if drive { &b[3..] } else { b };
+    let parts = || rest.split(|&c| is_sep(c)).filter(|p| !p.is_empty());
+    if drive {
+        let mut head = parts();
+        if let Some(top) = head.next() {
+            if any_eq(top, ROOT_DIRS) || any_eq(top, PROGRAM_ROOT_DIRS) {
+                return true;
+            }
+            if eq(top, "users")
+                && let Some(profile) = head.next()
+                && (any_eq(profile, SYSTEM_PROFILES) || head.next().is_some_and(|p| p.first() == Some(&b'.')))
+            {
+                return true;
+            }
+        }
+    }
+    let mut it = parts().peekable();
+    while let Some(p) = it.next() {
+        if eq(p, "appdata") {
+            // `AppData\<Local|Roaming>\Microsoft\<Office…>`: the user's files.
+            let office = it.next().is_some_and(|x| eq(x, "local") || eq(x, "roaming"))
+                && it.next().is_some_and(|x| eq(x, "microsoft"))
+                && it.next().is_some_and(|x| any_eq(x, OFFICE_USER_DIRS));
+            return !office;
+        }
+        if any_eq(p, PROGRAM_DIRS) {
+            return true;
+        }
+        if any_eq(p, BUILD_DIRS) && it.peek().is_some_and(|x| any_eq(x, BUILD_KINDS)) {
+            return true;
+        }
+    }
+    false
+}
+
+/// True when `path` is in one of the folders a person keeps their own
+/// documents in: `Desktop`, `Documents`, `Downloads` or `OneDrive…` (at any
+/// depth, so `D:\Users\a\Documents` and `OneDrive - Org` count too), and not
+/// in a program folder ([`is_program_path`]). The content index reads these
+/// first, and only these images (OCR) unless the user asks for all.
+pub fn in_user_folders(path: &str) -> bool {
+    path.split(['\\', '/'])
+        .any(|p| any_eq(p.as_bytes(), &["desktop", "documents", "downloads"]) || starts_with(p.as_bytes(), "onedrive"))
+        && !is_program_path(path)
+}
+
 /// Whether a search should include system files: when the "hide system
 /// files" option (`hide`) is off, or when the search is limited to a folder
 /// that is itself a system folder (the user asked for it explicitly).
@@ -334,6 +443,103 @@ mod tests {
                 s.push(alphabet[(x % alphabet.len() as u64) as usize]);
             }
             let _ = is_system_path(&s);
+        }
+    }
+
+    #[test]
+    fn program_and_system_folders_for_the_content_index() {
+        for p in [
+            r"C:\Windows\System32\drivers\etc\hosts.txt",
+            r"C:\Program Files\App\readme.txt",
+            r"c:\PROGRAM FILES (X86)\App\res\strings.json",
+            r"C:\Program Files (Arm)\x.xml",
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\x.txt",
+            r"D:\ProgramData\x.json",
+            r"C:\$Recycle.Bin\S-1-5-21\$R123.docx",
+            r"C:\Windows.old\Users\a\Documents\x.docx",
+            r"C:\Users\Default\AppData\x.json",
+            r"C:\Users\a\AppData\Roaming\Code\User\settings.json",
+            r"C:\Users\a\AppData\Local\Programs\App\resources\app\index.html",
+            r"C:\Users\a\AppData\Local\Temp\x.txt",
+            r"C:\Users\a\AppData",
+            r"C:\Users\a\AppData\Roaming\Microsoft\Windows\Recent\x.txt",
+            r"C:\Users\a\.cargo\registry\src\x\lib.rs",
+            r"C:\Users\a\.vscode\extensions\x\package.json",
+            r"C:\Users\a\.gitconfig",
+            r"C:\Users\a\Documents\project\node_modules\left-pad\index.js",
+            r"C:\Users\a\Documents\project\.git\config",
+            r"D:\src\app\target\release\build\x\out.txt",
+            r"D:\src\app\target\debug\deps\x.json",
+            r"D:\src\App\obj\Debug\x.cs",
+            r"D:\src\App\bin\Release\App.dll.config",
+            r"D:\py\venv\Lib\site-packages\x\y.py",
+            r"D:\py\.venv\x.txt",
+            r"D:\py\pkg\__pycache__\x.py",
+            r"D:\Games\Steam\steamapps\common\x\data.json",
+            r"\\?\C:\Program Files\x.txt",
+            "/home/a/project/node_modules/x/index.js",
+            "/tmp/bench/C/Program Files/App/x.json",
+            "/tmp/bench/C/Users/me/AppData/Roaming/x.xml",
+            r"C:\Program Files\",
+        ] {
+            assert!(is_program_path(p), "{p}");
+        }
+        for p in [
+            "",
+            r"C:\",
+            r"C:\Users\a\Documents\تقرير.docx",
+            r"C:\Users\a\Desktop\notes.txt",
+            r"C:\Users\a\Downloads\invoice.pdf",
+            r"C:\Users\a\OneDrive\Documents\x.xlsx",
+            r"C:\Users\a\Pictures\scan.jpg",
+            r"C:\Users\Public\Documents\x.pdf",
+            r"C:\Users\a\AppData\Local\Microsoft\Office\UnsavedFiles\Book1.xlsx",
+            r"C:\Users\a\AppData\Roaming\Microsoft\Word\x.docx",
+            r"D:\عمل\تقارير\2026.pdf",
+            r"D:\Work\Target\plan.docx",
+            r"D:\Work\Target\Debugging notes.txt",
+            r"D:\Bin\x.txt",
+            r"D:\Projects\Windows\notes.docx",
+            r"D:\Movies\Program Files list.txt",
+            r"D:\Docs\.hidden-notes.txt",
+            r"\\server\share\Reports\x.docx",
+            "/home/a/Documents/x.txt",
+            r"C:\Users\a.b\Documents\x.txt",
+        ] {
+            assert!(!is_program_path(p), "{p}");
+        }
+        // Every system path the searches hide is a program path too, but
+        // the Start menu's shortcuts and the user's Office files.
+        for p in [r"C:\Windows\x", r"C:\Users\a\AppData\Local\Temp\x", r"C:\Users\a\AppData\Local\Google\Chrome\User Data\Default\Cache\x"] {
+            assert!(is_system_path(p) && is_program_path(p), "{p}");
+        }
+        for p in ["C:\\ويندوز\\x", "C:\\Users\\أحمد\\AppData\\ملف", "é:\\Windows", "C:\\\u{0}", "\\\\?\\"] {
+            let _ = is_program_path(p);
+        }
+        assert!(is_program_path("C:\\Users\\أحمد\\AppData\\ملف"));
+    }
+
+    #[test]
+    fn the_users_own_folders() {
+        for p in [
+            r"C:\Users\a\Documents\x.docx",
+            r"C:\Users\a\DESKTOP\x.pdf",
+            r"C:\Users\a\Downloads\x.jpg",
+            r"C:\Users\a\OneDrive - Org\Pictures\x.png",
+            r"D:\Users\a\Documents\x.txt",
+            "/home/a/Documents/x.txt",
+        ] {
+            assert!(in_user_folders(p), "{p}");
+        }
+        for p in [
+            r"C:\Users\a\Pictures\x.jpg",
+            r"D:\عمل\x.docx",
+            r"C:\Users\a\AppData\Local\x\Documents\log.txt",
+            r"C:\Users\a\Documents\project\node_modules\x\README.md",
+            r"C:\Users\a\Documents2\x.txt",
+            "",
+        ] {
+            assert!(!in_user_folders(p), "{p}");
         }
     }
 

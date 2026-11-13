@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} năm {y} Hijri",
   "{lead} Checked {checked} of {total} documents…": "{lead} Đã kiểm tra {checked}/{total} tài liệu…",
-  "{}, {d} {} {y}": "{}, {d} {} năm {y}"
+  "{}, {d} {} {y}": "{}, {d} {} năm {y}",
+  "Also read inside program and system files": "Đọc cả bên trong tệp chương trình và tệp hệ thống",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Tên tệp đã sẵn sàng · đang đọc tài liệu trong thư mục của bạn: {checked}/{mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Tên tệp và thư mục của bạn đã sẵn sàng · đang đọc các tài liệu khác: {checked}/{total}"
  },
  "js": {
   "ph": "Tìm tên tệp…",
@@ -1115,6 +1118,7 @@
   "sPhoneRow": "Tìm từ điện thoại (mạng gia đình)",
   "sPhoneSub": "Tìm tệp trên PC này từ trình duyệt điện thoại của bạn khi dùng cùng Wi-Fi. Chỉ đọc, và chỉ trong mạng gia đình của bạn.",
   "sPhoneWait": "Đang kiểm tra mạng…",
-  "updChecking": "Đang kiểm tra bản cập nhật…"
+  "updChecking": "Đang kiểm tra bản cập nhật…",
+  "sReadPrograms": "Đọc cả bên trong tệp chương trình và tệp hệ thống"
  }
 }

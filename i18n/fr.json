@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} {y} de l'Hégire",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} documents vérifiés sur {total}…",
-  "{}, {d} {} {y}": "{} {d} {} {y}"
+  "{}, {d} {} {y}": "{} {d} {} {y}",
+  "Also read inside program and system files": "Lire aussi le contenu des fichiers de programmes et système",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Noms de fichiers prêts · lecture des documents de vos dossiers : {checked} sur {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Noms de fichiers et vos dossiers prêts · lecture des autres documents : {checked} sur {total}"
  },
  "js": {
   "ph": "Rechercher dans les noms de fichiers…",
@@ -1115,6 +1118,7 @@
   "sPhoneRow": "Rechercher depuis le téléphone (réseau domestique)",
   "sPhoneSub": "Recherchez dans les fichiers de ce PC depuis le navigateur de votre téléphone, sur le même Wi-Fi. Lecture seule, et uniquement sur votre réseau domestique.",
   "sPhoneWait": "Vérification du réseau…",
-  "updChecking": "Recherche de mises à jour…"
+  "updChecking": "Recherche de mises à jour…",
+  "sReadPrograms": "Lire aussi le contenu des fichiers de programmes et système"
  }
 }

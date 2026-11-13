@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} {y} H.",
   "{lead} Checked {checked} of {total} documents…": "{lead} {checked} / {total} belge denetlendi…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Program ve sistem dosyalarının içini de oku",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Dosya adları hazır · klasörlerinizdeki belgeler okunuyor: {checked} / {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Dosya adları ve klasörleriniz hazır · diğer belgeler okunuyor: {checked} / {total}"
  },
  "js": {
   "ph": "Dosya adlarında ara…",
@@ -1115,6 +1118,7 @@
   "sPhoneRow": "Telefondan ara (ev ağı)",
   "sPhoneSub": "Aynı Wi-Fi ağındaki telefonunuzun tarayıcısından bu bilgisayarın dosyalarında arayın. Salt okunurdur ve yalnızca ev ağınızda çalışır.",
   "sPhoneWait": "Ağ denetleniyor…",
-  "updChecking": "Güncelleştirmeler denetleniyor…"
+  "updChecking": "Güncelleştirmeler denetleniyor…",
+  "sReadPrograms": "Program ve sistem dosyalarının içini de oku"
  }
 }

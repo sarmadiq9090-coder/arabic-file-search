@@ -786,7 +786,10 @@
   "toman": "ܬܘܡܐܢ",
   "{d} {} {y} AH": "{d} {} {y} ܕܗܓܪܐ",
   "{lead} Checked {checked} of {total} documents…": "{lead} ܐܬܒܚܪܘ {checked} ܡܢ {total} ܟܬܒ̈ܬܐ…",
-  "{}, {d} {} {y}": "{}، {d} {} {y}"
+  "{}, {d} {} {y}": "{}، {d} {} {y}",
+  "Also read inside program and system files": "ܩܪܝ ܐܦ ܓܘ ܦܝ̈ܠܐ ܕܬܘܟܝ̈ܬܐ ܘܕܛܟܣܐ",
+  "File names ready · reading inside your folders: {checked} of {mine}": "ܫܡܗ̈ܐ ܕܦܝ̈ܠܐ ܡܛܝܒܝܢ · ܩܪܝܢܐ ܟܬܒ̈ܬܐ ܕܦܘܠܕܪ̈ܐ ܕܝܠܟ: {checked} ܡܢ {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "ܫܡܗ̈ܐ ܕܦܝ̈ܠܐ ܘܦܘܠܕܪ̈ܐ ܕܝܠܟ ܡܛܝܒܝܢ · ܩܪܝܢܐ ܟܬܒ̈ܬܐ ܐܚܪܢܝ̈ܬܐ: {checked} ܡܢ {total}"
  },
  "js": {
   "ph": "ܒܨܝ ܒܫܡܐ ܕܦܝܠܐ…",
@@ -1111,6 +1114,7 @@
   "sPhoneRow": "ܒܨܝܐ ܡܢ ܬܠܝܦܘܢ (ܡܨܕܐ ܕܒܝܬܐ)",
   "sPhoneSub": "ܒܨܝ ܓܘ ܦܝ̈ܠܐ ܕܐܕܐ ܚܫܘܒܬܐ ܡܢ ܒܪܐܘܙܪ ܕܬܠܝܦܘܢ ܕܝܘܟ ܥܠ ܗܝ Wi-Fi. ܩܐ ܩܪܝܐ ܒܠܚܘܕ، ܘܥܠ ܡܨܕܐ ܕܒܝܬܐ ܕܝܘܟ ܒܠܚܘܕ.",
   "sPhoneWait": "ܒܘܚܪܢܐ ܕܡܨܕܐ…",
-  "updChecking": "ܒܘܚܪܢܐ ܕܚܘܕ̈ܬܐ…"
+  "updChecking": "ܒܘܚܪܢܐ ܕܚܘܕ̈ܬܐ…",
+  "sReadPrograms": "ܩܪܝ ܐܦ ܓܘ ܦܝ̈ܠܐ ܕܬܘܟܝ̈ܬܐ ܘܕܛܟܣܐ"
  }
 }

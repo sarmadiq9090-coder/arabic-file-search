@@ -786,7 +786,10 @@
   "toman": "томан",
   "{d} {} {y} AH": "{d} {} {y} р. за гіджрою",
   "{lead} Checked {checked} of {total} documents…": "{lead} Перевірено документів: {checked} з {total}…",
-  "{}, {d} {} {y}": "{}, {d} {} {y} р."
+  "{}, {d} {} {y}": "{}, {d} {} {y} р.",
+  "Also read inside program and system files": "Читати також вміст програмних і системних файлів",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Імена файлів готові · читання документів у ваших папках: {checked} з {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Імена файлів і ваші папки готові · читання інших документів: {checked} з {total}"
  },
  "js": {
   "ph": "Пошук за іменами файлів…",
@@ -1115,6 +1118,7 @@
   "sPhoneRow": "Пошук із телефона (домашня мережа)",
   "sPhoneSub": "Шукайте файли цього комп’ютера з браузера телефона в тій самій мережі Wi-Fi. Лише читання і лише у вашій домашній мережі.",
   "sPhoneWait": "Перевірка мережі…",
-  "updChecking": "Перевірка оновлень…"
+  "updChecking": "Перевірка оновлень…",
+  "sReadPrograms": "Читати також вміст програмних і системних файлів"
  }
 }

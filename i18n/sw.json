@@ -786,7 +786,10 @@
   "toman": "toman",
   "{d} {} {y} AH": "{d} {} {y} Hijria",
   "{lead} Checked {checked} of {total} documents…": "{lead} Imekagua hati {checked} kati ya {total}…",
-  "{}, {d} {} {y}": "{}, {d} {} {y}"
+  "{}, {d} {} {y}": "{}, {d} {} {y}",
+  "Also read inside program and system files": "Soma pia ndani ya faili za programu na za mfumo",
+  "File names ready · reading inside your folders: {checked} of {mine}": "Majina ya faili tayari · inasoma hati za folda zako: {checked} kati ya {mine}",
+  "File names and your folders ready · reading other documents: {checked} of {total}": "Majina ya faili na folda zako tayari · inasoma hati nyingine: {checked} kati ya {total}"
  },
  "js": {
   "ph": "Tafuta majina ya faili…",
@@ -1115,6 +1118,7 @@
   "sPhoneRow": "Tafuta kutoka simu (mtandao wa nyumbani)",
   "sPhoneSub": "Tafuta faili za Kompyuta hii kutoka kwenye kivinjari cha simu yako kwenye Wi-Fi ileile. Ni ya kusoma tu, na kwenye mtandao wako wa nyumbani pekee.",
   "sPhoneWait": "Inaangalia mtandao…",
-  "updChecking": "Inaangalia masasisho…"
+  "updChecking": "Inaangalia masasisho…",
+  "sReadPrograms": "Soma pia ndani ya faili za programu na za mfumo"
  }
 }
