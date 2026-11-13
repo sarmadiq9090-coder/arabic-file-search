@@ -580,7 +580,7 @@ mod win {
                     let name_len = u32_at(at + 60) as usize;
                     let Some(raw) = b.get(at + 68..at + 68 + name_len) else { break };
                     name.clear();
-                    name.extend(raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])));
+                    name.extend(raw.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)));
                     let raw = Raw { name: &name, attributes: u32_at(at + 56), reparse_tag: u32_at(at + 64), size: u64_at(at + 40), write_time: u64_at(at + 24) };
                     emit(&mut self.path, base, raw, each);
                     let next = u32_at(at) as usize;
