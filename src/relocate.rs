@@ -163,7 +163,7 @@ pub fn in_permanent_place(exe: &str, local_app_data: &str) -> bool {
     [install_dir(local), format!("{local}\\{OLD_INSTALL_SUBDIR}")].iter().any(|d| normalize(d) == dir)
 }
 
-/// What a start does about the desktop shortcut (1.0.1). The move adds one
+/// What a start does about the desktop shortcut (1.1.0). The move adds one
 /// itself; a copy that was already in the permanent place before (moved by
 /// 1.0.0) gets one once, at its first start that sees `done` unset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn the_desktop_shortcut_is_added_once_and_only_in_place() {
         use DesktopShortcut::*;
-        // A copy moved by 1.0.0, first start of 1.0.1: made once.
+        // A copy moved by 1.0.0, first start of 1.1.0: made once.
         assert_eq!(desktop_shortcut_at_start(false, false, true, false), Create);
         // One is there already (made by hand, or by the move): just remembered.
         assert_eq!(desktop_shortcut_at_start(false, false, true, true), MarkDone);

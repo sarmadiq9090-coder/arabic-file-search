@@ -55,7 +55,7 @@ pub struct Settings {
     /// The user was offered once to move a copy that runs from Downloads or
     /// a temp folder to a permanent place (`crate::relocate`).
     pub move_asked: bool,
-    /// The desktop shortcut was made, or tried, once (1.0.1): by the move,
+    /// The desktop shortcut was made, or tried, once (1.1.0): by the move,
     /// or at the first start of a copy already in the permanent place
     /// (`crate::relocate::desktop_shortcut_at_start`). Never made again
     /// after that, so a shortcut the user deleted stays deleted.

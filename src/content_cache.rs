@@ -2301,10 +2301,10 @@ mod tests {
         // Images are documents only with Windows OCR: counted by the rule.
         let images: Vec<&Entry> = entries.iter().filter(|e| is_image(e)).collect();
         let ocr = |all: bool| images.iter().filter(|e| warm_reads(&e.path, true, all)).count();
-        eprintln!("images (OCR on Windows, not run here): 1.0.0 reads {}, 1.0.1 reads {} of {}", ocr(true), ocr(false), images.len());
+        eprintln!("images (OCR on Windows, not run here): 1.0.0 reads {}, 1.1.0 reads {} of {}", ocr(true), ocr(false), images.len());
         // BENCH_MODE=old or new runs one of them only (each on a cold store).
         let mode = std::env::var("BENCH_MODE").unwrap_or_default();
-        for (label, all) in [("1.0.0 (everything)", true), ("1.0.1 default", false)] {
+        for (label, all) in [("1.0.0 (everything)", true), ("1.1.0 default", false)] {
             if (mode == "old" && !all) || (mode == "new" && all) {
                 continue;
             }

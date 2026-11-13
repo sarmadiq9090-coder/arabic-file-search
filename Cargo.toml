@@ -1,6 +1,6 @@
 [package]
 name = "bahth"
-version = "1.0.1"
+version = "1.1.0"
 edition = "2024"
 description = "بحث سريع - برنامج بحث سريع عن الملفات وداخل المستندات لويندوز"
 license-file = "LICENSE"

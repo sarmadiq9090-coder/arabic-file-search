@@ -4,7 +4,7 @@
 //! `%LOCALAPPDATA%\Programs\InstaFind\bahth.exe`, add shortcuts in the
 //! Start menu and on the desktop, point "start with Windows" at the new
 //! place when it is on, and restart from there. A copy already there (moved
-//! by 1.0.0) gets its desktop shortcut once, at its first start of 1.0.1.
+//! by 1.0.0) gets its desktop shortcut once, at its first start of 1.1.0.
 //! Settings, history and the index live in `%LOCALAPPDATA%\BahthSari` and
 //! stay as they are. Copies installed by winget, Scoop or Chocolatey, or in
 //! Program Files, are never offered and get no desktop shortcut (see
@@ -80,7 +80,7 @@ fn start_menu_folder() -> Option<PathBuf> {
 }
 
 impl App {
-    /// A copy in the permanent place from before 1.0.1 (moved by 1.0.0)
+    /// A copy in the permanent place from before 1.1.0 (moved by 1.0.0)
     /// gets the desktop shortcut the move now adds: once, and only when
     /// the desktop has none (`relocate::desktop_shortcut_at_start`).
     fn desktop_shortcut_once(&self) {
