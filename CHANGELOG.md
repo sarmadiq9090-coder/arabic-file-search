@@ -2,6 +2,10 @@
 
 # سجل التغييرات
 
+## Unreleased
+
+- **عرض المصغّرات في نافذة غير مكبّرة**: في 1.0.0، حين لا تكون النافذة مكبّرة، كانت صفوف المربعات تُضغط في ارتفاع القائمة فتتراكب الأيقونات وتختفي الأسماء والصور، وكانت الأيقونات تصغر مع «العرض المضغوط». الآن لكل صف ارتفاع مربعاته كاملاً بأي حجم للنافذة وأي تكبير للشاشة، وبعد تغيير الحجم، وتُطلب الصور للمربعات الظاهرة فقط. / **Thumbnail view in a window that is not maximised:** in 1.0.0 the rows of tiles were squeezed into the list's height, so icons piled on each other and names and pictures were hidden, and compact rows shrank the tiles' icons. Each row of tiles now takes its tiles' full height at any window size and display scale, and after a resize, and pictures are asked only for the tiles in view.
+
 ## 1.0.0 — 2026-11-13
 
 الإصدار 1.0.0. كل سطر بالعربية أولاً ثم بالإنجليزية بعد «/». / InstaFind 1.0.0. Each line: Arabic first, then English after "/".
