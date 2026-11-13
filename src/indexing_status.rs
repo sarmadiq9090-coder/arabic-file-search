@@ -60,16 +60,10 @@ pub fn progress_text(lang: Lang, state: Indexing, num: &dyn Fn(usize) -> String)
         return None;
     }
     Some(match state {
-        Indexing::Names { found } => match lang {
-            Lang::Ar => format!("جارٍ الفهرسة… عدد الملفات حتى الآن: {}", num(found)),
-            Lang::En => format!("Indexing… {} files so far", num(found)),
-        },
+        Indexing::Names { found } => trf!(in lang; "جارٍ الفهرسة… عدد الملفات حتى الآن: {}", "Indexing… {} files so far", num(found)),
         Indexing::Contents { checked, total } => {
             let (checked, total) = (num(checked.min(total)), num(total));
-            match lang {
-                Lang::Ar => format!("أسماء الملفات جاهزة · تُقرأ محتويات المستندات: {checked} من {total}"),
-                Lang::En => format!("File names ready · reading inside documents: {checked} of {total}"),
-            }
+            trf!(in lang; "أسماء الملفات جاهزة · تُقرأ محتويات المستندات: {checked} من {total}", "File names ready · reading inside documents: {checked} of {total}")
         }
         Indexing::Idle => return None,
     })
@@ -103,10 +97,11 @@ pub fn first_scan_text(lang: Lang) -> &'static str {
 /// still reading and has found nothing yet: how far it got.
 pub fn reading_text(lang: Lang, checked: usize, total: usize, num: &dyn Fn(usize) -> String) -> String {
     let (checked, total) = (num(checked.min(total)), num(total));
-    match lang {
-        Lang::Ar => format!("جارٍ البحث داخل المستندات… قرأنا {checked} من {total} حتى الآن، ولم نجد شيئاً بعد."),
-        Lang::En => format!("Still reading inside documents… {checked} of {total} so far, nothing found yet."),
-    }
+    trf!(
+        in lang;
+        "جارٍ البحث داخل المستندات… قرأنا {checked} من {total} حتى الآن، ولم نجد شيئاً بعد.",
+        "Still reading inside documents… {checked} of {total} so far, nothing found yet."
+    )
 }
 
 /// The sentence above the "try" buttons of a search that found nothing:
@@ -156,10 +151,7 @@ pub fn no_results_text(lang: Lang, state: Indexing) -> Option<&'static str> {
 pub fn content_search_text(lang: Lang, state: Indexing, checked: usize, total: usize, num: &dyn Fn(usize) -> String) -> Option<String> {
     let lead = no_results_text(lang, state)?;
     let (checked, total) = (num(checked.min(total)), num(total));
-    Some(match lang {
-        Lang::Ar => format!("{lead} المستندات المفحوصة: {checked} من {total}…"),
-        Lang::En => format!("{lead} Checked {checked} of {total} documents…"),
-    })
+    Some(trf!(in lang; "{lead} المستندات المفحوصة: {checked} من {total}…", "{lead} Checked {checked} of {total} documents…"))
 }
 
 /// The heading of the quick popup's "No results — try" section while

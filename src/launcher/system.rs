@@ -3,6 +3,7 @@
 use std::sync::OnceLock;
 
 use super::windows::{exe_stem, program_match};
+use crate::i18n::Lang;
 use super::{Action, Context, Item, Kind, SystemCommand};
 
 /// Words for each command, as typed (normalised before matching).
@@ -57,11 +58,14 @@ pub fn refusal(cmd: &SystemCommand, english: bool) -> Option<String> {
     if exe_stem(name) != FRAME_HOST {
         return None;
     }
-    Some(if english {
-        "This is a Microsoft Store app whose own program can't be found while its window is minimized, and ending its frame would close every Store app. Restore its window and try again, or close it from its own window.".into()
-    } else {
-        "هذا تطبيق من متجر Microsoft لا يمكن معرفة برنامجه وهو مصغّر، وإنهاء إطاره يغلق كل تطبيقات المتجر معاً. أعد نافذته إلى الشاشة ثم جرّب مرة أخرى، أو أغلقه من نافذته.".into()
-    })
+    Some(
+        Lang::from_english(english)
+            .pick(
+                "هذا تطبيق من متجر Microsoft لا يمكن معرفة برنامجه وهو مصغّر، وإنهاء إطاره يغلق كل تطبيقات المتجر معاً. أعد نافذته إلى الشاشة ثم جرّب مرة أخرى، أو أغلقه من نافذته.",
+                "This is a Microsoft Store app whose own program can't be found while its window is minimized, and ending its frame would close every Store app. Restore its window and try again, or close it from its own window.",
+            )
+            .to_string(),
+    )
 }
 
 /// [`COMMANDS`] with the words normalised once.
@@ -122,50 +126,46 @@ fn word_match(q: &str, word: &str) -> u32 {
 }
 
 fn title(cmd: &SystemCommand, english: bool) -> String {
-    match (cmd, english) {
-        (SystemCommand::Shutdown, false) => "إيقاف تشغيل الجهاز".into(),
-        (SystemCommand::Shutdown, true) => "Shut down".into(),
-        (SystemCommand::Restart, false) => "إعادة تشغيل الجهاز".into(),
-        (SystemCommand::Restart, true) => "Restart".into(),
-        (SystemCommand::Sleep, false) => "السكون".into(),
-        (SystemCommand::Sleep, true) => "Sleep".into(),
-        (SystemCommand::Lock, false) => "قفل الجهاز".into(),
-        (SystemCommand::Lock, true) => "Lock".into(),
-        (SystemCommand::SignOut, false) => "تسجيل الخروج".into(),
-        (SystemCommand::SignOut, true) => "Sign out".into(),
-        (SystemCommand::EmptyRecycleBin, false) => "إفراغ سلة المحذوفات".into(),
-        (SystemCommand::EmptyRecycleBin, true) => "Empty Recycle Bin".into(),
-        (SystemCommand::EndProcess { name, .. }, false) => format!("إنهاء {name}"),
-        (SystemCommand::EndProcess { name, .. }, true) => format!("End {name}"),
+    let lang = Lang::from_english(english);
+    match cmd {
+        SystemCommand::Shutdown => lang.pick("إيقاف تشغيل الجهاز", "Shut down").into(),
+        SystemCommand::Restart => lang.pick("إعادة تشغيل الجهاز", "Restart").into(),
+        SystemCommand::Sleep => lang.pick("السكون", "Sleep").into(),
+        SystemCommand::Lock => lang.pick("قفل الجهاز", "Lock").into(),
+        SystemCommand::SignOut => lang.pick("تسجيل الخروج", "Sign out").into(),
+        SystemCommand::EmptyRecycleBin => lang.pick("إفراغ سلة المحذوفات", "Empty Recycle Bin").into(),
+        SystemCommand::EndProcess { name, .. } => end_title(name, english),
     }
+}
+
+/// "End <name>": the title of ending a program.
+fn end_title(name: &str, english: bool) -> String {
+    trf!(in Lang::from_english(english); "إنهاء {name}", "End {name}")
 }
 
 /// The question the UI shows before running `cmd`.
 pub fn confirm_text(cmd: &SystemCommand, english: bool) -> String {
-    match (cmd, english) {
-        (SystemCommand::Shutdown, false) => "هل تريد إيقاف تشغيل الجهاز الآن؟".into(),
-        (SystemCommand::Shutdown, true) => "Shut down the computer now?".into(),
-        (SystemCommand::Restart, false) => "هل تريد إعادة تشغيل الجهاز الآن؟".into(),
-        (SystemCommand::Restart, true) => "Restart the computer now?".into(),
-        (SystemCommand::Sleep, false) => "هل تريد وضع الجهاز في وضع السكون الآن؟".into(),
-        (SystemCommand::Sleep, true) => "Put the computer to sleep now?".into(),
-        (SystemCommand::Lock, false) => "هل تريد قفل الجهاز الآن؟".into(),
-        (SystemCommand::Lock, true) => "Lock the computer now?".into(),
-        (SystemCommand::SignOut, false) => "هل تريد تسجيل الخروج الآن؟ ستُغلق البرامج المفتوحة.".into(),
-        (SystemCommand::SignOut, true) => "Sign out now? Open programs will be closed.".into(),
-        (SystemCommand::EmptyRecycleBin, false) => "هل تريد إفراغ سلة المحذوفات؟ لا يمكن التراجع عن ذلك.".into(),
-        (SystemCommand::EmptyRecycleBin, true) => "Empty the Recycle Bin? This cannot be undone.".into(),
-        (SystemCommand::EndProcess { name, .. }, english) => {
-            let explorer = exe_stem(name) == "explorer";
-            match (english, explorer) {
-                (false, false) => format!("هل تريد إنهاء {name}؟ قد يضيع العمل غير المحفوظ."),
-                (true, false) => format!("End {name}? Unsaved work may be lost."),
-                (false, true) => format!(
-                    "هل تريد إنهاء {name}؟ سيختفي شريط المهام وسطح المكتب وتُغلق نوافذ المجلدات حتى يُعاد تشغيله."
-                ),
-                (true, true) => {
-                    format!("End {name}? The taskbar, desktop and folder windows disappear until it is restarted.")
-                }
+    let lang = Lang::from_english(english);
+    match cmd {
+        SystemCommand::Shutdown => lang.pick("هل تريد إيقاف تشغيل الجهاز الآن؟", "Shut down the computer now?").into(),
+        SystemCommand::Restart => lang.pick("هل تريد إعادة تشغيل الجهاز الآن؟", "Restart the computer now?").into(),
+        SystemCommand::Sleep => lang.pick("هل تريد وضع الجهاز في وضع السكون الآن؟", "Put the computer to sleep now?").into(),
+        SystemCommand::Lock => lang.pick("هل تريد قفل الجهاز الآن؟", "Lock the computer now?").into(),
+        SystemCommand::SignOut => {
+            lang.pick("هل تريد تسجيل الخروج الآن؟ ستُغلق البرامج المفتوحة.", "Sign out now? Open programs will be closed.").into()
+        }
+        SystemCommand::EmptyRecycleBin => {
+            lang.pick("هل تريد إفراغ سلة المحذوفات؟ لا يمكن التراجع عن ذلك.", "Empty the Recycle Bin? This cannot be undone.").into()
+        }
+        SystemCommand::EndProcess { name, .. } => {
+            if exe_stem(name) == "explorer" {
+                trf!(
+                    in lang;
+                    "هل تريد إنهاء {name}؟ سيختفي شريط المهام وسطح المكتب وتُغلق نوافذ المجلدات حتى يُعاد تشغيله.",
+                    "End {name}? The taskbar, desktop and folder windows disappear until it is restarted."
+                )
+            } else {
+                trf!(in lang; "هل تريد إنهاء {name}؟ قد يضيع العمل غير المحفوظ.", "End {name}? Unsaved work may be lost.")
             }
         }
     }
@@ -180,7 +180,7 @@ pub fn runs_in_background(cmd: &SystemCommand) -> bool {
 
 /// The message when `cmd` failed.
 pub fn failed_text(cmd: &SystemCommand, english: bool) -> String {
-    if english { format!("Could not do this: {}.", title(cmd, true)) } else { format!("تعذر تنفيذ: {}.", title(cmd, false)) }
+    trf!(in Lang::from_english(english); "تعذر تنفيذ: {}.", "Could not do this: {}.", title(cmd, english))
 }
 
 fn item(cmd: SystemCommand, subtitle: String, score: u32, english: bool) -> Item {
@@ -208,7 +208,7 @@ pub fn commands(query: &str, ctx: &Context) -> Vec<Item> {
     }
     let en = ctx.english;
     let mut out = Vec::new();
-    let sub = if en { "System command · asks to confirm" } else { "أمر نظام · يُطلب التأكيد قبل التنفيذ" };
+    let sub = Lang::from_english(en).pick("أمر نظام · يُطلب التأكيد قبل التنفيذ", "System command · asks to confirm");
     for (cmd, words) in command_words() {
         let best = words.iter().map(|w| word_match(&q, w)).max().unwrap_or(0);
         if best > 0 {
@@ -240,7 +240,7 @@ pub fn commands(query: &str, ctx: &Context) -> Vec<Item> {
             let score = if p >= 2 { 600 } else { 450 };
             let mut it = item(cmd, w.title.trim().to_string(), score, en);
             if frame {
-                it.title = if en { format!("End {}", w.title.trim()) } else { format!("إنهاء {}", w.title.trim()) };
+                it.title = end_title(w.title.trim(), en);
             }
             out.push(it);
         }
@@ -406,6 +406,21 @@ pub fn run(cmd: &SystemCommand) -> Result<(), String> {
 mod tests {
     use super::super::windows::OpenWindow;
     use super::*;
+
+    #[test]
+    fn texts_follow_the_language() {
+        let end = |name: &str| SystemCommand::EndProcess { pid: 5, name: name.into() };
+        assert_eq!(confirm_text(&SystemCommand::Shutdown, true), "Shut down the computer now?");
+        assert_eq!(confirm_text(&SystemCommand::Lock, false), "هل تريد قفل الجهاز الآن؟");
+        assert_eq!(
+            confirm_text(&end("Explorer.exe"), true),
+            "End Explorer.exe? The taskbar, desktop and folder windows disappear until it is restarted."
+        );
+        assert_eq!(confirm_text(&end("a.exe"), false), "هل تريد إنهاء a.exe؟ قد يضيع العمل غير المحفوظ.");
+        assert_eq!(failed_text(&SystemCommand::Restart, true), "Could not do this: Restart.");
+        assert_eq!(failed_text(&end("a.exe"), false), "تعذر تنفيذ: إنهاء a.exe.");
+        assert_eq!(title(&SystemCommand::EmptyRecycleBin, true), "Empty Recycle Bin");
+    }
 
     fn ctx_with<'a>(english: bool, windows: &'a [OpenWindow]) -> Context<'a> {
         static NO_LAUNCHES: fn(&str) -> u32 = |_| 0;

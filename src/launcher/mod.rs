@@ -23,6 +23,8 @@ mod units;
 pub mod web;
 pub mod windows;
 
+use crate::i18n::Lang;
+
 /// Which group a result is shown in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Kind {
@@ -166,7 +168,7 @@ impl Catalog {
             items.push(Item {
                 kind: Kind::App,
                 title: app.name.clone(),
-                subtitle: if ctx.english { "App" } else { "تطبيق" }.to_string(),
+                subtitle: Lang::from_english(ctx.english).pick("تطبيق", "App").to_string(),
                 score: s + boost(ctx, &action),
                 strong: s + picked_boost(ctx, &action) >= STRONG_SCORE,
                 action,
@@ -177,7 +179,7 @@ impl Catalog {
             let page = &self.settings[i];
             let action = page_action(page);
             let subtitle = if page.is_settings_uri() {
-                format!("{} › {}", if ctx.english { "Settings" } else { "الإعدادات" }, page.section(ctx.english))
+                format!("{} › {}", Lang::from_english(ctx.english).pick("الإعدادات", "Settings"), page.section(ctx.english))
             } else {
                 page.section(ctx.english).to_string()
             };

@@ -62,6 +62,13 @@ impl Lang {
         if langid & 0x3ff == 0x01 { Lang::Ar } else { Lang::En }
     }
 
+    /// English for `true`, Arabic for `false`: for code that is handed the
+    /// language as a flag (`english: bool`), so it can still [`Lang::pick`]
+    /// or `trf!(in …)` and get the translations.
+    pub fn from_english(english: bool) -> Lang {
+        if english { Lang::En } else { Lang::Ar }
+    }
+
     /// `ar` in Arabic, `en` in English; in a translated language the
     /// translation of `en` when it is a text that has one.
     pub fn pick<T: Text>(self, ar: T, en: T) -> T {
@@ -305,6 +312,22 @@ fn translation(en: &str) -> Option<&'static str> {
     table()?.rust.get(en).map(String::as_str)
 }
 
+/// The English template `en` filled with `values` (its placeholders in
+/// order, formatted) in language `l`, which need not be this process's:
+/// `l`'s translation when its file has one, the English text otherwise. For
+/// the few texts worded in a language the user just chose.
+#[cfg(any(windows, test))]
+pub fn format_in(l: &Locale, en: &str, values: &[String]) -> String {
+    let t = if !l.machine {
+        None
+    } else if std::ptr::eq(l, locale()) {
+        translation(en).map(str::to_string)
+    } else {
+        load(l).and_then(|t| t.rust.get(en).cloned())
+    };
+    fill(t.as_deref().unwrap_or(en), en, values)
+}
+
 /// The translated template of a `trf!` (used by its expansion).
 #[doc(hidden)]
 pub fn template(en: &'static str) -> Option<&'static str> {
@@ -514,7 +537,15 @@ macro_rules! tr {
 /// `trf!("… {x}", "… {x}", args…)`: `format!` with the template of the
 /// current language (in a translated one, the translation of the English
 /// template; see `i18n-macros`). The arguments are evaluated once.
+///
+/// `trf!(in lang; "…", "…", args…)` takes the language from `lang` (a
+/// [`Lang`]) instead, for code that is handed its language: Arabic, or
+/// the English template translated as above. The `format!` counterpart of
+/// [`Lang::pick`].
 macro_rules! trf {
+    (in $lang:expr; $ar:literal, $en:literal $(, $arg:expr)* $(,)?) => {
+        ::bahth_i18n_macros::trf_impl!(lang ($lang) ($ar) ($en) $(($arg))*)
+    };
     ($ar:literal, $en:literal $(, $arg:expr)* $(,)?) => {
         ::bahth_i18n_macros::trf_impl!(($ar) ($en) $(($arg))*)
     };
@@ -730,6 +761,22 @@ mod tests {
         let x = 0;
         assert_eq!(trf!("{:?} {x}", "{:?} {x}", next()).len(), 3);
         assert_eq!(calls, 1);
+        // With a given language: that one, whatever the process's.
+        assert_eq!(trf!(in Lang::En; "وجدت {n} نتيجة", "Found {n} results"), "Found 3 results");
+        assert_eq!(trf!(in Lang::from_english(false); "{} من {}", "{} of {}", 1, 2), "1 من 2");
+        // The language and the arguments are evaluated once.
+        let (mut langs, mut args) = (0, 0);
+        let mut lang = || {
+            langs += 1;
+            Lang::En
+        };
+        let mut arg = || {
+            args += 1;
+            args
+        };
+        assert_eq!(trf!(in lang(); "{:?} {x}", "{x} {:?}", arg()), "0 1");
+        assert_eq!((langs, args), (1, 1));
+        assert_eq!(Lang::from_english(true).pick("بحث", "Search"), "Search");
     }
 
     #[test]
@@ -747,6 +794,11 @@ mod tests {
             assert_eq!(fill(bad, "Found {n} results", &v(&["3"])), "Found 3 results", "{bad}");
         }
         assert!(same_placeholders("{} of {}", "{1} de {0}"));
+        // In a language that is not this process's: English without a translation.
+        assert_eq!(format_in(&EN, "In {}.\n\nNow?", &v(&["Français"])), "In Français.\n\nNow?");
+        if let Some(fr) = Locale::find("fr") {
+            assert!(!format_in(fr, "Found {n} results", &v(&["3"])).is_empty());
+        }
         assert!(!same_placeholders("{} of {}", "{}"));
         assert!(same_placeholders("a {{b}}", "x {{y}}"));
     }

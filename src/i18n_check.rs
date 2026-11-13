@@ -2,11 +2,11 @@
 //! files against it (`cargo test i18n -- --nocapture` prints the table).
 //!
 //! The texts are read from the sources themselves: every `tr!`/`trf!`
-//! with two literals, every `.pick("…", "…")`, every `("عربي", "English")`
-//! pair in a tuple, the `*_EN` arrays next to their Arabic ones, and the
-//! `T` table of `src/webui/assets/app.js`. `I18N_WRITE_SOURCE=1 cargo test
-//! i18n_source` writes them to `i18n/source.json`, the file translators
-//! work from.
+//! with two literals (`trf!(in lang; …)` too), every `.pick("…", "…")`,
+//! every `("عربي", "English")` pair in a tuple, the `*_EN` arrays next to
+//! their Arabic ones (`NAME` or `NAME_AR`), and the `T` table of
+//! `src/webui/assets/app.js`. `I18N_WRITE_SOURCE=1 cargo test i18n_source`
+//! writes them to `i18n/source.json`, the file translators work from.
 //!
 //! A language file fails the test when it is not valid JSON, when its
 //! `meta` disagrees with its row in [`super::LOCALES`], or when a
@@ -278,10 +278,12 @@ fn rust_sources() -> BTreeMap<String, String> {
             continue;
         }
         let t = without_tests(lex(&std::fs::read_to_string(&f).unwrap()));
-        // Word lists for matching (Windows settings pages, units, letters)
-        // pair Arabic and English too, but are not interface texts.
+        // Word lists for matching (app names, units, letters) pair Arabic
+        // and English too, but are not interface texts. The settings pages'
+        // titles and sections are (`Page::title`, `Page::section`); their
+        // keywords are in arrays, which this does not read.
         let rel = f.strip_prefix(root().join("src")).unwrap().to_string_lossy().replace('\\', "/");
-        let tables_are_texts = !["launcher/", "extract/", "search/"].iter().any(|d| rel.starts_with(d))
+        let tables_are_texts = (rel == "launcher/settings_pages.rs" || !["launcher/", "extract/", "search/"].iter().any(|d| rel.starts_with(d)))
             && !matches!(name.as_str(), "franco.rs" | "normalize.rs" | "suggest.rs" | "fuzzy.rs");
         let s = |i: usize| match t.get(i) {
             Some(Tok::Str(s)) => Some(s.as_str()),
@@ -296,6 +298,24 @@ fn rust_sources() -> BTreeMap<String, String> {
                 && let (Some(ar), Some(en)) = (s(i + 3), s(i + 5))
             {
                 add(en, ar);
+            }
+            // trf!(in lang; "ar", "en", …)
+            if id(i, "trf") && is(i + 1, '!') && is(i + 2, '(') && id(i + 3, "in") {
+                let mut j = i + 4;
+                let mut depth = 0i32;
+                while j < t.len() && depth >= 0 && !(depth == 0 && is(j, ';')) {
+                    match &t[j] {
+                        Tok::Punct('(' | '[' | '{') => depth += 1,
+                        Tok::Punct(')' | ']' | '}') => depth -= 1,
+                        _ => {}
+                    }
+                    j += 1;
+                }
+                if is(j + 2, ',')
+                    && let (Some(ar), Some(en)) = (s(j + 1), s(j + 3))
+                {
+                    add(en, ar);
+                }
             }
             // .pick("ar", "en")
             if is(i, '.') && id(i + 1, "pick") && is(i + 2, '(') && is(i + 4, ',')
@@ -320,8 +340,15 @@ fn rust_sources() -> BTreeMap<String, String> {
             }
             // const NAME: … = [ "…", … ]; or = "…";
             if id(i, "const") && let Some(Tok::Ident(n)) = t.get(i + 1) {
+                // Past the type, whose `[&str; 12]` has a `;` of its own.
                 let mut j = i + 2;
-                while j < t.len() && !is(j, '=') && !is(j, ';') {
+                let mut in_type = 0i32;
+                while j < t.len() && !is(j, '=') && !(in_type == 0 && is(j, ';')) {
+                    match &t[j] {
+                        Tok::Punct('[' | '(') => in_type += 1,
+                        Tok::Punct(']' | ')') => in_type -= 1,
+                        _ => {}
+                    }
                     j += 1;
                 }
                 let mut strs = Vec::new();
@@ -341,7 +368,8 @@ fn rust_sources() -> BTreeMap<String, String> {
             }
         }
         for (n, en) in &arrays {
-            if let Some(ar) = n.strip_suffix("_EN").and_then(|base| arrays.get(base))
+            // NAME_EN beside NAME or NAME_AR.
+            if let Some(ar) = n.strip_suffix("_EN").and_then(|base| arrays.get(base).or_else(|| arrays.get(&format!("{base}_AR"))))
                 && ar.len() == en.len()
             {
                 for (a, e) in ar.iter().zip(en) {

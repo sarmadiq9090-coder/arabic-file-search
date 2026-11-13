@@ -16,6 +16,7 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock, RwLock};
 
 use super::calc;
+use crate::i18n::Lang;
 
 /// Free exchange-rate API (no key), rates per US dollar.
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -542,7 +543,12 @@ fn format_money(v: f64) -> Option<String> {
 
 fn name(i: usize, english: bool) -> &'static str {
     let cur = &CURRENCIES[i];
-    if english { if cur.code == TOMAN_CODE { "toman" } else { cur.code } } else { cur.ar }
+    // In English the ISO code (the same in every language), but a word for the toman, which has none.
+    match (english, cur.code == TOMAN_CODE) {
+        (true, true) => Lang::En.pick("تومان", "toman"),
+        (true, false) => cur.code,
+        (false, _) => cur.ar,
+    }
 }
 
 fn convert(amount: f64, from: usize, to: usize, rates: &Rates) -> f64 {
@@ -572,11 +578,11 @@ pub fn answer(query: &str, english: bool, rates: &Rates) -> Option<(String, Stri
         note.push(loc(&format!("= {eur} {}", name(EUR, english))));
     }
     let date = loc(&date_text(rates.updated));
-    note.push(match (english, rates.is_bundled()) {
-        (true, false) => format!("approximate rate · {date}"),
-        (true, true) => format!("approximate built-in rate · {date}"),
-        (false, false) => format!("سعر تقريبي · {date}"),
-        (false, true) => format!("سعر تقريبي مضمّن · {date}"),
+    let lang = Lang::from_english(english);
+    note.push(if rates.is_bundled() {
+        trf!(in lang; "سعر تقريبي مضمّن · {date}", "approximate built-in rate · {date}")
+    } else {
+        trf!(in lang; "سعر تقريبي · {date}", "approximate rate · {date}")
     });
     Some((title, copy, note.join(" · ")))
 }

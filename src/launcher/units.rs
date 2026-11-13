@@ -4,6 +4,7 @@
 use std::sync::OnceLock;
 
 use super::calc::{self, Digits};
+use crate::i18n::Lang;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Dim {
@@ -262,7 +263,7 @@ pub fn describe(c: &Conversion, english: bool, digits: Digits) -> (String, Strin
     let r = calc::localize(&calc::format_number(c.result, 6), digits);
     let title = format!("{v} {} = {r} {}", name(a), name(b));
     let note = (a.dim == Dim::Data).then(|| {
-        if english { "1 KB = 1024 bytes, as Windows shows sizes".to_string() } else { "1 كيلوبايت = 1024 بايت كما يعرضها ويندوز".to_string() }
+        Lang::from_english(english).pick("1 كيلوبايت = 1024 بايت كما يعرضها ويندوز", "1 KB = 1024 bytes, as Windows shows sizes").to_string()
     });
     let note = note.map(|n| calc::localize(&n, digits));
     let copy = calc::localize(&calc::format_number(c.result, 6).replace(',', ""), digits);
