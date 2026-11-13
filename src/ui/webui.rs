@@ -319,10 +319,15 @@ mod imp {
             };
             let mut parts = Parts::default();
             let flags = if maximized { nwg::WindowFlags::MAIN_WINDOW | nwg::WindowFlags::MAXIMIZED } else { nwg::WindowFlags::MAIN_WINDOW };
+            // Centred in the work area (the monitor without the taskbar, on
+            // whichever side it is), not on the whole screen, and shrunk to
+            // fit it, as the classic window (`placement`): on 1366×768, or
+            // 1080p at 150 %, the footer was under the taskbar.
+            let (size, position) = super::super::placement::opening(w.max(0) as u32, h.max(0) as u32);
             nwg::Window::builder()
                 .title(&format!("{} (new)", title()))
-                .size((w, h))
-                .center(true)
+                .size(size)
+                .position(position)
                 .ex_flags(crate::i18n::rtl_only(WS_EX_LAYOUTRTL | WS_EX_NOINHERITLAYOUT))
                 .flags(flags)
                 .build(&mut parts.window)
@@ -343,6 +348,8 @@ mod imp {
                 .map_err(|e| e.to_string())?;
             let hwnd = parts.window.handle.hwnd().ok_or("no window handle")?;
             crate::icon::set_window_icon(hwnd);
+            // With the real frame, on the monitor it opened on.
+            super::super::placement::keep_on_screen(hwnd);
             self.webui.parts.set(parts);
 
             let weak = Rc::downgrade(self);
@@ -378,12 +385,28 @@ mod imp {
                 }),
             );
             // Shown by other means than `webui_show` (a second launch brings
-            // it to the front): the page leaves its low-memory mode.
+            // it to the front): the page leaves its low-memory mode. Every
+            // time it shows, and when it comes back from the taskbar, it is
+            // kept inside the work area of its monitor: the screen may have
+            // changed while it waited (a monitor unplugged, another
+            // resolution or scale, the taskbar moved).
             let weak = Rc::downgrade(self);
+            let minimized = Cell::new(false);
             let raw = nwg::bind_raw_event_handler(
                 &handle,
                 0x1_0041,
-                crate::crash_log::guard_raw(move |_h: HWND, msg: UINT, w: WPARAM, _l: LPARAM| {
+                crate::crash_log::guard_raw(move |h: HWND, msg: UINT, w: WPARAM, _l: LPARAM| {
+                    use winapi::um::winuser::{SIZE_MINIMIZED, SIZE_RESTORED, WM_SHOWWINDOW, WM_SIZE};
+                    if msg == WM_SHOWWINDOW && w != 0 {
+                        super::super::placement::keep_on_screen(h);
+                    }
+                    if msg == WM_SIZE {
+                        if w == SIZE_MINIMIZED {
+                            minimized.set(true);
+                        } else if w == SIZE_RESTORED && minimized.replace(false) {
+                            super::super::placement::keep_on_screen(h);
+                        }
+                    }
                     if msg == WM_ACTIVATE && (w & 0xFFFF) as u16 != WA_INACTIVE {
                         let app = weak.upgrade()?;
                         // (Not while the page is being created or closed.)
@@ -711,10 +734,13 @@ mod imp {
             let window = &self.webui.parts.window;
             if let Some(h) = window.handle.hwnd() {
                 surface::dwm_style(h, surface::apps_dark(), false, false);
+                // Inside the work area before it shows (see the raw handler).
+                super::super::placement::keep_on_screen(h);
                 window.set_visible(true);
                 unsafe {
                     if IsIconic(h) != 0 {
                         ShowWindow(h, SW_RESTORE);
+                        super::super::placement::keep_on_screen(h);
                     }
                     SetForegroundWindow(h);
                     winapi::um::winuser::UpdateWindow(h);
