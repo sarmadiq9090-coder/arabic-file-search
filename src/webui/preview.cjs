@@ -342,6 +342,9 @@ const SHOTS = [
   ["drag-en-light", "en", "light", [["type", "report"], ["drag", "#r1"]], { expect: { drags: 1, dialog: false } }],
   ["drag-recent-ar-light", "ar", "light", [["drag", "#rr0"]], { expect: { lastSent: "drag", drags: 1 } }],
   // After a drag the next click elsewhere still works (Windows' drag loop takes the mouseup).
+  // A page created again after the hidden window's WebView2 was closed: its search and filters come back and run.
+  ["restore-ar-light", "ar", "light", [["eval", "window.__instafind.recv({ type: 'restore', q: 'تقرير', kind: 0, size: 2, date: 4, content: false })"], ["wait", 100]], { expect: { q: "تقرير", chipsOn: 2, lastSearch: "تقرير|0|2|4|false" } }],
+  ["restore-content-en-dark", "en", "dark", [["eval", "window.__instafind.recv({ type: 'restore', q: 'lease agreement', kind: 1, size: 0, date: 0, content: true })"], ["wait", 300]], { expect: { q: "lease agreement", inside: true, content: true, rows: 3, lastSearch: "lease agreement|1|0|0|true" } }],
   ["drag-then-click-en-light", "en", "light", [["type", "report"], ["drag", "#r1"], ["wait", 50], ["click", "#set-btn"]], { expect: { drags: 1, settings: true } }],
   // A program the search names: a button above the results; a click asks for it by its place.
   ["apps-ar-light", "ar", "light", [["type", "كروم"], ["wait", 100], ["click", "#apps [data-app=\"0\"]"], ["wait", 50]], { expect: { apps: 1, lastSent: "app" } }],
@@ -569,6 +572,7 @@ const SHOTS = [
         clearItem: (() => { const it = document.getElementById("hist-clear"); return it ? `${it.textContent}|${it.getAttribute("aria-disabled") === "true" ? "off" : "on"}` : null; })(),
         recentRows: document.querySelectorAll("#recent .row").length,
         inside: document.getElementById("chip-content").getAttribute("aria-pressed") === "true",
+        lastSearch: (() => { const m = window.__sent.filter((x) => x.op === "search").pop(); return m ? [m.q, m.kind, m.size, m.date, m.content].join("|") : null; })(),
         ctxFirst: (() => { const it = document.querySelector("#ctx:not([hidden]) [role=menuitem] span"); return it ? it.textContent : null; })(),
       };
     }, lang);

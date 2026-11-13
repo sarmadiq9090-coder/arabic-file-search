@@ -188,6 +188,87 @@ pub const TRYING_AFTER_CLASSIC: u32 = 1;
 /// The largest `new_ui_trying` kept (anything from 2 means the same).
 pub const MAX_TRYING: u32 = 2;
 
+/// How long the window must have been hidden (to the tray), without a
+/// break, before its WebView2 is closed altogether, so that its processes
+/// exit (about 140 MB on a real PC); the next show creates the page again.
+/// Until then the hidden page is only suspended ([`idle_action`]).
+pub const RELEASE_AFTER: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+
+/// For the test of the release (`ci/newlook-test.ps1`): [`RELEASE_AFTER`]
+/// in seconds instead (`BAHTH_WEBUI_RELEASE_SECS=20`), never under
+/// [`RELEASE_MIN_SECS`]. Not offered to users.
+pub const RELEASE_ENV: &str = "BAHTH_WEBUI_RELEASE_SECS";
+
+/// The shortest release time [`RELEASE_ENV`] can set.
+pub const RELEASE_MIN_SECS: u64 = 5;
+
+/// [`RELEASE_AFTER`], or what [`RELEASE_ENV`] says (`env`: its value).
+pub fn release_after_by(env: Option<&str>) -> std::time::Duration {
+    env.and_then(|v| v.trim().parse::<u64>().ok())
+        .map_or(RELEASE_AFTER, |s| std::time::Duration::from_secs(s.max(RELEASE_MIN_SECS)))
+}
+
+/// [`release_after_by`] for this process (read once).
+pub fn release_after() -> std::time::Duration {
+    static AFTER: std::sync::OnceLock<std::time::Duration> = std::sync::OnceLock::new();
+    *AFTER.get_or_init(|| release_after_by(std::env::var(RELEASE_ENV).ok().as_deref()))
+}
+
+/// How a duration reads in the log: "10 min", or "20 s" when not whole minutes.
+pub fn log_duration(d: std::time::Duration) -> String {
+    let s = d.as_secs();
+    if s >= 60 && s.is_multiple_of(60) { format!("{} min", s / 60) } else { format!("{s} s") }
+}
+
+/// The page of the hidden window, as the program's timer sees it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Idle {
+    /// How long the window has been hidden without a break; `None`: on screen.
+    pub hidden_for: Option<std::time::Duration>,
+    /// There is a page (WebView2) in the window.
+    pub has_page: bool,
+    /// It was already asked to suspend since the window was hidden.
+    pub suspend_asked: bool,
+    /// A Save/Open dialog waits to be moved to a result's folder
+    /// (Ctrl+Alt+G): the page is part of that hand-off.
+    pub hand_off: bool,
+    /// A modal dialog or menu is open, or the page is being created, or a
+    /// dialog runs inside the page's own message handler.
+    pub modal: bool,
+    /// A search inside documents is still running for the page.
+    pub busy: bool,
+}
+
+/// What to do with the page of a hidden window ([`idle_action`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IdleAction {
+    /// Nothing (on screen, no page, already done, or not now).
+    Keep,
+    /// Freeze its processes (`TrySuspend`): kept in memory, back at once.
+    Suspend,
+    /// Close its WebView2, so its processes exit; created again on show.
+    Release,
+}
+
+/// The decision of the timer for the page of a window that may be hidden:
+/// suspended as soon as it is hidden, closed once it has been hidden for
+/// `release_after`. Never while a Save/Open dialog's hand-off is under way,
+/// while a modal is open, or while a search inside documents runs; then it
+/// waits (the hidden time still counts, so the release comes once that is over).
+pub fn idle_action(idle: Idle, release_after: std::time::Duration) -> IdleAction {
+    let Some(hidden_for) = idle.hidden_for else { return IdleAction::Keep };
+    if !idle.has_page || idle.hand_off || idle.modal {
+        return IdleAction::Keep;
+    }
+    if hidden_for >= release_after && !idle.busy {
+        return IdleAction::Release;
+    }
+    if idle.suspend_asked || idle.busy {
+        return IdleAction::Keep;
+    }
+    IdleAction::Suspend
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,6 +351,52 @@ mod tests {
         assert_eq!(run(&[true, true, false, false, false]), [New { careful: false }, careful, Classic, careful, New { careful: false }]);
         // Never crashing: never the classic window.
         assert!(run(&[false; 5]).iter().all(|&l| l == New { careful: false }));
+    }
+
+    #[test]
+    fn a_hidden_page_is_suspended_then_released() {
+        use std::time::Duration;
+        let after = RELEASE_AFTER;
+        let hidden = |secs: u64| Idle { hidden_for: Some(Duration::from_secs(secs)), has_page: true, ..Idle::default() };
+        // On screen, or no page (a start in the tray, or already released): nothing.
+        assert_eq!(idle_action(Idle { has_page: true, ..Idle::default() }, after), IdleAction::Keep);
+        assert_eq!(idle_action(Idle { has_page: false, ..hidden(3600) }, after), IdleAction::Keep);
+        // Just hidden: suspended, once.
+        assert_eq!(idle_action(hidden(0), after), IdleAction::Suspend);
+        assert_eq!(idle_action(Idle { suspend_asked: true, ..hidden(5) }, after), IdleAction::Keep);
+        assert_eq!(idle_action(Idle { suspend_asked: true, ..hidden(599) }, after), IdleAction::Keep);
+        // Hidden ten minutes without a break: closed, suspended or not.
+        assert_eq!(idle_action(Idle { suspend_asked: true, ..hidden(600) }, after), IdleAction::Release);
+        assert_eq!(idle_action(hidden(600), after), IdleAction::Release);
+        assert_eq!(idle_action(Idle { suspend_asked: true, ..hidden(86_400) }, after), IdleAction::Release);
+        // Never during a Save/Open dialog's hand-off or under a modal: it waits.
+        for held in [Idle { hand_off: true, ..hidden(0) }, Idle { modal: true, ..hidden(0) }] {
+            assert_eq!(idle_action(held, after), IdleAction::Keep);
+            assert_eq!(idle_action(Idle { hidden_for: Some(Duration::from_secs(3600)), ..held }, after), IdleAction::Keep);
+        }
+        assert_eq!(idle_action(Idle { hand_off: true, modal: true, suspend_asked: true, ..hidden(3600) }, after), IdleAction::Keep);
+        // A search inside documents still running: neither, until it ends.
+        assert_eq!(idle_action(Idle { busy: true, ..hidden(0) }, after), IdleAction::Keep);
+        assert_eq!(idle_action(Idle { busy: true, ..hidden(3600) }, after), IdleAction::Keep);
+        // The test's shorter time.
+        assert_eq!(idle_action(Idle { suspend_asked: true, ..hidden(20) }, Duration::from_secs(20)), IdleAction::Release);
+    }
+
+    #[test]
+    fn release_time_and_its_test_switch() {
+        use std::time::Duration;
+        assert_eq!(RELEASE_AFTER, Duration::from_secs(600));
+        assert_eq!(release_after_by(None), RELEASE_AFTER);
+        assert_eq!(release_after_by(Some("20")), Duration::from_secs(20));
+        assert_eq!(release_after_by(Some(" 90 ")), Duration::from_secs(90));
+        // Never shorter than a few seconds; nonsense keeps the ten minutes.
+        assert_eq!(release_after_by(Some("0")), Duration::from_secs(RELEASE_MIN_SECS));
+        for bad in ["", "x", "-5", "1.5"] {
+            assert_eq!(release_after_by(Some(bad)), RELEASE_AFTER, "{bad}");
+        }
+        assert_eq!(log_duration(RELEASE_AFTER), "10 min");
+        assert_eq!(log_duration(Duration::from_secs(20)), "20 s");
+        assert_eq!(log_duration(Duration::from_secs(90)), "90 s");
     }
 
     #[test]

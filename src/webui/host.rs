@@ -9,13 +9,14 @@ use std::num::NonZeroIsize;
 
 use raw_window_handle::{HandleError, HasWindowHandle, RawWindowHandle, Win32WindowHandle, WindowHandle};
 use webview2_com::Microsoft::Web::WebView2::Win32::{
-    COREWEBVIEW2_PROCESS_FAILED_KIND, COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED, COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED,
-    COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE, ICoreWebView2Controller4,
+    COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL, COREWEBVIEW2_PROCESS_FAILED_KIND,
+    COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED, COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED, COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE,
+    ICoreWebView2_3, ICoreWebView2_19, ICoreWebView2Controller4,
 };
-use webview2_com::ProcessFailedEventHandler;
+use webview2_com::{ProcessFailedEventHandler, TrySuspendCompletedHandler};
 use windows::core::Interface;
 use wry::http::{Request, Response};
-use wry::{MemoryUsageLevel, NewWindowResponse, WebContext, WebView, WebViewBuilder, WebViewBuilderExtWindows, WebViewExtWindows};
+use wry::{NewWindowResponse, WebContext, WebView, WebViewBuilder, WebViewBuilderExtWindows, WebViewExtWindows};
 
 use super::assets;
 use crate::i18n::Lang;
@@ -168,9 +169,41 @@ impl Host {
         let _ = self.webview.focus();
     }
 
-    /// Lowers the page's memory use while its window is hidden.
-    pub fn set_idle(&self, idle: bool) {
-        let level = if idle { MemoryUsageLevel::Low } else { MemoryUsageLevel::Normal };
-        let _ = self.webview.set_memory_usage_level(level);
+    /// The window went out of sight (`true`, to the tray) or came back.
+    /// Hidden: WebView2 is told the page is not visible (it stops painting,
+    /// and only then can it be suspended, [`Host::suspend`]) and to keep as
+    /// little memory as it can (`ICoreWebView2_19`, when the installed
+    /// runtime has it). Back: visible, normal memory, and resumed if it was
+    /// suspended (showing it would resume it anyway). Errors are left
+    /// alone: an older runtime lacks some of this.
+    pub fn set_hidden(&self, hidden: bool) {
+        let controller = self.webview.controller();
+        let webview = self.webview.webview();
+        let level = if hidden { COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW } else { COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL };
+        unsafe {
+            let _ = controller.SetIsVisible(!hidden);
+            if let Ok(w) = webview.cast::<ICoreWebView2_19>() {
+                let _ = w.SetMemoryUsageTargetLevel(level);
+            }
+            if !hidden && let Ok(w) = webview.cast::<ICoreWebView2_3>() {
+                let mut suspended = windows::core::BOOL::default();
+                if w.IsSuspended(&mut suspended).is_ok() && suspended.as_bool() {
+                    let _ = w.Resume();
+                }
+            }
+        }
+    }
+
+    /// Freezes the hidden page's processes (`ICoreWebView2_3::TrySuspend`;
+    /// after `set_hidden(true)`, a visible page can't be). `done(suspended)`
+    /// is told how it went, later, on the UI thread. False when it could not
+    /// even be asked (an old runtime).
+    pub fn suspend(&self, done: impl FnOnce(bool) + 'static) -> bool {
+        let Ok(w) = self.webview.webview().cast::<ICoreWebView2_3>() else { return false };
+        let handler = TrySuspendCompletedHandler::create(Box::new(move |result, suspended| {
+            let _ = crate::crash_log::catch(|| done(result.is_ok() && suspended));
+            Ok(())
+        }));
+        unsafe { w.TrySuspend(&handler) }.is_ok()
     }
 }

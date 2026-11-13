@@ -425,6 +425,16 @@ pub struct SettingsOut {
     pub store: bool,
 }
 
+/// What the page searched last, with its filters ([`Outbound::Restore`]).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct Restore {
+    pub q: String,
+    pub kind: usize,
+    pub size: usize,
+    pub date: usize,
+    pub content: bool,
+}
+
 /// A message to the page.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -549,6 +559,10 @@ pub enum Outbound {
         content: bool,
         all_kinds: bool,
     },
+    /// The search of the page before, given back to a page created again
+    /// after the hidden window's WebView2 was closed to free its memory:
+    /// its text and filters, run again.
+    Restore(Restore),
     /// Put the caret in the search box.
     Focus,
     /// A short message for the status bar; `warn` for a problem (shown
@@ -1873,6 +1887,12 @@ mod tests {
         let t = content_text(&done, Lang::En);
         assert!(t.starts_with("Searched 4,000 documents: found 0 files. (50 from the index) Results may be incomplete"), "{t}");
         assert!(t.contains("Arabic"), "{t}");
+    }
+
+    #[test]
+    fn restore_message() {
+        let s = script(&Outbound::Restore(Restore { q: "تقرير".into(), kind: 2, size: 1, date: 3, content: true }));
+        assert_eq!(s, r#"window.__instafind&&window.__instafind.recv({"type":"restore","q":"تقرير","kind":2,"size":1,"date":3,"content":true})"#);
     }
 
     #[test]

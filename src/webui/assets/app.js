@@ -490,6 +490,17 @@
       if (m.all_kinds || m.content) renderChips();
       if (m.content) { S.q = q.value; runSearch(); } else onInput();
     },
+    // The search of the page before, after the program closed WebView2 while
+    // the window waited hidden (to free its memory): text and filters back.
+    restore(m) {
+      closeSettings(); q.value = m.q;
+      S.kind = m.kind < S.kinds.length ? m.kind : 0;
+      S.size = m.size < S.sizes.length ? m.size : 0;
+      S.date = m.date < S.dates.length ? m.date : 0;
+      S.content = !!m.content;
+      renderChips(); updatePlaceholder();
+      runSearch();
+    },
     focus() { q.focus(); },
     thumbs(m) {
       if (m.seq !== S.shown || m.ver !== S.ver) return;
