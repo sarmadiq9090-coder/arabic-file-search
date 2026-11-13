@@ -80,6 +80,55 @@ pub struct Settings {
     /// The global hotkey that opens InstaFind (Ctrl+Alt+F unless the user
     /// picked another, e.g. because another program has it).
     pub hotkey: Hotkey,
+    /// The main window's colours (Settings ▸ Display); Windows' own
+    /// light or dark unless the user picked one.
+    pub theme: Theme,
+}
+
+/// The colour themes of the main window (the page's `data-theme`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Theme {
+    /// Follows Windows' light or dark app mode.
+    #[default]
+    Auto,
+    Light,
+    Dark,
+    /// Dark teal with lime accents: the look of 1.0.
+    Midnight,
+    /// Warm off-white with kiwi-green accents (fastkiwi.app).
+    Kiwi,
+}
+
+impl Theme {
+    pub const ALL: [Theme; 5] = [Theme::Auto, Theme::Light, Theme::Dark, Theme::Midnight, Theme::Kiwi];
+
+    /// As saved, and as the page names it (the serde name).
+    pub fn code(self) -> &'static str {
+        match self {
+            Theme::Auto => "auto",
+            Theme::Light => "light",
+            Theme::Dark => "dark",
+            Theme::Midnight => "midnight",
+            Theme::Kiwi => "kiwi",
+        }
+    }
+
+    pub fn from_code(code: &str) -> Option<Theme> {
+        let code = code.trim().to_ascii_lowercase();
+        Theme::ALL.into_iter().find(|t| t.code() == code)
+    }
+
+    /// Whether its colours are dark (the title bar follows), given whether
+    /// Windows' apps are dark now.
+    #[cfg_attr(not(all(windows, target_env = "msvc")), allow(dead_code))]
+    pub fn dark(self, windows_dark: bool) -> bool {
+        match self {
+            Theme::Auto => windows_dark,
+            Theme::Light | Theme::Kiwi => false,
+            Theme::Dark | Theme::Midnight => true,
+        }
+    }
 }
 
 /// The keys of the global "open InstaFind" hotkey the user can choose from
@@ -210,7 +259,7 @@ impl FloatPos {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Off, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_trying: 0, new_ui_default: false, new_ui_only: false, hotkey: Hotkey::CtrlAltF }
+        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Off, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_trying: 0, new_ui_default: false, new_ui_only: false, hotkey: Hotkey::CtrlAltF, theme: Theme::Auto }
     }
 }
 
@@ -289,6 +338,7 @@ impl Settings {
                 "new_ui_default" => s.new_ui_default = value == "1",
                 "new_ui_only" => s.new_ui_only = value == "1",
                 "hotkey" => s.hotkey = Hotkey::from_code(value).unwrap_or_default(),
+                "theme" => s.theme = Theme::from_code(value).unwrap_or_default(),
                 _ => {}
             }
         }
@@ -298,7 +348,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let cols: Vec<String> = self.columns.iter().map(i32::to_string).collect();
         format!(
-            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\nnew_ui_failed={}\nnew_ui_default={}\nread_cloud_files={}\nnew_ui_only={}\nnew_ui_trying={}\nhotkey={}\n",
+            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\nnew_ui_failed={}\nnew_ui_default={}\nread_cloud_files={}\nnew_ui_only={}\nnew_ui_trying={}\nhotkey={}\ntheme={}\n",
             self.width,
             self.height,
             self.maximized as u8,
@@ -327,7 +377,8 @@ impl Settings {
             self.read_cloud_files as u8,
             self.new_ui_only as u8,
             self.new_ui_trying,
-            self.hotkey.code()
+            self.hotkey.code(),
+            self.theme.code()
         )
     }
 
@@ -377,7 +428,7 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, read_cloud_files: true, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, file_opens: 7, rating_asked: true, new_ui: true, new_ui_failed: true, new_ui_trying: 2, new_ui_default: true, new_ui_only: true, hotkey: Hotkey::WinAltF };
+        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, read_cloud_files: true, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, file_opens: 7, rating_asked: true, new_ui: true, new_ui_failed: true, new_ui_trying: 2, new_ui_default: true, new_ui_only: true, hotkey: Hotkey::WinAltF, theme: Theme::Kiwi };
         assert_eq!(Settings::parse(&s.to_text()), s);
         for mode in [FloatingMode::Fade, FloatingMode::Hidden, FloatingMode::Off] {
             let s = Settings { floating_mode: mode, ..Settings::default() };
@@ -403,6 +454,26 @@ mod tests {
         assert_eq!(Settings::parse("width=900\n").hotkey, Hotkey::CtrlAltF);
         let labels: Vec<&str> = Hotkey::ALL.iter().map(|h| h.label()).collect();
         assert_eq!(labels, ["Ctrl+Alt+F", "Ctrl+Alt+Space", "Ctrl+Shift+F", "Win+Alt+F"]);
+    }
+
+    #[test]
+    fn theme_choice() {
+        assert_eq!(Settings::default().theme, Theme::Auto);
+        assert!(Settings::default().to_text().contains("theme=auto\n"));
+        for t in Theme::ALL {
+            let s = Settings { theme: t, ..Settings::default() };
+            assert_eq!(Settings::parse(&s.to_text()), s);
+            assert_eq!(Theme::from_code(t.code()), Some(t));
+            // The page names it by the same code (bridge.rs `Request::Theme`).
+            assert_eq!(serde_json::from_str::<Theme>(&format!("\"{}\"", t.code())).unwrap(), t);
+        }
+        // An older file (no key) or a damaged one: Windows' own.
+        assert_eq!(Settings::parse("theme=sepia\n").theme, Theme::Auto);
+        assert_eq!(Settings::parse("theme= Midnight\n").theme, Theme::Midnight);
+        assert_eq!(Settings::parse("width=900\n").theme, Theme::Auto);
+        assert!(Theme::Auto.dark(true) && !Theme::Auto.dark(false));
+        assert!(Theme::Dark.dark(false) && Theme::Midnight.dark(false));
+        assert!(!Theme::Light.dark(true) && !Theme::Kiwi.dark(true));
     }
 
     #[test]

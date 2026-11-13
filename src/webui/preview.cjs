@@ -125,7 +125,7 @@ function fakeProgram(cfg) {
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id", "name"],
     save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], options_menu: [], report_problem: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], thumbs: ["seq", "ver", "ids"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
-    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], rating: ["rate"], check_updates: [], hotkey: ["key"], phone_allow: [], phone_window: [], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
+    switch_to: ["list", "seq", "ver", "id"], switch_cancel: [], rating: ["rate"], check_updates: [], hotkey: ["key"], theme: ["key"], phone_allow: [], phone_window: [], open_with: ["list", "seq", "ver", "id"], properties: ["list", "seq", "ver", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
@@ -150,7 +150,7 @@ function fakeProgram(cfg) {
   const status = cfg.indexing
     ? { type: "status", state: "names", files: 36000, text: ar ? "جارٍ الفهرسة… عدد الملفات حتى الآن: 36,000" : "Indexing… 36,000 files so far" }
     : { type: "status", state: "ready", files: 1204331, text: null };
-  const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1", store: !!cfg.store,
+  const settings = { type: "settings", lang: cfg.lang, next_lang: cfg.lang, digits: false, autostart: true, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, hotkey_quick: true, floating: true, tray_icon: true, version: "0.9.1", store: !!cfg.store, theme: cfg.theme || "auto",
     hotkey: "ctrl_alt_f", hotkey_taken: !!cfg.hotkeyTaken, hotkeys: [["ctrl_alt_f", "Ctrl+Alt+F"], ["ctrl_alt_space", "Ctrl+Alt+Space"], ["ctrl_shift_f", "Ctrl+Shift+F"], ["win_alt_f", "Win+Alt+F"]],
     phone: cfg.store ? null : { on: !!(cfg.phoneOn || cfg.phoneRefused), running: false, url: "", pin: "", link: "", note: "", allow: false, idle_off: false } };
   // As web_server.rs `phone_settings`: running on the home network, or on but refused by the network.
@@ -268,6 +268,9 @@ function fakeProgram(cfg) {
       phoneUp(); send({ ...settings });
     } else if (m.op === "set") {
       settings[m.key] = m.on; send({ ...settings });
+    } else if (m.op === "theme") {
+      if (!["auto", "light", "dark", "midnight", "kiwi"].includes(m.key)) window.__fakeErrors.push("unknown theme " + m.key);
+      settings.theme = m.key; send({ ...settings });
     } else if (m.op === "hotkey") {
       // As the program: Windows refuses keys another program has (here Ctrl+Shift+F); the old ones stay.
       if (!settings.hotkeys.some(([code]) => code === m.key)) window.__fakeErrors.push("unknown hotkey " + m.key);
@@ -321,16 +324,17 @@ const SHOTS = [
   ["warn-gone-en-dark", "en", "dark", [["eval", "window.__instafind.recv({ type: 'notice', text: 'Could not open the file', warn: true })"], ["key", "Shift"]], { expect: { warn: false } }],
   // Density: compact rows by themselves in a low window (one line, ≤ 36 px), the preview pane can be hidden,
   // and the indexing banner shrinks to one line after its first seconds.
-  ["compact-ar-light", "ar", "light", [["type", "تقرير"], ["key", "ArrowDown"]], { height: 700, expect: { compact: true, rowH: true } }],
+  ["compact-ar-light", "ar", "light", [["type", "تقرير"], ["key", "ArrowDown"]], { height: 580, expect: { compact: true, rowH: true } }],
   ["roomy-en-light", "en", "light", [["type", "report"]], { height: 900, expect: { compact: false } }],
   ["compact-chosen-en-dark", "en", "dark", [["type", "report"], ["click", "#view-compact"]], { height: 900, expect: { compact: true, rowH: true } }],
   ["no-preview-ar-light", "ar", "light", [["type", "تقرير"], ["click", "#view-preview"]], { expect: { preview: false } }],
-  ["banner-slim-ar-light", "ar", "light", [["type", "تقرير"], ["wait", 6500]], { indexing: true, expect: { bannerSlim: true } }],
+  // Indexing: its progress and a thin bar at the status bar's end (no banner).
+  ["indexing-bar-ar-light", "ar", "light", [["type", "تقرير"]], { indexing: true, expect: { ixBar: true } }],
   // One-click actions: Export and Update index in the toolbar, labelled History/Settings, the
   // right-click menu's folder sizes and replace text, and the actions under the list in a narrow window.
-  ["tools-en-light", "en", "light", [["type", "report"], ["click", "#tool-export"]], { expect: { lastSent: "export", labels: true } }],
+  ["tools-en-light", "en", "light", [["type", "report"], ["click", "#more-btn"], ["click", "#tool-export"]], { expect: { lastSent: "export" } }],
   ["ctx-sizes-ar-light", "ar", "light", [["type", "تقرير"], ["rclick", "#r1"], ["click", "#ctx [data-op=folder_sizes]"], ["wait", 50]], { expect: { lastSent: "folder_sizes" } }],
-  ["narrow-ar-light", "ar", "light", [["type", "تقرير"], ["key", "ArrowDown"]], { width: 820, expect: { actbar: 4, labels: false } }],
+  ["narrow-ar-light", "ar", "light", [["type", "تقرير"], ["key", "ArrowDown"]], { width: 820, expect: { actbar: 4 } }],
   ["actbar-no-preview-en-light", "en", "light", [["type", "report"], ["click", "#view-preview"], ["click", "#actbar .btn:nth-child(3)"], ["wait", 50]], { expect: { actbar: 4, lastSent: "copy" } }],
   // The classic window's terms, and the date with its time in the preview.
   ["terms-ar-light", "ar", "light", [["type", "تقرير"]], { expect: { countsAr: true, termsAr: true, dateTime: true } }],
@@ -445,7 +449,7 @@ const SHOTS = [
   ["pv-name-en-ui-ar-name-en-light", "en", "light", [["type", "فاتورة"]], { expect: { pvNameSide: "right" } }],
   ["pv-name-en-dark", "en", "dark", [["type", "report"]], { expect: { pvNameSide: "left" } }],
   // «كيف أبحث؟»: the ? button and F1 open the card; an example clicked goes in the box and searches.
-  ["help-ar-light", "ar", "light", [["click", "#help-btn"]], { expect: { dialog: true, helpEx: 16, helpKeys: true, a11y: true } }],
+  ["help-ar-light", "ar", "light", [["click", "#more-btn"], ["click", "#more-help"]], { expect: { dialog: true, helpEx: 16, helpKeys: true, a11y: true } }],
   ["help-f1-en-dark", "en", "dark", [["key", "F1"]], { expect: { dialog: true, helpEx: 16, helpKeys: true, focus: "hx0" } }],
   ["help-example-ar-dark", "ar", "dark", [["key", "F1"], ["click", "#hx6"], ["wait", 100]], { expect: { dialog: false, q: "حجم:>10م", lastSent: "search", focus: "q" } }],
   ["help-more-en-light", "en", "light", [["click", "#help-more"]], { width: 900, height: 640, expect: { dialog: true, helpEx: 16 } }],
@@ -473,6 +477,24 @@ const SHOTS = [
     [`settings-${l}-dark`, l, "dark", [["key", "Control+,"]], { langs: LANGS.length, expect: { settings: true } }],
     [`nores-${l}-light`, l, "light", [["type", "zzqq 2024"]]],
   ]),
+  // Themes (the ⋮ menu and Settings ▸ Display): applied at once, kept by the program.
+  ["theme-menu-en-dark", "en", "dark", [["click", "#more-btn"], ["click", "#more-theme-midnight"], ["wait", 50]], { expect: { lastSent: "theme", theme: "midnight", focus: "q" } }],
+  ["theme-keys-ar-light", "ar", "light", [["key", "Control+,"], ["focus", "#theme-auto"], ["key", "ArrowLeft"], ["wait", 50]], { expect: { lastSent: "theme", theme: "light", focus: "theme-light", settings: true } }],
+  ["theme-kept-en-light", "en", "light", [], { theme: "kiwi", expect: { theme: "kiwi" } }],
+  // Every theme, in both directions, in a 1008x680 window and maximised: AA contrast everywhere.
+  ...["auto:light", "auto:dark", "light:light", "dark:dark", "midnight:dark", "kiwi:light"].flatMap((tc) => {
+    const [t, scheme] = tc.split(":"), tag = t === "auto" ? `auto-${scheme}` : t;
+    return ["ar", "en"].flatMap((l) => [[1008, 680, "s"], [1920, 1040, "max"]].flatMap(([w, hgt, z]) => [
+      [`th-${tag}-${l}-${z}-results`, l, scheme, [["type", l === "ar" ? "تقرير" : "report"], ["key", "ArrowDown"]], { theme: t, width: w, height: hgt, expect: { theme: t, contrast: true } }],
+      [`th-${tag}-${l}-${z}-empty`, l, scheme, [], { theme: t, width: w, height: hgt, indexing: true, expect: { theme: t, contrast: true, ixBar: true } }],
+      [`th-${tag}-${l}-${z}-filters`, l, scheme, [["type", l === "ar" ? "تقرير" : "report"], ["chip", "kind", 1], ["click", "#chip-filters"]], { theme: t, width: w, height: hgt, expect: { theme: t, menu: true, contrast: true } }],
+      [`th-${tag}-${l}-${z}-more`, l, scheme, [["type", l === "ar" ? "تقرير" : "report"], ["click", "#more-btn"]], { theme: t, width: w, height: hgt, expect: { theme: t, menu: true, contrast: true } }],
+      [`th-${tag}-${l}-${z}-nores`, l, scheme, [["type", "zzqq 2024"]], { theme: t, width: w, height: hgt, expect: { theme: t, contrast: true } }],
+      [`th-${tag}-${l}-${z}-docs`, l, scheme, [["click", "#chip-content"], ["type", l === "ar" ? "عقد الإيجار" : "lease agreement"], ["key", "Enter"], ["wait", 300]], { theme: t, width: w, height: hgt, expect: { theme: t, content: true, contrast: true } }],
+      [`th-${tag}-${l}-${z}-grid`, l, scheme, [["type", l === "ar" ? "تقرير" : "report"], ["key", "Control+t"], ["wait", 400]], { theme: t, width: w, height: hgt, expect: { theme: t, grid: true, contrast: true } }],
+      [`th-${tag}-${l}-${z}-settings`, l, scheme, [["key", "Control+,"]], { theme: t, width: w, height: hgt, expect: { theme: t, settings: true, contrast: true } }],
+    ]));
+  }),
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
@@ -501,9 +523,9 @@ const SHOTS = [
       if (!file.startsWith(ASSETS) || !fs.existsSync(file)) return route.fulfill({ status: 404, headers, body: "" });
       route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || "application/octet-stream", headers, body: fs.readFileSync(file) });
     });
-    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches, store: !!opts.store, hotkeyTaken: !!opts.hotkeyTaken, phoneOn: !!opts.phoneOn, phoneRefused: !!opts.phoneRefused, phoneIdle: !!opts.phoneIdle });
+    await pg.addInitScript(fakeProgram, { lang, indexing: !!opts.indexing, keepRunning: !!opts.keepRunning, switched: !!opts.switched, noSearches: !!opts.noSearches, store: !!opts.store, hotkeyTaken: !!opts.hotkeyTaken, phoneOn: !!opts.phoneOn, phoneRefused: !!opts.phoneRefused, phoneIdle: !!opts.phoneIdle, theme: opts.theme });
     await pg.goto(ORIGIN + "/");
-    await pg.waitForFunction(() => document.querySelector("#menu-kind") && document.querySelector("#menu-kind").children.length > 0);
+    await pg.waitForFunction(() => document.querySelector("#menu-filters [data-g=kind]"));
     for (const [what, a, b] of steps) {
       if (what === "type") { await pg.fill("#q", a); await pg.waitForTimeout(150); }
       else if (what === "key") { await pg.keyboard.press(a); await pg.waitForTimeout(60); }
@@ -512,6 +534,8 @@ const SHOTS = [
       else if (what === "focus") { await pg.focus(a); }
       else if (what === "rclick") { await pg.click(a, { button: "right" }); await pg.waitForTimeout(120); }
       else if (what === "fill") { await pg.fill(a, b); }
+      // (Type, size and date are groups of the one Filters menu.)
+      else if (what === "chip" && ["kind", "size", "date"].includes(a)) { await pg.click("#chip-filters"); await pg.click(`#menu-filters [data-g="${a}"][data-k="${b}"]`); await pg.waitForTimeout(120); }
       else if (what === "chip") { await pg.click(`#chip-${a}`); await pg.click(`#menu-${a} [data-k="${b}"]`); await pg.waitForTimeout(120); }
       else if (what === "wait") await pg.waitForTimeout(a);
       else if (what === "eval") await pg.evaluate(a);
@@ -610,7 +634,8 @@ const SHOTS = [
         active: document.querySelector("#q").getAttribute("aria-activedescendant"),
         menu: shown.some((el) => el.classList.contains("menu")), dialog: shown.some((el) => el.classList.contains("dlg")),
         content: document.querySelectorAll("#list .row .n3").length > 0, stop: visible(document.getElementById("stop")),
-        chipsOn: document.querySelectorAll(".chip.on").length, settings: view === "view-settings",
+        // Filters in use: the type, size and date chosen, and a folder.
+        chipsOn: [...document.querySelectorAll('#menu-filters [aria-checked="true"]')].filter((x) => x.dataset.k !== "0").length + document.querySelectorAll("#chip-scope.on").length, settings: view === "view-settings",
         names: [...document.querySelectorAll("#list .row .n1 .t")].map((e) => e.textContent), gone: document.querySelectorAll("#list .row.gone").length,
         fnames: document.querySelectorAll("#list .row .fname").length, runs, marks: document.querySelectorAll("#list .row .n1 mark").length,
         sent: window.__sent.map((m) => m.op), recycles: window.__sent.filter((m) => m.op === "recycle").length,
@@ -641,10 +666,36 @@ const SHOTS = [
         countsAr: !/[0-9٠-٩] ?(نتيجة|نتائج|ملف|مستند|تطابق)/.test(document.body.innerText),
         dateTime: /[0-9٠-٩]{1,2}:[0-9٠-٩]{2}/.test([...document.querySelectorAll(".facts .v")].map((d) => d.textContent).join(" ")),
         actbar: visible(document.getElementById("actbar")) ? document.querySelectorAll("#actbar .btn").length : 0,
-        labels: [...document.querySelectorAll(".hbtn .hlbl")].every((l) => visible(l) && l.textContent.trim()),
         rowH: [...document.querySelectorAll("#list .row")].every((r) => r.getBoundingClientRect().height <= 36),
         preview: visible(document.getElementById("preview")),
-        bannerSlim: document.getElementById("banner").classList.contains("slim") && document.getElementById("banner").getBoundingClientRect().height <= 48,
+        ixBar: visible(document.getElementById("ix-bar")) && document.getElementById("ix-bar").getBoundingClientRect().height <= 6 && !!document.getElementById("ix-text").textContent.trim(),
+        theme: document.documentElement.dataset.theme,
+        // WCAG AA: every visible text against what is painted behind it (4.5:1, 3:1 for large text).
+        contrast: (() => {
+          const rgba = (c) => { const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return null; const v = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [v[0], v[1], v[2], v.length > 3 ? v[3] : 1]; };
+          const over = (top, under) => [0, 1, 2].map((i) => top[i] * top[3] + under[i] * (1 - top[3])).concat(1);
+          const lum = (c) => { const f = (x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+          const bgOf = (el) => { const stack = []; for (let e = el; e; e = e.parentElement) { const b = rgba(getComputedStyle(e).backgroundColor); if (b && b[3] > 0) { stack.push(b); if (b[3] >= 1) break; } } let c = [255, 255, 255, 1]; for (const b of stack.reverse()) c = over(b, c); return c; };
+          const low = [];
+          const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          const seen = new Set();
+          while (walk.nextNode()) {
+            const el = walk.currentNode.parentElement;
+            if (!el || seen.has(el) || !walk.currentNode.textContent.trim() || !visible(el) || el.closest("[disabled], [aria-disabled='true'], .gone, .sr, .qr, svg")) continue;
+            seen.add(el);
+            const r = el.getBoundingClientRect();
+            if (r.bottom < 0 || r.top > innerHeight || r.width === 0) continue;
+            const cs = getComputedStyle(el);
+            let op = 1; for (let e = el; e; e = e.parentElement) op *= Number(getComputedStyle(e).opacity);
+            const bg = bgOf(el), fg0 = rgba(cs.color);
+            if (!fg0) continue;
+            const fg = over([fg0[0], fg0[1], fg0[2], fg0[3] * op], bg);
+            const [a, b] = [lum(fg), lum(bg)].sort((x, y) => y - x), ratio = (a + 0.05) / (b + 0.05);
+            const px = parseFloat(cs.fontSize), large = px >= 24 || (px >= 18.66 && Number(cs.fontWeight) >= 700);
+            if (ratio < (large ? 3 : 4.5)) low.push(`${ratio.toFixed(2)} «${walk.currentNode.textContent.trim().slice(0, 24)}» (${el.className || el.tagName})`);
+          }
+          return low.length ? "below AA: " + low.slice(0, 8).join("; ") : true;
+        })(),
         dlgName: !!document.querySelector("#dlg-h .fname"),
         qswitch: visible(document.getElementById("qswitch")),
         rating: visible(document.getElementById("rating")),

@@ -2,6 +2,11 @@
 
 # سجل التغييرات
 
+## Unreleased
+
+- **واجهة أهدأ وأصغر، بشكل ويندوز 11**: خانة بحث واحدة فيها زر مسح (×)، وبجانبها ثلاثة أزرار مربعة: السجل والإعدادات و⋮ «المزيد». تحتها سطر واحد: «التصفية» (النوع والحجم والتاريخ في قائمة واحدة)، و«كل الأقراص»، و«داخل المستندات»، وأزرار العرض الصغيرة، والترتيب في الطرف الآخر. الجدول «الاسم | الحجم | تاريخ التعديل» بأيقونة ملوّنة لكل نوع والمسار تحت الاسم، وشريط الحالة يعرض عدد النتائج وزمنها، وتقدّم الفهرسة مع شريط رفيع بدل البطاقة الكبيرة. «تصدير النتائج» و«تحديث الفهرس» و«كيف أبحث؟» والتحديثات والإبلاغ عن مشكلة في قائمة ⋮. لوحة المعاينة تظهر وحدها في النافذة الواسعة، وكل الاختصارات كما هي. / **A calmer, more compact Windows 11 look:** one search box with a clear (×) button and three square buttons beside it (History, Settings, ⋮ More); one toolbar row with Filters (type, size and date in one menu), All drives, Inside documents, small view toggles and the order at the far end; a Name | Size | Modified table with coloured file-type icons and the folder under each name; a status bar with the result count and time, and indexing progress with a thin bar instead of the big card. Export, Update index, How to search, updates and Report a problem are in the ⋮ menu. The preview pane shows by itself in wide windows; every keyboard shortcut is unchanged.
+- **سمات للنافذة**: في «الإعدادات ▸ العرض» وفي قائمة ⋮: «تلقائي» (يتبع الوضع الفاتح أو الداكن في ويندوز، وهو الافتراضي)، و«فاتح»، و«داكن»، و«ليلي أزرق» (ألوان 1.0)، و«كيوي» (ألوان موقع fastkiwi.app). تتغيّر فوراً دون إعادة تشغيل، وتُحفظ في الإعدادات، وشريط عنوان النافذة يتبعها، والتباين الكبير في ويندوز يتقدّم على أي سمة. كل السمات بتباين WCAG AA. / **Themes:** in Settings ▸ Display and the ⋮ menu: Automatic (follows Windows' light or dark mode; the default), Light, Dark, Midnight blue (1.0's colours) and Kiwi (fastkiwi.app's greens). Applied at once without a restart, saved in the settings, the title bar follows, and Windows high contrast always wins. Every theme meets WCAG AA contrast.
+
 ## 1.0.0 — 2026-11-13
 
 الإصدار 1.0.0. كل سطر بالعربية أولاً ثم بالإنجليزية بعد «/». / InstaFind 1.0.0. Each line: Arabic first, then English after "/".

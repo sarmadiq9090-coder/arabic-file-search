@@ -12,6 +12,8 @@
     "cancel": "Cancel",
     "chooseFolder": "Choose folder…",
     "clearFilter": "Remove",
+    "clearFilters": "Clear all filters",
+    "clearQ": "Clear search",
     "clearRecent": "Clear history and recent files",
     "clearSaved": "Delete all saved searches",
     "close": "Close",
@@ -32,6 +34,7 @@
     "fileOf": "FN:(x) => `${x} file`",
     "files": "FN:(n) => `Index up to date · ${num(n)} files`",
     "filters": "Filters",
+    "filtersBtn": "Filters",
     "firstLines": "FN:(n) => `(first ${num(n)} lines)`",
     "folder": "Folder",
     "gone": "Moved to the Recycle Bin",
@@ -113,6 +116,7 @@
     "history": "History",
     "historyKey": "History (Ctrl+H)",
     "inside": "Inside documents",
+    "ixContents": "FN:(n) => `Indexing document contents · ${n}%`",
     "ixSub": "You can search now; results may be incomplete until we finish. The list updates by itself.",
     "kFolder": "Folder",
     "kLabel": "Keyboard shortcuts",
@@ -263,6 +267,15 @@
     "switchedText": "This is InstaFind's new look.",
     "tagHead": "Nothing gets lost silently",
     "tagTail": ": when we find nothing, we tell you where we looked and what to try.",
+    "theme": "Theme",
+    "themeSub": "“Automatic” follows Windows' light or dark mode",
+    "themes": {
+      "auto": "Automatic",
+      "dark": "Dark",
+      "kiwi": "Kiwi",
+      "light": "Light",
+      "midnight": "Midnight blue"
+    },
     "tips": [
       [
         "report .pdf",
@@ -319,6 +332,8 @@
     "cancel": "إلغاء",
     "chooseFolder": "اختيار مجلد…",
     "clearFilter": "إزالة",
+    "clearFilters": "إزالة كل عوامل التصفية",
+    "clearQ": "مسح البحث",
     "clearRecent": "مسح السجل والملفات الأخيرة",
     "clearSaved": "حذف كل البحوث المحفوظة",
     "close": "إغلاق",
@@ -339,6 +354,7 @@
     "fileOf": "FN:(x) => `ملف ${x}`",
     "files": "FN:(n) => `الفهرس محدَّث · عدد الملفات: ${num(n)}`",
     "filters": "عوامل التصفية",
+    "filtersBtn": "التصفية",
     "firstLines": "FN:(n) => `(أول الأسطر فقط، عددها: ${num(n)})`",
     "folder": "مجلد",
     "gone": "نُقل إلى سلة المحذوفات",
@@ -420,6 +436,7 @@
     "history": "السجل",
     "historyKey": "السجل (Ctrl+H)",
     "inside": "داخل المستندات",
+    "ixContents": "FN:(n) => `فهرسة محتوى المستندات · ${n}٪`",
     "ixSub": "يمكنك البحث الآن. قد تكون النتائج ناقصة إلى أن تنتهي الفهرسة، وتكتمل القائمة تلقائياً.",
     "kFolder": "المجلد",
     "kLabel": "اختصارات لوحة المفاتيح",
@@ -570,6 +587,15 @@
     "switchedText": "هذا هو الشكل الجديد لبحث سريع.",
     "tagHead": "لا شيء يضيع بصمت",
     "tagTail": ": إذا لم نجد شيئاً نقول لك أين بحثنا وماذا تجرّب.",
+    "theme": "السمة",
+    "themeSub": "«تلقائي» يتبع الوضع الفاتح أو الداكن في ويندوز",
+    "themes": {
+      "auto": "تلقائي",
+      "dark": "داكن",
+      "kiwi": "كيوي",
+      "light": "فاتح",
+      "midnight": "ليلي أزرق"
+    },
     "tips": [
       [
         "تقرير .pdf",
