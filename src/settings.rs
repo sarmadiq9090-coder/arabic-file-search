@@ -190,7 +190,9 @@ impl Settings {
                 "maximized" => s.maximized = value == "1",
                 "columns" => s.columns = value.split(',').filter_map(|w| w.trim().parse().ok()).collect(),
                 "arabic_digits" => s.arabic_digits = value == "1",
-                "kind" => s.kind = value.parse().unwrap_or(0),
+                // A type the list does not have (a damaged file) is "all
+                // types": the last entry, folders only, would hide every file.
+                "kind" => s.kind = value.parse().ok().filter(|&k| k < crate::search::KINDS.len()).unwrap_or(0),
                 "sort_col" => s.sort_col = value.parse().unwrap_or(-1).clamp(-1, 3),
                 "sort_desc" => s.sort_desc = value == "1",
                 "update_check" => s.update_check = value.parse().unwrap_or(0),
@@ -310,6 +312,13 @@ mod tests {
         assert_eq!((s.width, s.height, s.sort_col, s.kind, s.update_check, s.maximized), (400, 10_000, 3, 0, 0, false));
         let s = Settings::parse("width=-5\nheight=\nsort_col=-9\nkind=-1\nsort_desc=true\narabic_digits=0");
         assert_eq!((s.width, s.height, s.sort_col, s.kind, s.sort_desc, s.arabic_digits), (d.width, d.height, -1, 0, false, false));
+        // A file type past the end of the list is "all types", not the last
+        // entry (folders only, which would hide every file).
+        let last = crate::search::KINDS.len() - 1;
+        assert_eq!(Settings::parse(&format!("kind={last}")).kind, last);
+        for bad in [format!("kind={}", last + 1), "kind=4294967295".into(), "kind=18446744073709551615".into(), "kind=99999999999999999999".into()] {
+            assert_eq!(Settings::parse(&bad).kind, 0, "{bad}");
+        }
         // Unparsable column widths are dropped, the rest kept in order.
         assert_eq!(Settings::parse("columns=100,x,, 200 ,-3,9999999999").columns, vec![100, 200, -3]);
         assert!(Settings::parse("columns=").columns.is_empty());
