@@ -87,8 +87,9 @@ scoop install instafind
 
 ### البحث
 - **نتائج فورية بالاسم** أثناء الكتابة في كل الأقراص أو في مجلد تختاره، مع فلاتر جاهزة: مستندات، صور، صوت، فيديو، مضغوطات، برامج، مجلدات.
-- **عربية حقيقية**: لا فرق بين أ إ آ ا، ولا ة ه، ولا ى ي، ويتجاهل التشكيل والتطويل و«ال»، ويقبل الأرقام العربية (٠١٢٣) والحروف الفارسية.
-- **يسامح الأخطاء**: إن لم يجد شيئاً جرّب وحده لوحة المفاتيح الأخرى، ثم الفرانكو (`3abd` ← عبد)، ثم الكلمات القريبة إملائياً (`تقريز` ← التقرير). و`جذر:` يبحث بجذر الكلمة.
+- **عربية حقيقية**: لا فرق بين أ إ آ ا، ولا ة ه، ولا ى ي، ويتجاهل التشكيل والتطويل و«ال»، ويقبل الأرقام العربية (٠١٢٣) وفواصلها (١٢٫٥) والحروف الفارسية والعراقية والكردية (گ چ پ ڤ ژ ێ ۆ ڕ ڵ: «گراج» تجد «كراج»، و«گاع» تجد «قاع» أيضاً).
+- **لغات أخرى**: يتجاهل علامات الحروف اللاتينية واليونانية («cafe» تجد «Café»، و«ogrenci» تجد «Öğrenci»)، ويقرأ ё كـ е، والحروف كاملة العرض ونصفها، والكاتاكانا كالهيراغانا، والكورية والهندية والبنغالية والتاميلية والتيلوغوية والغوجاراتية والبنجابية والكنّادية والمالايالامية والأوديا مُركّبةً ودون ZWJ/ZWNJ والنقطة (nukta)، وحروف الأردية والبشتو والسندية والأويغورية. الصينية المبسطة والتقليدية لا تتطابقان بعد.
+- **يسامح الأخطاء**: إن لم يجد شيئاً جرّب وحده لوحة المفاتيح الأخرى (العربية، ومعها الفارسية والكردية السورانية والروسية والأوكرانية والتركية Q والفرنسية AZERTY إن كانت مثبّتة في ويندوز)، ثم الفرانكو (`3abd` ← عبد)، ثم الكلمات القريبة إملائياً (`تقريز` ← التقرير). و`جذر:` يبحث بجذر الكلمة.
 - **صيغة بحث قوية**: عبارة بين علامتي تنصيص، «أو» و«ليس»، نوع الملف، الحجم، تاريخ التعديل، التعبيرات المنتظمة، الكلمة كاملة، والتقارب بين كلمتين. انظر [الجدول أدناه](#طريقة-البحث).
 - **إخفاء ملفات النظام** (مفعّل افتراضياً): مجلد Windows وسلة المحذوفات وملفات الصفحات ومجلدات المؤقت والذاكرة المخبأة داخل AppData لا تظهر في النتائج. يُطفأ من «خيارات ← إخفاء ملفات النظام»، أو اكتب `نظام:` لبحث واحد. مجلد Program Files وملفاتك تبقى ظاهرة.
 - **الملفات الأكثر فتحاً أولاً**، وخط تحت الجزء المطابق، وترتيب بالنقر على عنوان أي عمود.
@@ -262,8 +263,9 @@ InstaFind's second includes starting the command-line tool and loading the index
 
 #### Search
 - **Instant filename search** across all drives or one folder, with ready-made filters: documents, pictures, audio, video, archives, programs, folders.
-- **Real Arabic matching**: hamza forms, ta marbuta, alef maqsura, diacritics, tatweel and the `ال` prefix are ignored; Arabic-Indic digits and Persian letters are accepted.
-- **Forgiving**: when nothing matches, it retries with the other keyboard layout, then Arabizi (`3abd` → عبد), then near spellings (one or two typos). `root:` searches by the Arabic triliteral root.
+- **Real Arabic matching**: hamza forms, ta marbuta, alef maqsura, diacritics, tatweel and the `ال` prefix are ignored; Arabic-Indic digits and separators (١٢٫٥) and Persian, Iraqi and Kurdish letters (گ چ پ ڤ ژ ێ ۆ ڕ ڵ) are accepted: گراج finds كراج, and گاع also finds قاع.
+- **Other languages**: Latin and Greek accents are ignored (`cafe` finds `Café`, `ogrenci` finds `Öğrenci`), ё is е, full-width and half-width forms and katakana/hiragana match, Korean and the Indic scripts (Devanagari, Bengali, Tamil, Telugu, Gujarati, Gurmukhi, Kannada, Malayalam, Odia) are composed and matched without ZWJ/ZWNJ or nukta, and Urdu, Pashto, Sindhi and Uyghur letters match. Simplified and Traditional Chinese do not match each other yet.
+- **Forgiving**: when nothing matches, it retries with the other keyboard layout (Arabic, and Persian, Central Kurdish, Russian, Ukrainian, Turkish Q and French AZERTY when installed in Windows), then Arabizi (`3abd` → عبد), then near spellings (one or two typos). `root:` searches by the Arabic triliteral root.
 - **Rich query syntax**: phrases, OR, NOT, extensions, size, date modified, regex, whole word, and word proximity. See [Query syntax](#query-syntax).
 - **System files hidden** (on by default): the Windows folder, Recycle Bin, page files and temp/cache folders under AppData stay out of the results. Turn it off in **Options → Hide system files**, or type `sys:` for one search. Program Files and your own files always show.
 - **Often-opened files first**, match underlining, sort by any column, search history and saved searches (Ctrl+H).

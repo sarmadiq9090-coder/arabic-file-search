@@ -240,13 +240,13 @@ impl Matcher {
     }
 }
 
-/// Same as `char::is_alphanumeric` (what [`split_words`] uses), much faster
-/// for Arabic letters, which are all alphanumeric.
+/// Same as what [`split_words`] uses (letters, digits and the marks on
+/// them), much faster for Arabic letters, which are all alphanumeric.
 fn is_word_char(c: char) -> bool {
     match c {
         _ if c.is_ascii() => c.is_ascii_alphanumeric(),
         '\u{0621}'..='\u{064A}' => true,
-        _ => c.is_alphanumeric(),
+        _ => c.is_alphanumeric() || unicode_normalization::char::is_combining_mark(c),
     }
 }
 
@@ -401,7 +401,8 @@ pub fn name_fallback(
     let found = |hits: Vec<u32>, kind, query: String, shown: String| {
         (!hits.is_empty()).then_some((hits, Fallback { kind, query, shown }))
     };
-    if let Some(alt) = layout::convert_layout(text) {
+    // Each keyboard layout installed on the PC, Arabic first.
+    for alt in layout::layout_candidates(text) {
         let hits = search::search_names(entries, &parse(&alt), scope);
         if let Some(r) = found(hits, FallbackKind::Layout, alt.clone(), alt) {
             return Some(r);
@@ -477,8 +478,9 @@ mod tests {
 
     #[test]
     fn word_chars_agree() {
-        for c in ('\u{0}'..='\u{07FF}').chain('\u{FB50}'..='\u{FEFF}') {
-            assert_eq!(is_word_char(c), c.is_alphanumeric(), "{c:?}");
+        for c in ('\u{0}'..='\u{0DFF}').chain('\u{FB50}'..='\u{FEFF}') {
+            let s = c.to_string();
+            assert_eq!(is_word_char(c), search::split_words(&s).next().is_some(), "{c:?}");
         }
     }
 
@@ -594,6 +596,19 @@ mod tests {
     fn fallback<'a>(es: &'a [Entry], text: &str) -> Option<(Vec<&'a str>, FallbackKind, String)> {
         let (hits, fb) = name_fallback(es, text, "", &|t: &str| Query::parse(t))?;
         Some((hits.into_iter().map(|i| es[i as usize].name()).collect(), fb.kind, fb.shown))
+    }
+
+    /// The other keyboard layouts (all of them outside Windows; on Windows
+    /// only those installed).
+    #[cfg(not(windows))]
+    #[test]
+    fn fallback_other_layouts() {
+        let es = entries(&["привет мир.txt", "maison.docx", "ڕۆژ.jpg", "پدر.pdf", "report.pdf"]);
+        assert_eq!(fallback(&es, "ghbdtn").map(|r| (r.0, r.1)), Some((vec!["привет мир.txt"], FallbackKind::Layout)));
+        assert_eq!(fallback(&es, ";qison").unwrap().0, vec!["maison.docx"]);
+        assert_eq!(fallback(&es, "Roj").unwrap().0, vec!["ڕۆژ.jpg"]);
+        assert_eq!(fallback(&es, "\\nv").unwrap().0, vec!["پدر.pdf"]);
+        assert_eq!(fallback(&es, "кузщке").unwrap().2, "report");
     }
 
     #[test]
