@@ -22,6 +22,18 @@
 
 pub(super) use imp::{WebUi, available, wanted};
 
+/// How a search handed over from the quick popup runs in the main window
+/// (its suggestions for a search that found nothing).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(super) struct Handover {
+    /// Inside documents too.
+    pub content: bool,
+    /// Every file type.
+    pub all_kinds: bool,
+    /// Every drive, not the folder chosen.
+    pub all_drives: bool,
+}
+
 #[cfg(target_env = "msvc")]
 mod imp {
     use native_windows_gui as nwg;
@@ -179,6 +191,9 @@ mod imp {
         /// A Save/Open dialog waits since Ctrl+Alt+G (`super::super::quickswitch`):
         /// the hint the page shows meanwhile.
         quick_switch: RefCell<Option<String>>,
+        /// A search the quick popup handed over (its text and how to run
+        /// it), sent once the page is there.
+        handover: RefCell<Option<(String, super::Handover)>>,
     }
 
     impl App {
@@ -825,8 +840,35 @@ mod imp {
             self.webui_send(&Outbound::Notice { text: text.into(), warn: true });
         }
 
+        /// The quick popup's search continues in the new window, run as
+        /// `how` says (inside documents, all types, all drives), never in the
+        /// hidden classic window. Shows the window. False when the new look
+        /// is not in use.
+        pub(in super::super) fn webui_take_search(&self, q: &str, how: super::Handover) -> bool {
+            if !self.webui.active.get() {
+                return false;
+            }
+            // (The classic box keeps the text, as before; the plain hand-over
+            // below then has nothing more to send.)
+            self.query.set_text(q);
+            self.webui.handed.replace(q.to_string());
+            self.webui.handover.replace(Some((q.to_string(), how)));
+            self.webui_show();
+            true
+        }
+
         /// The quick popup's search, when it asked for the full window.
         fn webui_hand_over_query(&self) {
+            if !self.webui.ready.get() {
+                return;
+            }
+            if let Some((q, how)) = self.webui.handover.take() {
+                if how.all_drives {
+                    self.webui_set_scope(String::new(), false);
+                }
+                self.webui_send(&Outbound::Query { q, content: how.content, all_kinds: how.all_kinds });
+                return;
+            }
             let text = self.query.text();
             if *self.webui.handed.borrow() == text {
                 return;
@@ -834,7 +876,7 @@ mod imp {
             if self.webui.ready.get() {
                 self.webui.handed.replace(text.clone());
                 if !text.trim().is_empty() {
-                    self.webui_send(&Outbound::Query { q: text });
+                    self.webui_send(&Outbound::Query { q: text, content: false, all_kinds: false });
                 }
             }
         }
@@ -954,12 +996,14 @@ mod imp {
                     // older text of the classic box); a first page gets the
                     // classic box's text (the quick popup's search).
                     let again = self.webui.page_query.borrow().clone();
-                    if again.trim().is_empty() {
+                    if self.webui.handover.borrow().is_some() {
+                        self.webui_hand_over_query();
+                    } else if again.trim().is_empty() {
                         self.webui.handed.replace(String::new());
                         self.webui_hand_over_query();
                     } else {
                         self.webui.handed.replace(self.query.text());
-                        self.webui_send(&Outbound::Query { q: again });
+                        self.webui_send(&Outbound::Query { q: again, content: false, all_kinds: false });
                     }
                 }
                 Request::Search { seq, q, kind, size, date, content, sort, desc } => {
@@ -1942,6 +1986,10 @@ mod imp {
         }
 
         pub(in super::super) fn webui_step_aside(&self) -> bool {
+            false
+        }
+
+        pub(in super::super) fn webui_take_search(&self, _q: &str, _how: super::Handover) -> bool {
             false
         }
 

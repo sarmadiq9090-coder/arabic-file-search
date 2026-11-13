@@ -465,7 +465,15 @@
       renderBanner(); renderStatus();
       if (S.view === "nores") renderNoResults();
     },
-    query(m) { closeSettings(); q.value = m.q; onInput(); },
+    // A search from the quick popup; its suggestions say how to run it
+    // (inside documents, every file type; "all drives" came as a scope).
+    query(m) {
+      closeSettings(); q.value = m.q;
+      if (m.all_kinds) S.kind = 0;
+      if (m.content) S.content = true;
+      if (m.all_kinds || m.content) renderChips();
+      if (m.content) { S.q = q.value; runSearch(); } else onInput();
+    },
     focus() { q.focus(); },
     thumbs(m) {
       if (m.seq !== S.shown || m.ver !== S.ver) return;

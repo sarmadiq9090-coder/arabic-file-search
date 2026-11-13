@@ -1176,6 +1176,11 @@ impl App {
                 return;
             }
             (Target::OpenInMain(q), _) => {
+                // The new look takes the text (no search in the hidden classic window).
+                if self.webui_take_search(q, super::webui::Handover::default()) {
+                    self.hide_quick();
+                    return;
+                }
                 self.query.set_text(q);
                 self.show_window();
                 self.hide_quick();
@@ -1454,6 +1459,13 @@ impl App {
                 }
             }
             Suggestion::Contents | Suggestion::AllDrives | Suggestion::AllKinds => {
+                // The new look runs it as the suggestion says (inside
+                // documents, all drives, all types), not the hidden classic window.
+                let how = super::webui::Handover { content: *s == Suggestion::Contents, all_kinds: *s == Suggestion::AllKinds, all_drives: *s == Suggestion::AllDrives };
+                if self.webui_take_search(query.trim(), how) {
+                    self.hide_quick();
+                    return;
+                }
                 self.query.set_text(query.trim());
                 if *s == Suggestion::Contents {
                     self.content_chk.set_check_state(nwg::CheckBoxState::Checked);

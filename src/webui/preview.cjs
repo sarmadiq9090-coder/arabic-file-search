@@ -350,6 +350,9 @@ const SHOTS = [
   ["qswitch-enter-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["key", "Enter"], ["wait", 50]], { expect: { lastSent: "switch_to", opens: 0, qswitch: false } }],
   ["qswitch-esc-en-dark", "en", "dark", [["eval", QS_ON.en], ["type", "report"], ["key", "Escape"], ["wait", 50]], { expect: { lastSent: "switch_cancel", qswitch: false, q: "report" } }],
   ["qswitch-ctx-ar-dark", "ar", "dark", [["eval", QS_ON.ar], ["type", "تقرير"], ["rclick", "#r1"]], { expect: { menu: true, ctxFirst: "فتح مجلدها في نافذة الحفظ/الفتح" } }],
+  // The quick popup's suggestions carry over: inside documents runs a document search, all types clears the type.
+  ["handover-content-ar-light", "ar", "light", [["eval", "window.__instafind.recv({ type: 'query', q: 'عقد الإيجار', content: true, all_kinds: false })"], ["wait", 300]], { expect: { content: true, rows: 3, inside: true } }],
+  ["handover-kinds-en-light", "en", "light", [["chip", "kind", 1], ["eval", "window.__instafind.recv({ type: 'query', q: 'report', content: false, all_kinds: true })"], ["wait", 150]], { expect: { chipsOn: 0, inside: false } }],
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
@@ -497,6 +500,7 @@ const SHOTS = [
         bannerSlim: document.getElementById("banner").classList.contains("slim") && document.getElementById("banner").getBoundingClientRect().height <= 48,
         dlgName: !!document.querySelector("#dlg-h .fname"),
         qswitch: visible(document.getElementById("qswitch")),
+        inside: document.getElementById("chip-content").getAttribute("aria-pressed") === "true",
         ctxFirst: (() => { const it = document.querySelector("#ctx:not([hidden]) [role=menuitem] span"); return it ? it.textContent : null; })(),
       };
     }, lang);

@@ -522,9 +522,13 @@ pub enum Outbound {
         /// The progress in words, while indexing runs.
         text: Option<String>,
     },
-    /// Put this text in the box and search (from the quick popup).
+    /// Put this text in the box and search (from the quick popup); with
+    /// `content` inside documents, with `all_kinds` in every file type
+    /// (its suggestions for a search that found nothing).
     Query {
         q: String,
+        content: bool,
+        all_kinds: bool,
     },
     /// Put the caret in the search box.
     Focus,
@@ -1832,7 +1836,7 @@ mod tests {
 
     #[test]
     fn script_and_status() {
-        let s = script(&Outbound::Query { q: "a\"b</script>\u{2028}".into() });
+        let s = script(&Outbound::Query { q: "a\"b</script>\u{2028}".into(), content: false, all_kinds: false });
         assert!(s.starts_with("window.__instafind&&window.__instafind.recv({\"type\":\"query\""), "{s}");
         assert!(s.contains(r#"a\"b</script>"#));
         assert!(matches!(status(true, Indexing::Idle, 0, Lang::Ar), Outbound::Status { state: "loading", .. }));
