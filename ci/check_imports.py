@@ -39,13 +39,15 @@ import sys
 
 # DLLs that ship with every supported Windows version (10/11). Lower case.
 # usp10.dll is Uniscribe (Arabic text shaping, src/draw.rs).
+# oleacc.dll is Active Accessibility (the quick popup's screen-reader list,
+# src/ui/quick_access.rs); in System32 on every Windows since XP.
 ALLOWED = {
     "advapi32.dll", "bcrypt.dll", "bcryptprimitives.dll", "combase.dll",
     "comctl32.dll", "comdlg32.dll", "crypt32.dll", "d2d1.dll", "d3d11.dll",
     "dbghelp.dll", "dwmapi.dll", "dwrite.dll", "dxgi.dll", "gdi32.dll",
     "imm32.dll", "iphlpapi.dll", "kernel32.dll", "kernelbase.dll",
     "msimg32.dll", "mswsock.dll", "ncrypt.dll", "ntdll.dll", "ole32.dll",
-    "oleaut32.dll", "powrprof.dll", "propsys.dll", "psapi.dll", "rpcrt4.dll", "secur32.dll",
+    "oleacc.dll", "oleaut32.dll", "powrprof.dll", "propsys.dll", "psapi.dll", "rpcrt4.dll", "secur32.dll",
     "setupapi.dll", "shcore.dll", "shell32.dll", "shlwapi.dll",
     "uiautomationcore.dll", "urlmon.dll", "user32.dll", "userenv.dll",
     "usp10.dll", "uxtheme.dll", "version.dll", "winhttp.dll", "wininet.dll", "winmm.dll",
