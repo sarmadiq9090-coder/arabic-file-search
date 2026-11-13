@@ -348,7 +348,10 @@ impl App {
                 self.show_suggestions(Vec::new());
             }
             if n != old_n && !res.empty {
-                self.set_status(&trf!("عدد النتائج: {} (حُدِّثت تلقائياً){warn}", "Found {} results (updated automatically){warn}", fmt_num(n)));
+                // The classic status bar only: while the new look is the
+                // main window this is the hidden classic list's own count,
+                // not the new look's results (it showed «1,026,415» over 37).
+                self.status.set_text(0, &trf!("عدد النتائج: {} (حُدِّثت تلقائياً){warn}", "Found {} results (updated automatically){warn}", fmt_num(n)));
             }
             return;
         }

@@ -1202,7 +1202,9 @@
   // total" in the program's words, in either order); else its size.
   function renderBanner() {
     const busy = S.state !== "ready", bar = $("ix-bar");
-    $("ix").title = busy ? T.ixSub : "";
+    // (The tooltip keeps the program's own words, e.g. "your folders first",
+    // which the short percentage below leaves out.)
+    $("ix").title = busy ? (S.stateText ? digits(S.stateText) + "\n" : "") + T.ixSub : "";
     const say = (text) => { $("ix-text").replaceChildren(); fill($("ix-text"), [[text, false]]); };
     if (!busy) { say(S.files ? T.files(S.files) : ""); bar.hidden = true; return; }
     let pct = null;
