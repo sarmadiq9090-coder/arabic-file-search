@@ -212,6 +212,13 @@ impl ChangeQueue {
         ChangeQueue { roots: roots.to_vec(), ..ChangeQueue::default() }
     }
 
+    /// Also takes changes under `root` (a drive added while watching).
+    pub fn add_root(&mut self, root: &str) {
+        if !self.roots.iter().any(|r| r.eq_ignore_ascii_case(root)) {
+            self.roots.push(root.to_string());
+        }
+    }
+
     /// The same queue for changes under `roots` (for tests with small limits).
     #[cfg(test)]
     pub fn under(mut self, roots: &[String]) -> ChangeQueue {
@@ -691,6 +698,21 @@ mod tests {
         assert_eq!(taken.collapsed, [r"D:\", r"C:\"]);
         assert_eq!(taken.changes, [Change::Modified(r"E:\a.txt".into()), Change::Rescan(r"D:\".into()), Change::Rescan(r"C:\".into())]);
         assert_eq!(taken.dropped, 400_002);
+    }
+
+    /// A root added while watching (a drive plugged in, or a folder walk's
+    /// queue) names its own changes when they are dropped, once.
+    #[test]
+    fn a_root_added_later_names_its_dropped_changes() {
+        let mut q = ChangeQueue::new(3, usize::MAX).under(&[r"C:\".to_string()]);
+        q.add_root(r"E:\Photos\");
+        q.add_root(r"e:\photos\");
+        for i in 0..5 {
+            q.push(Change::Added(format!(r"E:\Photos\{i}.jpg")));
+        }
+        let taken = q.take();
+        assert_eq!(taken.collapsed, [r"E:\Photos\"]);
+        assert_eq!(taken.changes, [Change::Rescan(r"E:\Photos\".into())]);
     }
 
     #[test]

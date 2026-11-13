@@ -63,6 +63,10 @@ mod imp {
     /// buttons are): WebView2 lays the page out right to left itself.
     const WS_EX_NOINHERITLAYOUT: u32 = 0x0010_0000;
 
+    /// Microsoft's free WebView2 download page, offered by the classic
+    /// window's line when WebView2 is not installed.
+    const WEBVIEW2_DOWNLOAD: &str = "https://developer.microsoft.com/microsoft-edge/webview2/";
+
     /// A page that has not said hello this long after it was created or
     /// reloaded is taken as failed (a blank window).
     const PAGE_TIMEOUT: Duration = Duration::from_secs(20);
@@ -321,18 +325,39 @@ mod imp {
                 return;
             }
             if show && !self.webui.note.is_built() {
+                // Not installed at all: the line offers Microsoft's free
+                // download page, opened in the browser on a click.
+                let missing = !available();
                 let mut label = nwg::Label::default();
                 let built = nwg::Label::builder()
                     .parent(&self.window)
                     .font(Some(&self.font))
                     .v_align(nwg::VTextAlign::Center)
-                    .text(tr!(
-                        "يعمل البرنامج بالشكل البسيط لأن مكوّن WebView2 في ويندوز لا يعمل.",
-                        "Running in the simple look because Windows' WebView2 component is not working."
-                    ))
+                    .text(if missing {
+                        tr!(
+                            "يعمل البرنامج بالشكل البسيط لأن مكوّن WebView2 غير مثبّت. انقر هنا لتنزيله مجاناً من Microsoft.",
+                            "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft."
+                        )
+                    } else {
+                        tr!(
+                            "يعمل البرنامج بالشكل البسيط لأن مكوّن WebView2 في ويندوز لا يعمل.",
+                            "Running in the simple look because Windows' WebView2 component is not working."
+                        )
+                    })
                     .build(&mut label);
                 match built {
-                    Ok(()) => self.webui.note.set(label),
+                    Ok(()) => {
+                        if missing {
+                            let at = label.handle;
+                            // (Kept bound for the run, as the line itself.)
+                            let _ = self.bind_main_events(move |evt, _data, handle| {
+                                if evt == nwg::Event::OnLabelClick && handle == at && !shell::open(WEBVIEW2_DOWNLOAD) {
+                                    log("webui: could not open the WebView2 download page");
+                                }
+                            });
+                        }
+                        self.webui.note.set(label);
+                    }
                     Err(e) => log(&format!("webui: the note could not be shown: {e}")),
                 }
             }
@@ -1089,6 +1114,18 @@ mod imp {
             self.webui_send(&msg);
         }
 
+        /// Something the Settings view shows changed outside the page (a
+        /// check for updates started or ended, search from phone started or
+        /// stopped): sent now when the page is there, else on the first
+        /// tick it is.
+        pub(in super::super) fn webui_settings_changed(&self) {
+            if self.webui.active.get() && self.webui.ready.get() {
+                self.webui_send_settings();
+            } else {
+                self.webui.settings_stale.set(true);
+            }
+        }
+
         fn webui_send_settings(&self) {
             let current = i18n::locale();
             let msg = {
@@ -1107,6 +1144,11 @@ mod imp {
                     tray_icon: s.tray_icon,
                     version: env!("CARGO_PKG_VERSION"),
                     store: crate::store::is_packaged(),
+                    checking_updates: self.update_check_asked(),
+                    hotkey: s.hotkey.code(),
+                    hotkey_taken: super::super::keys::hotkey_taken(),
+                    hotkeys: bridge::hotkeys(),
+                    phone: self.phone_settings(),
                 })
             };
             self.webui_send(&msg);
@@ -1441,6 +1483,22 @@ mod imp {
                     if let Some(app) = self.webui.me.borrow().upgrade() {
                         app.show_report();
                     }
+                }
+                Request::PhoneAllow {} => self.web_allow_now(),
+                Request::PhoneWindow {} => {
+                    if let Some(app) = self.webui.me.borrow().upgrade() {
+                        app.open_web_window();
+                    }
+                }
+                Request::Hotkey { key } => {
+                    if !self.change_hotkey(key) {
+                        self.webui_warn(trf!(
+                            "الاختصار {} يستخدمه برنامج آخر أيضاً. اختر غيره.",
+                            "Another program has {} too. Pick another one.",
+                            key.label()
+                        ));
+                    }
+                    self.webui_send_settings();
                 }
                 // The Save dialog runs inside this handler: the timer leaves the page alone meanwhile.
                 Request::Export {} => {
@@ -1827,6 +1885,7 @@ mod imp {
                 Setting::HotkeyQuick => self.set_hotkey_quick(on),
                 Setting::Floating => self.set_floating_mode(if on { FloatingMode::Fade } else { FloatingMode::Off }),
                 Setting::TrayIcon => self.set_tray_icon(on),
+                Setting::Phone => self.set_web_on(on),
             }
             self.save_settings();
             self.webui_send_settings();
@@ -2040,6 +2099,9 @@ mod imp {
                 // As the Options menu's item: the Store version is told where
                 // its updates come from and offered its Store page.
                 self.check_for_update(true);
+                // The page said "Checking…" at the click; now it hears
+                // whether a check really runs (none for a managed copy).
+                self.webui_settings_changed();
             }
             if self.webui.active.get() && !self.webui.switching.get() {
                 if let Some(browser_gone) = self.webui.failed.take() {
@@ -2218,6 +2280,8 @@ mod imp {
         }
 
         pub(in super::super) fn webui_tell_switch(&self) {}
+
+        pub(in super::super) fn webui_settings_changed(&self) {}
 
         pub(in super::super) fn webui_shed_thumbs(&self) {}
 

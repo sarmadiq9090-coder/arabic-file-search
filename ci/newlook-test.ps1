@@ -218,7 +218,7 @@ function Focus-Window($Hwnd) {
     [void][N]::SetForegroundWindow($Hwnd)
     Start-Sleep -Milliseconds 400
 }
-function Read-Settings { if (Test-Path $settingsFile) { [IO.File]::ReadAllText($settingsFile) } else { '' } }
+function Read-Settings { if (Test-Path $settingsFile) { Read-Shared $settingsFile } else { '' } }
 function Setting([string]$Text, [string]$Key) {
     $m = [regex]::Matches($Text, "(?m)^\s*$Key\s*=\s*(.*?)\s*$")
     if ($m.Count) { $m[$m.Count - 1].Groups[1].Value } else { $null }
@@ -281,7 +281,19 @@ function Center($El) {
 function Is-Selected($El) {
     try { return $El.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected } catch { return $null }
 }
-function Log-Text { if (Test-Path $logFile) { [IO.File]::ReadAllText($logFile, [Text.Encoding]::UTF8) } else { '' } }
+# Reads a file the program may be writing at that moment (log.txt, settings):
+# File.ReadAllText asks for FileShare.Read only and fails while another handle
+# has write access, so open with FileShare.ReadWrite and retry briefly.
+function Read-Shared([string]$Path) {
+    for ($i = 0; $i -lt 5; $i++) {
+        try {
+            $fs = New-Object IO.FileStream($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+            try { $sr = New-Object IO.StreamReader($fs, [Text.Encoding]::UTF8); return $sr.ReadToEnd() } finally { $fs.Dispose() }
+        } catch { Start-Sleep -Milliseconds 100 }
+    }
+    return ''
+}
+function Log-Text { if (Test-Path $logFile) { Read-Shared $logFile } else { '' } }
 function Log-Lines([string]$Pattern) { @((Log-Text) -split "`r?`n" | Where-Object { $_ -match $Pattern }) }
 
 # Saves the window's client area to <Out>\<Name>.png; returns how varied it

@@ -343,6 +343,14 @@ fn pdf_parent_chain(depth: usize) -> Vec<u8> {
     pdf_of(&objects)
 }
 
+/// `pdf` with its cross-reference entries ending in a bare line feed (19
+/// bytes), which lopdf refuses to load.
+fn with_bare_lf_xref(pdf: Vec<u8>) -> Vec<u8> {
+    let bad = String::from_utf8(pdf).unwrap().replace(" n \n", " n\n").replace(" f \n", " f\n").into_bytes();
+    assert!(lopdf::Document::load_mem(&bad).is_err());
+    bad
+}
+
 #[test]
 fn pdf_form_recursion_does_not_kill_the_process() {
     // pdf-extract runs every `Do` as a nested call with no depth limit: a
@@ -354,6 +362,10 @@ fn pdf_form_recursion_does_not_kill_the_process() {
         ("self.pdf", pdf_form_calling_itself()),
         ("loop.pdf", pdf_two_forms_in_a_loop()),
         ("chain.pdf", pdf_form_chain(20_000, "deep")),
+        // A table lopdf refuses (19-byte entries) is rebuilt (`pdf_fix`),
+        // and the rebuilt document is checked like any other.
+        ("self-bad-xref.pdf", with_bare_lf_xref(pdf_form_calling_itself())),
+        ("loop-bad-xref.pdf", with_bare_lf_xref(pdf_two_forms_in_a_loop())),
     ] {
         let c = child(name, &pdf, &[]);
         assert!(c.ok, "{name}: {c:?}");

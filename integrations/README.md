@@ -7,7 +7,7 @@ bahth.exe -s "فاتورة ext:pdf" --json -n 20
 ```
 
 يطبع مصفوفة JSON بعناصر `{path, name, size, modified, is_dir}`. رمز الخروج: 0 نتائج، 1 لا نتائج، 2 خطأ (غالباً لا يوجد فهرس بعد: افتح البرنامج مرة لبنائه).
-مسار التثبيت الافتراضي: `%LOCALAPPDATA%\Programs\Bahth\bahth.exe`.
+مسار التثبيت الافتراضي: `%LOCALAPPDATA%\Programs\InstaFind\bahth.exe` (المجلد الذي ينقل البرنامج نفسه إليه عند أول تشغيل من مجلد التنزيلات). النسخ الأقدم في `%LOCALAPPDATA%\Programs\Bahth\bahth.exe`، ونسخة Microsoft Store تُشغَّل بالاسم `instafind.exe`. إضافة Flow Launcher تبحث في الثلاثة.
 
 ## Flow Launcher
 
@@ -39,7 +39,7 @@ bahth.exe -s "فاتورة ext:pdf" --json -n 20
 ### Windows Terminal / موجّه الأوامر
 
 ```
-"%LOCALAPPDATA%\Programs\Bahth\bahth.exe" -s "تقرير" -n 20 --sort date --desc
+"%LOCALAPPDATA%\Programs\InstaFind\bahth.exe" -s "تقرير" -n 20 --sort date --desc
 ```
 
 أضف ملف تعريف في Windows Terminal (الإعدادات ← Open JSON file) ليفتح نافذة بحث جاهزة:
@@ -47,7 +47,7 @@ bahth.exe -s "فاتورة ext:pdf" --json -n 20
 ```json
 {
   "name": "بحث سريع",
-  "commandline": "powershell -NoExit -Command \"Set-Alias b $env:LOCALAPPDATA\\Programs\\Bahth\\bahth.exe\""
+  "commandline": "powershell -NoExit -Command \"Set-Alias b $env:LOCALAPPDATA\\Programs\\InstaFind\\bahth.exe\""
 }
 ```
 
@@ -57,7 +57,7 @@ bahth.exe -s "فاتورة ext:pdf" --json -n 20
 
 ```powershell
 [Console]::OutputEncoding = [Text.Encoding]::UTF8   # حتى تُقرأ الأسماء العربية من الأنبوب صحيحة
-$bahth = "$env:LOCALAPPDATA\Programs\Bahth\bahth.exe"
+$bahth = "$env:LOCALAPPDATA\Programs\InstaFind\bahth.exe"   # نسخة المتجر: $bahth = "instafind.exe"
 
 # أكبر 10 ملفات PDF فيها «عقد»
 & $bahth -s "عقد ext:pdf" --json -n 10 --sort size --desc | ConvertFrom-Json |
@@ -81,7 +81,7 @@ $bahth = "$env:LOCALAPPDATA\Programs\Bahth\bahth.exe"
     ib := InputBox("اكتب كلمة البحث:", "بحث سريع")
     if (ib.Result != "OK" || ib.Value = "")
         return
-    exe := EnvGet("LOCALAPPDATA") "\Programs\Bahth\bahth.exe", tmp := A_Temp "\bahth-results.txt"
+    exe := EnvGet("LOCALAPPDATA") "\Programs\InstaFind\bahth.exe", tmp := A_Temp "\bahth-results.txt"
     RunWait(A_ComSpec ' /c ""' exe '" -s "' ib.Value '" -n 30 > "' tmp '""', , "Hide")
     g := Gui(, "نتائج: " ib.Value), lb := g.AddListBox("w800 r20", StrSplit(Trim(FileRead(tmp, "UTF-8"), "`r`n"), "`n", "`r"))
     lb.OnEvent("DoubleClick", (*) => Run(lb.Text)), g.Show()
@@ -94,9 +94,9 @@ $bahth = "$env:LOCALAPPDATA\Programs\Bahth\bahth.exe"
 
 ## English
 
-InstaFind's Arabic-aware index (hamza forms, ta marbuta, alef maqsura, diacritics) can be used from launchers and scripts through the CLI: `bahth.exe -s "query" --json -n 20` prints a JSON array of `{path, name, size, modified, is_dir}`; exit code 0 = results, 1 = none, 2 = error (usually no index yet: open the app once). Default install path: `%LOCALAPPDATA%\Programs\Bahth\bahth.exe`.
+InstaFind's Arabic-aware index (hamza forms, ta marbuta, alef maqsura, diacritics) can be used from launchers and scripts through the CLI: `bahth.exe -s "query" --json -n 20` prints a JSON array of `{path, name, size, modified, is_dir}`; exit code 0 = results, 1 = none, 2 = error (usually no index yet: open the app once). Default install path: `%LOCALAPPDATA%\Programs\InstaFind\bahth.exe` (where the app moves itself on its first run from Downloads); older copies live in `%LOCALAPPDATA%\Programs\Bahth\bahth.exe`, and the Microsoft Store edition runs as `instafind.exe`. The Flow Launcher plugin looks in all three.
 
-- **Flow Launcher:** copy `flow-launcher/` into `%APPDATA%\FlowLauncher\Plugins\` and restart Flow. Keywords `ب` and `bs`. Enter opens the file; the context menu opens its folder. Set the exe path in the plugin settings or the `BAHTH_EXE` environment variable if it is not installed in the default place. Tests: `python3 -m unittest -v test_main`.
+- **Flow Launcher:** copy `flow-launcher/` into `%APPDATA%\FlowLauncher\Plugins\` and restart Flow. Keywords `ب` and `bs`. Enter opens the file; the context menu opens its folder. Set the exe path in the plugin settings or the `BAHTH_EXE` environment variable if it is in none of those places. Tests: `python3 -m unittest -v test_main`.
 - **PowerToys Run:** plugins are C# DLLs, so there is none yet. Use the built-in Shell plugin (`> bahth.exe -s ...`), Flow Launcher, or the AutoHotkey script above.
 - **PowerShell:** set `[Console]::OutputEncoding = [Text.Encoding]::UTF8`, then pipe `--json` into `ConvertFrom-Json`.
 - **AutoHotkey:** redirect output to a file and read it with `FileRead(path, "UTF-8")`; reading the pipe directly uses the console code page and garbles Arabic.

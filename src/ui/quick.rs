@@ -35,7 +35,7 @@ use winapi::um::winuser::*;
 
 use super::launcher_shim as shim;
 use super::startup::{background_priority, log};
-use super::surface::{self, Canvas, Font, KIND_POPUP, WM_APP_CATALOG, WM_APP_FILES, WM_APP_SYSTEM};
+use super::surface::{self, Canvas, Font, KIND_POPUP, WM_APP_ACC_OPEN, WM_APP_CATALOG, WM_APP_FILES, WM_APP_SYSTEM};
 use super::{App, shell, title};
 use crate::feedback::{self, SystemInfo};
 use crate::launcher::{self, Action, Catalog, SystemCommand, windows::OpenWindow};
@@ -119,6 +119,9 @@ pub struct Popup {
     /// Bin), and its result for the UI thread: the command and whether it worked.
     system_running: Cell<bool>,
     system_slot: Arc<Mutex<Option<(SystemCommand, bool)>>>,
+    /// The rows as a list for screen readers (`ui/quick_access.rs`); unset
+    /// when Windows refused it.
+    results: std::cell::OnceCell<super::quick_access::Results>,
 }
 
 /// File rows of the latest finished search.
@@ -325,10 +328,18 @@ impl App {
         }
         // What a screen reader says for the box (its text is what is typed,
         // and the hint above is only a cue banner, which it does not read).
-        super::accessible::set_name(
+        super::accessible::name_edit(
             edit,
-            tr!("بحث سريع: اكتب اسم ملف أو برنامج أو إعداد، ثم Enter", "Quick search: type the name of a file, an app or a setting, then press Enter"),
+            tr!("ابحث", "Search"),
+            tr!(
+                "اكتب اسم ملف أو برنامج أو إعداد. السهمان للأعلى وللأسفل يتنقلان بين النتائج، وEnter يفتح النتيجة المحددة.",
+                "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one."
+            ),
         );
+        // The rows for screen readers, on a window of their own over the list.
+        if let Some(results) = super::quick_access::Results::create(hwnd) {
+            let _ = self.popup.results.set(results);
+        }
         self.popup.hwnd.set(hwnd as usize);
         self.popup.edit.set(edit as usize);
         self.popup.post_to.store(hwnd as usize, Ordering::Relaxed);
@@ -417,6 +428,9 @@ impl App {
         self.popup.rect.set(rect);
         self.popup.selected.set(None);
         self.popup.enter_pending.set(false);
+        if let Some(results) = self.popup.results.get() {
+            results.reset();
+        }
         // Where the cursor is now: only a real move selects a row.
         let mut cur = winapi::shared::windef::POINT { x: 0, y: 0 };
         unsafe { GetCursorPos(&mut cur) };
@@ -702,11 +716,29 @@ impl App {
         let previous = self.popup.selected.get().and_then(|i| self.popup.rows.borrow().get(i).map(|r| r.target.clone()));
         let selected = quick::reselect(&rows, previous.as_ref());
         ui_test_dump(&query, &rows);
+        let spoken = self.popup.results.get().map(|_| self.popup_spoken_rows(&rows, &slots));
         *self.popup.rows.borrow_mut() = rows;
         *self.popup.slots.borrow_mut() = slots;
         self.popup.selected.set(selected);
         self.popup.list_h.set(list_h);
         self.popup_resize(list_h + px(STRIP_H, scale));
+        if let (Some(results), Some(items)) = (self.popup.results.get(), spoken) {
+            results.update(items, selected, self.popup.note.borrow().clone(), self.popup_edit());
+        }
+    }
+
+    /// The rows as a screen reader reads them, with their place in the list.
+    fn popup_spoken_rows(&self, rows: &[Row], slots: &[Slot]) -> Vec<super::quick_access::Item> {
+        let lang = crate::i18n::current();
+        let names_incomplete = self.popup.note.borrow().is_some() && self.popup.names_incomplete.get();
+        rows.iter()
+            .enumerate()
+            .map(|(i, row)| {
+                let header = quick::starts_section(rows, i).then(|| header_label(row.group, names_incomplete));
+                let (top, height) = slots.iter().find(|s| s.kind == SlotKind::Row(i)).map_or((0, 0), |s| (s.y, s.h));
+                super::quick_access::Item { name: quick::spoken_name(row, header, lang), top, height, selectable: quick::selectable(row) }
+            })
+            .collect()
     }
 
     /// The progress line under the results while indexing runs (the
@@ -744,6 +776,9 @@ impl App {
         let list_h = self.popup.list_h.get().min(r.height());
         unsafe {
             SetWindowPos(hwnd, HWND_TOPMOST, r.left, r.top, r.width(), r.height(), SWP_NOACTIVATE);
+        }
+        if let Some(results) = self.popup.results.get() {
+            results.place(r.width(), list_h);
         }
         // The backdrop shows through the list; a solid Windows 11 popup still
         // extends one (opaque) row, which gets it DWM's shadow.
@@ -815,6 +850,9 @@ impl App {
                     if row.is_some() && row != self.popup.selected.get() {
                         self.popup.selected.set(row);
                         unsafe { InvalidateRect(hwnd, std::ptr::null(), 0) };
+                        if let Some(results) = self.popup.results.get() {
+                            results.select(row, false);
+                        }
                     }
                 }
                 Some(0)
@@ -846,6 +884,16 @@ impl App {
                 self.popup_system_done();
                 Some(0)
             }
+            WM_APP_ACC_OPEN => {
+                // A screen reader's "default action" on row `w` of the list it saw.
+                let current = self.popup.results.get().is_some_and(|r| r.generation() == l as u32);
+                if current && self.quick_visible() && w < self.popup.rows.borrow().len() {
+                    self.popup.selected.set(Some(w));
+                    unsafe { InvalidateRect(hwnd, std::ptr::null(), 0) };
+                    self.popup_open_selected(How::Open);
+                }
+                Some(0)
+            }
             WM_APP_CATALOG => {
                 if self.quick_visible() {
                     self.popup_refresh();
@@ -869,9 +917,23 @@ impl App {
     /// Keys typed in the search box; `None` lets the box have them.
     fn popup_edit_key(&self, msg: UINT, w: WPARAM) -> Option<LRESULT> {
         match msg {
+            // Windows tells the screen reader about the box itself.
+            WM_SETFOCUS => {
+                if let Some(results) = self.popup.results.get() {
+                    results.leave_list(self.popup_edit(), false);
+                }
+                None
+            }
             WM_KEYDOWN => {
                 let ctrl = unsafe { GetKeyState(VK_CONTROL) } < 0;
                 match w as i32 {
+                    // The caret keys work the box: the screen reader goes back to it.
+                    VK_LEFT | VK_RIGHT | VK_HOME | VK_END => {
+                        if let Some(results) = self.popup.results.get() {
+                            results.leave_list(self.popup_edit(), true);
+                        }
+                        return None;
+                    }
                     VK_DOWN => self.popup_move(1),
                     VK_UP => self.popup_move(-1),
                     VK_NEXT => self.popup_move(4),
@@ -894,6 +956,10 @@ impl App {
         let next = quick::step_selection(&self.popup.rows.borrow(), self.popup.selected.get(), delta);
         self.popup.selected.set(next);
         unsafe { InvalidateRect(self.popup_hwnd(), std::ptr::null(), 0) };
+        // A screen reader reads the row the keys moved to.
+        if let Some(results) = self.popup.results.get() {
+            results.select(next, true);
+        }
     }
 
     // ---------------------------------------------------------------- painting
@@ -978,11 +1044,7 @@ impl App {
                     SlotKind::Header(g) => {
                         let r = Rect::at(quick::mirror_x(px(16, s), w - px(32, s), w, rtl), slot.y, w - px(32, s), slot.h);
                         // Not a plain "No results" while the index is not complete.
-                        let label = if g == Group::Suggest && names_incomplete {
-                            crate::indexing_status::incomplete_try(crate::i18n::current())
-                        } else {
-                            group_label(g)
-                        };
+                        let label = header_label(g, names_incomplete);
                         surface::draw_text(dc, &look.header, p.muted, label, &r, rtl, false);
                     }
                     SlotKind::Separator => {}
@@ -1535,6 +1597,12 @@ fn label_more_row(r: &mut Row) {
     }
 }
 
+/// The name drawn above a section: not a plain "No results" while the
+/// names are still being scanned (`names_incomplete`).
+fn header_label(g: Group, names_incomplete: bool) -> &'static str {
+    if g == Group::Suggest && names_incomplete { crate::indexing_status::incomplete_try(crate::i18n::current()) } else { group_label(g) }
+}
+
 /// The name shown above a section.
 fn group_label(g: Group) -> &'static str {
     match g {
@@ -1554,7 +1622,8 @@ fn group_label(g: Group) -> &'static str {
 }
 
 /// For the automated UI test (`ci/ui-test.ps1`) only: the popup draws its rows
-/// itself, so UI Automation cannot read them. With `BAHTH_UI_TEST` set, each
+/// itself (screen readers get them from `ui/quick_access.rs`), and the test
+/// reads this file rather than the accessibility tree. With `BAHTH_UI_TEST` set, each
 /// refresh writes the query and the rows to `quick-rows.txt` next to the log.
 fn ui_test_dump(query: &str, rows: &[Row]) {
     use std::io::Write;

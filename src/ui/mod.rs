@@ -51,6 +51,7 @@ mod memory;
 mod older_copy;
 mod placement;
 mod quick;
+mod quick_access;
 mod quickswitch;
 mod rating;
 mod relocate;
@@ -95,7 +96,7 @@ use crate::leave::Leaving;
 use files::SAVES;
 use format::ARABIC_DIGITS;
 use history_menu::HistoryMenu;
-use keys::{HOTKEY_ID, HOTKEY_TEXT};
+use keys::{HOTKEY_ID, hotkey_text};
 use search_jobs::NameResult;
 use startup::{LOOP_STARTED, activate_running_copy, phase, ui_font_family};
 use updates::UpdateEvent;
@@ -271,6 +272,11 @@ pub struct App {
     /// Bytes downloaded / total of a running update download.
     update_progress: Arc<(AtomicU64, AtomicU64)>,
     update_busy: Cell<bool>,
+    /// A check for updates is running (`update_busy` is also set for a download).
+    update_checking: Cell<bool>,
+    /// The user asked for that check (or asked while an automatic one ran):
+    /// its answer is shown, and the new look's button says "Checking…".
+    update_asked: Cell<bool>,
     /// Timer ticks since start, to delay the automatic update check.
     ticks: Cell<u32>,
     /// Built on first use: each one starts a COM file dialog, which is slow.
@@ -584,7 +590,7 @@ impl App {
         if self.state.borrow().settings.tray_icon && !self.tray_hint_shown.replace(true) {
             // The hotkey, unless another program has it (its menu item is
             // greyed then).
-            let hotkey = self.menu_hotkey.enabled().then_some(HOTKEY_TEXT);
+            let hotkey = self.menu_hotkey.enabled().then_some(hotkey_text());
             self.tray.show(
                 &crate::quick::hidden_hint(crate::i18n::current(), hotkey),
                 Some(title()),

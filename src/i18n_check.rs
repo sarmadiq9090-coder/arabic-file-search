@@ -712,6 +712,24 @@ impl Expr<'_> {
                 self.i += 1;
                 self.template_body(Some('`'))?;
             }
+            // A list: [a, b, …] (helpKeys gives rows of [key, text]).
+            '[' => {
+                self.i += 1;
+                if !self.eat("]") {
+                    loop {
+                        self.expr()?;
+                        if self.eat("]") {
+                            break;
+                        }
+                        if !self.eat(",") {
+                            return Err("bad list".into());
+                        }
+                        if self.eat("]") {
+                            break;
+                        }
+                    }
+                }
+            }
             d if d.is_ascii_digit() => {
                 while self.peek().is_ascii_digit() || self.peek() == '.' {
                     self.i += 1;

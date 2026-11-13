@@ -10,8 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::time::UNIX_EPOCH;
 
 use crate::normalize::name_key;
@@ -156,14 +155,21 @@ pub struct Applied {
 
 impl Index {
     /// Scans all `roots` in parallel and returns the finished index.
+    #[cfg(test)]
     pub fn build(roots: &[String], progress: &ScanProgress) -> Index {
-        Index { entries: walk_all(roots, 500_000, progress), roots: roots.to_vec(), built_at: now_secs() }
+        Index::build_measured(roots, progress).0
+    }
+
+    /// [`Index::build`], with what the walk did (for the log).
+    pub fn build_measured(roots: &[String], progress: &ScanProgress) -> (Index, crate::walk::Stats) {
+        let (entries, stats) = walk_all(roots, 500_000, progress);
+        (Index { entries, roots: roots.to_vec(), built_at: now_secs() }, stats)
     }
 
     /// Everything below `dir` (not `dir` itself), sorted, with the same rules
     /// as a full scan. Used for folders that appear with unknown contents.
     pub fn scan_subtree(dir: &str, progress: &ScanProgress) -> Vec<Entry> {
-        walk_all(&[dir.to_string()], 0, progress)
+        walk_all(&[dir.to_string()], 0, progress).0
     }
 
     pub fn load(path: &Path) -> Option<Index> {
@@ -458,6 +464,44 @@ impl Index {
         out
     }
 
+    /// Makes the drive `root` (`E:\`) a root of the index, after its first
+    /// walk (a drive plugged in while watching). Anything else is no root.
+    pub fn add_root(&mut self, root: &str) {
+        let drive = root.len() == 3 && root.ends_with(":\\") && root.as_bytes()[0].is_ascii_alphabetic();
+        if drive && !self.roots.iter().any(|r| r.eq_ignore_ascii_case(root)) {
+            self.roots.push(root.to_string());
+            self.roots.sort_by_key(|r| r.to_ascii_uppercase());
+        }
+    }
+
+    /// Copies of everything below `roots`, for [`Index::keep_entries`].
+    pub fn copies_under(&self, roots: &[String]) -> Vec<Entry> {
+        roots.iter().flat_map(|r| self.descendants(r)).flat_map(|range| self.entries[range].iter().cloned()).collect()
+    }
+
+    /// Puts back what an older index had below `roots` (drives not connected
+    /// during this scan, which could not see them): `kept`, from
+    /// [`Index::copies_under`]. A root this index already has entries below
+    /// keeps those instead. The drives stay roots. Returns the entries put back.
+    pub fn keep_entries(&mut self, roots: &[String], mut kept: Vec<Entry>) -> usize {
+        let full: Vec<&String> = roots.iter().filter(|r| !self.descendants(r).is_empty()).collect();
+        kept.retain(|e| !full.iter().any(|r| is_under(&e.path, r)));
+        sort_by_path(&mut kept);
+        kept.dedup_by(|a, b| a.path == b.path);
+        let n = kept.len();
+        if n > 0 {
+            let rest = std::mem::take(&mut self.entries);
+            self.entries = merge_by_path(rest, kept);
+        }
+        for r in roots {
+            if !self.roots.iter().any(|x| x.eq_ignore_ascii_case(r)) {
+                self.roots.push(r.clone());
+            }
+        }
+        self.roots.sort_by_key(|r| r.to_ascii_uppercase());
+        n
+    }
+
     /// Replaces everything below `dir` with `found` (from `scan_subtree`,
     /// sorted by path). `dir`'s own entry is kept. Returns the new count of
     /// entries below `dir`.
@@ -515,19 +559,13 @@ pub fn remove_stale_tmp(path: &Path, older_than: std::time::Duration) -> usize {
     removed
 }
 
-/// Walks `roots` in parallel; the result is sorted with names filled in.
-fn walk_all(roots: &[String], capacity: usize, progress: &ScanProgress) -> Vec<Entry> {
-    let out: Mutex<Vec<Entry>> = Mutex::new(Vec::with_capacity(capacity));
-    rayon::scope(|s| {
-        for root in roots {
-            let out = &out;
-            s.spawn(move |s| walk(s, PathBuf::from(root), out, progress));
-        }
-    });
-    let mut entries = out.into_inner().unwrap_or_default();
+/// Walks `roots` in parallel (`crate::walk`); the result is sorted with
+/// names filled in, so it does not depend on the order the walk found them.
+fn walk_all(roots: &[String], capacity: usize, progress: &ScanProgress) -> (Vec<Entry>, crate::walk::Stats) {
+    let (mut entries, stats) = crate::walk::walk(roots, capacity, progress);
     sort_by_path(&mut entries);
     fill_norm_names(&mut entries);
-    entries
+    (entries, stats)
 }
 
 fn sort_by_path(entries: &mut [Entry]) {
@@ -554,40 +592,6 @@ fn merge_by_path(a: Vec<Entry>, b: Vec<Entry>) -> Vec<Entry> {
         merged.extend(if take_a { a.next() } else { b.next() });
     }
     merged
-}
-
-fn walk<'s>(s: &rayon::Scope<'s>, dir: PathBuf, out: &'s Mutex<Vec<Entry>>, progress: &'s ScanProgress) {
-    if progress.cancel.load(Ordering::Relaxed) {
-        return;
-    }
-    let Ok(rd) = fs::read_dir(&dir) else { return };
-    let mut local = Vec::new();
-    for ent in rd.flatten() {
-        // On Windows file_type() and metadata() come straight from the
-        // directory listing, so they cost no extra system call.
-        let Ok(ft) = ent.file_type() else { continue };
-        // Symlinks and junctions are skipped to avoid loops and duplicates.
-        if ft.is_symlink() {
-            continue;
-        }
-        let path = ent.path();
-        let Some(path_str) = path.to_str() else { continue };
-        let (size, mtime) = match ent.metadata() {
-            Ok(m) => (
-                if ft.is_dir() { 0 } else { m.len() },
-                m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs() as i64),
-            ),
-            Err(_) => (0, 0),
-        };
-        local.push(Entry { path: path_str.into(), size, mtime, is_dir: ft.is_dir(), norm_name: Box::default() });
-        if ft.is_dir() && !ent.file_name().to_str().is_some_and(skip_dir) {
-            s.spawn(move |s| walk(s, path, out, progress));
-        }
-    }
-    progress.files.fetch_add(local.len(), Ordering::Relaxed);
-    if let Ok(mut v) = out.lock() {
-        v.append(&mut local);
-    }
 }
 
 pub fn now_secs() -> i64 {
@@ -624,6 +628,7 @@ pub fn list_drives() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::Ordering;
 
     #[test]
     fn skipped_dirs() {
@@ -982,6 +987,32 @@ mod tests {
         assert!(Change::Renamed(r"C:\x".into(), r"C:\a\y".into()).touches(r"C:\a"));
         assert!(!Change::Added(r"C:\ab\y".into()).touches(r"C:\a"));
         assert!(Change::Added(r"C:\ab\y".into()).touches(r"C:\"));
+    }
+
+    #[test]
+    fn a_drive_plugged_in_becomes_a_root_once() {
+        let mut idx = index_of(&[r"C:\a"]);
+        idx.roots = vec![r"C:\".into(), r"F:\".into()];
+        idx.add_root(r"E:\");
+        idx.add_root(r"e:\");
+        idx.add_root(r"C:\");
+        idx.add_root(r"C:\folder\"); // a folder walk, not a drive
+        assert_eq!(idx.roots, [r"C:\", r"E:\", r"F:\"]);
+    }
+
+    #[test]
+    fn a_full_scan_keeps_the_entries_of_unplugged_drives() {
+        let old = index_of(&[r"C:\old.txt", r"E:\photos", r"E:\photos\a.jpg", r"F:\x.txt"]);
+        let kept = old.copies_under(&[r"E:\".to_string(), r"F:\".to_string()]);
+        assert_eq!(kept.len(), 3);
+        // The new scan saw C: (and F:, which is back with other files).
+        let mut new = index_of(&[r"C:\new.txt", r"F:\y.txt"]);
+        new.roots = vec![r"C:\".into(), r"F:\".into()];
+        assert_eq!(new.keep_entries(&[r"E:\".to_string(), r"F:\".to_string()], kept), 2);
+        assert_eq!(paths(&new), [r"C:\new.txt", r"E:\photos", r"E:\photos\a.jpg", r"F:\y.txt"]);
+        assert!(is_sorted(&new));
+        assert_eq!(new.roots, [r"C:\", r"E:\", r"F:\"]);
+        assert_eq!(new.find(r"E:\photos\a.jpg").map(|i| &*new.entries[i].norm_name), Some("a.jpg"));
     }
 
     #[test]

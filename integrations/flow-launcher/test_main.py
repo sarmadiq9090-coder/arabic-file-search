@@ -100,7 +100,18 @@ class ExeTests(unittest.TestCase):
             self.assertEqual(main.find_exe({"bahth_path": ' "F:\\set\\bahth.exe" '}), "F:\\set\\bahth.exe")
             self.assertEqual(main.find_exe({"bahth_path": ""}), "E:\\env\\bahth.exe")
         with mock.patch.dict(os.environ, {"LOCALAPPDATA": "C:\\L"}, clear=True):
-            self.assertEqual(main.find_exe(None), os.path.join("C:\\L", "Programs", "Bahth", "bahth.exe"))
+            moved = os.path.join("C:\\L", "Programs", "InstaFind", "bahth.exe")
+            old = os.path.join("C:\\L", "Programs", "Bahth", "bahth.exe")
+            store = os.path.join("C:\\L", "Microsoft", "WindowsApps", "instafind.exe")
+            # Nothing installed: the folder the app moves itself to (named in the message).
+            with mock.patch.object(main.os.path, "isfile", return_value=False):
+                self.assertEqual(main.find_exe(None), moved)
+            for there in (moved, old, store):
+                with mock.patch.object(main.os.path, "isfile", side_effect=lambda p, there=there: p == there):
+                    self.assertEqual(main.find_exe(None), there)
+            # Both folders: the one the app moves itself to wins.
+            with mock.patch.object(main.os.path, "isfile", side_effect=lambda p: p in (old, moved)):
+                self.assertEqual(main.find_exe(None), moved)
 
 
 class ActionTests(unittest.TestCase):

@@ -34,7 +34,7 @@
 
 1. نزّل [`bahth.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe) من [أحدث إصدار](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest). ملف واحد، لا يحتاج تثبيتاً.
    - لأجهزة ARM64 (مثل Snapdragon) نزّل [`bahth-arm64.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-arm64.exe)، ولويندوز 32 بت نزّل [`bahth-x86.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-x86.exe). كل نسخة تحدّث نفسها بنسختها.
-2. ضعه في مجلد دائم، مثلاً `%LOCALAPPDATA%\Programs\Bahth\` (هذا المسار تستعمله إضافات `integrations/`)، ثم شغّله.
+2. شغّله. إن شغّلته من مجلد التنزيلات يعرض عليك مرة واحدة نقل نفسه إلى `%LOCALAPPDATA%\Programs\InstaFind\` (هذا المسار تبحث فيه إضافات `integrations/`، ومعه `Programs\Bahth\` القديم)، أو ضعه أنت في مجلد دائم.
 3. إن ظهر تحذير SmartScreen لأن الملف غير موقّع رقمياً: «مزيد من المعلومات» ← «تشغيل على أي حال».
 
 أو ثبّته بأمر واحد عبر [Scoop](https://scoop.sh):
@@ -107,7 +107,7 @@ scoop install instafind
 - **أحجام المجلدات**: عمود الحجم يشمل المجلدات، ونافذة تبيّن ما يملأ القرص.
 - **عرض المصغرات** للصور والمستندات (Ctrl+T).
 - **استبدال نص في عدة ملفات نصية** مع معاينة ونسخة احتياطية وزر تراجع.
-- **البحث من الهاتف** عبر شبكة المنزل: مطفأ افتراضياً، برمز دخول، وللقراءة فقط.
+- **البحث من الهاتف** عبر شبكة المنزل: مطفأ افتراضياً، برمز دخول أو رمز QR من الإعدادات، وللقراءة فقط، ويتوقف وحده بعد ساعتين دون استخدام.
 - **سحب النتيجة وإفلاتها** في واتساب أو البريد أو Word، وCtrl+C ينسخ الملف نفسه، وF2 لإعادة التسمية، وDelete إلى سلة المحذوفات.
 - **تصدير النتائج** إلى CSV يفتحه Excel بالعربية.
 - **سطر الأوامر** و**إضافة Flow Launcher** وأمثلة PowerShell وAutoHotkey.
@@ -148,7 +148,7 @@ scoop install instafind
 
 | المفتاح | العمل |
 |---|---|
-| Ctrl+Alt+F | نافذة البحث الصغيرة من أي مكان (Tab للإجراءات، Esc للإغلاق) |
+| Ctrl+Alt+F | نافذة البحث الصغيرة من أي مكان (Tab للإجراءات، Esc للإغلاق). إن كان برنامج آخر يستعمله فاختر غيره من الإعدادات ← البحث من أي مكان |
 | Ctrl+Alt+G | في نافذة حفظ أو فتح: الانتقال إلى مجلد نتيجة |
 | Enter / Ctrl+Enter | فتح الملف / فتح مجلده مع تحديده |
 | السهم للأسفل | من خانة البحث إلى النتائج (وفي خانة فارغة: السجل) |
@@ -209,7 +209,7 @@ InstaFind is a free file search tool for Windows, written in Rust. It indexes al
 
 1. Download [`bahth.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth.exe) from the [latest release](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest). It is a single file; nothing to install.
    - On ARM64 PCs (e.g. Snapdragon) download [`bahth-arm64.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-arm64.exe); on 32-bit Windows, [`bahth-x86.exe`](https://github.com/sarmadiq9090-coder/arabic-file-search/releases/latest/download/bahth-x86.exe). Each one updates itself with its own build.
-2. Put it in a permanent folder, for example `%LOCALAPPDATA%\Programs\Bahth\` (the path the `integrations/` plugins expect), and run it.
+2. Run it. Started from Downloads, it offers once to move itself to `%LOCALAPPDATA%\Programs\InstaFind\` (where the `integrations/` plugins look, along with the older `Programs\Bahth\`); or put it in a permanent folder yourself.
 3. If SmartScreen warns because the file is not code-signed: **More info → Run anyway**.
 
 Or install it with [Scoop](https://scoop.sh):
@@ -281,7 +281,7 @@ InstaFind's second includes starting the command-line tool and loading the index
 - **Folder sizes** in the Size column and a disk-usage window.
 - **Thumbnail view** (Ctrl+T).
 - **Find & replace in text files** with preview, backups and undo.
-- **Search from your phone** over the home network: off by default, PIN-protected, read-only.
+- **Search from your phone** over the home network: off by default, PIN-protected (or scan the QR code in Settings), read-only, and it turns itself off after two hours unused.
 - **Drag & drop** results into WhatsApp, mail or Word; Ctrl+C copies the file itself; F2 renames; Delete sends to the Recycle Bin.
 - **Export** results to CSV that opens correctly in Excel.
 - **Command line**, a **Flow Launcher** plugin, and PowerShell / AutoHotkey examples.
@@ -322,7 +322,7 @@ Every filter also has an Arabic spelling (`حجم:`, `تاريخ:`, `كلمة:`,
 
 | Key | Action |
 |---|---|
-| Ctrl+Alt+F | quick-search popup from anywhere (Tab for actions, Esc to close) |
+| Ctrl+Alt+F | quick-search popup from anywhere (Tab for actions, Esc to close); if another program has it, pick other keys in Settings ▸ Search from anywhere |
 | Ctrl+Alt+G | in a Save/Open dialog: jump to a result's folder |
 | Enter / Ctrl+Enter | open the file / open its folder with the file selected |
 | Down arrow | from the search box to the results (in an empty box: history) |

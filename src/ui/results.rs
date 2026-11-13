@@ -423,6 +423,8 @@ impl App {
             // An Arabic name's extension kept whole (".xlsx") at its end,
             // its dates and phone numbers as typed.
             COL_NAME => crate::bidi_layout::list_name(e.name(), e.is_dir, ui_rtl()).0,
+            // A drive that is not connected keeps its entries; a quiet note says so.
+            COL_PATH if crate::drives::is_absent(&e.path) => format!("{}  ({})", ltr_path(&e.path), crate::drives::absent_note()),
             COL_PATH => ltr_path(&e.path),
             COL_SIZE => self.size_cell(&st.rows_index, r.entry, e),
             COL_DATE => shell::format_time(e.mtime, true),

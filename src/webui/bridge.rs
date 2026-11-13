@@ -139,6 +139,8 @@ pub enum Setting {
     Floating,
     /// The icon in the notification area.
     TrayIcon,
+    /// Search from phone (home network); not in the Microsoft Store version.
+    Phone,
 }
 
 /// The interface language the page can choose: the code of a language
@@ -277,6 +279,15 @@ pub enum Request {
     /// The answer to the Store rating row ([`Outbound::Rating`]): rate now
     /// (`rate`, opens the Store's review page) or not now.
     Rating { rate: bool },
+    /// Use `key` as the global hotkey from now on (one of
+    /// [`crate::settings::Hotkey::ALL`]; refused by Windows when another
+    /// program has it, then the old one stays).
+    Hotkey { key: crate::settings::Hotkey },
+    /// Search from phone: allow the network this PC is on now (Windows
+    /// does not mark it private, or it is not the home network).
+    PhoneAllow {},
+    /// The "Search from phone" window, with the port, downloads and a new PIN.
+    PhoneWindow {},
 }
 
 /// Why a message was refused.
@@ -371,6 +382,10 @@ pub struct RowOut {
     /// Moved to the Recycle Bin since it was listed.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub gone: bool,
+    /// On a drive that is not connected now (its entry is kept until the
+    /// drive is back): the page adds «القرص غير متصل» / "drive not connected".
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub offline: bool,
 }
 
 fn is_zero(n: &u32) -> bool {
@@ -418,6 +433,16 @@ pub struct SettingsOut {
     pub version: &'static str,
     /// The Microsoft Store version: its updates come from the Store.
     pub store: bool,
+    /// A check for updates the user asked for is running: its button says
+    /// so and waits.
+    pub checking_updates: bool,
+    /// The global hotkey (`Hotkey::code`), whether another program has it,
+    /// and the choices as `[code, keys]`.
+    pub hotkey: &'static str,
+    pub hotkey_taken: bool,
+    pub hotkeys: Vec<[&'static str; 2]>,
+    /// Search from phone; `None` in the Microsoft Store version (it has none).
+    pub phone: Option<PhoneOut>,
 }
 
 /// What the page searched last, with its filters ([`Outbound::Restore`]).
@@ -428,6 +453,31 @@ pub struct Restore {
     pub size: usize,
     pub date: usize,
     pub content: bool,
+}
+
+/// Search from phone, as the settings page shows it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct PhoneOut {
+    /// The switch is on (it runs whenever the network allows).
+    pub on: bool,
+    /// The server runs now.
+    pub running: bool,
+    /// While running: the address to open on the phone, the PIN
+    /// (`1234 5678`) and the direct link with the secret (for the QR code).
+    pub url: String,
+    pub pin: String,
+    pub link: String,
+    /// Why it is not running although on, or that it works on this PC only.
+    pub note: String,
+    /// "Allow this network" would start it.
+    pub allow: bool,
+    /// It turned itself off after two hours with no request.
+    pub idle_off: bool,
+}
+
+/// The hotkey choices for [`SettingsOut::hotkeys`].
+pub fn hotkeys() -> Vec<[&'static str; 2]> {
+    crate::settings::Hotkey::ALL.iter().map(|h| [h.code(), h.label()]).collect()
 }
 
 /// A message to the page.
@@ -710,6 +760,7 @@ pub fn row(id: u32, e: &Entry, q: Option<&Query>) -> RowOut {
         snippet: None,
         matches: 0,
         gone: false,
+        offline: crate::drives::is_absent(&e.path),
     }
 }
 
@@ -1497,6 +1548,14 @@ mod tests {
         assert_eq!(req(r#""op":"thumbs","seq":3,"ids":[0]"#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"thumbs","seq":3,"ver":4,"ids":[0],"path":"C:\\a.jpg""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"report_problem""#), Ok(Request::ReportProblem {}));
+        assert_eq!(req(r#""op":"hotkey","key":"win_alt_f""#), Ok(Request::Hotkey { key: crate::settings::Hotkey::WinAltF }));
+        assert_eq!(req(r#""op":"hotkey","key":"alt_f4""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"hotkey""#), Err(Rejected::Malformed));
+        assert_eq!(req(r#""op":"set","key":"phone","on":true"#), Ok(Request::Set { key: Setting::Phone, on: true }));
+        assert_eq!(req(r#""op":"phone_allow""#), Ok(Request::PhoneAllow {}));
+        assert_eq!(req(r#""op":"phone_window""#), Ok(Request::PhoneWindow {}));
+        // The page never names a port, a network or a PIN.
+        assert_eq!(req(r#""op":"phone_allow","network":"x""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"report_problem","text":"x""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"export""#), Ok(Request::Export {}));
         assert_eq!(req(r#""op":"export","path":"C:\\x.csv""#), Err(Rejected::Malformed));
@@ -1917,10 +1976,16 @@ mod tests {
             tray_icon: true,
             version: "1.0.0",
             store: true,
+            checking_updates: true,
+            hotkey: "ctrl_alt_f",
+            hotkey_taken: true,
+            hotkeys: hotkeys(),
+            phone: None,
         });
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.starts_with(r#"{"type":"settings","lang":"ar","next_lang":"en""#), "{json}");
-        assert!(json.ends_with(r#""version":"1.0.0","store":true}"#), "{json}");
+        assert!(json.contains(r#""version":"1.0.0","store":true,"checking_updates":true,"hotkey":"ctrl_alt_f","hotkey_taken":true,"hotkeys":[["ctrl_alt_f","Ctrl+Alt+F"],["ctrl_alt_space","Ctrl+Alt+Space"],"#), "{json}");
+        assert!(json.ends_with(r#""phone":null}"#), "{json}");
         let json = serde_json::to_string(&Outbound::Renamed { list: List::Recent, seq: 0, ver: 3, id: 1, name: "a".into() }).unwrap();
         assert_eq!(json, r#"{"type":"renamed","list":"recent","seq":0,"ver":3,"id":1,"name":"a"}"#);
     }

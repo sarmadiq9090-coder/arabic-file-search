@@ -23,6 +23,7 @@
     "desc": "descending",
     "dismiss": "Dismiss",
     "exportBtn": "Export results",
+    "fDetails": "File details",
     "fMatches": "Matches",
     "fMod": "Modified",
     "fSize": "Size",
@@ -35,12 +36,86 @@
     "folder": "Folder",
     "gone": "Moved to the Recycle Bin",
     "grid": "Thumbnail view (Ctrl+T)",
+    "helpEx": [
+      [
+        "sales report",
+        "names with both words"
+      ],
+      [
+        "\"lease agreement\"",
+        "the exact phrase"
+      ],
+      [
+        "report .pdf",
+        "PDF files only (or ext:pdf)"
+      ],
+      [
+        "ext:docx,xlsx",
+        "several types"
+      ],
+      [
+        "photo|video",
+        "either word"
+      ],
+      [
+        "contract -old",
+        "without “old” (or !old)"
+      ],
+      [
+        "size:>10mb",
+        "bigger than 10 MB"
+      ],
+      [
+        "dm:thisweek",
+        "changed this week"
+      ],
+      [
+        "dm:2026-05",
+        "changed in May 2026"
+      ],
+      [
+        "ww:contract",
+        "whole word only"
+      ],
+      [
+        "\"lease contract\"~5",
+        "both words within 5 words"
+      ],
+      [
+        "folder: photos",
+        "folders only"
+      ],
+      [
+        "root: كتاب",
+        "same Arabic root: مكتبة، الكاتب"
+      ],
+      [
+        "fuzzy: reprot",
+        "tolerates a typo"
+      ],
+      [
+        "حجم:>1ج",
+        "in Arabic too: bigger than 1 GB"
+      ],
+      [
+        "احمد",
+        "also finds «أحمد»"
+      ]
+    ],
+    "helpH": "How to search",
+    "helpInside": "To search inside documents (PDF, Word, Excel, pictures): press “Inside documents”, then Enter.",
+    "helpKey": "How to search (F1)",
+    "helpKeys": "FN:(hk) => [[hk, \"the small search box from any program\"], [\"Ctrl+Alt+G\", \"in a Save/Open dialog: go to a result's folder\"], [\"Enter\", \"open the file\"], [\"Ctrl+Enter\", \"open its folder\"], [\"↓\", \"to the results (in an empty box: history)\"],\n        [\"Ctrl+C\", \"copy the file\"], [\"Ctrl+Shift+C\", \"copy the path\"], [\"F2\", \"rename\"], [\"Delete\", \"to the Recycle Bin\"], [\"F4\", \"all matches in the file\"], [\"Ctrl+H\", \"history\"], [\"Ctrl+T\", \"thumbnails\"], [\"Ctrl+,\", \"settings\"], [\"F1\", \"this card\"]]",
+    "helpKeysH": "Keyboard",
+    "helpMore": "All the ways to search…",
+    "helpSub": "Click an example to put it in the search box. Every filter also has an Arabic spelling.",
     "hidePreview": "Hide the preview",
     "history": "History",
     "historyKey": "History (Ctrl+H)",
     "inside": "Inside documents",
     "ixSub": "You can search now; results may be incomplete until we finish. The list updates by itself.",
     "kFolder": "Folder",
+    "kLabel": "Keyboard shortcuts",
     "kMenu": "More",
     "kNav": "Move",
     "kOpen": "Open",
@@ -76,6 +151,7 @@
     "note": "Note",
     "now": "Just now",
     "nres": "FN:(n) => (n === 0 ? \"No results\" : n === 1 ? \"1 result\" : `${num(n)} results`)",
+    "offline": "drive not connected",
     "open": "Open",
     "openFolder": "Open folder",
     "ph": "Search file names…",
@@ -83,6 +159,7 @@
     "pressEnter": "Press Enter to search inside documents.",
     "preview": "Preview",
     "qsCancel": "Cancel the move",
+    "qsNone": "No result to move the dialog to. Change the search, or press Esc to cancel.",
     "rateLater": "Not now",
     "rateOk": "Rate InstaFind in the Store",
     "rateRegion": "Rate in the Store",
@@ -123,7 +200,10 @@
     "sHelp": "Updates and help",
     "sHideSystem": "Hide system files",
     "sHideSystemSub": "The Windows folder, temporary and cache files",
-    "sHotkey": "Ctrl+Alt+F opens the small search box; when off, it opens this window.",
+    "sHotkey": "FN:(k) => `${k} opens the small search box; when off, it opens this window.`",
+    "sHotkeyKeys": "Shortcut to open the search",
+    "sHotkeyKeysSub": "Works in any program. Pick another if another program uses it.",
+    "sHotkeyTaken": "FN:(k) => `Another program has ${k}, so it does nothing now. Pick another shortcut:`",
     "sLang": "Language",
     "sLangHelp": "Help improve this translation",
     "sLangMachine": "(machine translation)",
@@ -131,9 +211,22 @@
     "sMore": "More",
     "sMoreRow": "More options",
     "sMoreSub": "Check for updates, support and feedback, tools such as duplicate files and folder sizes, and search-from-anywhere settings",
+    "sPhone": "Search from phone",
+    "sPhoneAllow": "Allow this network",
+    "sPhoneIdle": "It turned itself off after two hours with no request from a phone, to be safe. Turn it on again when you need it.",
+    "sPhoneMore": "More settings…",
+    "sPhoneMoreSub": "The port, downloading files, and a new PIN and link",
+    "sPhoneOff": "Off. Turn it on to see the address and the PIN.",
+    "sPhoneOpen": "Open in the phone's browser:",
+    "sPhonePin": "and type the PIN:",
+    "sPhoneQr": "Or scan this code with the phone's camera to open the search without the PIN. Don't show it to anyone.",
+    "sPhoneQrLabel": "QR code that opens phone search",
+    "sPhoneRow": "Search from phone (home network)",
+    "sPhoneSub": "Search this PC's files from your phone's browser on the same Wi-Fi. Read-only, and only on your home network.",
+    "sPhoneWait": "Checking the network…",
     "sReadCloud": "Read contents of cloud-only files (downloads them)",
     "sReportRow": "Report a problem",
-    "sReportSub": "Shows what would be shared first: nothing is sent unless you press a button, and file names and paths are removed.",
+    "sReportSub": "Shows what would be shared first; then you send it by email or on the GitHub page (which is public: anyone can read it). Nothing is sent automatically, and file names and paths are removed.",
     "sSearch": "Search and indexing",
     "sStartup": "Startup",
     "sTray": "Icon in the notification area",
@@ -198,7 +291,7 @@
     ],
     "today": "Today",
     "trust": "Your files and their index stay on your PC; no usage data is collected. InstaFind goes online only to check for updates (GitHub) and fetch exchange rates; phone search works only on your home network.",
-    "trustStore": "Your files and their index stay on your PC; no usage data is collected. InstaFind goes online only to fetch exchange rates, and its updates come from the Microsoft Store; phone search works only on your home network.",
+    "trustStore": "Your files and their index stay on your PC; no usage data is collected. InstaFind goes online only to fetch exchange rates, and its updates come from the Microsoft Store.",
     "tryThese": "Try these",
     "type": "Type",
     "units": [
@@ -210,6 +303,7 @@
     ],
     "updBtn": "Check for updates…",
     "updBtnStore": "Updates from Microsoft Store…",
+    "updChecking": "Checking for updates…",
     "version": "FN:(v) => `InstaFind — version ${v}`",
     "yesterday": "Yesterday"
   },
@@ -236,6 +330,7 @@
     "desc": "تنازلي",
     "dismiss": "إخفاء",
     "exportBtn": "تصدير النتائج",
+    "fDetails": "تفاصيل الملف",
     "fMatches": "التطابقات",
     "fMod": "تاريخ التعديل",
     "fSize": "الحجم",
@@ -248,12 +343,86 @@
     "folder": "مجلد",
     "gone": "نُقل إلى سلة المحذوفات",
     "grid": "عرض المصغرات (Ctrl+T)",
+    "helpEx": [
+      [
+        "تقرير المبيعات",
+        "الاسم فيه الكلمتان معاً"
+      ],
+      [
+        "\"عقد إيجار\"",
+        "العبارة كما هي"
+      ],
+      [
+        "تقرير .pdf",
+        "ملفات PDF فقط (أو ext:pdf)"
+      ],
+      [
+        "ext:docx,xlsx",
+        "أكثر من نوع"
+      ],
+      [
+        "صورة|فيديو",
+        "إحدى الكلمتين"
+      ],
+      [
+        "عقد -قديم",
+        "دون ما فيه «قديم» (أو !قديم)"
+      ],
+      [
+        "حجم:>10م",
+        "أكبر من 10 ميغابايت"
+      ],
+      [
+        "تاريخ:هذا_الأسبوع",
+        "عُدّلت هذا الأسبوع"
+      ],
+      [
+        "dm:2026-05",
+        "عُدّلت في أيار 2026"
+      ],
+      [
+        "كلمة:عقد",
+        "الكلمة كاملة: «عقد» لا «العقود»"
+      ],
+      [
+        "\"عقد إيجار\"~5",
+        "الكلمتان وبينهما 5 كلمات على الأكثر"
+      ],
+      [
+        "مجلد: صور",
+        "المجلدات فقط"
+      ],
+      [
+        "جذر: كتاب",
+        "مكتبة، الكاتب، كتابات"
+      ],
+      [
+        "تقريب: تقريز",
+        "يتحمّل خطأً إملائياً"
+      ],
+      [
+        "size:>1gb",
+        "بالإنجليزية أيضاً: أكبر من 1 غيغابايت"
+      ],
+      [
+        "dm:thisweek",
+        "بالإنجليزية أيضاً: هذا الأسبوع"
+      ]
+    ],
+    "helpH": "كيف أبحث؟",
+    "helpInside": "للبحث داخل المستندات (PDF وWord وExcel والصور): اضغط «داخل المستندات» ثم Enter.",
+    "helpKey": "كيف أبحث؟ (F1)",
+    "helpKeys": "FN:(hk) => [[hk, \"خانة البحث الصغيرة من أي برنامج\"], [\"Ctrl+Alt+G\", \"في نافذة حفظ أو فتح: الانتقال إلى مجلد نتيجة\"], [\"Enter\", \"فتح الملف\"], [\"Ctrl+Enter\", \"فتح مجلده\"], [\"↓\", \"إلى النتائج (وفي خانة فارغة: السجل)\"],\n        [\"Ctrl+C\", \"نسخ الملف\"], [\"Ctrl+Shift+C\", \"نسخ المسار\"], [\"F2\", \"تغيير الاسم\"], [\"Delete\", \"إلى سلة المحذوفات\"], [\"F4\", \"كل التطابقات داخل الملف\"], [\"Ctrl+H\", \"السجل\"], [\"Ctrl+T\", \"المصغرات\"], [\"Ctrl+,\", \"الإعدادات\"], [\"F1\", \"هذه البطاقة\"]]",
+    "helpKeysH": "لوحة المفاتيح",
+    "helpMore": "كل طرق البحث…",
+    "helpSub": "انقر مثالاً ليُكتب في خانة البحث. تعمل الأمثلة بالعربية والإنجليزية، والأرقام العربية مقبولة.",
     "hidePreview": "إخفاء المعاينة",
     "history": "السجل",
     "historyKey": "السجل (Ctrl+H)",
     "inside": "داخل المستندات",
     "ixSub": "يمكنك البحث الآن. قد تكون النتائج ناقصة إلى أن تنتهي الفهرسة، وتكتمل القائمة تلقائياً.",
     "kFolder": "المجلد",
+    "kLabel": "اختصارات لوحة المفاتيح",
     "kMenu": "المزيد",
     "kNav": "تنقل",
     "kOpen": "فتح",
@@ -289,6 +458,7 @@
     "note": "تنبيه",
     "now": "الآن",
     "nres": "FN:(n) => (n === 0 ? \"لا نتائج\" : `عدد النتائج: ${num(n)}`)",
+    "offline": "القرص غير متصل",
     "open": "فتح",
     "openFolder": "فتح المجلد",
     "ph": "ابحث باسم الملف…",
@@ -296,6 +466,7 @@
     "pressEnter": "اضغط Enter للبحث داخل المستندات.",
     "preview": "المعاينة",
     "qsCancel": "إلغاء النقل",
+    "qsNone": "لا توجد نتيجة لنقل النافذة إلى مجلدها. غيّر البحث، أو اضغط Esc للإلغاء.",
     "rateLater": "ليس الآن",
     "rateOk": "قيّم InstaFind في المتجر",
     "rateRegion": "التقييم في المتجر",
@@ -336,7 +507,10 @@
     "sHelp": "التحديثات والمساعدة",
     "sHideSystem": "إخفاء ملفات النظام",
     "sHideSystemSub": "مجلد ويندوز والملفات المؤقتة وملفات الذاكرة المخبأة",
-    "sHotkey": "Ctrl+Alt+F يفتح خانة البحث الصغيرة؛ عند إيقافه يفتح هذه النافذة",
+    "sHotkey": "FN:(k) => `${k} يفتح خانة البحث الصغيرة؛ عند إيقافه يفتح هذه النافذة`",
+    "sHotkeyKeys": "اختصار فتح البحث",
+    "sHotkeyKeysSub": "يعمل من أي برنامج. اختر غيره إن كان برنامج آخر يستعمله.",
+    "sHotkeyTaken": "FN:(k) => `الاختصار ${k} يستخدمه برنامج آخر، فلا يعمل الآن. اختر اختصاراً غيره:`",
     "sLang": "اللغة",
     "sLangHelp": "ساعد في تحسين هذه الترجمة",
     "sLangMachine": "(ترجمة آلية)",
@@ -344,9 +518,22 @@
     "sMore": "المزيد",
     "sMoreRow": "خيارات أخرى",
     "sMoreSub": "التحقق من التحديثات، الدعم والملاحظات، أدوات مثل الملفات المكررة وأحجام المجلدات، وإعدادات البحث من أي مكان",
+    "sPhone": "البحث من الهاتف",
+    "sPhoneAllow": "السماح بهذه الشبكة",
+    "sPhoneIdle": "توقّف وحده بعد ساعتين دون أي طلب من الهاتف، للأمان. شغّله من جديد حين تحتاجه.",
+    "sPhoneMore": "إعدادات أخرى…",
+    "sPhoneMoreSub": "المنفذ، والسماح بتنزيل الملفات، ورمز ورابط جديدان",
+    "sPhoneOff": "متوقف. شغّله لترى العنوان والرمز.",
+    "sPhoneOpen": "افتح في متصفح الهاتف:",
+    "sPhonePin": "واكتب الرمز السري:",
+    "sPhoneQr": "أو امسح هذا الرمز بكاميرا الهاتف ليفتح البحث مباشرة دون الرمز السري. لا تُطلع عليه أحداً.",
+    "sPhoneQrLabel": "رمز QR يفتح البحث من الهاتف",
+    "sPhoneRow": "البحث من الهاتف (شبكة البيت)",
+    "sPhoneSub": "ابحث في ملفات هذا الحاسوب من متصفح هاتفك المتصل بشبكة Wi-Fi نفسها. للقراءة فقط، ويعمل في شبكة البيت فقط.",
+    "sPhoneWait": "جارٍ التحقق من الشبكة…",
     "sReadCloud": "قراءة محتوى الملفات الموجودة على السحابة فقط (يُنزّلها من الإنترنت)",
     "sReportRow": "الإبلاغ عن مشكلة",
-    "sReportSub": "تعرض ما سيُشارَك قبل أي شيء: لن يُرسل شيء إلا إذا ضغطت أنت، وأسماء الملفات والمسارات تُحذف.",
+    "sReportSub": "تعرض ما سيُشارَك قبل أي شيء، ثم ترسله أنت بالبريد أو من صفحة GitHub (وهي عامة يراها أي أحد). لا يُرسل شيء تلقائياً، وأسماء الملفات والمسارات تُحذف.",
     "sSearch": "البحث والفهرسة",
     "sStartup": "التشغيل",
     "sTray": "أيقونة بجانب الساعة",
@@ -411,7 +598,7 @@
     ],
     "today": "اليوم",
     "trust": "ملفاتك وفهرسها يبقيان على جهازك ولا نجمع بيانات استخدام. يتصل البرنامج بالإنترنت فقط ليتحقق من التحديثات (GitHub) ولأسعار العملات؛ والبحث من الهاتف يعمل داخل شبكة بيتك فقط.",
-    "trustStore": "ملفاتك وفهرسها يبقيان على جهازك ولا نجمع بيانات استخدام. يتصل البرنامج بالإنترنت فقط لأسعار العملات، وتصله التحديثات من Microsoft Store؛ والبحث من الهاتف يعمل داخل شبكة بيتك فقط.",
+    "trustStore": "ملفاتك وفهرسها يبقيان على جهازك ولا نجمع بيانات استخدام. يتصل البرنامج بالإنترنت فقط لأسعار العملات، وتصله التحديثات من Microsoft Store.",
     "tryThese": "جرّب هذه",
     "type": "النوع",
     "units": [
@@ -423,6 +610,7 @@
     ],
     "updBtn": "التحقق من التحديثات…",
     "updBtnStore": "التحديثات من Microsoft Store…",
+    "updChecking": "جارٍ التحقق من التحديثات…",
     "version": "FN:(v) => `بحث سريع (InstaFind) — الإصدار ${v}`",
     "yesterday": "أمس"
   },
@@ -448,6 +636,7 @@
     " — by name and size only; contents were not compared": " — بالاسم والحجم فقط، لم يُقارَن المحتوى",
     "(first {} lines)\r\n": "(أول الأسطر فقط، عددها: {})\r\n",
     "(machine translation)": "(ترجمة آلية)",
+    ", ": "، ",
     "--sort: expected name, path, size or date, got {value}": "--sort: المتوقع name أو path أو size أو date، وليس {value}",
     "1 KB or more": "1 ك.ب فأكثر",
     "1 MB or more": "1 م.ب فأكثر",
@@ -458,6 +647,8 @@
     "100 MB or more": "100 م.ب فأكثر",
     "2 minutes ago": "قبل دقيقتين",
     "; ": "، ",
+    "A message to {} opened in your mail program (the report could not be copied: press “Copy”, then paste it there). Nothing was sent yet.": "فُتحت رسالة إلى {} في برنامج البريد (تعذر نسخ التقرير: اضغط «نسخ» ثم الصقه فيها). لم يُرسل شيء بعد.",
+    "A message to {} opened in your mail program. The full report is copied: paste it in the message (Ctrl+V), then press “Send”. Nothing was sent yet.": "فُتحت رسالة إلى {} في برنامج البريد. التقرير الكامل منسوخ: الصقه في الرسالة (Ctrl+V) ثم اضغط «إرسال». لم يُرسل شيء بعد.",
     "A name cannot contain any of these characters: \\ / : * ? \" < > |": "لا يمكن أن يحتوي الاسم على أي من هذه الرموز: \\ / : * ? \" < > |",
     "A new version of InstaFind is available: {} (you have {current}).{notes}\n\nUpdate now? The program restarts after the download.": "يتوفر إصدار جديد من بحث سريع: {} (لديك {current}).{notes}\n\nهل تريد التحديث الآن؟ سيُعاد تشغيل البرنامج بعد التنزيل.",
     "About InstaFind": "حول InstaFind",
@@ -469,11 +660,12 @@
     "Allow downloading result files to the phone": "السماح بتنزيل ملفات النتائج إلى الهاتف",
     "Allow this network": "السماح بهذه الشبكة",
     "Also search inside documents": "البحث داخل المستندات أيضاً",
-    "Alt+Space is already taken by another program, so it can't be used here. Ctrl+Alt+F still works.": "الاختصار Alt+Space مستخدم من برنامج آخر، فلا يمكن استخدامه هنا. يبقى Ctrl+Alt+F متاحاً.",
+    "Alt+Space is already taken by another program, so it can't be used here. {} still works.": "الاختصار Alt+Space مستخدم من برنامج آخر، فلا يمكن استخدامه هنا. يبقى {} متاحاً.",
     "Alt+Space opens the quick search": "Alt+Space يفتح نافذة البحث الصغيرة",
     "Alt+Space opens the quick search (another program has it for now)": "Alt+Space يفتح نافذة البحث الصغيرة (يستخدمه برنامج آخر الآن)",
     "An unexpected error stopped the operation.": "حدث خطأ غير متوقع؛ لم تكتمل العملية.",
     "Another file named “{new_name}” already exists in this folder.": "يوجد ملف آخر بالاسم «{new_name}» في هذا المجلد.",
+    "Another program has {} too. Pick another one.": "الاختصار {} يستخدمه برنامج آخر أيضاً. اختر غيره.",
     "Answers": "إجابات",
     "Any size": "كل الأحجام",
     "Any time": "أي وقت",
@@ -551,6 +743,7 @@
     "Done": "تم",
     "Done: {} replacements in {} files.": "تم. عدد الاستبدالات: {}، في ملفات عددها: {}.",
     "Downloading files is turned off on the computer.": "تنزيل الملفات غير مفعّل على الحاسوب.",
+    "Downloading the update…": "جارٍ تنزيل التحديث…",
     "Downloading the update… {}%": "جارٍ تنزيل التحديث… {}٪",
     "Duplicate files": "الملفات المكررة",
     "Email support: {}": "راسل الدعم: {}",
@@ -586,6 +779,7 @@
     "GitHub opened with the report. Review it, then press “Submit” to send it. Thank you!": "فُتحت صفحة GitHub وفيها التقرير. راجعها ثم اضغط «Submit» لإرسالها. شكراً لك!",
     "GitHub opened with the start of the report (the rest could not be copied). Review it, then press “Submit”.": "فُتحت صفحة GitHub وفيها بداية التقرير (تعذر نسخ الباقي). راجعها ثم اضغط «Submit».",
     "GitHub opened. The report is longer than the page can take, so all of it is copied: paste it in the report box, then review the page and press “Submit”.": "فُتحت صفحة GitHub. التقرير أطول مما تتسع له الصفحة، فنُسخ كاملاً: الصقه في خانة التقرير، ثم راجع الصفحة واضغط «Submit».",
+    "GitHub page (public)": "صفحة GitHub (عامة)",
     "Group {}: {} copies": "المجموعة {}: عدد النسخ: {}",
     "Grouping by size…": "جارٍ التجميع حسب الحجم…",
     "Hide next to the clock\tEsc": "إخفاء بجانب الساعة\tEsc",
@@ -606,7 +800,7 @@
     "InstaFind is running from your Downloads folder. If the file is deleted or the folder is cleaned up, the program stops working.": "يعمل «InstaFind» الآن من مجلد التنزيلات. إذا حُذف الملف أو نُظّف المجلد سيتوقف البرنامج.",
     "InstaFind ran into an internal error last time. A report about it was saved on your computer only.\n\nSend it to the developer so it can be fixed? A GitHub page opens with the report (version, Windows version and where in the program it happened) for you to review before pressing “Submit”. Nothing is sent automatically.": "حدث خطأ داخلي في بحث سريع في المرة السابقة، وحُفظ تقرير عنه على جهازك فقط.\n\nهل تريد إرساله للمطوّر لإصلاحه؟ ستُفتح صفحة GitHub فيها التقرير (رقم الإصدار، نظام ويندوز، ومكان الخطأ في البرنامج) لتراجعها قبل الضغط على «Submit». لا يُرسَل شيء تلقائياً.",
     "InstaFind search box — click it or press {}": "خانة بحث سريع — انقرها أو اضغط {}",
-    "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {HOTKEY_TEXT} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "بحث سريع (InstaFind) — الإصدار {}\nبحث فوري عن الملفات وداخل المستندات، بالعربية والإنجليزية.\n\nاضغط {HOTKEY_TEXT} من أي مكان لتبحث.\n{}\n\nالدعم: {}\n{}\n\nتراخيص المكوّنات الخارجية التي يستعملها البرنامج في THIRD-PARTY-NOTICES.txt. هل تريد فتحه؟",
+    "InstaFind — version {}\nInstant search for files and inside documents, in Arabic and English.\n\nPress {hk} anywhere to search.\n{}\n\nSupport: {}\n{}\n\nThe licences of the third-party components it uses are in THIRD-PARTY-NOTICES.txt. Open it?": "بحث سريع (InstaFind) — الإصدار {}\nبحث فوري عن الملفات وداخل المستندات، بالعربية والإنجليزية.\n\nاضغط {hk} من أي مكان لتبحث.\n{}\n\nالدعم: {}\n{}\n\nتراخيص المكوّنات الخارجية التي يستعملها البرنامج في THIRD-PARTY-NOTICES.txt. هل تريد فتحه؟",
     "Invalid regular expression: {e}": "التعبير النمطي غير صالح: {e}",
     "Is InstaFind useful to you? A rating in the Store helps others find it.": "هل يفيدك InstaFind؟ تقييمك في المتجر يساعد غيرك على إيجاده.",
     "Jump to the result's folder in Save/Open dialogs ({HOTKEY_TEXT})": "القفز إلى مجلد النتيجة في نوافذ الحفظ والفتح ({HOTKEY_TEXT})",
@@ -631,8 +825,11 @@
     "No exact results; showing close matches for “{}”": "لا نتائج مطابقة تماماً؛ عرض نتائج مقاربة لـ «{}»",
     "No file is checked. Check the files to change.": "لم يُحدَّد أي ملف. ضع علامة على الملفات المراد تعديلها.",
     "No files match your search. Try:": "لم نجد ملفات تطابق بحثك. جرّب:",
+    "No home network connection found; it works on this PC only.": "لم يُعثر على اتصال بشبكة منزلية، يعمل على هذا الحاسوب فقط.",
     "No home network connection found; it works on this PC only:": "لم يُعثر على اتصال بشبكة منزلية، يعمل على هذا الحاسوب فقط",
     "No index yet: open InstaFind once to build it, then try again.\n": "لا يوجد فهرس بعد: افتح برنامج «بحث سريع» مرة واحدة لبنائه، ثم أعد المحاولة.\nNo index yet: open InstaFind once to build it, then try again.\n",
+    "No mail program opened. Press “Copy” and send the report to {}.": "لا يوجد برنامج بريد يفتح هنا. اضغط «نسخ» وأرسل التقرير إلى {}.",
+    "No mail program opened. The report is copied: paste it in a message to {} from your own mail (on your phone or in the browser).": "لا يوجد برنامج بريد يفتح هنا. نُسخ التقرير: الصقه في رسالة إلى {} من بريدك (من الهاتف أو المتصفح).",
     "No plain text files in the current results.": "لا توجد ملفات نصية عادية في النتائج الحالية.",
     "No plain text files in the current results. Search first (e.g. .txt).": "لا توجد ملفات نصية عادية في النتائج الحالية. ابحث أولاً (مثلاً: ‎.txt).",
     "No recent searches yet": "لا توجد عمليات بحث سابقة بعد",
@@ -646,9 +843,10 @@
     "Not now": "ليس الآن",
     "Not what you expected? Tell us": "النتيجة غلط؟ أخبرنا",
     "Note: Arabic text in images can't be read: the Windows Arabic language pack is not installed.": "تنبيه: لا يمكن قراءة النص العربي داخل الصور لأن حزمة اللغة العربية غير مثبّتة في ويندوز.",
-    "Nothing is sent unless you press a button. File names and paths are removed from the report.": "لن يُرسل شيء إلا إذا ضغطت أنت. أسماء الملفات والمسارات تُحذف من التقرير.",
+    "Nothing is sent unless you press a button. File names and paths are removed from the report. The GitHub page is public: anyone can read it. An email is read only by us.": "لن يُرسل شيء إلا إذا ضغطت أنت. أسماء الملفات والمسارات تُحذف من التقرير. صفحة GitHub عامة يراها أي أحد؛ أما البريد فلا يقرؤه غيرنا.",
     "Off. Tick the box above to start.": "متوقف. فعّل الخيار أعلاه للبدء.",
     "Older than a year": "أقدم من سنة",
+    "Open": "فتح",
     "Open\tEnter": "فتح\tEnter",
     "Open containing folder": "فتح المجلد الذي يحتويه",
     "Open containing folder\tCtrl+Enter": "فتح المجلد الذي يحتويه\tCtrl+Enter",
@@ -658,9 +856,7 @@
     "Open in Explorer": "فتح في المستكشف",
     "Open in the phone's browser:": "افتح في متصفح الهاتف",
     "Open its folder in the Save/Open dialog\tEnter": "فتح مجلدها في نافذة الحفظ/الفتح\tEnter",
-    "Open quick search\tCtrl+Alt+F": "فتح نافذة البحث\tCtrl+Alt+F",
-    "Open quick search\t{HOTKEY_TEXT}": "فتح نافذة البحث\t{HOTKEY_TEXT}",
-    "Open the report page": "فتح صفحة الإبلاغ",
+    "Open quick search\t{}": "فتح نافذة البحث\t{}",
     "Open windows": "النوافذ المفتوحة",
     "Open with…": "فتح باستخدام…",
     "Open “{q}” in the full InstaFind window": "افتح «{q}» في نافذة البحث الكاملة",
@@ -679,19 +875,19 @@
     "Phone search did not start: no network connection. It starts by itself when you join your home network.": "لم يبدأ البحث من الهاتف: لا يوجد اتصال بشبكة. يبدأ وحده حين تتصل بشبكتك المنزلية.",
     "Phone search did not start: this is not your home network.": "لم يبدأ البحث من الهاتف: هذه ليست شبكتك المنزلية.",
     "Phone search is on": "البحث من الهاتف يعمل",
+    "Phone search turned itself off after two hours with no request from a phone, to be safe. Tick the box above to turn it on again.": "توقّف البحث من الهاتف وحده بعد ساعتين دون أي طلب من الهاتف، للأمان. فعّل الخيار أعلاه لتشغيله من جديد.",
     "Pick a result from the list first.": "اختر نتيجة من القائمة أولاً.",
     "Pictures": "صور",
     "Pin to favourites": "تثبيت في المفضلة",
     "Port:": "المنفذ:",
     "Preparing your file list for the first time (a few minutes). Search now; results fill in as it finishes.": "نجهّز قائمة ملفاتك لأول مرة (دقائق قليلة). ابحث الآن، وتكتمل النتائج عند الانتهاء.",
     "Press {HOTKEY_TEXT} in a Save or Open dialog first.": "اضغط {HOTKEY_TEXT} في نافذة حفظ أو فتح أولاً.",
-    "Press {HOTKEY_TEXT} in any program to open the quick search.": "اضغط {HOTKEY_TEXT} من أي برنامج لفتح نافذة البحث الصغيرة.",
-    "Press {HOTKEY_TEXT} in any program to show or hide InstaFind.": "اضغط {HOTKEY_TEXT} من أي برنامج لإظهار بحث سريع أو إخفائه.",
+    "Press {} in any program to open the quick search.": "اضغط {} من أي برنامج لفتح نافذة البحث الصغيرة.",
+    "Press {} in any program to show or hide InstaFind.": "اضغط {} من أي برنامج لإظهار بحث سريع أو إخفائه.",
     "Preview": "معاينة",
     "Programs": "برامج",
     "Properties": "خصائص",
     "Put the box back by the clock": "إعادة الخانة إلى مكانها",
-    "Quick search: type the name of a file, an app or a setting, then press Enter": "بحث سريع: اكتب اسم ملف أو برنامج أو إعداد، ثم Enter",
     "Rate InstaFind in the Store": "قيّم InstaFind في المتجر",
     "Rate in the Store": "التقييم في المتجر",
     "Read contents of cloud-only files (downloads them)": "قراءة محتوى الملفات الموجودة على السحابة فقط (يُنزّلها من الإنترنت)",
@@ -714,9 +910,11 @@
     "Request from another site.": "طلب من موقع آخر.",
     "Reset position": "إعادة الخانة إلى مكانها",
     "Restore {} files to how they were before “{}” was replaced with “{}” ({})?\n\nFiles edited since the replace are left as they are.": "إرجاع الملفات إلى ما كانت عليه قبل استبدال «{1}» بـ «{2}» ({3})؟ عدد الملفات: {0}.\n\nالملفات التي عُدّلت بعد الاستبدال لن تُمسّ.",
+    "Results": "النتائج",
     "Results may be incomplete while indexing": "قد تكون النتائج ناقصة أثناء الفهرسة",
     "Results may be incomplete while indexing — try": "قد تكون النتائج ناقصة أثناء الفهرسة — جرّب",
     "Run as administrator": "تشغيل كمسؤول",
+    "Running in the simple look because Windows' WebView2 component is not installed. Click here to download it free from Microsoft.": "يعمل البرنامج بالشكل البسيط لأن مكوّن WebView2 غير مثبّت. انقر هنا لتنزيله مجاناً من Microsoft.",
     "Running in the simple look because Windows' WebView2 component is not working.": "يعمل البرنامج بالشكل البسيط لأن مكوّن WebView2 في ويندوز لا يعمل.",
     "Same content (exact)": "نفس المحتوى (مقارنة دقيقة)",
     "Same name and size (quick)": "نفس الاسم والحجم (سريع)",
@@ -747,13 +945,14 @@
     "Searching inside documents…{warn}": "جارٍ البحث داخل المستندات…{warn}",
     "Select a file in the list first.": "اختر ملفاً من القائمة أولاً.",
     "Select the files to delete first.": "اختر الملفات التي تريد حذفها أولاً.",
+    "Send by email": "إرسال بالبريد",
     "Send feedback": "أرسل ملاحظة",
     "Settings": "الإعدادات",
     "Share": "النسبة",
     "Show Arabic-Indic digits (٠١٢٣)": "عرض الأرقام بالعربية (٠١٢٣)",
     "Show all matches in the file\tF4": "عرض كل التطابقات داخل الملف\tF4",
     "Show the floating search box": "إظهار خانة البحث العائمة",
-    "Show the program from anywhere\t{HOTKEY_TEXT}": "إظهار البرنامج من أي مكان\t{HOTKEY_TEXT}",
+    "Show the program from anywhere\t{}": "إظهار البرنامج من أي مكان\t{}",
     "Size": "الحجم",
     "Size in bytes": "الحجم بالبايت",
     "Start with Windows (in the background)": "التشغيل مع ويندوز (في الخلفية)",
@@ -790,7 +989,7 @@
     "The program could not restart itself ({e}). Close the program and open it again.": "تعذرت إعادة التشغيل تلقائياً ({e}). أغلق البرنامج وافتحه من جديد.",
     "The program was copied to the permanent place, but could not restart from there ({e}).\nOpen it from the Start menu.": "نُسخ البرنامج إلى المكان الدائم، لكن تعذرت إعادة تشغيله من هناك ({e}).\nافتحه من قائمة «ابدأ».",
     "The program will not start with Windows.": "لن يعمل البرنامج تلقائياً مع ويندوز.",
-    "The program will run in the background when Windows starts; show it with Ctrl+Alt+F.": "سيعمل البرنامج في الخلفية عند تشغيل ويندوز، وتُظهره بـ Ctrl+Alt+F.",
+    "The program will run in the background when Windows starts; show it with {}.": "سيعمل البرنامج في الخلفية عند تشغيل ويندوز، وتُظهره بـ {}.",
     "The regular expression “{v}” is not valid, so it matches nothing.": "التعبير النمطي «{v}» غير صحيح، فلن يطابق أي شيء.",
     "The replacement has characters the file's encoding can't hold": "نص الاستبدال يحوي أحرفاً لا يدعمها ترميز الملف",
     "The report is copied. Paste it in a message to {} or on the report page.": "نُسخ التقرير. الصقه في رسالة إلى {} أو في صفحة الإبلاغ.",
@@ -819,6 +1018,7 @@
     "Type a file name or part of one to search.": "اكتب اسم الملف أو جزءاً منه للبحث.",
     "Type a file name or part of one to search. Listed: the files you opened lately.": "اكتب اسم الملف أو جزءاً منه للبحث. في القائمة الملفات التي فتحتها مؤخراً.",
     "Type the PIN shown in the \"Search from phone\" window on the computer.": "اكتب الرمز السري الظاهر في نافذة «البحث من الهاتف» على الحاسوب.",
+    "Type the name of a file, an app or a setting. The Up and Down arrows go through the results; Enter opens the selected one.": "اكتب اسم ملف أو برنامج أو إعداد. السهمان للأعلى وللأسفل يتنقلان بين النتائج، وEnter يفتح النتيجة المحددة.",
     "Type the text to find.": "اكتب النص المراد البحث عنه.",
     "Type the word or phrase to search for inside documents.": "اكتب الكلمة أو العبارة التي تريد البحث عنها داخل المستندات.",
     "Type to search files, apps and settings": "اكتب للبحث في الملفات والتطبيقات والإعدادات",
@@ -858,6 +1058,7 @@
     "You turned starting with Windows off in Settings. To turn it on: Settings ▸ Apps ▸ Startup ▸ InstaFind.": "أوقفتَ تشغيل البرنامج مع ويندوز من الإعدادات. لتشغيله: الإعدادات ◂ التطبيقات ◂ بدء التشغيل ◂ InstaFind.",
     "cannot reach the server (is the internet connected?)": "تعذر الوصول إلى الخادم (هل الإنترنت متصل؟)",
     "choose only one of --count, --csv and --json": "اختر واحداً فقط من --count و--csv و--json",
+    "drive not connected": "القرص غير متصل",
     "error: {msg}\r\nbahth.exe --help\r\n": "خطأ / error: {msg}\r\nbahth.exe --help\r\n",
     "every copy in its group is selected": "كل نسخ مجموعته محددة",
     "fuzzy: and root: work on file names only; inside documents the words were searched as typed": "«تقريب:» و«جذر:» (fuzzy: وroot:) يعملان على أسماء الملفات فقط؛ داخل المستندات بُحث عن الكلمات كما كُتبت",
@@ -880,7 +1081,6 @@
     "{:.1} KB": "{:.1} ك.ب",
     "{:.1} MB": "{:.1} م.ب",
     "{:.2} GB": "{:.2} ج.ب",
-    "{HOTKEY_TEXT} opens the quick search (otherwise the full window)": "{HOTKEY_TEXT} يفتح نافذة البحث الصغيرة (وإلا النافذة الكاملة)",
     "{name} needs a value": "{name} يحتاج إلى قيمة",
     "{name} takes no value": "{name} لا يأخذ قيمة",
     "{name}: not a number: {value}": "{name}: ليس رقماً: {value}",
@@ -895,6 +1095,7 @@
     "{} files were not deleted, so that the last copy is not lost:\n\n{}{}\n\nPress Search to refresh the list.": "ملفات لم تُحذف حتى لا تُحذف آخر نسخة (عددها: {}):\n\n{}{}\n\nاضغط «بحث» لتحديث القائمة.",
     "{} groups, {} files — wasted space: {}": "عدد المجموعات: {}، عدد الملفات: {} — المساحة المهدرة: {}",
     "{} matches in {} files. Files without a match: {}.": "عدد التطابقات: {}، في ملفات عددها: {}. ملفات بلا تطابق: {}.",
+    "{} opens the quick search (otherwise the full window)": "{} يفتح نافذة البحث الصغيرة (وإلا النافذة الكاملة)",
     "{} plain text files from the current results will be searched.": "سيُبحث في الملفات النصية من النتائج الحالية، وعددها: {}.",
     "{} — changed after the replace\r\n": "{} — تغيّر بعد الاستبدال\r\n",
     "{}: {} results in {} ms{tail}": "{} · عدد النتائج: {} في {} ملي ثانية{tail}",

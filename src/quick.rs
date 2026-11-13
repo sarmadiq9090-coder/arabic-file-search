@@ -861,6 +861,62 @@ pub fn row_at(slots: &[Slot], y: i32) -> Option<usize> {
     })
 }
 
+// ------------------------------------------------------------------ screen readers
+
+/// Whether row `i` is the first of its section, where the list draws the
+/// section's name ([`layout_list`]: every section but the "more" rows).
+pub fn starts_section(rows: &[Row], i: usize) -> bool {
+    let Some(row) = rows.get(i) else { return false };
+    row.group != Group::More && (i == 0 || rows[i - 1].group != row.group)
+}
+
+/// What a screen reader says for a result row: the section's name (`header`,
+/// on the first row of a section), the title, then the second line, the way
+/// the row reads on screen: «أفضل نتيجة: الدفتر، تطبيق», "Files: report.pdf,
+/// C:\Docs". The "more" rows show their title only.
+pub fn spoken_name(row: &Row, header: Option<&str>, lang: crate::i18n::Lang) -> String {
+    let mut text = String::new();
+    if let Some(h) = header.map(str::trim).filter(|h| !h.is_empty()) {
+        text.push_str(h);
+        text.push_str(": ");
+    }
+    text.push_str(row.title.trim());
+    let sub = row.subtitle.trim();
+    if row.group != Group::More && !sub.is_empty() && sub != row.title.trim() {
+        text.push_str(lang.pick("، ", ", "));
+        text.push_str(sub);
+    }
+    text
+}
+
+/// The accessibility child id of result row `i` (MSAA numbers children
+/// from 1; 0 is the list itself).
+pub fn child_id(i: usize) -> i32 {
+    i32::try_from(i).map_or(i32::MAX, |i| i.saturating_add(1))
+}
+
+/// The result row of accessibility child `child` in a list of `len` rows;
+/// `None` for the list itself (0) and ids that are not a row.
+pub fn row_of_child(child: i32, len: usize) -> Option<usize> {
+    let i = usize::try_from(child).ok()?.checked_sub(1)?;
+    (i < len).then_some(i)
+}
+
+/// Where MSAA's `accNavigate` goes from child `from` (0 = the list) in a
+/// list of `len` rows: `dir` is NAVDIR_UP/DOWN/LEFT/RIGHT/NEXT/PREVIOUS
+/// (1–6) between the rows, NAVDIR_FIRSTCHILD/LASTCHILD (7, 8) from the list.
+pub fn navigate_child(from: i32, dir: u32, len: usize) -> Option<i32> {
+    let last = child_id(len.checked_sub(1)?);
+    match (from, dir) {
+        (0, 7) => Some(1),
+        (0, 8) => Some(last),
+        (0, _) => None,
+        (c, 2 | 4 | 5) if c >= 1 && c < last => Some(c + 1),
+        (c, 1 | 3 | 6) if c > 1 && c <= last => Some(c - 1),
+        _ => None,
+    }
+}
+
 // ------------------------------------------------------------------ pixels
 
 /// Premultiplied BGRA pixels, as Windows' 32-bit DIBs and
@@ -1729,5 +1785,96 @@ mod everyday_tests {
         assert!(!hotkey_retry_due(2, 2));
         // The tick counter wraps around after about 27 years; no panic.
         assert!(hotkey_retry_due(24, u32::MAX));
+    }
+}
+
+#[cfg(test)]
+mod screen_reader_tests {
+    use super::*;
+    use crate::i18n::Lang;
+
+    fn row(group: Group, title: &str, subtitle: &str) -> Row {
+        Row { group, title: title.into(), subtitle: subtitle.into(), target: Target::OpenInMain(title.into()), icon: Icon::Glyph(glyph::SEARCH) }
+    }
+
+    #[test]
+    fn a_row_reads_as_name_and_folder_with_its_section_first() {
+        let file = Row::file(r"C:\Docs\تقرير 2026.pdf", false);
+        assert_eq!(spoken_name(&file, None, Lang::Ar), r"تقرير 2026.pdf، C:\Docs");
+        assert_eq!(spoken_name(&file, None, Lang::En), r"تقرير 2026.pdf, C:\Docs");
+        assert_eq!(spoken_name(&file, Some("الملفات"), Lang::Ar), r"الملفات: تقرير 2026.pdf، C:\Docs");
+        // The header is passed only for the first row of a section.
+        assert_eq!(spoken_name(&row(Group::Files, "b.txt", r"C:\x"), None, Lang::En), r"b.txt, C:\x");
+    }
+
+    #[test]
+    fn header_is_folded_in_front() {
+        let app = row(Group::Best, "Notepad", "App");
+        assert_eq!(spoken_name(&app, Some("Best match"), Lang::En), "Best match: Notepad, App");
+        assert_eq!(spoken_name(&app, Some("  "), Lang::En), "Notepad, App");
+    }
+
+    #[test]
+    fn no_second_line_and_more_rows_read_their_title_only() {
+        assert_eq!(spoken_name(&row(Group::Web, "Search the web", ""), Some("Web"), Lang::En), "Web: Search the web");
+        assert_eq!(spoken_name(&row(Group::More, "Open in InstaFind", "ignored"), None, Lang::En), "Open in InstaFind");
+        assert_eq!(spoken_name(&row(Group::Answers, "4", "4"), None, Lang::En), "4");
+    }
+
+    #[test]
+    fn sections_start_where_the_list_draws_a_header() {
+        let rows = vec![
+            row(Group::Best, "a", ""),
+            row(Group::Files, "b", ""),
+            row(Group::Files, "c", ""),
+            row(Group::Web, "d", ""),
+            row(Group::More, "e", ""),
+            row(Group::More, "f", ""),
+        ];
+        let starts: Vec<bool> = (0..rows.len()).map(|i| starts_section(&rows, i)).collect();
+        assert_eq!(starts, [true, true, false, true, false, false]);
+        assert!(!starts_section(&rows, 99));
+        // The same as the headers of the drawn layout.
+        let groups: Vec<Group> = rows.iter().map(|r| r.group).collect();
+        let m = ListMetrics { row: 40, more: 34, header: 26, separator: 9, pad: 6 };
+        let (slots, _) = layout_list(&groups, &m);
+        for (i, s) in slots.iter().enumerate() {
+            if let SlotKind::Row(r) = s.kind {
+                let headed = i > 0 && matches!(slots[i - 1].kind, SlotKind::Header(_));
+                assert_eq!(headed, starts[r], "row {r}");
+            }
+        }
+    }
+
+    #[test]
+    fn child_ids_are_rows_from_one() {
+        assert_eq!(child_id(0), 1);
+        assert_eq!(child_id(6), 7);
+        assert_eq!(child_id(usize::MAX), i32::MAX);
+        assert_eq!(row_of_child(1, 3), Some(0));
+        assert_eq!(row_of_child(3, 3), Some(2));
+        assert_eq!(row_of_child(4, 3), None);
+        assert_eq!(row_of_child(0, 3), None);
+        assert_eq!(row_of_child(-5, 3), None);
+        assert_eq!(row_of_child(1, 0), None);
+        for i in 0..5 {
+            assert_eq!(row_of_child(child_id(i), 5), Some(i));
+        }
+    }
+
+    #[test]
+    fn navigation_between_rows() {
+        // NAVDIR_UP 1, DOWN 2, LEFT 3, RIGHT 4, NEXT 5, PREVIOUS 6, FIRSTCHILD 7, LASTCHILD 8.
+        assert_eq!(navigate_child(0, 7, 3), Some(1));
+        assert_eq!(navigate_child(0, 8, 3), Some(3));
+        assert_eq!(navigate_child(0, 5, 3), None);
+        assert_eq!(navigate_child(1, 5, 3), Some(2));
+        assert_eq!(navigate_child(1, 2, 3), Some(2));
+        assert_eq!(navigate_child(3, 5, 3), None);
+        assert_eq!(navigate_child(3, 6, 3), Some(2));
+        assert_eq!(navigate_child(1, 6, 3), None);
+        assert_eq!(navigate_child(2, 7, 3), None);
+        assert_eq!(navigate_child(0, 7, 0), None);
+        assert_eq!(navigate_child(9, 6, 3), None);
     }
 }
