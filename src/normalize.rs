@@ -10,6 +10,9 @@
 //! A file name keeps them after its normalised name in [`name_key`], and a
 //! query adds them to its alternatives, so «مسئول», «مسؤول» and «مسوول» all
 //! find each other while و and ي stay different letters everywhere else.
+//! A final ئ is also يء (شاطئ = شاطيء). Document text is kept as it is and
+//! has no extra forms, so a search inside documents adds to the query the
+//! spellings its words may have there ([`document_forms`]).
 
 // Only the Windows UI and the tests use this module.
 
@@ -132,19 +135,24 @@ fn is_arabic_letter(c: Option<char>) -> bool {
 
 /// How a hamza seat in a spelling may also be written: `(carrier, alt, drop)`.
 /// ئ is ي, also و before و (مسئول = مسؤول) and nothing before ي (رئيس = ريس);
-/// ء between two letters is also و before و (رءوف = رؤوف), ي elsewhere
-/// (رءيس = رئيس), and nothing before ي. ؤ is و; in a `query` also ي before
-/// و, to reach a text that spells it ئ (شؤون finds شئون in a document,
-/// whose words have no extra forms). None for every other character.
-fn seat(c: char, prev: Option<char>, next: Option<char>, query: bool) -> Option<(char, char, bool)> {
+/// at the end of a word it is also يء (شاطئ = شاطيء, مبادئ = مباديء, شئ =
+/// شيء), the other way being a plain substring already. ء between two
+/// letters is also و before و (رءوف = رؤوف), ي elsewhere (رءيس = رئيس, قراءة
+/// = قرائة), and nothing before ي. ؤ is و. In a `query` ؤ before و is also ي
+/// and ئ before ة also ء, to reach a text that spells it ئ or ء (شؤون finds
+/// شئون and قرائة finds قراءة in a document, whose words have no extra
+/// forms). None for every other character.
+fn seat(c: char, prev: Option<char>, next: Option<char>, query: bool) -> Option<(char, &'static str, bool)> {
     let alt = |carrier| match next {
-        Some('و') => (carrier, 'و', false),
-        Some('ي') => (carrier, 'ي', true),
-        _ => (carrier, 'ي', false),
+        Some('و') => (carrier, "و", false),
+        Some('ي') => (carrier, "ي", true),
+        _ => (carrier, "ي", false),
     };
     match c {
-        'ؤ' if query && next == Some('و') => Some(('و', 'ي', false)),
-        'ؤ' => Some(('و', 'و', false)),
+        'ؤ' if query && next == Some('و') => Some(('و', "ي", false)),
+        'ؤ' => Some(('و', "و", false)),
+        'ئ' if query && next == Some('ه') => Some(('ي', "ء", false)),
+        'ئ' if is_arabic_letter(prev) && !is_arabic_letter(next) => Some(('ي', "يء", false)),
         'ئ' => Some(alt('ي')),
         'ء' if is_arabic_letter(prev) && is_arabic_letter(next) => Some(alt('ء')),
         _ => None,
@@ -167,13 +175,21 @@ fn forms_mapped(spelling: &str, map: &[u32], query: bool) -> Vec<(String, Vec<u3
         let bytes = &map[i.min(map.len())..(i + c.len_utf8()).min(map.len())];
         let prev = k.checked_sub(1).map(|p| chars[p].1);
         let next = chars.get(k + 1).map(|n| n.1);
-        let (plain, other, drop) = seat(c, prev, next, query).unwrap_or((c, c, false));
+        let Some((plain, other, drop)) = seat(c, prev, next, query) else {
+            carrier.push(c);
+            for f in [&mut alt, &mut dropped] {
+                f.0.push(c);
+                f.1.extend_from_slice(bytes);
+            }
+            continue;
+        };
         carrier.push(plain);
-        alt.0.push(other);
-        alt.1.extend_from_slice(bytes);
-        if !drop {
-            dropped.0.push(other);
-            dropped.1.extend_from_slice(bytes);
+        // Every byte of a written seat maps to the seat's own source offset.
+        let src = bytes.first().copied().unwrap_or(0);
+        let fs: &mut [&mut (String, Vec<u32>)] = if drop { &mut [&mut alt] } else { &mut [&mut alt, &mut dropped] };
+        for f in fs {
+            f.0.push_str(other);
+            f.1.extend(std::iter::repeat_n(src, other.len()));
         }
     }
     let mut out: Vec<(String, Vec<u32>)> = Vec::new();
@@ -183,6 +199,66 @@ fn forms_mapped(spelling: &str, map: &[u32], query: bool) -> Vec<(String, Vec<u3
         }
     }
     out
+}
+
+/// Most extra spellings [`document_forms`] gives one query alternative.
+pub const MAX_DOCUMENT_FORMS: usize = 4;
+
+/// The spellings a normalised query alternative may have in a document
+/// (a document's words have no extra forms, unlike a [`name_key`]):
+/// `(forms, ends)`, `ends` being forms that only match where a word ends.
+/// A final ء after ي may be the seat ئ: «شيء» is also «شي» (شئ) and
+/// «مباديء» «مبادي» (مبادئ), but only at the end of a word, or «شيء»
+/// would find «شيخ».
+///
+/// Each change on its own, then all of them, at most [`MAX_DOCUMENT_FORMS`]
+/// forms: never one per combination.
+pub fn document_forms(norm: &str) -> (Vec<String>, Vec<String>) {
+    let (mut forms, mut ends) = (Vec::new(), Vec::new());
+    if !norm.contains('ء') {
+        return (forms, ends);
+    }
+    let chars: Vec<char> = norm.chars().collect();
+    // (char index, replacement) of every place a seat may be.
+    let mut edits: Vec<(usize, &'static str)> = Vec::new();
+    // The letter's place in its word.
+    let mut at = 0usize;
+    for (k, &c) in chars.iter().enumerate() {
+        let prev = k.checked_sub(1).map(|p| chars[p]);
+        let next = chars.get(k + 1).copied();
+        if !is_arabic_letter(Some(c)) {
+            at = 0;
+            continue;
+        }
+        if c == 'ء' && prev == Some('ي') && at >= 2 && !is_arabic_letter(next) {
+            edits.push((k, ""));
+        }
+        at += 1;
+    }
+    let all: Vec<usize> = (0..edits.len()).collect();
+    let singles = (0..edits.len()).map(|e| vec![e]);
+    let subsets = singles.chain((edits.len() > 1).then_some(all));
+    for subset in subsets {
+        if forms.len() + ends.len() >= MAX_DOCUMENT_FORMS {
+            break;
+        }
+        let mut f = String::with_capacity(norm.len() + 2);
+        let mut ends_word = false;
+        for (k, &c) in chars.iter().enumerate() {
+            match subset.iter().map(|&e| edits[e]).find(|&(i, _)| i == k) {
+                Some((_, to)) => {
+                    f.push_str(to);
+                    ends_word |= to.is_empty() && k + 1 == chars.len();
+                }
+                None => f.push(c),
+            }
+        }
+        let list = if ends_word { &mut ends } else { &mut forms };
+        if f != norm && !list.contains(&f) {
+            list.push(f);
+        }
+    }
+    (forms, ends)
 }
 
 /// The other spellings of a name's hamza seats (see the module notes), as
@@ -362,6 +438,44 @@ mod tests {
         assert_eq!(name_key("سماء"), "سماء");
         assert_eq!(name_key("Report.PDF"), "report.pdf");
         assert_eq!(normalize("a\u{1}b\u{2}"), "ab");
+    }
+
+    #[test]
+    fn word_final_seats() {
+        // A final ئ is also يء (and the other way round is a plain part of it).
+        assert_eq!(seat_forms("شاطئ"), ["شاطيء"]);
+        assert_eq!(seat_forms("مبادئ عامة"), ["مباديء عامه"]);
+        assert_eq!(seat_forms("شئ.txt"), ["شيء.txt"]);
+        assert_eq!(query_forms("شاطئ"), ["شاطيء"]);
+        for none in ["شاطيء", "شيء", "ئ", "سماء", "قارئة"] {
+            assert!(seat_forms(none).is_empty(), "{none}");
+        }
+        assert_eq!(name_key("شاطئ.txt"), "شاطي.txt\u{1}شاطيء.txt\u{2}شاطئ.txt");
+        // ءة / ئة: a query with ئ before ة also has ء (قرائة finds قراءة).
+        assert_eq!(seat_forms("قراءة"), ["قرايه"]);
+        assert_eq!(query_forms("قرائة"), ["قراءه"]);
+        assert!(seat_forms("قرائة").is_empty());
+        let forms = forms_with_map("شئ هنا");
+        assert_eq!(forms[1].0, "شيء هنا");
+        assert_eq!(forms[1].1, [0, 0, 2, 2, 2, 2, 4, 5, 5, 7, 7, 9, 9]);
+    }
+
+    #[test]
+    fn document_forms_of_a_query() {
+        let df = |s: &str| document_forms(&normalize(s));
+        let none = (Vec::<String>::new(), Vec::<String>::new());
+        assert_eq!(df("شيء"), (vec![], vec!["شي".to_string()]));
+        assert_eq!(df("مباديء"), (vec![], vec!["مبادي".to_string()]));
+        // Inside a phrase the next character ends the word already.
+        assert_eq!(df("شيء جديد"), (vec!["شي جديد".to_string()], vec![]));
+        // Each change, then all of them.
+        assert_eq!(df("شيء وشيء"), (vec!["شي وشيء".to_string()], vec!["شيء وشي".to_string(), "شي وشي".to_string()]));
+        for w in ["سماء", "شيئا", "تقرير", "report", ""] {
+            assert_eq!(df(w), none, "{w}");
+        }
+        let long = "شيء ".repeat(100);
+        let (f, e) = document_forms(&long);
+        assert_eq!(f.len() + e.len(), MAX_DOCUMENT_FORMS);
     }
 
     #[test]

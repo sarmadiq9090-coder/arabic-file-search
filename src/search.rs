@@ -24,26 +24,62 @@ mod robustness;
 /// thread. Counts stop growing there.
 const MAX_SPANS: usize = 1_000_000;
 
+/// Most spellings [`Query::for_documents`] adds to one term: a handful of
+/// extra substring searches per document, whatever the query.
+const MAX_TERM_DOCUMENT_FORMS: usize = 6;
+
 /// One search term: it matches when any of its alternatives is contained.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Term {
     /// Normalised alternatives; never empty.
     pub alts: Vec<String>,
+    /// Alternatives that only match where a word ends (see
+    /// [`crate::normalize::document_forms`]); only a query for documents
+    /// ([`Query::for_documents`]) has them.
+    pub ends: Vec<String>,
 }
 
 impl Term {
     /// Byte position of the earliest alternative found in `hay`.
     fn find_in(&self, hay: &str) -> Option<usize> {
-        self.alts.iter().filter_map(|a| hay.find(a.as_str())).min()
+        let ends = self.ends.iter().filter_map(|a| end_matches(hay, a).next());
+        self.alts.iter().filter_map(|a| hay.find(a.as_str())).chain(ends).min()
     }
 
     pub(crate) fn matches(&self, hay: &str) -> bool {
-        self.alts.iter().any(|a| hay.contains(a.as_str()))
+        self.alts.iter().any(|a| hay.contains(a.as_str())) || self.ends.iter().any(|a| end_matches(hay, a).next().is_some())
+    }
+
+    /// Byte position of the earliest alternative found in `hay` as a whole word.
+    fn find_word(&self, hay: &str) -> Option<usize> {
+        self.alts.iter().chain(&self.ends).filter_map(|a| word_matches(hay, a).next()).min()
     }
 
     /// True when an alternative occurs in `hay` as a whole word.
     fn matches_word(&self, hay: &str) -> bool {
-        self.alts.iter().any(|a| word_matches(hay, a).next().is_some())
+        self.find_word(hay).is_some()
+    }
+
+    /// Adds the spellings its alternatives may have in a document
+    /// ([`crate::normalize::document_forms`]), at
+    /// most [`MAX_TERM_DOCUMENT_FORMS`] in all.
+    fn add_document_forms(&mut self) {
+        let mut room = MAX_TERM_DOCUMENT_FORMS;
+        for i in 0..self.alts.len() {
+            let (forms, ends) = crate::normalize::document_forms(&self.alts[i]);
+            for f in forms {
+                if room > 0 && !self.alts.contains(&f) {
+                    self.alts.push(f);
+                    room -= 1;
+                }
+            }
+            for f in ends {
+                if room > 0 && !self.alts.contains(&f) && !self.ends.contains(&f) {
+                    self.ends.push(f);
+                    room -= 1;
+                }
+            }
+        }
     }
 
     /// Every occurrence `(start, end)` of every alternative in `hay`, sorted,
@@ -56,6 +92,10 @@ impl Term {
             } else {
                 spans.extend(hay.match_indices(a.as_str()).take(MAX_SPANS).map(|(s, _)| (s, s + a.len())));
             }
+        }
+        for a in self.ends.iter().filter(|a| !a.is_empty()) {
+            let at = if whole_word { word_matches(hay, a).take(MAX_SPANS).collect::<Vec<_>>() } else { end_matches(hay, a).take(MAX_SPANS).collect() };
+            spans.extend(at.into_iter().map(|s| (s, s + a.len())));
         }
         merge_spans(spans)
     }
@@ -87,6 +127,13 @@ fn word_matches<'a>(hay: &'a str, w: &'a str) -> impl Iterator<Item = usize> + '
             && !hay[..s].chars().next_back().is_some_and(is_word_char)
             && !hay[s + w.len()..].chars().next().is_some_and(is_word_char)
     })
+}
+
+/// Start offsets of the occurrences of `w` in `hay` that end a word.
+fn end_matches<'a>(hay: &'a str, w: &'a str) -> impl Iterator<Item = usize> + 'a {
+    hay.match_indices(w)
+        .map(|(s, _)| s)
+        .filter(move |&s| !w.is_empty() && !hay[s + w.len()..].chars().next().is_some_and(is_word_char))
 }
 
 /// The words of `hay` as (byte offset, word), split on non-word characters.
@@ -882,7 +929,7 @@ impl Query {
                     for f in query_forms(w) {
                         push_alt(&mut alts, f, false);
                     }
-                    words.push(Term { alts });
+                    words.push(Term { alts, ..Term::default() });
                 }
                 if words.len() >= 2 {
                     q.near.push(Near { words, dist });
@@ -962,7 +1009,7 @@ impl Query {
             }
             match q.terms.last_mut() {
                 Some(last) if joins => alts.into_iter().for_each(|a| push_unique(&mut last.alts, a)),
-                _ => q.terms.push(Term { alts }),
+                _ => q.terms.push(Term { alts, ..Term::default() }),
             }
         }
         q.spelled_seat = q.spelled.iter().any(|a| a.contains(['ؤ', 'ئ']) || !query_forms(a).is_empty());
@@ -1043,12 +1090,31 @@ impl Query {
                 }
             }
             if !alts.is_empty() {
-                self.words.push(Term { alts });
+                self.words.push(Term { alts, ..Term::default() });
             }
         } else {
             return false;
         }
         true
+    }
+
+    /// This query for matching document text: each term (also `ww:` and
+    /// proximity words) and exclusion also has the spellings its words may
+    /// have in a document, «شيء» finding «شئ»
+    /// ([`crate::normalize::document_forms`]). A file name has those as extra
+    /// forms in its key, and a stored text is kept as it is, so they are
+    /// added to the query once per search instead.
+    pub(crate) fn for_documents(&self) -> Query {
+        let mut q = self.clone();
+        let near = q.near.iter_mut().flat_map(|n| n.words.iter_mut());
+        for t in q.terms.iter_mut().chain(q.words.iter_mut()).chain(near) {
+            t.add_document_forms();
+        }
+        let extra: Vec<String> = q.excludes.iter().flat_map(|x| crate::normalize::document_forms(x).0).collect();
+        for x in extra {
+            push_unique(&mut q.excludes, x);
+        }
+        q
     }
 
     /// For a search inside documents: `fuzzy:` and `root:` match file names
@@ -1372,6 +1438,7 @@ fn search_documents(
     text_of: &(dyn Fn(&Entry) -> (Option<String>, bool) + Sync),
 ) {
     let scope_lower = scope.to_lowercase();
+    let q = &q.for_documents();
     let candidates: Vec<u32> = entries
         .par_iter()
         .enumerate()
@@ -1435,7 +1502,7 @@ fn search_documents(
 /// longer matches.
 pub fn document_matches(path: &str, q: &Query, cache: Option<&ContentCache>) -> Option<(u32, Vec<(u32, String)>)> {
     let text = content_cache::text_of(cache, path).0?;
-    let hit = content_hit(0, &text, q)?;
+    let hit = content_hit(0, &text, &q.for_documents())?;
     Some((hit.count, hit.lines))
 }
 
@@ -1460,7 +1527,7 @@ fn text_matches(text: &str, norm: &str, map: &[u32], q: &Query, all: bool) -> Op
             }
             at.extend(spans.iter().map(|&(s, _)| s));
         } else if whole {
-            at.push(t.alts.iter().filter_map(|a| word_matches(norm, a).next()).min()?);
+            at.push(t.find_word(norm)?);
         } else {
             at.push(t.find_in(norm)?);
         }
@@ -1502,7 +1569,7 @@ fn text_matches(text: &str, norm: &str, map: &[u32], q: &Query, all: bool) -> Op
 #[cfg_attr(not(test), allow(dead_code))] // for the UI and the CLI; not called there yet
 pub fn match_text(text: &str, q: &Query) -> Option<String> {
     let (norm, map) = normalize_with_map(text);
-    let at = text_matches(text, &norm, &map, q, false)?;
+    let at = text_matches(text, &norm, &map, &q.for_documents(), false)?;
     Some(snippet_at(text, at[0]))
 }
 
@@ -1512,7 +1579,7 @@ pub fn match_text(text: &str, q: &Query) -> Option<String> {
 #[cfg_attr(not(test), allow(dead_code))] // for the UI and the CLI; not called there yet
 pub fn all_matches(text: &str, q: &Query, max: usize) -> (u32, Vec<(u32, String)>) {
     let (norm, map) = normalize_with_map(text);
-    match text_matches(text, &norm, &map, q, true) {
+    match text_matches(text, &norm, &map, &q.for_documents(), true) {
         Some(at) => (u32::try_from(at.len()).unwrap_or(u32::MAX), matching_lines(text, &at, max)),
         None => (0, Vec::new()),
     }

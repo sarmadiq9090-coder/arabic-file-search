@@ -576,3 +576,61 @@ fn hamza_seats_in_filters_and_order() {
     assert_eq!(marked("مسئول.txt", "ww:مسوول"), ["مسئول"]);
     assert_eq!(marked("مسئول.txt", r#""مسؤول txt"~2"#), ["مسئول", "txt"]);
 }
+
+// ------------------------------------------- word-final hamza: شاطئ / شاطيء
+
+/// «شاطيء» did not find «شاطئ»: a final ء after ي was kept, so only the
+/// other way round («شاطئ» is شاطي, a part of شاطيء) matched. A final ئ is
+/// now also يء, in names and in queries, and inside documents a final يء
+/// typed in the query also finds ئ (at the end of a word only: «شيء» must
+/// not find «شيخ»). The spelling as typed still comes first.
+#[test]
+fn word_final_hamza_spellings_find_each_other() {
+    let entries = vec![
+        entry(r"C:\a\شاطئ.txt", false),       // 0
+        entry(r"C:\a\شاطيء.txt", false),      // 1
+        entry(r"C:\a\مبادئ عامة.docx", false), // 2
+        entry(r"C:\a\مباديء.docx", false),    // 3
+        entry(r"C:\a\شئ.txt", false),         // 4
+        entry(r"C:\a\شيء.txt", false),        // 5
+        entry(r"C:\a\شيخ.txt", false),        // 6
+        entry(r"C:\a\قراءة.txt", false),      // 7
+        entry(r"C:\a\قرائة.txt", false),      // 8
+    ];
+    let find = |s: &str| {
+        let mut r = search_names(&entries, &at(s), "");
+        r.sort_unstable();
+        r
+    };
+    for q in ["شاطئ", "شاطيء", "شاطئ.txt", "شاطيء.txt"] {
+        assert_eq!(find(q), vec![0, 1], "{q}");
+    }
+    for q in ["مبادئ", "مباديء"] {
+        assert_eq!(find(q), vec![2, 3], "{q}");
+    }
+    for q in ["شيء", "شيء.txt"] {
+        assert_eq!(find(q), vec![4, 5], "{q}");
+    }
+    // «شئ» is «شي» once normalised, a part of «شيخ» too (as before).
+    assert_eq!(find("شئ"), vec![4, 5, 6]);
+    for q in ["قراءة", "قرائة"] {
+        assert_eq!(find(q), vec![7, 8], "{q}");
+    }
+    // The spelling as typed first.
+    assert_eq!(search_names(&entries, &at("شاطيء"), ""), vec![1, 0]);
+    assert_eq!(search_names(&entries, &at("شاطئ"), ""), vec![0, 1]);
+    assert_eq!(search_names(&entries, &at("شيء"), ""), vec![5, 4]);
+    // Inside documents, both ways.
+    for (text, q) in [("على الشاطئ صباحاً", "شاطيء"), ("على الشاطيء صباحاً", "شاطئ"), ("لا شئ هنا", "شيء"), ("لا شيء هنا", "شئ")] {
+        assert!(match_text(text, &at(q)).is_some(), "{q} in {text}");
+    }
+    assert!(match_text("هذه مبادئ.", &at("مباديء")).is_some());
+    assert!(match_text("قراءة الكتاب", &at("قرائة")).is_some());
+    assert!(match_text("قرائة الكتاب", &at("قراءة")).is_some());
+    assert!(match_text("رأي الشيخ", &at("شيء")).is_none());
+    assert_eq!(all_matches("شئ ثم شيء ثم شيخ", &at("شيء"), 5).0, 2);
+    // The underline covers the name whichever spelling found it.
+    let marked = |name: &str, q: &str| match_ranges(name, &at(q)).into_iter().map(|(s, e)| name[s..e].to_string()).collect::<Vec<_>>();
+    assert_eq!(marked("شاطئ.txt", "شاطيء"), ["شاطئ"]);
+    assert_eq!(marked("لا شئ هنا", "شيء"), ["شئ"]);
+}
