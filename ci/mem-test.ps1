@@ -9,7 +9,8 @@
 # the program crashes (crash.txt) or exits by itself.
 #
 # Scenarios (-Scenarios, any subset; each starts from an empty data folder):
-#   A  Baseline: the machine as it is. Wait for the name index, 3 min idle.
+#   A  Baseline: the machine as it is. Wait for the name index, 3 min idle;
+#      then (branch build) the idle trim check, see below.
 #   B  Heavy tree: a synthetic Unity-like Library/ and node_modules tree
 #      (about 500,000 small files), multi-GB text files (.txt .json .log
 #      .csv), a 1 GB zip, tar.gz archives, 1 GB .blend/.fbx/.asset/
@@ -19,7 +20,8 @@
 #   C  Search stress, in the same process as B: 20 rounds of typed searches
 #      that match almost everything and long or odd ones, a search inside
 #      documents every 5th round, the Ctrl+Alt+F popup 20 times, 5 min idle.
-#   E  Long idle, same process: 10 min in the tray, slope of private bytes.
+#   E  Long idle, same process: 10 min in the tray, slope of private bytes;
+#      the 10 minutes are also (branch build) the idle trim check.
 #   F  Churn: started as Windows starts it (--startup, in the tray), with
 #      B's 500,000 small files on disk so the index is big. After the name
 #      index and 2 min of idle baseline, 15 min of continuous file churn
@@ -54,8 +56,24 @@
 #      (D3a, D3b); and the updater's own swap + `--updated` start is
 #      replayed while the old copy stays alive (D2).
 #   G  The new look (WebView2), 0.10.0 and later, 3 min idle: bahth plus
-#      its msedgewebview2 processes.
+#      its msedgewebview2 processes; then (branch build) the idle trim check.
 # B, C and E share one run of the program (B -> C -> E), as on a real PC.
+#
+# The idle trim (1.0, src/mem_guard.rs and src/ui/memory.rs), checked in A,
+# E and G for the branch build only (the released exes have none): once the
+# content index's warm-up has ended, a timed search in the Ctrl+Alt+F popup,
+# then no input at all for at least 3 minutes (the harness's own keys count
+# as activity); log.txt must get "memory: idle trim: private X MB -> Y MB";
+# private bytes settled before and after it are recorded; criteria: settled
+# private <= max(350 MB, 1.2 x (230 B x entries + 260 B x documents +
+# 60 MB)) with the entries and documents of that line, and the same popup
+# search after the trim at most 2x + 200 ms slower than before it.
+#
+# The look: since 1.0 the new look is the only one for users and new_ui=0 is
+# ignored, so every scenario but G starts the program (and the copies it
+# starts itself, which inherit it) with BAHTH_CLASSIC=1, the program's own
+# switch for the tests: the harness drives the classic window. The released
+# exes ignore it.
 #
 # Every 5 s a background thread writes one line per bahth process to
 # samples.csv: PID, parent PID, start time, command line, private bytes,
@@ -1596,15 +1614,18 @@ function Reset-Data {
 }
 
 # settings.txt as the program reads it (key=value, ASCII, no BOM). No
-# first-run question (the box above the clock is on, as after "Yes"; no
-# offer to move; no rating), and `update_check` a minute ago: the automatic
+# first-run question (the box above the clock is on, as after "Yes"; 1.0
+# asks nothing and keeps it off unless the settings say so; no offer to
+# move; no rating), 1.0's one-time look markers already there
+# (new_ui_default=1, new_ui_only=1: nothing to move), and `update_check` a
+# minute ago: the automatic
 # check for a new version (src/update.rs, should_check_now) stays quiet for
 # 24 hours, so the exe under test is not replaced. (A time in the future
 # would start a check at once.)
 function Write-Settings([hashtable]$Extra = @{}) {
     New-Item -ItemType Directory -Force $data | Out-Null
     $now = [int64]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds()) - 60
-    $s = [ordered]@{ floating_asked = '1'; floating_mode = 'fade'; move_asked = '1'; rating_asked = '1'; new_ui = '0'; new_ui_failed = '0'; content_index = '1'; auto_index = '1'; tray_icon = '1'; update_check = "$now" }
+    $s = [ordered]@{ floating_asked = '1'; floating_mode = 'fade'; move_asked = '1'; rating_asked = '1'; new_ui = '0'; new_ui_failed = '0'; new_ui_default = '1'; new_ui_only = '1'; content_index = '1'; auto_index = '1'; tray_icon = '1'; update_check = "$now" }
     foreach ($k in @($Extra.Keys)) { $s[$k] = "$($Extra[$k])" }
     $text = ''
     foreach ($k in @($s.Keys)) { $text += "$k=$($s[$k])`n" }
@@ -1624,11 +1645,24 @@ function Copy-Exe([string]$From, [string]$To) {
 }
 function Install-Exe([string]$V) {
     Copy-Exe $exes[$V] $instExe
+    $script:installed = $V
     Say "installed $V at $instExe"
 }
 
+# The environment the program starts with (and the copies it starts
+# itself, and every later Start-Process here, inherit): BAHTH_CLASSIC=1
+# unless the scenario is about the new look (`$script:classic`, reset for
+# every scenario); BAHTH_UI_TEST=1 for the branch build, whose quick popup
+# then writes its rows to quick-rows.txt (the idle trim's timed search).
+function Set-AppEnv {
+    if ($script:classic) { $env:BAHTH_CLASSIC = '1' } else { Remove-Item Env:BAHTH_CLASSIC -ErrorAction SilentlyContinue }
+    if (Has-Trim $script:installed) { $env:BAHTH_UI_TEST = '1' } else { Remove-Item Env:BAHTH_UI_TEST -ErrorAction SilentlyContinue }
+    foreach ($v in 'BAHTH_WEBUI', 'BAHTH_WEBUI_FAIL') { Remove-Item "Env:$v" -ErrorAction SilentlyContinue }
+}
+
 function Start-App([string[]]$AppArgs) {
-    Say "starting $instExe $($AppArgs -join ' ')"
+    Set-AppEnv
+    Say "starting $instExe $($AppArgs -join ' ') (BAHTH_CLASSIC=$env:BAHTH_CLASSIC)"
     if ($AppArgs -and $AppArgs.Count) { $script:app = Start-Process -FilePath $instExe -ArgumentList $AppArgs -WorkingDirectory $instDir -PassThru }
     else { $script:app = Start-Process -FilePath $instExe -WorkingDirectory $instDir -PassThru }
     Say "process $($script:app.Id)"
@@ -1710,8 +1744,9 @@ function Content-Settled { return (Log-Has 'content index warm: \d+ of \d+ new d
 
 # Empty data folder, `V` installed, settings written, program started, name
 # index awaited. `Label` is the version name in samples.csv.
-function Start-Fresh([string]$V, [string]$Scenario, [string[]]$AppArgs, [hashtable]$Settings = @{}, [string]$Label = '') {
+function Start-Fresh([string]$V, [string]$Scenario, [string[]]$AppArgs, [hashtable]$Settings = @{}, [string]$Label = '', [switch]$NewLook) {
     if (-not $Label) { $Label = $V }
+    $script:classic = -not $NewLook
     Reset-Data
     Install-Exe $V
     Write-Settings $Settings
@@ -1965,6 +2000,7 @@ function Finish-Session([string]$Label, [string]$Scenario, [string]$Title, [stri
 function Run-Scenario([string]$Name, [scriptblock]$Body) {
     Say "==================== $Name"
     if ((Time-Up) -or (Time-Left) -lt 300) { Note "$Name was skipped: the time budget of $BudgetMinutes min is used up"; return }
+    $script:classic = $true
     try { & $Body }
     catch {
         $m = One-Line "$_"
@@ -2080,6 +2116,162 @@ function New-BigFiles {
     return $script:bigFiles
 }
 
+# ---------------------------------------------------------------- the idle trim (1.0)
+# See the notes at the top. Only the branch build has the trim.
+function Has-Trim([string]$V) { return ($V -eq 'branch') }
+
+# The file the timed popup search finds: in Documents, which every index
+# holds; made before the first start of the run and deleted at its end.
+$trimProbeDir = Join-Path $env:USERPROFILE 'Documents\InstaFind mem-test probe'
+$trimProbeWord = 'zqmemtrimprobe'
+$quickRowsFile = Join-Path $data 'quick-rows.txt'
+$script:trim = $null
+function New-TrimProbe {
+    New-Item -ItemType Directory -Force $trimProbeDir | Out-Null
+    $f = Join-Path $trimProbeDir "$trimProbeWord report.txt"
+    if (-not (Test-Path -LiteralPath $f)) { [IO.File]::WriteAllText($f, 'the idle trim check of ci/mem-test.ps1', $utf8) }
+}
+
+# The popup's own dump of its rows (BAHTH_UI_TEST=1): "query<TAB>text",
+# then one line per row. (Call it as @(Quick-Rows): one line alone would
+# come back as a bare string.)
+function Quick-Rows {
+    try { if (Test-Path -LiteralPath $quickRowsFile) { return @(([MemSampler]::ReadShared($quickRowsFile)) -split "`r?`n" | Where-Object { $_ }) } } catch { }
+    return @()
+}
+function Close-Popup {
+    for ($i = 0; $i -lt 3 -and (Popup-Window); $i++) {
+        # Esc only while the popup is there: in the main window it hides the window.
+        [MemUi]::Chord($VK.ESC)
+        [void](Wait-Until { -not (Popup-Window) } 2)
+    }
+}
+function Ms-Text([double]$Ms) { if ($Ms -lt 0) { return 'not measured' }; return ('{0:N0} ms' -f $Ms) }
+
+# One search in the Ctrl+Alt+F popup, timed from the moment the word is put
+# in its box (WM_SETTEXT, as a paste) to the moment the popup's dump holds
+# the probe file. Milliseconds, or -1. This is input to the program: its
+# idle clock starts again.
+function Popup-SearchMs([string]$Why) {
+    $pop = $null
+    for ($try = 1; $try -le 3 -and -not $pop; $try++) {
+        [MemUi]::Chord($VK.CTRL, $VK.ALT, $VK.F)
+        $pop = Wait-Until { Popup-Window } 4
+    }
+    if (-not $pop) { Note "popup search ($Why): Ctrl+Alt+F did not open the popup (3 tries)"; return -1 }
+    $edit = Get-Children $pop.Handle | Where-Object { $_.Class -eq 'Edit' } | Select-Object -First 1
+    if (-not $edit) { Note "popup search ($Why): the popup has no search box"; Close-Popup; return -1 }
+    [void][MemUi]::SetText($edit.Handle, '')
+    Start-Sleep -Milliseconds 400
+    Remove-Item -LiteralPath $quickRowsFile -Force -ErrorAction SilentlyContinue
+    $ms = -1
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    if ([MemUi]::SetText($edit.Handle, $trimProbeWord)) {
+        while ($sw.ElapsedMilliseconds -lt 20000) {
+            $rows = @(Quick-Rows)
+            if ($rows.Count -gt 1 -and $rows[0] -eq "query`t$trimProbeWord" -and @($rows | Select-Object -Skip 1 | Where-Object { $_ -like "*$trimProbeWord*" }).Count -gt 0) { $ms = [double]$sw.ElapsedMilliseconds; break }
+            Start-Sleep -Milliseconds 10
+        }
+    } else { Note "popup search ($Why): the search box did not take the text" }
+    $shown = (@(Quick-Rows) | Select-Object -First 3) -join ' / '
+    Say ("  popup search ({0}): '{1}' -> {2}; rows: {3}" -f $Why, $trimProbeWord, $(if ($ms -ge 0) { Ms-Text $ms } else { 'probe file NOT shown within 20 s' }), ($shown -replace "`t", ': '))
+    Close-Popup
+    return $ms
+}
+
+# Waits for the content index's warm-up to end (at most `Seconds`, and what
+# the budget leaves after `Reserve` seconds for what comes later).
+function Wait-Warm([string]$V, [string]$Scn, [int]$Seconds, [int]$Reserve) {
+    if (Content-Settled) { return $true }
+    Set-Phase $V $Scn 'warm-up'
+    $t = Get-Date
+    $ok = Wait-Sampled (Plan-Seconds $Seconds "$Scn warm-up before the idle trim" $Reserve 30) "${Scn}: the content index's warm-up to end, for the idle trim ($V)" { Content-Settled }
+    Say ("{0}: the warm-up {1} after {2:N0} s more (status bar: {3})" -f $Scn, $(if ($ok) { 'ended' } else { 'is STILL RUNNING' }), ((Get-Date) - $t).TotalSeconds, (Status-Line))
+    return $ok
+}
+
+function Trim-Lines { Sync-Log; return @($script:logAll -split "`r?`n" | Where-Object { $_ -match 'memory: idle trim: ' }) }
+# From now on no input: the trim line that comes next is the one measured;
+# from it on the samples get phase `After`.
+function Trim-Start([string]$V, [string]$Scn, [string]$After) {
+    $script:trim = @{ V = $V; Scn = $Scn; After = $After; Count0 = @(Trim-Lines).Count; At = $null; Line = ''; Idle0 = (Get-Date) }
+}
+# For Wait-Sampled: notes the trim line when it comes; true once it came at
+# least 60 s ago and there was no input for at least `MinIdle` seconds.
+function Trim-Watch([int]$MinIdle) {
+    $t = $script:trim
+    if (-not $t.At) {
+        $lines = @(Trim-Lines)
+        if ($lines.Count -gt $t.Count0) {
+            $t.At = Get-Date
+            $t.Line = [string]$lines[$t.Count0]
+            Say ("  the idle trim came {0:N0} s after the last input: {1}" -f ($t.At - $t.Idle0).TotalSeconds, ($t.Line -replace '^\d+ ', ''))
+            Set-Phase $t.V $t.Scn $t.After
+        }
+    }
+    return ($null -ne $t.At -and ((Get-Date) - $t.At).TotalSeconds -ge 60 -and ((Get-Date) - $t.Idle0).TotalSeconds -ge $MinIdle)
+}
+# The numbers and the criteria of a watched idle spell: the samples of phase
+# `Before` (until the trim) and of the trim's `After` phase.
+function Trim-Result([string]$V, [string]$Scn, [int]$Order, [string]$Title, [string]$Before, [double]$BeforeMs) {
+    $t = $script:trim
+    $idle = ((Get-Date) - $t.Idle0).TotalSeconds
+    $memLine = @($script:logAll -split "`r?`n" | Where-Object { $_ -match 'memory: private .*\(expected about \d+ MB\)' } | Select-Object -Last 1) -join ''
+    if ($null -eq $t.At) {
+        Add-Criterion $Scn $V 'idle trim: the trim line comes within minutes without input' $false ("no 'memory: idle trim' line in {0:N0} s without input after the warm-up; last memory line: {1}" -f $idle, ($memLine -replace '^\d+ ', ''))
+        Shot "$V-$Scn-no-trim"
+        return ("idle trim: NO trim line in {0:N0} s without input (last memory line: {1})" -f $idle, ($memLine -replace '^\d+ ', ''))
+    }
+    $after = ($t.At - $t.Idle0).TotalSeconds
+    Add-Criterion $Scn $V 'idle trim: the trim line comes within minutes without input' $true ("{0:N0} s after the last input: {1}" -f $after, ($t.Line -replace '^\d+ ', ''))
+    $entries = [int64]0; $docs = [int64]0; $fromMb = [int64]0; $toMb = [int64]0
+    if ($t.Line -match 'private (\d+) MB -> (\d+) MB .*entries (\d+), documents (\d+)') { $fromMb = [int64]$Matches[1]; $toMb = [int64]$Matches[2]; $entries = [int64]$Matches[3]; $docs = [int64]$Matches[4] }
+    else { Note "${Scn} [$V]: the idle trim line has an unexpected form: $($t.Line)" }
+    $pre = Get-Ticks $V $Scn @($Before)
+    $post = Get-Ticks $V $Scn @($t.After)
+    $preAll = @($pre)
+    $preTail = @()
+    if ($preAll.Count) {
+        # The 30 s before the trim (the last sample may be just after it).
+        $end = [double]$preAll[-1].T
+        $preTail = @($preAll | Where-Object { $_.T -le $end - 5 -and $_.T -ge $end - 35 })
+        if (-not $preTail.Count) { $preTail = @($preAll | Select-Object -Last 3) }
+    }
+    $settledBefore = Median ($preTail | ForEach-Object { $_.Private })
+    $settledAfter = Median (@(Last-Seconds $post 30) | ForEach-Object { $_.Private })
+    # The limit the owner set, in MB as the program counts them (1024 x 1024 bytes).
+    $expectMb = (230.0 * $entries + 260.0 * $docs) / 1MB + 60.0
+    $limitMb = [Math]::Max(350.0, 1.2 * $expectMb)
+    $memOk = (-not [double]::IsNaN($settledAfter)) -and ($settledAfter -le $limitMb)
+    Add-Criterion $Scn $V 'idle trim: settled private <= max(350 MB, 1.2 x (230 B x entries + 260 B x documents + 60 MB))' $memOk ("{0:N0} MB settled after the trim against a limit of {1:N0} MB ({2:N0} entries, {3:N0} documents); {4:N0} MB settled before it; the trim's line: {5:N0} -> {6:N0} MB" -f $settledAfter, $limitMb, $entries, $docs, $settledBefore, $fromMb, $toMb)
+    $afterMs = Popup-SearchMs "$Scn after the idle trim"
+    $fastOk = ($BeforeMs -ge 0) -and ($afterMs -ge 0) -and ($afterMs -le 2 * $BeforeMs + 200)
+    Add-Criterion $Scn $V 'idle trim: the popup search after it is at most 2x + 200 ms slower than before it' $fastOk ("'$trimProbeWord' before the trim: {0}; first search after it: {1}" -f (Ms-Text $BeforeMs), (Ms-Text $afterMs))
+    $text = "idle trim {0:N0} s after the last input ({1:N0} -> {2:N0} MB; {3:N0} entries, {4:N0} documents); settled private {5:N0} MB before, {6:N0} MB after (limit {7:N0} MB); popup search {8} before, {9} after" -f $after, $fromMb, $toMb, $entries, $docs, $settledBefore, $settledAfter, $limitMb, (Ms-Text $BeforeMs), (Ms-Text $afterMs)
+    $all = @(@($pre) + @($post))
+    # (A trim in the last seconds of E's ten minutes leaves no samples after it.)
+    $settle = @(if (@($post).Count) { $post } else { $all })
+    Add-Row $Order $Title $V $all $settle $text
+    return "Idle trim: $text."
+}
+# The check in A and G: the warm-up's end, a timed popup search, no input
+# until the trim and for at least 3 minutes, then the search again.
+function Trim-Check([string]$V, [string]$Scn, [int]$Order, [string]$Title, [int]$Reserve = 240) {
+    if (-not (Has-Trim $V)) { return "Idle trim: not checked ($V has none; it came in 1.0)." }
+    if (-not (Wait-Warm $V $Scn 2700 $Reserve)) {
+        Warn "$Scn [$V]: the idle trim was not checked: the content index's warm-up had not ended (status bar: $(Status-Line))"
+        return 'Idle trim: NOT checked (the warm-up did not end in time).'
+    }
+    Set-Phase $V $Scn 'trim-before'
+    # The first search after a quiet time is not timed (the popup builds its lists).
+    [void](Popup-SearchMs "$Scn, first")
+    $beforeMs = Popup-SearchMs "$Scn before the idle trim"
+    Trim-Start $V $Scn 'trim-after'
+    Set-Phase $V $Scn 'trim-wait'
+    [void](Wait-Sampled (Plan-Seconds 420 "$Scn idle until the trim" 120 420) "${Scn}: no input until the idle trim and for at least 3 min ($V)" { Trim-Watch 180 })
+    return (Trim-Result $V $Scn $Order $Title 'trim-wait' $beforeMs)
+}
+
 # ---------------------------------------------------------------- A: baseline
 function Scenario-A([string]$V) {
     $hash = File-Hash $exes[$V]
@@ -2091,7 +2283,14 @@ function Scenario-A([string]$V) {
     $idle = Get-Ticks $V 'A' @('idle')
     Add-Row 10 'A. Baseline: this machine as it is, 3 min after the name index' $V $all $idle "$($s.Text); status bar at the end: $status"
     Shot "$V-A-end"
-    Finish-Session $V 'A' "A. Baseline, $V" @("Name index: $($s.Text).", "Status bar at the end: $status", "Sampler at the end: $([MemSampler]::LastLine)") $hash
+    # What comes after A in this run needs its time (F and H about 32 min
+    # each, B to E about an hour).
+    $later = 240
+    if ($scenarioList -contains 'F') { $later += 1900 }
+    if (($scenarioList -contains 'H') -and $V -eq 'branch') { $later += 1900 }
+    if (@($scenarioList | Where-Object { $_ -in @('B', 'C', 'E') }).Count) { $later += 3600 }
+    $trimText = Trim-Check $V 'A' 15 'A2. Idle trim: after the warm-up, 3 min or more without input (A''s process)' $later
+    Finish-Session $V 'A' "A. Baseline, $V" @("Name index: $($s.Text).", "Status bar at the end of the 3 min: $status", $trimText, "Sampler at the end: $([MemSampler]::LastLine)") $hash
 }
 
 # ---------------------------------------------------------------- C: search stress
@@ -2215,6 +2414,19 @@ function Do-SearchStress([string]$V) {
 
 # ---------------------------------------------------------------- E: long idle in the tray
 function Do-TrayIdle([string]$V) {
+    # The idle trim (branch build): the warm-up must be over first (B waited
+    # for it up to 20 min), then a timed popup search; the ten minutes in
+    # the tray are the time without input.
+    $trimOn = $false; $beforeMs = -1
+    if (Has-Trim $V) {
+        # (The ten minutes in the tray and the report come after the wait.)
+        $trimOn = Wait-Warm $V 'E' 2700 900
+        if ($trimOn) {
+            Set-Phase $V 'E' 'trim-before'
+            [void](Popup-SearchMs 'E, first')
+            $beforeMs = Popup-SearchMs 'E before the idle trim'
+        } else { Warn "E [$V]: the idle trim was not checked: the content index's warm-up had not ended (status bar: $(Status-Line))" }
+    }
     Set-Phase $V 'E' 'hide'
     $main = Main-Window
     if ($main) {
@@ -2224,9 +2436,15 @@ function Do-TrayIdle([string]$V) {
     }
     if (-not (Get-Process bahth -ErrorAction SilentlyContinue)) { throw 'APP-EXITED: closing the window ended the program instead of hiding it to the tray' }
     if (Main-Window) { Note "E ($V): the main window is still on screen after the close button" }
+    $until = $null
+    if ($trimOn) {
+        Trim-Start $V 'E' 'tray-trimmed'
+        # Notes the trim when it comes; the ten minutes run out in any case.
+        $until = { [void](Trim-Watch 0); $false }
+    }
     Set-Phase $V 'E' 'tray'
-    [void](Wait-Sampled (Plan-Seconds 600 'E idle in the tray') "E: ten minutes in the tray ($V)")
-    $ticks = Get-Ticks $V 'E' @('tray')
+    [void](Wait-Sampled (Plan-Seconds 600 'E idle in the tray') "E: ten minutes in the tray ($V)" $until)
+    $ticks = Get-Ticks $V 'E' @('tray', 'tray-trimmed')
     $x = @($ticks | ForEach-Object { $_.T / 60.0 })
     $y = @($ticks | ForEach-Object { $_.Private })
     $slope = Slope $x $y
@@ -2235,7 +2453,10 @@ function Do-TrayIdle([string]$V) {
     $mins = if ($x.Count) { $x[-1] - $x[0] } else { 0 }
     $text = "slope of private bytes {0:+0.00;-0.00;0.00} MB/min over {1:N1} min in the tray ({2:N0} MB at the start, {3:N0} MB at the end); status bar: {4}" -f $slope, $mins, $first, $last, (Status-Line)
     Add-Row 50 'E. Long idle: 10 min in the tray (same process as B and C)' $V $ticks $ticks $text
-    return "E: $text."
+    $trimText = ''
+    if ($trimOn) { $trimText = ' ' + (Trim-Result $V 'E' 55 'E2. Idle trim: the 10 min in the tray after the warm-up (same process as B and C)' 'tray' $beforeMs) }
+    elseif (-not (Has-Trim $V)) { $trimText = " Idle trim: not checked ($V has none; it came in 1.0)." }
+    return "E: $text.$trimText"
 }
 
 # ---------------------------------------------------------------- B (then C, E): the heavy tree
@@ -2549,6 +2770,8 @@ function Do-Moved([string]$V) {
     $findOffer = { Find-Dialogs | Where-Object { "$($_.Title) $($_.Body)" -match $offerMatch } | Select-Object -First 1 }
     try {
         Set-Phase $V 'M' 'index'
+        $script:installed = $V
+        Set-AppEnv
         Say "starting $dlExe (a copy in Downloads)"
         $script:app = Start-Process -FilePath $dlExe -WorkingDirectory $dl -PassThru
         $offer = Wait-Until $findOffer 60
@@ -2847,7 +3070,8 @@ function Scenario-D3aD2 {
 
 # ---------------------------------------------------------------- G: the new look
 function Scenario-G([string]$V) {
-    $s = Start-Fresh $V 'G' @() @{ new_ui = '1' }
+    # No BAHTH_CLASSIC: the new look, as every 1.0 user gets it.
+    $s = Start-Fresh $V 'G' @() @{ new_ui = '1' } -NewLook
     Set-Phase $V 'G' 'idle'
     [void](Wait-Sampled (Plan-Seconds 180 'G idle') 'G: the new look, three minutes after the name index')
     $webui = @($script:logAll -split "`r?`n" | Where-Object { $_ -match 'webui' } | ForEach-Object { $_ -replace '^\d+ ', '' }) -join ' / '
@@ -2859,7 +3083,8 @@ function Scenario-G([string]$V) {
     $all = Get-Ticks $V 'G' @('index', 'idle')
     $end = Get-Ticks $V 'G' @('idle')
     Add-Row 70 'G. New look (WebView2 window), 3 min after the name index' $V $all $end $text
-    Finish-Session $V 'G' "G. New look, $V" @("G: $text.")
+    $trimText = Trim-Check $V 'G' 75 'G2. Idle trim in the new look: after the warm-up, 3 min or more without input' 240
+    Finish-Session $V 'G' "G. New look, $V" @("G: $text.", $trimText)
 }
 
 # ---------------------------------------------------------------- run
@@ -2903,6 +3128,11 @@ foreach ($v in @($exes.Keys | Sort-Object { Version-Key $_ })) {
 }
 foreach ($l in $machine) { Say $l }
 Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+# The idle trim's probe file, there before the first index.
+if ($exes.ContainsKey('branch')) { try { New-TrimProbe } catch { Note "the idle trim's probe file could not be made: $_" } }
+$script:classic = $true
+$script:installed = ''
 
 [MemSampler]::Version = 'none'; [MemSampler]::Scenario = 'setup'; [MemSampler]::Phase = 'setup'
 [MemSampler]::Start($samplesFile, 5000)
@@ -2949,6 +3179,7 @@ try {
         if (-not (Remove-Tree $dataRoot 150)) { Note "the synthetic files in $dataRoot were not all deleted within 150 s" }
     }
     Remove-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'InstaFind-memtest-load') -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $trimProbeDir -Recurse -Force -ErrorAction SilentlyContinue
     foreach ($d in @($instDir, $sideDir)) { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
 
     # ------------------------------------------------------------ report

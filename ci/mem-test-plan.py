@@ -4,11 +4,16 @@
 
     {"mem-test": {"exes": ["0.9.1", "0.10.0", "branch"],
                   "scenarios": ["A", "B", "C", "D", "E", "F", "G", "H", "O", "K", "M", "S", "Q"],
+                  "released_scenarios": ["D", "G"],
                   "quick": ["B", "C", "E", "F"]}}
 
 exes       which exes to measure: the released 0.9.1 and 0.10.0, and "branch",
            the exe built from the checked-out branch.
 scenarios  which scenarios of ci/mem-test.ps1 to run in full.
+released_scenarios
+           optional: of those, the ones the released exes run too (default:
+           all of them). The branch exe always runs every scenario listed.
+           D always needs both released exes.
 quick      optional: scenarios for one short run (waits and data at 5 %) that
            only shows early whether the harness works; its numbers stay out
            of the report's tables. Never D (it uses the network).
@@ -21,13 +26,16 @@ What is not in the plan does not run. On a push, no file, no `mem-test` entry
 or an empty one means: run nothing. Started by hand (workflow_dispatch)
 without an entry, everything runs.
 
-The legs (one Windows job each, at most three at a time):
+The legs (one Windows job each, at most three at a time), in this order:
     quick          the quick scenarios on one exe
-    churn-<exe>    A, F (and G for the branch exe)
+    churn-<exe>    A, F
     hook-branch    H (the save-delay hook: only the branch build has it)
-    robust-<exe>   O, K, M, S, Q
-    update         D (needs 0.9.1 and 0.10.0) and G for 0.10.0
+    robust-<exe>   O, K, M, S, Q (and G for the branch exe)
     static-<exe>   B, C, E
+    update         D (needs 0.9.1 and 0.10.0) and G for 0.10.0
+(The branch build's A, E and G also wait for the content index's warm-up
+and check 1.0's idle trim, which can take most of an hour: A and E are in
+different legs, and G is with the shorter O to Q.)
 Prints the plan and writes `matrix`, `any`, `branch` and `released` to
 $GITHUB_OUTPUT.
 """
@@ -55,7 +63,8 @@ def read_options(entry):
 
 
 def read_plan(path, event):
-    """The `mem-test` entry as (exes, scenarios, quick, options)."""
+    """The `mem-test` entry as (exes, scenarios, quick, options, released);
+    released is None when every scenario runs on the released exes too."""
     entry = None
     try:
         with open(path, encoding="utf-8-sig") as f:
@@ -69,9 +78,9 @@ def read_plan(path, event):
     if not isinstance(entry, dict) or not entry:
         if event == "workflow_dispatch":
             print("no `mem-test` entry in the plan; started by hand: everything runs")
-            return list(EXES), list(SCENARIOS), [], read_options({})
+            return list(EXES), list(SCENARIOS), [], read_options({}), None
         print("no `mem-test` entry in the plan: nothing to run")
-        return [], [], [], read_options({})
+        return [], [], [], read_options({}), None
 
     def names(key, allowed):
         raw = entry.get(key) or []
@@ -83,11 +92,18 @@ def read_plan(path, event):
                 print(f"::warning::ci/test-plan.json: mem-test.{key} has an unknown value {x!r}")
         return [a for a in allowed if a.upper() in [w.upper() for w in wanted]]
 
-    return names("exes", EXES), names("scenarios", SCENARIOS), names("quick", SCENARIOS), read_options(entry)
+    released = names("released_scenarios", SCENARIOS) if "released_scenarios" in entry else None
+    return names("exes", EXES), names("scenarios", SCENARIOS), names("quick", SCENARIOS), read_options(entry), released
 
 
-def legs(exes, scenarios, quick, options):
+def legs(exes, scenarios, quick, options, released=None):
     out = []
+
+    def mine(exe):
+        """The scenarios `exe` runs."""
+        if exe == "branch" or released is None:
+            return list(scenarios)
+        return [s for s in scenarios if s in released]
 
     def leg(name, versions, scens, scale="1"):
         if versions and scens:
@@ -98,31 +114,32 @@ def legs(exes, scenarios, quick, options):
     if exes:
         leg("quick", exes[:1], [s for s in quick if s != "D"], "0.05")
     for exe in exes:
-        wanted = [s for s in scenarios if s in ("A", "F") or (s == "G" and exe == "branch")]
-        leg(f"churn-{exe}", [exe], wanted)
+        leg(f"churn-{exe}", [exe], [s for s in mine(exe) if s in ("A", "F")])
         if exe == "branch":
             leg("hook-branch", [exe], [s for s in scenarios if s == "H"])
     for exe in sorted(exes, key=lambda e: e != "branch"):
-        leg(f"robust-{exe}", [exe], [s for s in scenarios if s in ("O", "K", "M", "S", "Q")])
+        leg(f"robust-{exe}", [exe], [s for s in mine(exe) if s in ("O", "K", "M", "S", "Q") or (s == "G" and exe == "branch")])
+    for exe in sorted(exes, key=lambda e: e != "branch"):
+        leg(f"static-{exe}", [exe], [s for s in mine(exe) if s in ("B", "C", "E")])
     update = []
-    if "D" in scenarios:
+    if "D" in scenarios and (released is None or "D" in released):
         if all(v in exes for v in RELEASED):
             update.append("D")
         else:
             print("::warning::scenario D needs both 0.9.1 and 0.10.0 in mem-test.exes; skipped")
-    if "G" in scenarios and "0.10.0" in exes:
+    if "G" in mine("0.10.0") and "0.10.0" in exes:
         update.append("G")
     leg("update", [v for v in ("0.9.1", "0.10.0") if v in exes], update)
-    for exe in exes:
-        leg(f"static-{exe}", [exe], [s for s in scenarios if s in ("B", "C", "E")])
     return out
 
 
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else "ci/test-plan.json"
     event = os.environ.get("EVENT_NAME", "push")
-    exes, scenarios, quick, options = read_plan(path, event)
-    plan = legs(exes, scenarios, quick, options)
+    exes, scenarios, quick, options, released = read_plan(path, event)
+    plan = legs(exes, scenarios, quick, options, released)
+    if released is not None and plan:
+        print(f"the released exes run only: {', '.join(released) or '(nothing)'}")
     if plan:
         print(f"hook {options['save_delay_var']}={options['save_delay_ms']}, fail on criteria: {options['fail_on_criteria']}")
     for item in plan:

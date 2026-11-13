@@ -7,22 +7,29 @@ name: mem-test
 # job fails when the harness breaks, the program crashes or exits by itself.
 #
 # What runs is written in ci/test-plan.json, entry `mem-test` (see
-# ci/mem-test-plan.py): which exes, which scenarios. What is not in the plan
-# does not run; on a push, no plan means nothing runs at all. The scenarios
-# run as "legs", one Windows job each:
+# ci/mem-test-plan.py): which exes, which scenarios, and which of them the
+# released exes run too. What is not in the plan does not run; on a push,
+# no plan means nothing runs at all. The scenarios run as "legs", one
+# Windows job each:
 #   quick          a short run of the harness itself (5 % of the waits and data)
 #   churn-<exe>    A (baseline) and F (file churn with every core and the disk busy, a big index)
 #   hook-branch    H (the same churn with the branch build's save-delay hook)
 #   robust-<exe>   O (watch-buffer overflow), K (killed mid-save), M (--moved handover),
-#                  S (second start beside a suspended copy), Q (session end)
-#   update         D (0.9.1 updates itself; a second copy is started), G (new look)
+#                  S (second start beside a suspended copy), Q (session end);
+#                  and G (new look) for the branch exe
 #   static-<exe>   B, C, E (heavy tree, search stress, long idle; one run of the program)
+#   update         D (0.9.1 updates itself; a second copy is started), G for 0.10.0
+# The branch build's A, E and G also check 1.0's idle trim, after the
+# content index's warm-up (most of an hour on a runner's own files).
+# Every scenario but G drives the classic window (BAHTH_CLASSIC=1, set by
+# the script: since 1.0 users only get the new look).
 # The `report` job puts every leg in one table (job summary, artifact
 # `mem-test`).
 #
 # Limits, on purpose: a new push cancels the run before it; at most three
-# legs at a time; every job has a timeout, and the script stops by itself
-# before it (-BudgetMinutes, then its watchdog); the synthetic files leave at
+# legs at a time (a full round of the branch build is five legs, about
+# 2 h 15 min from the push); every job has a timeout, and the script stops
+# by itself before it (-BudgetMinutes, then its watchdog); the synthetic files leave at
 # least 10 GB of the disk free and are deleted at the end; no cache, no
 # secrets, read-only token. Network: the two released exes are downloaded
 # once per run (job `setup`), and in scenario D the program's own updater
@@ -131,7 +138,7 @@ jobs:
     needs: [setup, exe]
     if: ${{ !cancelled() && needs.setup.outputs.any == 'true' }}
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -161,15 +168,15 @@ jobs:
           MEM_SAVE_DELAY_VAR: ${{ matrix.save_delay_var }}
           MEM_SAVE_DELAY_MS: ${{ matrix.save_delay_ms }}
           MEM_FAIL_ON_CRITERIA: ${{ matrix.fail_on_criteria }}
-        # 75 of the job's 90 minutes: the script's watchdog would end a hung
-        # run at 81, which leaves time to upload what was measured.
+        # 105 of the job's 120 minutes: the script's watchdog would end a
+        # hung run at 111, which leaves time to upload what was measured.
         run: |
           $a = @{
             Out = "$env:RUNNER_TEMP/mem-test"; Leg = $env:MEM_LEG
             Versions = $env:MEM_VERSIONS; Scenarios = $env:MEM_SCENARIOS
             TimeScale = [double]$env:MEM_TIME_SCALE; SizeScale = [double]$env:MEM_SIZE_SCALE
             SaveDelayVar = $env:MEM_SAVE_DELAY_VAR; SaveDelayMs = [int]$env:MEM_SAVE_DELAY_MS
-            BudgetMinutes = 75
+            BudgetMinutes = 105
           }
           if ($env:MEM_FAIL_ON_CRITERIA -eq 'true') { $a.FailOnCriteria = $true }
           foreach ($e in @(@('Exe091', 'exe/0.9.1/bahth.exe'), @('Exe0100', 'exe/0.10.0/bahth.exe'), @('ExeBranch', 'exe/branch/bahth.exe'))) {
