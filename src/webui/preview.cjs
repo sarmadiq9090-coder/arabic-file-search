@@ -374,7 +374,8 @@ const SHOTS = [
   // The Store build's rating question: a row above the status line that keeps the focus in the box; one answer.
   ["rating-ar-light", "ar", "light", [["type", "تقرير"], ["eval", "window.__instafind.recv({ type: 'rating' })"], ["wait", 50]], { expect: { rating: true, focus: "q" } }],
   ["rating-later-en-dark", "en", "dark", [["type", "report"], ["eval", "window.__instafind.recv({ type: 'rating' })"], ["click", "#rate-later"], ["wait", 50]], { expect: { rating: false, lastSent: "rating" } }],
-  // "Check for updates" beside "Report a problem" (both mandatory); the Store version says the Store, in its privacy line too.
+  // "Check for updates" beside "Report a problem" (both mandatory); the Store version says the Store, in its privacy line too
+  // (which never mentions phone search: the Store edition has none).
   ["updates-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#check-updates"], ["wait", 50]], { expect: { settings: true, lastSent: "check_updates", updBtn: "التحقق من التحديثات…" } }],
   ["updates-store-en-dark", "en", "dark", [["key", "Control+,"]], { store: true, expect: { settings: true, updBtn: "Updates from Microsoft Store…", trustStore: true } }],
   ["trust-store-ar-light", "ar", "light", [], { store: true, expect: { trustStore: true } }],
@@ -565,7 +566,7 @@ const SHOTS = [
           return !bad.length;
         })(),
         updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent : null; })(),
-        trustStore: [...document.querySelectorAll('[data-i18n="trust"], .settings .muted')].filter(visible).every((el) => el.textContent.includes("Microsoft Store") && !el.textContent.includes("GitHub")),
+        trustStore: [...document.querySelectorAll('[data-i18n="trust"], .settings .muted')].filter(visible).every((el) => el.textContent.includes("Microsoft Store") && !el.textContent.includes("GitHub") && !/phone|الهاتف/.test(el.textContent)),
         clearItem: (() => { const it = document.getElementById("hist-clear"); return it ? `${it.textContent}|${it.getAttribute("aria-disabled") === "true" ? "off" : "on"}` : null; })(),
         recentRows: document.querySelectorAll("#recent .row").length,
         inside: document.getElementById("chip-content").getAttribute("aria-pressed") === "true",
