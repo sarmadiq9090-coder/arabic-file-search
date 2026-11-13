@@ -864,7 +864,7 @@
     open.append(h("kbd", null, "Enter"));
     const parts = [
       h("div", { class: "thumb" }, badge(r)),
-      h("div", null, h("div", { class: "pv-name" }, nameEl(r)), h("div", { class: "pv-path" }, pathEl(r.dir, 999))),
+      h("div", null, h("div", { class: "pv-name", dir: firstStrongDir(plainName(r)) }, nameEl(r)), h("div", { class: "pv-path" }, pathEl(r.dir, 999))),
     ];
     if (r.gone) parts.push(h("p", { class: "gone-note" }, T.gone));
     else parts.push(h("div", { class: "actions" }, open, btn("", I.folder, T.openFolder, () => act("reveal", S.rows[S.sel])),

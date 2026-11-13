@@ -86,6 +86,8 @@ function fakeProgram(cfg) {
     [`${U}\\OneDrive\\HR\\Attendance\\2026`, "Attendance report - March.xlsx", 92 * 1024, 200 * 86400],
     [`${U}\\Music\\Recordings`, "Report voice memo.m4a", 8.7 * 1048576, 240 * 86400],
     ["D:\\Archive\\2024", "Old reports", 0, 400 * 86400, true],
+    // An Arabic name in the English interface (long: the preview wraps it).
+    [`${U}\\Documents\\الفواتير`, "فاتورة الكهرباء الشهرية لشهر تشرين الثاني مع ملاحظات المحاسب والمدير.pdf", 120 * 1024, 40 * 86400],
   ]).map(([dir, name, size, age, folder]) => ({ dir, name, size: Math.round(size), mtime: now - age, folder: !!folder, ext: folder ? "" : name.split(".").pop().toLowerCase() }));
   // Synthetic document texts for the search inside documents.
   const docs = ar ? [
@@ -382,6 +384,10 @@ const SHOTS = [
   ["recent-menu-en-dark", "en", "dark", [["focus", "#recent"], ["key", "Shift+F10"]], { expect: { menu: true, a11y: true } }],
   ["a11y-content-en-light", "en", "light", [["click", "#chip-content"]], { expect: { qName: "Search inside documents, then press Enter…", a11y: true } }],
   ["a11y-results-ar-light", "ar", "light", [["type", "تقرير"], ["click", "#chip-sort"]], { expect: { menu: true, a11y: true } }],
+  // A long Arabic name in the preview wraps and lines up on the right, in either interface language; an English one on the left.
+  ["pv-name-ar-light", "ar", "light", [["type", "123-45"]], { expect: { pvNameSide: "right" } }],
+  ["pv-name-en-ui-ar-name-en-light", "en", "light", [["type", "فاتورة"]], { expect: { pvNameSide: "right" } }],
+  ["pv-name-en-dark", "en", "dark", [["type", "report"]], { expect: { pvNameSide: "left" } }],
   ["qswitch-ctx-click-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["rclick", "#r1"], ["click", "#ctx [role=menuitem]:first-child"], ["wait", 50]], { expect: { lastSent: "switch_to", qswitch: false } }],
 ];
 
@@ -538,6 +544,8 @@ const SHOTS = [
         dlgName: !!document.querySelector("#dlg-h .fname"),
         qswitch: visible(document.getElementById("qswitch")),
         rating: visible(document.getElementById("rating")),
+        // The preview's name lines up with its own direction (an Arabic name on the right, even on several lines).
+        pvNameSide: (() => { const n = document.querySelector(".pv-name"); if (!n || !visible(n)) return null; const b = n.getBoundingClientRect(), t = n.firstElementChild.getBoundingClientRect(); return Math.abs(b.right - t.right) < 2 ? "right" : Math.abs(b.left - t.left) < 2 ? "left" : "middle"; })(),
         recentActive: document.getElementById("recent").getAttribute("aria-activedescendant"),
         qName: document.getElementById("q").getAttribute("aria-label"),
         // Every visible menu, list and focusable control has a name a screen reader can say.

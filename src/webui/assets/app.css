@@ -249,7 +249,10 @@ mark { background: var(--mark-bg); color: var(--mark-fg); border-radius: 3px; pa
 .preview { border-inline-start: 1px solid var(--line); background: var(--bg); padding: 18px 20px; overflow: hidden auto; display: flex; flex-direction: column; gap: 14px; }
 .thumb { height: 150px; flex: none; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; overflow: hidden; }
 .thumb .ft { width: 72px; height: 82px; }
-.pv-name { font-size: 16px; font-weight: 600; line-height: 1.35; word-break: break-word; unicode-bidi: plaintext; text-align: start; }
+/* The name's own direction (app.js sets dir from its first letter): an
+   Arabic name that wraps lines up on the right. (plaintext alone found no
+   letter outside the name's isolates, so every name lined up on the left.) */
+.pv-name { font-size: 16px; font-weight: 600; line-height: 1.35; word-break: break-word; unicode-bidi: isolate; text-align: start; }
 .pv-path { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; margin-top: 4px; text-align: start; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 /* The pane's buttons fit one or two even rows (English labels are longer). */
