@@ -275,7 +275,7 @@ mark { background: var(--mark-bg); color: var(--mark-fg); border-radius: 3px; pa
 dl.facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; }
 dl.facts dt { color: var(--muted); }
 dl.facts dd { margin: 0; }
-.btn:disabled { opacity: .5; cursor: default; }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .5; cursor: default; }
 .btn.small { height: 26px; padding-inline: 10px; font-size: 12px; border-radius: 8px; }
 .gone-note { margin: 0; color: var(--muted); }
 .pv-lines .sec-h { margin-bottom: 6px; }

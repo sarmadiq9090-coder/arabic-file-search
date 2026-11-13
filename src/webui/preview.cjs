@@ -166,6 +166,11 @@ function fakeProgram(cfg) {
         return;
       }
     }
+    if (m.op === "check_updates" && !cfg.store) {
+      // As the program: "Checking…" on its next tick, the answer (a message box) after a while.
+      setTimeout(() => window.__instafind.recv({ ...settings, checking_updates: true }), 30);
+      setTimeout(() => window.__instafind.recv({ ...settings, checking_updates: false }), 400);
+    }
     if (m.op === "hello") {
       send({ type: "hello", kinds: KINDS, sizes: SIZES, dates: DATES, kind: 0, sort: "best", desc: false, digits: false, version: "0.9.1", switched: !!cfg.switched, store: !!cfg.store });
       send({ type: "scope", path: cfg.scope || "", search: false });
@@ -367,6 +372,9 @@ const SHOTS = [
   // selected result's folder (not open it), Esc cancels; the result menu has the move first.
   ["qswitch-ar-light", "ar", "light", [["eval", QS_ON.ar], ["type", "تقرير"], ["key", "ArrowDown"]], { expect: { qswitch: true } }],
   ["qswitch-enter-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["key", "Enter"], ["wait", 50]], { expect: { lastSent: "switch_to", opens: 0, qswitch: false } }],
+  // FIN1 F6: nothing found while a dialog waits: no suggestion is Enter's default, Enter starts nothing.
+  ["qswitch-nores-en-light", "en", "light", [["eval", QS_ON.en], ["type", "lease 2024"], ["key", "Enter"], ["wait", 50]], { expect: { view: "view-nores", qswitch: true, q: "lease 2024", suggKbd: 0, lastSent: "search", statusText: "No result to move the dialog to. Change the search, or press Esc to cancel." } }],
+  ["qswitch-nores-ar-dark", "ar", "dark", [["eval", QS_ON.ar], ["type", "عقد الايجار 2024"], ["key", "ArrowDown"], ["key", "Enter"], ["wait", 50]], { expect: { view: "view-nores", qswitch: true, q: "عقد الايجار 2024", suggKbd: 0, lastSent: "search" } }],
   ["qswitch-esc-en-dark", "en", "dark", [["eval", QS_ON.en], ["type", "report"], ["key", "Escape"], ["wait", 50]], { expect: { lastSent: "switch_cancel", qswitch: false, q: "report" } }],
   ["qswitch-ctx-ar-dark", "ar", "dark", [["eval", QS_ON.ar], ["type", "تقرير"], ["rclick", "#r1"]], { expect: { menu: true, ctxFirst: "فتح مجلدها في نافذة الحفظ/الفتح" } }],
   // The quick popup's suggestions carry over: inside documents runs a document search, all types clears the type.
@@ -383,8 +391,10 @@ const SHOTS = [
   ["rating-ar-light", "ar", "light", [["type", "تقرير"], ["eval", "window.__instafind.recv({ type: 'rating' })"], ["wait", 50]], { expect: { rating: true, focus: "q" } }],
   ["rating-later-en-dark", "en", "dark", [["type", "report"], ["eval", "window.__instafind.recv({ type: 'rating' })"], ["click", "#rate-later"], ["wait", 50]], { expect: { rating: false, lastSent: "rating" } }],
   // "Check for updates" beside "Report a problem" (both mandatory); the Store version says the Store, in its privacy line too.
-  ["updates-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#check-updates"], ["wait", 50]], { expect: { settings: true, lastSent: "check_updates", updBtn: "التحقق من التحديثات…" } }],
-  ["updates-store-en-dark", "en", "dark", [["key", "Control+,"]], { store: true, expect: { settings: true, updBtn: "Updates from Microsoft Store…", trustStore: true } }],
+  // The button says at once that the check runs (FIN1 F5), waits, and is itself again with the answer.
+  ["updates-ar-light", "ar", "light", [["key", "Control+,"], ["click", "#check-updates"], ["wait", 50]], { expect: { settings: true, lastSent: "check_updates", updBtn: "جارٍ التحقق من التحديثات…|busy", focus: "check-updates" } }],
+  ["updates-done-en-dark", "en", "dark", [["key", "Control+,"], ["click", "#check-updates"], ["eval", "document.getElementById('check-updates').click()"], ["wait", 700]], { expect: { settings: true, updBtn: "Check for updates…|ready", updChecks: 1 } }],
+  ["updates-store-en-dark", "en", "dark", [["key", "Control+,"]], { store: true, expect: { settings: true, updBtn: "Updates from Microsoft Store…|ready", trustStore: true } }],
   ["trust-store-ar-light", "ar", "light", [], { store: true, expect: { trustStore: true } }],
   // Accessibility: the recent files from the keyboard (Tab, arrows, Enter), named menus, the box's name
   // following its hint, and every focusable control with a name.
@@ -572,7 +582,10 @@ const SHOTS = [
           if (bad.length) window.__fakeErrors.push("no accessible name: " + bad.map((el) => el.id || el.className).join(", "));
           return !bad.length;
         })(),
-        updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent : null; })(),
+        updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent + (b.getAttribute("aria-disabled") === "true" ? "|busy" : "|ready") : null; })(),
+        updChecks: window.__sent.filter((m) => m.op === "check_updates").length,
+        suggKbd: document.querySelectorAll("#sugg kbd").length,
+        statusText: document.getElementById("status-text").textContent,
         trustStore: [...document.querySelectorAll('[data-i18n="trust"], .settings .muted')].filter(visible).every((el) => el.textContent.includes("Microsoft Store") && !el.textContent.includes("GitHub")),
         clearItem: (() => { const it = document.getElementById("hist-clear"); return it ? `${it.textContent}|${it.getAttribute("aria-disabled") === "true" ? "off" : "on"}` : null; })(),
         recentRows: document.querySelectorAll("#recent .row").length,

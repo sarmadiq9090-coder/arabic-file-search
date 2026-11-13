@@ -271,6 +271,11 @@ pub struct App {
     /// Bytes downloaded / total of a running update download.
     update_progress: Arc<(AtomicU64, AtomicU64)>,
     update_busy: Cell<bool>,
+    /// A check for updates is running (`update_busy` is also set for a download).
+    update_checking: Cell<bool>,
+    /// The user asked for that check (or asked while an automatic one ran):
+    /// its answer is shown, and the new look's button says "Checking…".
+    update_asked: Cell<bool>,
     /// Timer ticks since start, to delay the automatic update check.
     ticks: Cell<u32>,
     /// Built on first use: each one starts a COM file dialog, which is slow.

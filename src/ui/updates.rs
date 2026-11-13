@@ -24,6 +24,11 @@ impl App {
         // update it, never the program itself (that would break their
         // records of the file, or cannot work at all).
         if let Some(pm) = crate::update::managed_by() {
+            // No check runs: the new look's button, which said "Checking…"
+            // from the click, is itself again before the message box.
+            if manual {
+                self.webui_settings_changed();
+            }
             if manual && pm == crate::update::PackageManager::Store {
                 self.show_store_update_note();
             } else if manual {
@@ -37,19 +42,26 @@ impl App {
         // self-update would always fail, so none is offered.
         if let Some(dir) = crate::update::read_only_folder() {
             if manual {
+                self.webui_settings_changed();
                 log(&format!("update: skipped, cannot write to {dir}"));
                 self.modal_info(title(), &crate::update::read_only_message(&dir));
             }
             return;
         }
         if self.update_busy.replace(true) {
-            if manual {
-                self.set_status(tr!("جارٍ التحقق من التحديثات…", "Checking for updates…"));
+            if manual && self.update_checking.get() {
+                // The automatic check that is running answers this one too.
+                self.update_asked.set(true);
+                self.show_checking();
+            } else if manual {
+                self.set_status(tr!("جارٍ تنزيل التحديث…", "Downloading the update…"));
             }
             return;
         }
+        self.update_checking.set(true);
         if manual {
-            self.set_status(tr!("جارٍ التحقق من التحديثات…", "Checking for updates…"));
+            self.update_asked.set(true);
+            self.show_checking();
         }
         let slot = self.update_result.clone();
         let notice = self.update_notice.sender();
@@ -61,6 +73,20 @@ impl App {
             }
             notice.notice();
         });
+    }
+
+    /// Says at once that a check the user asked for is running: the status
+    /// line, and in the new look its button ("Checking…", disabled). The
+    /// answer comes later as a message box.
+    fn show_checking(&self) {
+        self.set_status(tr!("جارٍ التحقق من التحديثات…", "Checking for updates…"));
+        self.webui_settings_changed();
+    }
+
+    /// Whether a check the user asked for is still waiting for its answer.
+    #[cfg_attr(not(target_env = "msvc"), allow(dead_code))]
+    pub(super) fn update_check_asked(&self) -> bool {
+        self.update_asked.get()
     }
 
     pub(super) fn maybe_check_for_update(&self) {
@@ -79,6 +105,11 @@ impl App {
         match event {
             UpdateEvent::Checked { manual, result } => {
                 self.update_busy.set(false);
+                self.update_checking.set(false);
+                // Asked for while an automatic check ran: answered like a manual one.
+                let manual = self.update_asked.replace(false) || manual;
+                // The button is back before a message box holds the window.
+                self.webui_settings_changed();
                 // A failed check (no network yet, rate limit) is retried at
                 // the next hourly tick instead of a day later.
                 match &result {

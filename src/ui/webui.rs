@@ -1089,6 +1089,15 @@ mod imp {
             self.webui_send(&msg);
         }
 
+        /// Something the Settings view shows changed outside the page (a
+        /// check for updates started or ended): sent now, when the page is
+        /// there.
+        pub(in super::super) fn webui_settings_changed(&self) {
+            if self.webui.active.get() && self.webui.ready.get() {
+                self.webui_send_settings();
+            }
+        }
+
         fn webui_send_settings(&self) {
             let current = i18n::current();
             let msg = {
@@ -1107,6 +1116,7 @@ mod imp {
                     tray_icon: s.tray_icon,
                     version: env!("CARGO_PKG_VERSION"),
                     store: crate::store::is_packaged(),
+                    checking_updates: self.update_check_asked(),
                 })
             };
             self.webui_send(&msg);
@@ -2041,6 +2051,9 @@ mod imp {
                 // As the Options menu's item: the Store version is told where
                 // its updates come from and offered its Store page.
                 self.check_for_update(true);
+                // The page said "Checking…" at the click; now it hears
+                // whether a check really runs (none for a managed copy).
+                self.webui_settings_changed();
             }
             if self.webui.active.get() && !self.webui.switching.get() {
                 if let Some(browser_gone) = self.webui.failed.take() {
@@ -2255,6 +2268,8 @@ mod imp {
         }
 
         pub(in super::super) fn webui_quick_switch(&self, _hint: Option<&str>) {}
+
+        pub(in super::super) fn webui_settings_changed(&self) {}
 
         pub(in super::super) fn webui_status_text(&self, _text: &str) {}
 
