@@ -14,7 +14,13 @@
 #              killed 15 times while indexing, saving and reading documents
 #   instances  20 quick starts, a second copy, exit paths, sign-out
 #   content    document torture for "search inside documents"
-#   soak       30 minutes of light churn and searches; memory slope
+#   soak       2 hours (-SoakMinutes) of light churn and searches; memory
+#              slope, and the idle trim's log lines
+#
+# The program is driven through its classic window: since 1.0 users only
+# get the new look, so every copy this script starts (and every copy the
+# program starts itself, which inherits it) runs with BAHTH_CLASSIC=1, the
+# program's own switch for the tests (src/webui/mod.rs, CLASSIC_ENV).
 #
 # Two kinds of checks, as in ci/ui-test.ps1:
 #   core  - must never fail: a crash report, the program gone, a user
@@ -45,14 +51,18 @@ param(
     [Parameter(Mandatory)][ValidateSet('names', 'tree', 'churn', 'state', 'instances', 'content', 'soak')][string]$Group,
     [string]$Out = (Join-Path $env:RUNNER_TEMP "torture-$Group"),
     # The whole run, set-up and clean-up included, stays under this many
-    # minutes (0: 39, and 43 for the soak, under the job's limit of 45).
+    # minutes (0: 39, under the job's limit of 45; for the soak
+    # -SoakMinutes + 30, under its job's limit of 160).
     [int]$Minutes = 0,
+    # How long the soak's churn and searches last (the owner's standard
+    # for a long run: two hours).
+    [int]$SoakMinutes = 120,
     [string]$Root = (Join-Path $env:SystemDrive 'ifx'),
     [string]$Scratch = (Join-Path $env:SystemDrive 'ifx-s')
 )
 $ErrorActionPreference = 'Stop'
 $started = Get-Date
-if ($Minutes -le 0) { $Minutes = if ($Group -eq 'soak') { 43 } else { 39 } }
+if ($Minutes -le 0) { $Minutes = if ($Group -eq 'soak') { $SoakMinutes + 30 } else { 39 } }
 $Exe = (Resolve-Path $Exe).Path
 New-Item -ItemType Directory -Force $Out | Out-Null
 $Out = (Resolve-Path $Out).Path
@@ -277,14 +287,16 @@ function Keep-Log([string]$Name) {
     if (Test-Path -LiteralPath $logFile) { Copy-Item -LiteralPath $logFile -Destination (Join-Path $Out "log-$Name.txt") -Force -ErrorAction SilentlyContinue }
 }
 # settings.txt as the program reads it (key=value, no BOM): no first-run
-# question, the classic window, and "checked for updates just now".
-# new_ui_default=1 is needed with new_ui=0: without it the program makes
-# the new look the default once (as for a user of 0.10.0), and the main
-# window on screen is then the page, which Main-Window does not look for.
+# question and "checked for updates just now". The look: since 1.0 new_ui=0
+# is ignored and the classic window comes only with BAHTH_CLASSIC=1 (set
+# for every start, see the set-up at the end); the one-time markers
+# new_ui_default=1 and new_ui_only=1 are written as the program writes
+# them, so that it has nothing to move. The box above the clock is off
+# (1.0's default); floating_asked=1 stays for older builds' question.
 function Write-Settings([hashtable]$Extra = @{}) {
     New-Item -ItemType Directory -Force $data | Out-Null
     $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    $set = [ordered]@{ floating_asked = 1; move_asked = 1; rating_asked = 1; new_ui = 0; new_ui_failed = 0; new_ui_default = 1; update_check = $now }
+    $set = [ordered]@{ floating_asked = 1; move_asked = 1; rating_asked = 1; new_ui = 0; new_ui_failed = 0; new_ui_default = 1; new_ui_only = 1; update_check = $now }
     foreach ($k in $Extra.Keys) { $set[$k] = $Extra[$k] }
     $text = (($set.Keys | ForEach-Object { "$_=$($set[$_])" }) -join "`n") + "`n"
     [IO.File]::WriteAllText($settingsFile, $text, (New-Object Text.ASCIIEncoding))
@@ -457,7 +469,13 @@ function Wait-Main([string]$When, [int]$Seconds = 30, [switch]$Quiet) {
     if (-not $Quiet -or -not $main) {
         Record 'start' 'core' "the main window is created ($When)" ($null -ne $main) ("{0:N1} s" -f ((Get-Date) - $t).TotalSeconds)
     }
-    if (-not $main) { Shot "no-window-$When"; Keep-Log 'no-window' }
+    if (-not $main) {
+        Shot "no-window-$When"; Keep-Log 'no-window'
+        # The new look's window instead (BAHTH_CLASSIC not taken)? Then the
+        # failure is the test switch's, not the classic window's.
+        $other = @(foreach ($id in @(App-Ids)) { Get-Windows $id | Where-Object { $_.Visible -and $_.Class -eq 'NativeWindowsGuiWindow' -and $_.W -gt 300 -and $_.H -gt 200 } })
+        Detail ("no classic window ({0}): BAHTH_CLASSIC={1}; other main windows on screen: {2}; log: {3}" -f $When, $env:BAHTH_CLASSIC, (($other | ForEach-Object { "'$($_.Text)' $($_.W)x$($_.H)" }) -join ', '), ((Log-Lines 'webui') -join ' | '))
+    }
     return $main
 }
 # Waits until the first index is saved. A count that stops growing for five
@@ -504,6 +522,8 @@ function Fresh-Start([string[]]$AppArgs = @(), [double]$IndexMinutes = 22, [hash
     [void](Start-App $AppArgs)
     $main = Wait-Main 'first start'
     Start-Sleep -Seconds 2
+    $asked = @(Log-Lines 'webui: the classic window was asked for')
+    Record 'setup' 'probe' 'the program took the tests'' switch for the classic window (BAHTH_CLASSIC=1)' ($asked.Count -gt 0) ((Log-Lines 'webui') -join ' | ')
     [void](Dismiss-Dialogs 'first start')
     Shot 'first-start'
     [void](Health 'first start')
@@ -2137,9 +2157,13 @@ function Group-Soak {
         [void](Fresh-Start @('--startup') 14)
     } 8
     Step 'soak' {
-        $span = [Math]::Min(30, (Time-Left) - 3.5)
+        # (Eight minutes are kept for the checks after it.)
+        $span = [Math]::Min($SoakMinutes, (Time-Left) - 8)
         if ($span -lt 5) { Note 'soak' 'skipped' ("only {0:N1} min left" -f (Time-Left)); return }
-        if ($span -lt 30) { Note 'soak' 'shortened' ("{0:N1} minutes instead of 30: the first index took long" -f $span) }
+        if ($span -lt $SoakMinutes - 0.5) { Note 'soak' 'shortened' ("{0:N1} minutes instead of {1}: the first index took long" -f $span, $SoakMinutes) }
+        # 1.0's idle trim lines, gathered as they come (log.txt is emptied
+        # past 64 KB, which two hours can reach).
+        $trimSeen = New-Object 'System.Collections.Generic.List[string]'
         Start-Sleep -Seconds 20          # let the start settle before the slope is measured
         [TM]::Phase = 'soak'
         [TC]::StartSoak($S.dir, $S.base, 8, 17)
@@ -2158,7 +2182,10 @@ function Group-Soak {
             # The hidden window searches too, as a person coming back to it.
             if ($round % 3 -eq 0) { [void](Gui-Find ('zqa0' + ('{0:x2}' -f ($round % 256))) '' 0); Gui-Clear }
             if (-not (Health "soak minute $([int]((Get-Date) - $t0).TotalMinutes)")) { break }
-            if ($round % 15 -eq 0) { Say ("  soak {0:N0} min: {1} file operations, {2} searches, {3} files alive" -f ((Get-Date) - $t0).TotalMinutes, [TC]::SoakOps, $searches, [TC]::SoakLive()) }
+            if ($round % 15 -eq 0) {
+                foreach ($l in @(Log-Lines 'memory: (idle trim|private|passed)')) { if (-not $trimSeen.Contains([string]$l)) { $trimSeen.Add([string]$l) } }
+                Say ("  soak {0:N0} min: {1} file operations, {2} searches, {3} files alive" -f ((Get-Date) - $t0).TotalMinutes, [TC]::SoakOps, $searches, [TC]::SoakLive())
+            }
         }
         [TC]::StopSoak()
         $S.soakMinutes = ((Get-Date) - $t0).TotalMinutes
@@ -2166,6 +2193,13 @@ function Group-Soak {
         Note 'soak' 'ran' ("{0:N1} minutes: {1:N0} file operations ({2} failed), {3} command-line searches (slowest {4} ms)" -f $S.soakMinutes, [TC]::SoakOps, [TC]::SoakErrors, $searches, $slowest)
         Record 'soak' 'core' 'every command-line search during the soak ended with exit 0, 1 or 2' ($badCli.Count -eq 0) ($badCli -join '; ')
         Record 'soak' 'core' 'the program is running and answering after the soak' (Health 'after the soak') ''
+        # The soak types nothing in the program's windows (its searches are
+        # the command line's and messages to the hidden window), so 1.0's
+        # idle trim may run in it: its lines and the memory guard's.
+        foreach ($l in @(Log-Lines 'memory: (idle trim|private|passed)')) { if (-not $trimSeen.Contains([string]$l)) { $trimSeen.Add([string]$l) } }
+        $trims = @($trimSeen | Where-Object { $_ -match 'memory: idle trim:' })
+        $mem = @($trimSeen | Where-Object { $_ -match 'memory: (private|passed)' })
+        Note 'soak' 'idle trims and memory lines in log.txt' ("{0} idle trims: {1}; memory lines: {2}" -f $trims.Count, ((@($trims | Select-Object -Last 4) | ForEach-Object { ($_ -replace '^\d+ ', '') }) -join ' | '), ((@($mem | Select-Object -Last 3) | ForEach-Object { ($_ -replace '^\d+ ', '') }) -join ' | '))
         Keep-Log 'soak'
     } 6
     Step 'the index matches the disk after the soak' {
@@ -2286,6 +2320,11 @@ try {
         New-Item -ItemType Directory -Force $Root, $Scratch, (Split-Path $App) | Out-Null
         Copy-Item -LiteralPath $Exe -Destination $App -Force
         $env:SCOOP = $scoop
+        # The classic window for every start, whatever settings.txt says
+        # (1.0: the new look is the only one for users); the copies the
+        # program starts itself inherit it. Nothing forces the new look.
+        $env:BAHTH_CLASSIC = '1'
+        foreach ($v in 'BAHTH_WEBUI', 'BAHTH_WEBUI_FAIL') { Remove-Item "Env:$v" -ErrorAction SilentlyContinue }
         $r = [TT]::Run($App, @('--version'), 30000)
         Note 'setup' 'program' "$(Short $r.Out 60) ($((Get-Item -LiteralPath $App).Length) bytes) at $App"
         if ($r.Code -ne 0) { Record 'setup' 'core' 'the program answers --version' $false "exit $($r.Code) $(Short $r.Err 200)" }

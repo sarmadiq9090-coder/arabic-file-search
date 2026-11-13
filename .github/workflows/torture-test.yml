@@ -3,7 +3,9 @@ name: torture-test
 # Hunts for crashes, hangs, a corrupt index and runaway memory on real
 # Windows before a release: ci/torture-test.ps1 with hostile file names,
 # folder shapes, change storms, damaged state files, many instances,
-# document bombs and a 30-minute soak. One job for each group.
+# document bombs and a two-hour soak. One job for each group. The program
+# is driven through its classic window (BAHTH_CLASSIC=1, set by the script:
+# since 1.0 users only get the new look).
 #
 # Which groups run is decided by ci/test-plan.json on the pushed branch:
 #   { "torture-test": { "groups": ["names", "tree", "churn", "state",
@@ -15,13 +17,16 @@ name: torture-test
 #
 # Kept small on purpose (GitHub's runners are shared):
 #   - a new push to the same branch cancels the run before it;
-#   - at most three groups at a time, each at most 45 minutes, and the
-#     script stops itself before that (its watchdog);
+#   - at most three groups at a time, each at most 45 minutes (the soak
+#     160: two hours of soak, its index and its checks), and the script
+#     stops itself before that (its watchdog); the soak starts first, so a
+#     full round takes about as long as the soak;
 #   - read-only token, no secrets, no cache, no network use by the tests;
 #   - the tests only touch scratch folders, the program's own data folder
 #     and a scratch VHD / subst drive, and clean up after themselves.
-# Worst case for a full round: 5 + 30 + 7 x 45 = 350 job-minutes; a usual
-# round is about 250.
+# Worst case for a full round: 5 + 30 + 6 x 45 + 160 = 465 job-minutes
+# (about 2 h 45 min from the push); a usual round is about 330 job-minutes
+# and 2 h 40 min, set by the soak.
 
 on:
   push:
@@ -62,7 +67,9 @@ jobs:
           import json
           import os
 
-          ALL = ["names", "tree", "churn", "state", "instances", "content", "soak"]
+          # The soak first: it is the longest by far (two hours), so it starts
+          # in the first wave and the other groups share the other slots.
+          ALL = ["soak", "names", "tree", "churn", "state", "instances", "content"]
           event = os.environ.get("EVENT", "")
           wanted = os.environ.get("WANTED", "").replace(",", " ").split()
 
@@ -147,8 +154,9 @@ jobs:
         group: ${{ fromJSON(needs.plan.outputs.groups) }}
     name: torture (${{ matrix.group }})
     runs-on: windows-latest
-    # The script ends itself after 39 minutes (43 for the soak).
-    timeout-minutes: 45
+    # The script ends itself after 39 minutes; the soak after 150 (its two
+    # hours, -SoakMinutes, plus 30 for its index and its checks).
+    timeout-minutes: ${{ matrix.group == 'soak' && 160 || 45 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
