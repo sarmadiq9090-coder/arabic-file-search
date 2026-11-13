@@ -121,7 +121,7 @@ fn installed_before() -> bool {
 }
 
 /// The settings key only versions with English write (0.10.1's one-time
-/// switch to the new look, `Settings::make_new_look_default`).
+/// switch to the new look; 1.0 still writes it, `Settings::make_new_look_only`).
 const ENGLISH_ERA_KEY: &str = "new_ui_default";
 
 /// Whether `dir` holds data of a copy installed before English existed:

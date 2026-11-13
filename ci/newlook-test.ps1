@@ -6,23 +6,29 @@
 #      no WebView2 failure), the setting is kept, no crash, and a screenshot
 #      of its client area is not one flat colour. A short search is typed
 #      (screenshot only, never fails the job).
-#   B. new_ui=0: the classic window opens, and its Options menu offers
-#      "Try the new look".
-#   C. Probe (warns, never fails): choosing that item swaps in the new window
-#      without a restart and saves new_ui=1.
-#   0. Before A (the default since 0.10.1): with no settings.txt at all the
-#      new look opens, and the one-time switch (new_ui=1, new_ui_default=1)
-#      is saved; the first-run question over it is answered No.
-#   D. After C: settings as 0.10.0 left them (new_ui=0, no new_ui_default):
-#      the new look opens once; "Back to the classic look" (keyboard: Ctrl+,
-#      then Tab to the button) brings the classic window and saves new_ui=0;
-#      after a restart the classic window stays. If the keys miss the button
-#      (a probe), the test writes what the button saves and goes on.
+#   0. Before A (the only look since 1.0): with no settings.txt at all the
+#      new look opens, and the one-time markers (new_ui=1, new_ui_default=1,
+#      new_ui_only=1) are saved; the first-run question over it is answered No.
+#   B. Settings of a classic user of 0.10.x (new_ui=0, new_ui_default=1, as
+#      after "Back to the classic look"): the new look opens, the move is
+#      saved (new_ui=1, new_ui_only=1), and neither its settings page nor
+#      the Options menu over it offers a way back to the classic look.
+#   C. BAHTH_CLASSIC=1 (the tests' own classic window): the classic window
+#      opens without the "WebView2 is not working" line, and its Options
+#      menu offers "Try the new look"; probe (warns, never fails): choosing
+#      it swaps in the new window without a restart.
+#   D. Settings as 0.10.0 left them (new_ui=0, no markers): the new look
+#      opens and the markers are saved; then new_ui=0 written by hand after
+#      the move: still the new look.
+#   F. The fallback: with BAHTH_WEBUI_FAIL=1 (WebView2 taken as failing to
+#      start) the classic window takes over and says why, and settings.txt
+#      keeps new_ui=1 (new_ui_failed=1: this run only); the next start,
+#      without it, opens the new look again.
 #
 # Note: in a right-to-left (mirrored) window the client origin is the top
 # RIGHT corner on screen; ClientOnScreen returns the true rectangle.
 #
-# Output: <Out>\newlook.png, newlook-query.png, classic.png, switched.png,
+# Output: <Out>\newlook.png, newlook-query.png, classic.png, switched.png, fallback.png,
 # diagnostics.txt (windows, settings.txt, log.txt, crash.txt), report.md.
 # Runs under Windows PowerShell 5.1 or PowerShell 7 on 64-bit Windows.
 # This file is UTF-8 with a BOM so Windows PowerShell reads the Arabic in it.
@@ -212,12 +218,13 @@ function Setting([string]$Text, [string]$Key) {
 }
 # settings.txt as the program reads it (key=value, ASCII, no BOM): no
 # first-run question (box above the clock, moving the exe, Store rating).
-# With -Old: as 0.10.0 wrote it, without the one-time default marker
-# (new_ui_default), so the program makes the new look the default once.
-function Write-Settings([int]$NewUi, [switch]$Old) {
+# With -Old: as 0.10.0 wrote it, without 0.10.1's marker (new_ui_default);
+# with -Only: as 1.0 writes it, with its marker (new_ui_only) too.
+function Write-Settings([int]$NewUi, [switch]$Old, [switch]$Only) {
     New-Item -ItemType Directory -Force $data | Out-Null
     $text = "floating_asked=1`nmove_asked=1`nrating_asked=1`nnew_ui=$NewUi`nnew_ui_failed=0`n"
     if (-not $Old) { $text += "new_ui_default=1`n" }
+    if ($Only) { $text += "new_ui_only=1`n" }
     [IO.File]::WriteAllText($settingsFile, $text, (New-Object Text.ASCIIEncoding))
     Say "settings.txt written: $($text -replace "`n", ' ')"
 }
@@ -408,7 +415,7 @@ try {
     Record 'probe' 'the first-run question shows over the new look' ([bool]$asked)
     if ($asked) { Full-Shot 'first-run-question'; [void](Dismiss-Dialogs $script:proc.Id); Start-Sleep -Seconds 2 }
     $s = Read-Settings
-    Record 'core' 'the one-time default is saved (new_ui=1, new_ui_default=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_default') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default')")
+    Record 'core' 'the one-time markers are saved (new_ui=1, new_ui_default=1, new_ui_only=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_default') -eq '1') -and ((Setting $s 'new_ui_only') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default') new_ui_only=$(Setting $s 'new_ui_only')")
     Record 'core' 'the classic window stays hidden (new user)' ($null -eq (Classic $script:proc.Id))
     Alive 'new user'
     Check-Crash 'new user'
@@ -462,7 +469,7 @@ try {
     Alive 'new look, after 45 s'
     Check-Crash 'new look'
     foreach ($l in Log-Lines 'webui') { Say "log: $l" }
-    $bad = @(Log-Lines 'webui: .*(did not load|process failed|showing the page again|back to the classic look|using the classic window|refused a message)')
+    $bad = @(Log-Lines 'webui: .*(did not load|process failed|showing the page again|using the classic window|refused a message)')
     $retried = @(Log-Lines 'webui: first try failed')
     if ($retried.Count) { Record 'probe' 'WebView2 started at the first try' $false ($retried -join ' | ') }
     Record 'core' 'the page loaded: no WebView2 failure or blank-page fallback in log.txt' ($bad.Count -eq 0) ($bad -join ' | ')
@@ -539,128 +546,184 @@ try {
     if ($results | Where-Object Result -eq 'FAIL') { Diagnostics 'new look' }
     Stop-Program
 
-    # ------------------------------------------------------------ B. the classic window
+    # ------------------------------------------------------------ B. a classic user of 0.10.x: moved once, no way back
+    Say 'part B: settings of a classic user of 0.10.x (new_ui=0, new_ui_default=1)'
     Write-Settings 0
     $t0 = Get-Date
     Start-Program
-    $cw = Wait-Until { Classic $script:proc.Id } 40
-    Record 'core' 'the classic window opens with new_ui=0' ($null -ne $cw) $(if ($cw) { "'$($cw.Text)' after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { '' })
-    $other = New-Look $script:proc.Id
-    Record 'core' 'no new window with new_ui=0' ($null -eq $other)
-    if ($cw) {
-        Start-Sleep -Seconds 3
-        Focus-Window $cw.Handle
-        [void](Shot-Client $cw 'classic')
-        # The Options menu offers the new look (first item).
-        $options = Get-Children $cw.Handle | Where-Object { $_.Visible -and $_.Class -eq 'Button' -and $_.Text -match '^Options|^خيارات' } | Select-Object -First 1
-        $items = @()
-        $menu = $null
-        if ($options) {
-            # Focus-Window's Alt tap can leave the window in menu mode, where
-            # a popup menu closes at once: leave that mode first.
-            [void][N]::PostMessage($cw.Handle, 0x001F, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CANCELMODE
-            Start-Sleep -Milliseconds 500
-            for ($try = 1; $try -le 3 -and -not $menu; $try++) {
-                [void][N]::PostMessage($options.Handle, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
-                $menu = Wait-Until { Open-Menu } 6
-            }
-            if ($menu) { $items = @([N]::MenuItems($menu.Handle)); Say ("Options items: " + ($items -join ' / ')) }
-        }
-        if ($options -and -not $menu) { Say 'no popup menu window (#32768) after clicking Options'; Diagnostics 'options menu did not open' }
-        $first = if ($items.Count) { $items[0] } else { '' }
-        Record 'core' 'the Options menu offers "Try the new look"' ($first -match 'Try the new look|جرّب الشكل الجديد') $(if ($options) { "first item '$first'" } else { 'no Options button' })
-        Full-Shot 'classic-options'
-
-        # ------------------------------------------------------------ C. probe: switch without a restart
-        if ($menu -and $first -match 'Try the new look|جرّب الشكل الجديد') {
-            try {
-                # (The classic window has the foreground, so the open menu
-                # takes the keys; no Alt tap here, it would close the menu.)
-                [N]::Chord($VK.DOWN)
-                Start-Sleep -Milliseconds 300
-                [N]::Chord($VK.ENTER)
-                $sw = Wait-Until { New-Look $script:proc.Id } 40
-                Record 'probe' '"Try the new look" swaps in the new window without a restart' ($null -ne $sw) $(if ($sw) { "'$($sw.Text)'" } else { '' })
-                if ($sw) {
-                    Start-Sleep -Seconds 25   # past the blank-page watchdog
-                    $sw = New-Look $script:proc.Id
-                    if ($sw) { Focus-Window $sw.Handle; $x = Shot-Client $sw 'switched'; Record 'probe' 'the switched-in page is painted' ($x -and $x.Colours -ge 8 -and $x.Top -lt 0.97) $(if ($x) { "$($x.Colours) colours" } else { '' }) }
-                    Record 'probe' 'new_ui=1 saved after switching' ((Setting (Read-Settings) 'new_ui') -eq '1') ("new_ui=" + (Setting (Read-Settings) 'new_ui'))
-                    $back = Classic $script:proc.Id
-                    Record 'probe' 'the classic window is hidden after switching' ($null -eq $back)
-                } else {
-                    Full-Shot 'switch-screen'
-                }
-            } catch { Record 'probe' 'switching from the Options menu' $false "$_" }
-        } elseif ($menu) {
-            [N]::Chord($VK.ESC)
-        }
-        Alive 'classic and switch'
-        Check-Crash 'classic and switch'
-    } else {
-        Full-Shot 'classic-screen'
-    }
-    Stop-Program
-
-    # ------------------------------------------------------------ D. 0.10.0 settings: the new look once, then the user's choice
-    Say 'part D: settings from 0.10.0 (new_ui=0, no new_ui_default)'
-    Write-Settings 0 -Old
-    $t0 = Get-Date
-    Start-Program
     $win = Wait-Until { New-Look $script:proc.Id } 40
-    Record 'core' '0.10.0 settings with new_ui=0: the new look opens once' ($null -ne $win) $(if ($win) { "after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { 'no new window' })
+    Record 'core' 'a classic user of 0.10.x gets the new look' ($null -ne $win) $(if ($win) { "after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { 'no new window' })
+    Record 'core' 'the classic window stays hidden (classic user)' ($null -eq (Classic $script:proc.Id))
     $s = Read-Settings
-    Record 'core' 'the one-time switch is saved (new_ui=1, new_ui_default=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_default') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default')")
-    $clicked = $false
+    Record 'core' 'the move is saved (new_ui=1, new_ui_default=1, new_ui_only=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_default') -eq '1') -and ((Setting $s 'new_ui_only') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default') new_ui_only=$(Setting $s 'new_ui_only')")
     if ($win) {
         # Let the page load, open its settings (the gear button, found with
-        # UI Automation, else Ctrl+,), then click "Back to the classic look"
-        # with the mouse where UI Automation says it is.
+        # UI Automation, else Ctrl+,): no "Back to the classic look" there.
         Start-Sleep -Seconds 8
         Focus-Window $win.Handle
         [void][N]::PostMessage($win.Handle, 0x001F, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CANCELMODE (the Alt tap)
         Start-Sleep -Milliseconds 300
         $gear = Find-Uia $win.Handle ([Windows.Automation.ControlType]::Button) '^(Settings|الإعدادات)'
         if ($gear) { $c = Center $gear; [N]::Click($c[0], $c[1]) } else { Say 'no Settings button in UI Automation; pressing Ctrl+,'; [N]::Chord($VK.CTRL, $VK.COMMA) }
-        $back = Wait-Until { Find-Uia $win.Handle ([Windows.Automation.ControlType]::Button) '^(Back to the classic look|العودة إلى الشكل القديم)$' } 10
-        if (-not $back) { Say ("buttons UI Automation sees: " + ((Uia-Names $win.Handle ([Windows.Automation.ControlType]::Button)) -join ' | ')) }
-        Record 'core' 'the "Back to the classic look" button is on the settings page' ($null -ne $back)
+        $page = Wait-Until { Find-Uia $win.Handle ([Windows.Automation.ControlType]::Button) '^(Back to search|رجوع إلى البحث)' } 10
+        Record 'probe' 'the settings page opens' ($null -ne $page) ("buttons UI Automation sees: " + ((Uia-Names $win.Handle ([Windows.Automation.ControlType]::Button)) -join ' | '))
         [void](Shot-Client $win 'settings-page')
-        if ($back) {
-            $c = Center $back
-            Say "clicking 'Back to the classic look' at $($c[0]),$($c[1])"
-            [N]::Click($c[0], $c[1])
-        }
-        $cw = Wait-Until { Classic $script:proc.Id } 10
-        $clicked = $null -ne $cw
-        Record 'core' 'clicking "Back to the classic look" brings the classic window' $clicked
-        if ($clicked) {
-            Start-Sleep -Seconds 2
-            $s = Read-Settings
-            Record 'core' '"Back to the classic look" saves new_ui=0 (the marker kept)' (((Setting $s 'new_ui') -eq '0') -and ((Setting $s 'new_ui_default') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default')")
-            Record 'core' 'the new window is gone after going back' ($null -eq (New-Look $script:proc.Id))
-            [void](Shot-Client $cw 'back-to-classic')
+        if ($page) {
+            $back = Find-Uia $win.Handle ([Windows.Automation.ControlType]::Button) '(classic look|الشكل القديم)'
+            Record 'core' 'the settings page has no way back to the classic look' ($null -eq $back) $(if ($back) { "'$($back.Current.Name)'" } else { '' })
+            # The Options menu over the new look (its "Open the Options
+            # menu" button): no switch of look in it either.
+            $more = Find-Uia $win.Handle ([Windows.Automation.ControlType]::Button) '(Options|خيارات)'
+            $menu = $null
+            if ($more) { $c = Center $more; [N]::Click($c[0], $c[1]); $menu = Wait-Until { Open-Menu } 6 }
+            if ($menu) {
+                $items = @([N]::MenuItems($menu.Handle))
+                Say ("Options items over the new look: " + ($items -join ' / '))
+                $look = @($items | Where-Object { $_ -match 'classic look|الشكل القديم|Try the new look|جرّب الشكل الجديد' })
+                Record 'core' 'the Options menu over the new look offers no switch of look' ($look.Count -eq 0) ($look -join ' / ')
+                Full-Shot 'newlook-options'
+                [N]::Chord($VK.ESC)
+            } else {
+                Record 'probe' 'the Options menu opens over the new look' $false $(if ($more) { 'no popup menu window (#32768)' } else { 'no Options button in UI Automation' })
+            }
         }
     }
+    Alive 'classic user moved'
+    Check-Crash 'classic user moved'
+    Stop-Program
+
+    # ------------------------------------------------------------ C. the tests' classic window
+    Say 'part C: BAHTH_CLASSIC=1'
+    Write-Settings 1 -Only
+    $env:BAHTH_CLASSIC = '1'
+    try {
+        $t0 = Get-Date
+        Start-Program
+        $cw = Wait-Until { Classic $script:proc.Id } 40
+        Record 'core' 'the classic window opens with BAHTH_CLASSIC=1' ($null -ne $cw) $(if ($cw) { "'$($cw.Text)' after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { '' })
+        $other = New-Look $script:proc.Id
+        Record 'core' 'no new window with BAHTH_CLASSIC=1' ($null -eq $other)
+        if ($cw) {
+            Start-Sleep -Seconds 3
+            $note = @(Get-Children $cw.Handle | Where-Object { $_.Visible -and $_.Class -eq 'Static' -and $_.Text -match 'WebView2' })
+            Record 'core' 'no "WebView2 is not working" line in the tests'' classic window' ($note.Count -eq 0) (($note | ForEach-Object Text) -join ' | ')
+            Focus-Window $cw.Handle
+            [void](Shot-Client $cw 'classic')
+            # The Options menu offers the new look (first item).
+            $options = Get-Children $cw.Handle | Where-Object { $_.Visible -and $_.Class -eq 'Button' -and $_.Text -match '^Options|^خيارات' } | Select-Object -First 1
+            $items = @()
+            $menu = $null
+            if ($options) {
+                # Focus-Window's Alt tap can leave the window in menu mode, where
+                # a popup menu closes at once: leave that mode first.
+                [void][N]::PostMessage($cw.Handle, 0x001F, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CANCELMODE
+                Start-Sleep -Milliseconds 500
+                for ($try = 1; $try -le 3 -and -not $menu; $try++) {
+                    [void][N]::PostMessage($options.Handle, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
+                    $menu = Wait-Until { Open-Menu } 6
+                }
+                if ($menu) { $items = @([N]::MenuItems($menu.Handle)); Say ("Options items: " + ($items -join ' / ')) }
+            }
+            if ($options -and -not $menu) { Say 'no popup menu window (#32768) after clicking Options'; Diagnostics 'options menu did not open' }
+            $first = if ($items.Count) { $items[0] } else { '' }
+            Record 'core' 'the Options menu offers "Try the new look"' ($first -match 'Try the new look|جرّب الشكل الجديد') $(if ($options) { "first item '$first'" } else { 'no Options button' })
+            Full-Shot 'classic-options'
+
+            # ---------------------------------------------------- probe: switch without a restart
+            if ($menu -and $first -match 'Try the new look|جرّب الشكل الجديد') {
+                try {
+                    # (The classic window has the foreground, so the open menu
+                    # takes the keys; no Alt tap here, it would close the menu.)
+                    [N]::Chord($VK.DOWN)
+                    Start-Sleep -Milliseconds 300
+                    [N]::Chord($VK.ENTER)
+                    $sw = Wait-Until { New-Look $script:proc.Id } 40
+                    Record 'probe' '"Try the new look" swaps in the new window without a restart' ($null -ne $sw) $(if ($sw) { "'$($sw.Text)'" } else { '' })
+                    if ($sw) {
+                        Start-Sleep -Seconds 25   # past the blank-page watchdog
+                        $sw = New-Look $script:proc.Id
+                        if ($sw) { Focus-Window $sw.Handle; $x = Shot-Client $sw 'switched'; Record 'probe' 'the switched-in page is painted' ($x -and $x.Colours -ge 8 -and $x.Top -lt 0.97) $(if ($x) { "$($x.Colours) colours" } else { '' }) }
+                        Record 'probe' 'new_ui=1 kept after switching' ((Setting (Read-Settings) 'new_ui') -eq '1') ("new_ui=" + (Setting (Read-Settings) 'new_ui'))
+                        $back = Classic $script:proc.Id
+                        Record 'probe' 'the classic window is hidden after switching' ($null -eq $back)
+                    } else {
+                        Full-Shot 'switch-screen'
+                    }
+                } catch { Record 'probe' 'switching from the Options menu' $false "$_" }
+            } elseif ($menu) {
+                [N]::Chord($VK.ESC)
+            }
+            Alive 'classic and switch'
+            Check-Crash 'classic and switch'
+        } else {
+            Full-Shot 'classic-screen'
+        }
+        Stop-Program
+    } finally {
+        Remove-Item Env:BAHTH_CLASSIC -ErrorAction SilentlyContinue
+    }
+
+    # ------------------------------------------------------------ D. 0.10.0 settings, and new_ui=0 after the move
+    Say 'part D: settings from 0.10.0 (new_ui=0, no markers)'
+    Write-Settings 0 -Old
+    $t0 = Get-Date
+    Start-Program
+    $win = Wait-Until { New-Look $script:proc.Id } 40
+    Record 'core' '0.10.0 settings with new_ui=0: the new look opens' ($null -ne $win) $(if ($win) { "after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { 'no new window' })
+    $s = Read-Settings
+    Record 'core' 'the move is saved for 0.10.0 settings (new_ui=1, new_ui_default=1, new_ui_only=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_default') -eq '1') -and ((Setting $s 'new_ui_only') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default') new_ui_only=$(Setting $s 'new_ui_only')")
     Alive '0.10.0 settings'
     Check-Crash '0.10.0 settings'
     Stop-Program
-    if (-not $clicked) {
-        # (Already a failure above; the restart check still runs on what
-        # the button saves.)
-        Write-Settings 0
-    }
-    # A restart: the user's choice sticks, the one-time switch is not made again.
+    Write-Settings 0 -Only
     Start-Program
-    $cw = Wait-Until { Classic $script:proc.Id } 40
-    Record 'core' 'after "Back to the classic look" and a restart, the classic window opens' ($null -ne $cw)
-    Record 'core' 'and no new window' ($null -eq (New-Look $script:proc.Id))
+    $win = Wait-Until { New-Look $script:proc.Id } 40
+    Record 'core' 'new_ui=0 after the move is ignored: the new look opens' ($null -ne $win)
+    Record 'core' 'and no classic window' ($null -eq (Classic $script:proc.Id))
     Start-Sleep -Seconds 3
     $s = Read-Settings
-    Record 'core' 'settings.txt still says new_ui=0 after the restart' ((Setting $s 'new_ui') -eq '0') ("new_ui=$(Setting $s 'new_ui') new_ui_default=$(Setting $s 'new_ui_default')")
-    if ($cw) { [void](Shot-Client $cw 'classic-after-restart') }
-    Alive 'classic after restart'
-    Check-Crash 'classic after restart'
+    Record 'core' 'settings.txt says new_ui=1 again' ((Setting $s 'new_ui') -eq '1') ("new_ui=$(Setting $s 'new_ui') new_ui_only=$(Setting $s 'new_ui_only')")
+    Alive 'new_ui=0 after the move'
+    Check-Crash 'new_ui=0 after the move'
+    Stop-Program
+
+    # ------------------------------------------------------------ F. the fallback is for one run only
+    Say 'part F: WebView2 failing (BAHTH_WEBUI_FAIL=1), then a normal start'
+    Write-Settings 1 -Only
+    Remove-Item $logFile -Force -ErrorAction SilentlyContinue   # this part's lines only
+    $env:BAHTH_WEBUI_FAIL = '1'
+    try {
+        Start-Program
+        $cw = Wait-Until { Classic $script:proc.Id } 40
+        Record 'core' 'WebView2 failing: the classic window takes over' ($null -ne $cw) (((Log-Lines 'webui:') | Select-Object -Last 4) -join ' | ')
+        Record 'core' 'and no new window is left on screen' ($null -eq (New-Look $script:proc.Id))
+        if ($cw) {
+            Start-Sleep -Seconds 2
+            $note = @(Get-Children $cw.Handle | Where-Object { $_.Visible -and $_.Class -eq 'Static' -and $_.Text -match 'WebView2' })
+            Record 'core' 'the classic window says WebView2 is not working' ($note.Count -gt 0) (($note | ForEach-Object Text) -join ' | ')
+            [void](Shot-Client $cw 'fallback')
+        }
+        $s = Read-Settings
+        Record 'core' 'the fallback does not turn the new look off (new_ui=1, new_ui_failed=1)' (((Setting $s 'new_ui') -eq '1') -and ((Setting $s 'new_ui_failed') -eq '1')) ("new_ui=$(Setting $s 'new_ui') new_ui_failed=$(Setting $s 'new_ui_failed')")
+        Alive 'fallback'
+        Check-Crash 'fallback'
+        Stop-Program
+    } finally {
+        Remove-Item Env:BAHTH_WEBUI_FAIL -ErrorAction SilentlyContinue
+    }
+    $t0 = Get-Date
+    Start-Program
+    $win = Wait-Until { New-Look $script:proc.Id } 40
+    Record 'core' 'after a fallback, the next start opens the new look again' ($null -ne $win) $(if ($win) { "after {0:N1} s" -f ((Get-Date) - $t0).TotalSeconds } else { (((Log-Lines 'webui:') | Select-Object -Last 4) -join ' | ') })
+    Record 'core' 'and the classic window stays hidden' ($null -eq (Classic $script:proc.Id))
+    Record 'probe' 'log.txt says it is tried again, once' ((Log-Lines 'webui: the new look failed at the last start').Count -gt 0)
+    $hello = Wait-Until { (Log-Lines 'webui: page said hello').Count -gt 0 } 40
+    Record 'core' 'its page loads' ([bool]$hello)
+    # A page that works a minute forgets the failed start.
+    $cleared = Wait-Until { (Setting (Read-Settings) 'new_ui_failed') -eq '0' } 90
+    Record 'probe' 'new_ui_failed=0 again after the page worked a minute' ([bool]$cleared) ("new_ui_failed=" + (Setting (Read-Settings) 'new_ui_failed'))
+    Alive 'after the fallback'
+    Check-Crash 'after the fallback'
 } catch {
     Record 'core' 'the test ran to the end' $false "$_ at line $($_.InvocationInfo.ScriptLineNumber)"
 } finally {

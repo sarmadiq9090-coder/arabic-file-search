@@ -206,4 +206,13 @@ mod tests {
         assert!(!css.contains("http:") && !css.contains("https:") && !css.contains("@import"));
         assert!(!PAGE.contains("http:") && !PAGE.contains("https:") && !PAGE.contains("<script>") && !PAGE.contains("style=\""));
     }
+
+    #[test]
+    fn no_way_back_to_the_classic_look() {
+        // Since 1.0 the new look is the only one: the page offers no switch.
+        let js = text("/app.js");
+        for gone in ["classic_look", "العودة إلى الشكل القديم", "Back to the classic look", "classic look"] {
+            assert!(!js.contains(gone), "app.js still has {gone:?}");
+        }
+    }
 }

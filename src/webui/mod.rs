@@ -9,12 +9,13 @@
 //!   Win32 window, serving `assets` through the `instafind://` protocol
 //!
 //! The window itself, wired to the running program, is `ui/webui.rs`. Since
-//! 0.10.1 it is the default where it can run ([`chosen`]; the `new_ui`
-//! setting is turned on once, `Settings::make_new_look_default`):
-//! «العودة إلى الشكل القديم» on its settings page turns it off for good,
-//! «جرّب الشكل الجديد» in the classic window's Options menu on again, and
-//! the classic Win32 window is the fallback when WebView2 is missing or
-//! fails (and in mingw builds).
+//! 1.0 it is the only look users get ([`chosen`]; `new_ui` is turned on for
+//! good once, `Settings::make_new_look_only`, and nothing offers the way
+//! back). The classic Win32 window is a hidden safety fallback, for one run
+//! only, when WebView2 is missing or fails (and in mingw builds): the next
+//! start tries the new look again, and «جرّب الشكل الجديد» in the classic
+//! window's Options menu tries it at once. The tests ask for the classic
+//! window with [`CLASSIC_ARG`] / [`CLASSIC_ENV`].
 
 // Only MSVC builds host the page (see Cargo.toml); elsewhere the shared parts
 // are compiled for their tests and for the opt-in switch alone.
@@ -31,12 +32,31 @@ pub mod host;
 pub const ARG: &str = "--webui";
 /// The same switch as an environment variable (`BAHTH_WEBUI=1`).
 pub const ENV: &str = "BAHTH_WEBUI";
+/// For the tests of the classic window (`ci/ui-test.ps1`): the classic
+/// window for one launch, whatever the settings say, without the note that
+/// WebView2 is not working. Wins over [`ARG`] / [`ENV`]. Not offered to users.
+pub const CLASSIC_ARG: &str = "--classic";
+/// The same as an environment variable (`BAHTH_CLASSIC=1`).
+pub const CLASSIC_ENV: &str = "BAHTH_CLASSIC";
+/// For the test of the fallback (`ci/newlook-test.ps1`): WebView2 is taken
+/// as failing to start, as on a machine where it is broken.
+pub const FAIL_ENV: &str = "BAHTH_WEBUI_FAIL";
 
-/// Whether the new interface was asked for, by [`ARG`] or by [`ENV`] set to
-/// anything but empty, `0`, `false` or `off`.
-pub fn requested_by<S: AsRef<str>>(args: &[S], env: Option<&str>) -> bool {
-    args.iter().any(|a| a.as_ref() == ARG)
+/// Whether switch `arg` is in `args`, or `env` is set to anything but empty,
+/// `0`, `false` or `off`.
+fn switch_by<S: AsRef<str>>(arg: &str, args: &[S], env: Option<&str>) -> bool {
+    args.iter().any(|a| a.as_ref() == arg)
         || env.is_some_and(|v| !matches!(v.trim().to_ascii_lowercase().as_str(), "" | "0" | "false" | "off"))
+}
+
+/// Whether the new interface was asked for, by [`ARG`] or by [`ENV`].
+pub fn requested_by<S: AsRef<str>>(args: &[S], env: Option<&str>) -> bool {
+    switch_by(ARG, args, env)
+}
+
+/// Whether the classic window was asked for, by [`CLASSIC_ARG`] or by [`CLASSIC_ENV`].
+pub fn classic_requested_by<S: AsRef<str>>(args: &[S], env: Option<&str>) -> bool {
+    switch_by(CLASSIC_ARG, args, env)
 }
 
 /// [`requested_by`] for this process.
@@ -45,11 +65,30 @@ pub fn requested() -> bool {
     requested_by(&args, std::env::var(ENV).ok().as_deref())
 }
 
-/// Whether this launch should use the new interface: chosen in the settings
-/// (`new_ui`, see `crate::settings`), or asked for by [`ARG`] or [`ENV`].
-/// (WebView2 must be installed too; the window checks that.)
+/// [`classic_requested_by`] for this process.
+pub fn classic_requested() -> bool {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    classic_requested_by(&args, std::env::var(CLASSIC_ENV).ok().as_deref())
+}
+
+/// Whether [`FAIL_ENV`] is set for this process (anything but empty, `0`,
+/// `false` or `off`).
+pub fn fail_requested() -> bool {
+    let none: [&str; 0] = [];
+    switch_by("", &none, std::env::var(FAIL_ENV).ok().as_deref())
+}
+
+/// Whether this launch should use the new interface: `new_ui` (always on
+/// since 1.0, see `crate::settings`) or [`ARG`] / [`ENV`], unless the tests
+/// asked for the classic window. (WebView2 must be installed too; the
+/// window checks that.)
 pub fn chosen(new_ui: bool) -> bool {
-    new_ui || requested()
+    pick(new_ui, requested(), classic_requested())
+}
+
+/// [`chosen`] from its parts.
+fn pick(new_ui: bool, requested: bool, classic: bool) -> bool {
+    !classic && (new_ui || requested)
 }
 
 /// What a failed WebView2 process means for the page.
@@ -93,13 +132,18 @@ pub fn stable(ready_for: Option<std::time::Duration>) -> bool {
     ready_for.is_some_and(|d| d >= STABLE)
 }
 
-/// After the new look could not be started at launch (both attempts):
-/// `(new_ui, new_ui_failed)` to save. One bad start (WebView2 updating
-/// during login) keeps the new look for the next launch; a second start in
-/// a row that fails turns it off. Nothing is turned on that was not
-/// (`--webui` alone).
-pub fn after_failed_start(new_ui: bool, failed_before: bool) -> (bool, bool) {
-    if new_ui && !failed_before { (true, true) } else { (false, false) }
+/// How the new look starts after the classic window took over at the last
+/// launch (`new_ui_failed`, see `crate::settings::Settings::note_fallback`):
+/// it is tried again (WebView2 may have been repaired or updated since),
+/// but without the second chances, so a WebView2 that is still broken
+/// hands over to the classic window quickly instead of every start
+/// waiting through the retries. `(attempts to create WebView2, failures
+/// already counted)`: normally two attempts and none counted, so the
+/// first failure of the page is retried and the second gives up; after a
+/// fallback one attempt and one counted, so the first failure gives up.
+/// A page that then works a while (`STABLE`) gets the second chances back.
+pub fn start_tolerance(failed_last_time: bool) -> (u32, u32) {
+    if failed_last_time { (1, 1) } else { (2, 0) }
 }
 
 #[cfg(test)]
@@ -127,14 +171,12 @@ mod tests {
     }
 
     #[test]
-    fn a_second_bad_start_in_a_row_turns_the_new_look_off() {
-        // First bad start: kept, remembered.
-        assert_eq!(after_failed_start(true, false), (true, true));
-        // The next start fails too: off.
-        assert_eq!(after_failed_start(true, true), (false, false));
-        // Only forced by --webui: stays off.
-        assert_eq!(after_failed_start(false, false), (false, false));
-        assert_eq!(after_failed_start(false, true), (false, false));
+    fn after_a_fallback_the_next_start_tries_again_quickly() {
+        // Normal: two attempts, the first page failure is retried.
+        assert_eq!(start_tolerance(false), (2, 0));
+        // The classic window took over last time: still tried (never off
+        // for good), but one attempt, and the first failure gives up.
+        assert_eq!(start_tolerance(true), (1, 1));
     }
 
     #[test]
@@ -149,5 +191,21 @@ mod tests {
         for off in ["", "0", "false", "OFF"] {
             assert!(!requested_by(&none, Some(off)), "{off}");
         }
+        // The tests' classic window: its own switch, not --webui's.
+        assert!(!classic_requested_by(&none, None));
+        assert!(classic_requested_by(&["--classic"], None));
+        assert!(!classic_requested_by(&["--webui"], None));
+        assert!(!requested_by(&["--classic"], None));
+        assert!(classic_requested_by(&none, Some("1")) && !classic_requested_by(&none, Some("0")));
+    }
+
+    #[test]
+    fn the_new_look_unless_the_tests_ask_for_the_classic_window() {
+        assert!(pick(true, false, false));
+        assert!(pick(false, true, false));
+        assert!(!pick(false, false, false));
+        // --classic / BAHTH_CLASSIC win, also over --webui.
+        assert!(!pick(true, false, true));
+        assert!(!pick(true, true, true));
     }
 }

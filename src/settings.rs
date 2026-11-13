@@ -58,15 +58,20 @@ pub struct Settings {
     /// The one-time Store rating question was shown or answered.
     pub rating_asked: bool,
     /// Use the new main window (WebView2) instead of the classic one, when
-    /// WebView2 is there (see `crate::webui`). Off by default while it is
-    /// opt-in; `--webui` / `BAHTH_WEBUI=1` turn it on for one launch.
+    /// WebView2 is there (see `crate::webui`). Always on since 1.0
+    /// ([`Settings::make_new_look_only`]); still written, for older versions.
     pub new_ui: bool,
-    /// The last launch could not start the new look; a second one in a row
-    /// turns `new_ui` off (`crate::webui::after_failed_start`).
+    /// The classic window took over at the last launch because the new
+    /// look failed ([`Settings::note_fallback`]): the next start tries the
+    /// new look again, without the second chances
+    /// (`crate::webui::start_tolerance`). Cleared by a page that works a while.
     pub new_ui_failed: bool,
-    /// The new look was made the default once ([`Settings::make_new_look_default`]);
-    /// from then on `new_ui` is the user's (or the fallback's) choice.
+    /// 0.10.1's one-time switch to the new look was made. Kept and written:
+    /// `crate::i18n` takes a file with it as written by a version with English.
     pub new_ui_default: bool,
+    /// 1.0's one-time move of classic users to the new look was made
+    /// ([`Settings::make_new_look_only`]).
+    pub new_ui_only: bool,
 }
 
 /// How the floating search box above the clock shows itself.
@@ -155,30 +160,43 @@ impl FloatPos {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Fade, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_default: false }
+        Settings { width: 1100, height: 680, maximized: false, columns: Vec::new(), arabic_digits: false, kind: 0, sort_col: -1, sort_desc: false, update_check: 0, content_index: true, read_cloud_files: false, auto_index: true, hide_system: true, crash_seen: 0, floating_mode: FloatingMode::Fade, floating_pos: None, hotkey_opens: HotkeyOpens::Quick, alt_space: false, tray_icon: true, floating_asked: false, move_asked: false, file_opens: 0, rating_asked: false, new_ui: false, new_ui_failed: false, new_ui_default: false, new_ui_only: false }
     }
 }
 
 impl Settings {
-    /// The new look as the default (0.10.1), once per settings file: a new
-    /// user, and one whose settings come from 0.10.0 or earlier (which
-    /// wrote `new_ui=0` whether or not anyone chose it), get `new_ui` on;
-    /// the marker (`new_ui_default`) is set with it, so from then on
-    /// "Back to the classic look", or the fallback after two failed starts,
-    /// sticks. Returns whether anything changed (then save). Where the new
-    /// look can't run (no WebView2), the classic window is used anyway.
-    pub fn make_new_look_default(&mut self) -> bool {
-        if self.new_ui_default {
-            return false;
-        }
-        self.new_ui_default = true;
+    /// The new look is the only one (1.0). Once per settings file (the
+    /// marker `new_ui_only`), whoever used the classic window is moved to
+    /// the new look: settings of 0.10.0 or earlier, "Back to the classic
+    /// look" of 0.10.x (`new_ui=0` with 0.10.1's marker `new_ui_default`),
+    /// and machines where 0.10.x gave the new look up after two failed
+    /// starts. From then on `new_ui=0` in the file is ignored as well. The
+    /// classic window is only a fallback for one run, when WebView2 is
+    /// missing or fails ([`Settings::note_fallback`]), or for the tests
+    /// (`crate::webui::CLASSIC_ARG`). `new_ui_default` is set with it, as
+    /// 0.10.1 did: `crate::i18n` looks for that key. Returns whether
+    /// anything changed (then save).
+    pub fn make_new_look_only(&mut self) -> bool {
+        let before = (self.new_ui, self.new_ui_default, self.new_ui_only);
         self.new_ui = true;
-        true
+        self.new_ui_default = true;
+        self.new_ui_only = true;
+        before != (true, true, true)
+    }
+
+    /// The classic window took over for this run (WebView2 failed to start,
+    /// or its page failed twice): remembered so the next start tries the
+    /// new look again but gives up quickly if it still fails. The new look
+    /// is never turned off by it.
+    // (Only MSVC builds host the new look, see `crate::webui`.)
+    #[cfg_attr(not(all(windows, target_env = "msvc")), allow(dead_code))]
+    pub fn note_fallback(&mut self) {
+        self.new_ui_failed = true;
     }
 
     /// Whether the one-time switch just done changed the look for someone
     /// who used the classic window (a settings file was there, the new look
-    /// was off): they are told once, with the way back. Not for a new user.
+    /// was off): they are told once. Not for a new user.
     pub fn switch_to_tell(had_file: bool, was_on: bool, switched: bool) -> bool {
         switched && had_file && !was_on
     }
@@ -218,6 +236,7 @@ impl Settings {
                 "new_ui" => s.new_ui = value == "1",
                 "new_ui_failed" => s.new_ui_failed = value == "1",
                 "new_ui_default" => s.new_ui_default = value == "1",
+                "new_ui_only" => s.new_ui_only = value == "1",
                 _ => {}
             }
         }
@@ -227,7 +246,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let cols: Vec<String> = self.columns.iter().map(i32::to_string).collect();
         format!(
-            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\nnew_ui_failed={}\nnew_ui_default={}\nread_cloud_files={}\n",
+            "width={}\nheight={}\nmaximized={}\ncolumns={}\narabic_digits={}\nkind={}\nsort_col={}\nsort_desc={}\nupdate_check={}\ncontent_index={}\nauto_index={}\nhide_system={}\ncrash_seen={}\nfloating_mode={}\nfloating_pos={}\nhotkey_opens={}\nalt_space={}\ntray_icon={}\nfloating_asked={}\nmove_asked={}\nfile_opens={}\nrating_asked={}\nnew_ui={}\nnew_ui_failed={}\nnew_ui_default={}\nread_cloud_files={}\nnew_ui_only={}\n",
             self.width,
             self.height,
             self.maximized as u8,
@@ -253,7 +272,8 @@ impl Settings {
             self.new_ui as u8,
             self.new_ui_failed as u8,
             self.new_ui_default as u8,
-            self.read_cloud_files as u8
+            self.read_cloud_files as u8,
+            self.new_ui_only as u8
         )
     }
 
@@ -303,7 +323,7 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, read_cloud_files: true, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, file_opens: 7, rating_asked: true, new_ui: true, new_ui_failed: true, new_ui_default: true };
+        let s = Settings { width: 900, height: 500, maximized: true, columns: vec![200, 300, 80], arabic_digits: true, kind: 3, sort_col: 2, sort_desc: true, update_check: 1_700_000_000, content_index: false, read_cloud_files: true, auto_index: false, hide_system: false, crash_seen: 1_800_000_000, floating_mode: FloatingMode::Hidden, floating_pos: Some(FloatPos { monitor: [-1920, 0, 0, 1080], x: -500, y: 990 }), hotkey_opens: HotkeyOpens::Main, alt_space: true, tray_icon: false, floating_asked: true, move_asked: true, file_opens: 7, rating_asked: true, new_ui: true, new_ui_failed: true, new_ui_default: true, new_ui_only: true };
         assert_eq!(Settings::parse(&s.to_text()), s);
         for mode in [FloatingMode::Fade, FloatingMode::Hidden, FloatingMode::Off] {
             let s = Settings { floating_mode: mode, ..Settings::default() };
@@ -372,11 +392,12 @@ mod tests {
         assert_eq!((s.file_opens, s.rating_asked), (5, true));
         assert_eq!(Settings::parse("file_opens=-3\nrating_asked=yes").file_opens, 0);
         assert!(!Settings::parse("rating_asked=yes").rating_asked);
-        // The new look is opt-in: off unless explicitly turned on.
+        // Read as written (the one-time move turns the new look on, not parsing).
         assert!(!d.new_ui && !Settings::parse("width=900").new_ui && !Settings::parse("new_ui=yes").new_ui && Settings::parse("new_ui=1").new_ui);
         assert!(!Settings::parse("new_ui=1\nnew_ui=0").new_ui);
         assert!(!d.new_ui_failed && Settings::parse("new_ui_failed=1").new_ui_failed && !Settings::parse("new_ui=1").new_ui_failed);
         assert!(!d.new_ui_default && Settings::parse("new_ui_default=1").new_ui_default && !Settings::parse("new_ui_default=yes").new_ui_default);
+        assert!(!d.new_ui_only && Settings::parse("new_ui_only=1").new_ui_only && !Settings::parse("new_ui_only=yes").new_ui_only);
         // Positions: six numbers and a real monitor rectangle, else the default place.
         let p = FloatPos { monitor: [0, 0, 2560, 1440], x: 1800, y: 1360 };
         assert_eq!(FloatPos::parse(&p.to_text()), Some(p));
@@ -389,39 +410,68 @@ mod tests {
     }
 
     #[test]
-    fn the_new_look_becomes_the_default_once() {
-        // A new user (no settings file): the new look.
+    fn the_new_look_is_the_only_one() {
+        // A new user (no settings file): the new look, with every marker.
         let mut s = Settings::parse("");
-        assert!(s.make_new_look_default());
-        assert!(s.new_ui && s.new_ui_default);
+        assert!(s.make_new_look_only());
+        assert!(s.new_ui && s.new_ui_default && s.new_ui_only);
         // Saved and read again: nothing more to do.
         let mut again = Settings::parse(&s.to_text());
-        assert!(!again.make_new_look_default());
+        assert!(!again.make_new_look_only());
         assert_eq!(again, s);
-        // Settings written by 0.10.0 (new_ui=0, chosen or not, no marker): on once.
+        // 0.10.0 or earlier (new_ui=0, no marker): moved, the rest kept.
         let mut old = Settings::parse("width=900\nfloating_asked=1\nnew_ui=0\nnew_ui_failed=0\n");
-        assert!(old.make_new_look_default());
-        assert!(old.new_ui && old.new_ui_default && old.width == 900 && old.floating_asked);
-        // Already on in 0.10.0: stays on, the marker is written.
-        let mut on = Settings::parse("new_ui=1\n");
-        assert!(on.make_new_look_default() && on.new_ui);
-        // "Back to the classic look" after the switch: sticks, start after start.
-        let mut back = Settings::parse("new_ui=0\nnew_ui_default=1\n");
-        for _ in 0..3 {
-            assert!(!back.make_new_look_default());
-            back = Settings::parse(&back.to_text());
-            assert!(!back.new_ui);
+        assert!(old.make_new_look_only());
+        assert!(old.new_ui && old.new_ui_default && old.new_ui_only && old.width == 900 && old.floating_asked);
+        // "Back to the classic look" of 0.10.x (new_ui=0 after 0.10.1's
+        // switch), or 0.10.x's give-up after two failed starts: moved once.
+        for text in ["new_ui=0\nnew_ui_default=1\n", "new_ui=0\nnew_ui_failed=0\nnew_ui_default=1\n"] {
+            let mut back = Settings::parse(text);
+            assert!(back.make_new_look_only(), "{text:?}");
+            assert!(back.new_ui && back.new_ui_only, "{text:?}");
+            // Start after start: the new look, nothing to save.
+            for _ in 0..3 {
+                back = Settings::parse(&back.to_text());
+                assert!(!back.make_new_look_only() && back.new_ui, "{text:?}");
+            }
         }
-        // A machine where the new look failed twice (new_ui off by the
-        // fallback, after the switch): never switched on again.
-        let mut failed = Settings::parse("new_ui=0\nnew_ui_failed=0\nnew_ui_default=1\n");
-        assert!(!failed.make_new_look_default() && !failed.new_ui);
-        // One failed start remembered before the switch: the switch keeps
-        // that memory, so a second failed start still turns it off.
+        // Already on: stays on, the marker is written.
+        let mut on = Settings::parse("new_ui=1\nnew_ui_default=1\n");
+        assert!(on.make_new_look_only() && on.new_ui && on.new_ui_only);
+        // After the move, new_ui=0 in the file (an older version, a hand
+        // edit) is ignored: the new look again.
+        let mut edited = Settings::parse("new_ui=0\nnew_ui_default=1\nnew_ui_only=1\n");
+        assert!(edited.make_new_look_only());
+        assert!(edited.new_ui);
+        // Settings written by 1.0 still carry 0.10.1's key (`crate::i18n`).
+        assert!(s.to_text().lines().any(|l| l == "new_ui_default=1"));
+        assert!(s.to_text().lines().any(|l| l == "new_ui_only=1"));
+    }
+
+    #[test]
+    fn a_fallback_does_not_persist() {
+        // The classic window took over (WebView2 failed): remembered, but
+        // the new look stays chosen for the next start.
+        let mut s = Settings::parse("");
+        s.make_new_look_only();
+        s.note_fallback();
+        let mut next = Settings::parse(&s.to_text());
+        assert!(next.new_ui && next.new_ui_failed);
+        assert!(!next.make_new_look_only());
+        assert!(next.new_ui && crate::webui::chosen(next.new_ui) == !crate::webui::classic_requested());
+        // ... tried again without the second chances.
+        assert_eq!(crate::webui::start_tolerance(next.new_ui_failed), (1, 1));
+        // Falling back again and again never turns it off.
+        for _ in 0..5 {
+            next.note_fallback();
+            next = Settings::parse(&next.to_text());
+            next.make_new_look_only();
+            assert!(next.new_ui && next.new_ui_only);
+        }
+        // A failure remembered by 0.10.x (new_ui=1, new_ui_failed=1) is kept.
         let mut once = Settings::parse("new_ui=1\nnew_ui_failed=1\n");
-        assert!(once.make_new_look_default());
+        assert!(once.make_new_look_only());
         assert!(once.new_ui && once.new_ui_failed);
-        assert_eq!(crate::webui::after_failed_start(once.new_ui, once.new_ui_failed), (false, false));
     }
 
     #[test]

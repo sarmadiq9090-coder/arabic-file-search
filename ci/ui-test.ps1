@@ -299,10 +299,12 @@ function Find-Controls($Main) {
 Get-Process bahth* -ErrorAction SilentlyContinue | Stop-Process -Force
 Remove-Item $data -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item 'HKCU:\Software\BahthSari' -Recurse -Force -ErrorAction SilentlyContinue
-# This test is about the classic window. The new look is the default since
-# 0.10.1 (ci/newlook-test.ps1 tests it): settings.txt says "classic, chosen",
-# as after "Back to the classic look", and nothing else, so the first-run
-# questions still come. (key=value, ASCII, no BOM: how the program reads it.)
+# This test is about the classic window. Since 1.0 users only get the new
+# look (ci/newlook-test.ps1 tests it) and new_ui=0 in settings.txt is
+# ignored; BAHTH_CLASSIC=1 (below) is the tests' own way to the classic
+# window, without the "WebView2 is not working" line. settings.txt holds
+# nothing else, so the first-run questions still come. (key=value, ASCII,
+# no BOM: how the program reads it.)
 New-Item -ItemType Directory -Force $data | Out-Null
 [IO.File]::WriteAllText((Join-Path $data 'settings.txt'), "new_ui=0`nnew_ui_default=1`n", (New-Object Text.ASCIIEncoding))
 $docs = Join-Path $env:USERPROFILE 'Documents\InstaFind UI test'
@@ -312,6 +314,9 @@ Set-Content -LiteralPath (Join-Path $docs 'أحمد - سيرة ذاتية.txt') 
 Set-Content -LiteralPath (Join-Path $docs 'Quarterly Budget 2026.txt') -Value 'revenue forecast' -Encoding UTF8
 Set-Content -LiteralPath (Join-Path $docs 'محاضرة الفيزياء.txt') -Value 'quantum lecture notes' -Encoding UTF8
 $env:BAHTH_UI_TEST = '1'
+# The classic window, whatever settings.txt says (also for the copies the
+# program starts itself: they inherit it).
+$env:BAHTH_CLASSIC = '1'
 Note 'setup' 'screen' ("{0}x{1}, PowerShell {2}" -f [Windows.Forms.SystemInformation]::VirtualScreen.Width, [Windows.Forms.SystemInformation]::VirtualScreen.Height, $PSVersionTable.PSVersion)
 
 # ---------------------------------------------------------------- first start

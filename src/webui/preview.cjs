@@ -108,7 +108,7 @@ function fakeProgram(cfg) {
     hello: [], search: ["seq", "q", "kind", "size", "date", "content", "sort", "desc"], more: ["seq", "ver", "from"], sort: ["seq", "sort", "desc"], stop: ["seq"],
     matches: ["seq", "ver", "id"], open: ["list", "seq", "ver", "id"], reveal: ["list", "seq", "ver", "id"], copy: ["list", "seq", "ver", "id"], copy_file: ["list", "seq", "ver", "id"], copy_all: ["seq", "ver"],
     rename: ["list", "seq", "ver", "id", "name"], recycle: ["list", "seq", "ver", "id"], scope: ["list", "seq", "ver", "id"], pick_folder: [], all_drives: [], saved: ["id", "name"],
-    save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], classic_look: [], options_menu: [], report_problem: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], thumbs: ["seq", "ver", "ids"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
+    save_search: ["q", "kind", "content"], clear_recent: [], clear_saved: [], set: ["key", "on"], lang: ["lang"], restart: [], reindex: [], web: ["q"], hide: [], options_menu: [], report_problem: [], drag: ["list", "seq", "ver", "id"], app: ["seq", "id"], thumbs: ["seq", "ver", "ids"], export: [], replace_text: [], folder_sizes: ["list", "seq", "ver", "id"],
   };
   const REQUIRED = { search: ["seq", "q"], sort: ["seq", "sort"], set: ["key", "on"], rename: ["list", "seq", "ver", "id", "name"] };
   // Requests about rows, and the list version they must name (a new one for every list sent and every new order).
@@ -258,9 +258,9 @@ const SHOTS = [
   ["enter-twice-en-light", "en", "light", [["type", "report"], ["key", "Enter"], ["key", "Enter"]], { expect: { opens: 1 } }],
   // The first indexing, nothing found yet: "still indexing", not "nothing in 0 files".
   ["indexing-nores-ar-light", "ar", "light", [["type", "zzqq"]], { indexing: true, expect: { view: "view-nores", stillIndexing: true, tagline: false } }],
-  // A classic user switched by the update: told once, with the way back.
+  // A classic user moved by the update: told once (no way back since 1.0).
   ["switched-ar-light", "ar", "light", [], { switched: true, expect: { switched: true } }],
-  ["switched-back-en-light", "en", "light", [["click", "#switched-back"], ["wait", 50]], { switched: true, expect: { switched: false, lastSent: "classic_look" } }],
+  ["switched-dismiss-en-light", "en", "light", [["click", "#switched-x"], ["wait", 50]], { switched: true, expect: { switched: false } }],
   // A problem stays, in the warning colour, until the next key.
   ["warn-en-dark", "en", "dark", [["eval", "window.__instafind.recv({ type: 'notice', text: 'Could not open the file: C:\\\\x.txt', warn: true })"], ["wait", 3800]], { expect: { warn: true } }],
   ["warn-gone-en-dark", "en", "dark", [["eval", "window.__instafind.recv({ type: 'notice', text: 'Could not open the file', warn: true })"], ["key", "Shift"]], { expect: { warn: false } }],
@@ -317,8 +317,6 @@ const SHOTS = [
   ["saved-ar-light", "ar", "light", [["click", "#hist-btn"], ["click", "#hist [role=menuitem]"], ["wait", 300]], { expect: { content: true } }],
   ["settings-ar-light", "ar", "light", [["click", "#set-btn"], ["click", "#settings .seg[lang=en]"], ["click", "#set-floating"]], { expect: { settings: true } }],
   ["settings-en-dark", "en", "dark", [["key", "Control+,"]], { expect: { settings: true } }],
-  // «العودة إلى الشكل القديم»: one typed request.
-  ["classic-look-ar-light", "ar", "light", [["click", "#set-btn"], ["click", "#classic-look"], ["wait", 50]], { expect: { settings: true, lastSent: "classic_look" } }],
   // Dragging a row out asks the program to drag that file (once), naming its list version.
   ["drag-en-light", "en", "light", [["type", "report"], ["drag", "#r1"]], { expect: { drags: 1, dialog: false } }],
   ["drag-recent-ar-light", "ar", "light", [["drag", "#rr0"]], { expect: { lastSent: "drag", drags: 1 } }],

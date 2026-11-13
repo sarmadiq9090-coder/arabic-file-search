@@ -54,15 +54,15 @@ impl NativeUi<AppUi> for App {
     fn build_ui(mut app: App) -> Result<AppUi, nwg::NwgError> {
         let had_file = Settings::exists();
         let mut settings = Settings::load();
-        // 0.10.1: the new look is the default, once (see the method); a
-        // classic user is told so once in the new look, with the way back.
+        // 1.0: the new look is the only one (see the method); a classic
+        // user is moved once, and told so once in the new look.
         let was_on = settings.new_ui;
-        let switched = settings.make_new_look_default();
-        if switched {
-            super::startup::log("settings: the new look is now the default (once)");
+        let first = !settings.new_ui_only;
+        if settings.make_new_look_only() {
+            super::startup::log(if first { "settings: moved to the new look (once)" } else { "settings: new_ui=0 ignored; the new look is the only one" });
             settings.save();
         }
-        if Settings::switch_to_tell(had_file, was_on, switched) {
+        if Settings::switch_to_tell(had_file, was_on, first) {
             app.webui_tell_switch();
         }
         // A size saved on a bigger screen must still fit this one.
@@ -315,7 +315,8 @@ impl NativeUi<AppUi> for App {
         phase("tray");
         nwg::Menu::builder().popup(true).parent(&app.window).build(&mut app.options_menu)?;
         // The new interface, first so it is seen; not offered without
-        // WebView2 (nor in mingw builds, which can't host it).
+        // WebView2 (nor in mingw builds, which can't host it), and only in
+        // the classic window (`webui_titles` takes it out over the new look).
         if super::webui::available() {
             nwg::MenuItem::builder().text(tr!("جرّب الشكل الجديد", "Try the new look")).parent(&app.options_menu).build(&mut app.menu_new_ui)?;
             nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.menu_new_ui_sep)?;

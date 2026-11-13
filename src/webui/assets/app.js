@@ -37,7 +37,7 @@
       noresSubContent: (scope) => `بحثنا داخل المستندات ${scope ? `في ${scope}` : "في كل الأقراص"}.`,
       noresIx: "الفهرسة ما زالت جارية، وقد يظهر الملف حين تنتهي.",
       stillIx: "ما زلنا نفهرس ملفاتك…", stillIxSub: "ستظهر النتائج هنا تلقائياً.",
-      switchedText: "هذا الشكل الجديد لبحث سريع. تفضّل القديم؟", dismiss: "إخفاء", matchesPre: "كل التطابقات — ",
+      switchedText: "هذا هو الشكل الجديد لبحث سريع.", dismiss: "إخفاء", matchesPre: "كل التطابقات — ",
       tagHead: "لا شيء يضيع بصمت", tagTail: ": إذا لم نجد شيئاً نقول لك أين بحثنا وماذا تجرّب.",
       loading: "جارٍ تحميل الفهرس…", ixSub: "يمكنك البحث الآن. قد تكون النتائج ناقصة إلى أن تنتهي الفهرسة، وتكتمل القائمة تلقائياً.",
       moreRows: "مرّر لعرض المزيد", searching: "جارٍ البحث داخل المستندات…", pressEnter: "اضغط Enter للبحث داخل المستندات.",
@@ -65,7 +65,6 @@
       settings: "الإعدادات", settingsKey: "الإعدادات (Ctrl+,)", back: "رجوع إلى البحث",
       sLang: "اللغة", sLangNote: "ستظهر الواجهة باللغة المختارة بعد إعادة تشغيل البرنامج.", restart: "إعادة التشغيل الآن",
       sDisplay: "العرض", sDigits: "عرض الأرقام بالعربية (٠١٢٣)",
-      sLook: "الشكل الجديد", sLookSub: "هذا هو الشكل الجديد للبرنامج. يمكنك العودة إلى الشكل القديم متى شئت، والرجوع منه إلى الجديد من «خيارات ← جرّب الشكل الجديد».", classicLook: "العودة إلى الشكل القديم",
       app: "تطبيق", appsLabel: "برامج بهذا الاسم",
       grid: "عرض المصغرات (Ctrl+T)",
       compact: "عرض مضغوط", compactSub: "سطر واحد لكل نتيجة، فتظهر نتائج أكثر", showPreview: "إظهار المعاينة", hidePreview: "إخفاء المعاينة",
@@ -102,7 +101,7 @@
       noresSubContent: (scope) => `We searched inside documents ${scope ? `in ${scope}` : "on all drives"}.`,
       noresIx: "Indexing is still running; the file may appear when it finishes.",
       stillIx: "Still indexing your files…", stillIxSub: "Results will appear here by themselves.",
-      switchedText: "This is InstaFind's new look. Prefer the old one?", dismiss: "Dismiss", matchesPre: "All matches — ",
+      switchedText: "This is InstaFind's new look.", dismiss: "Dismiss", matchesPre: "All matches — ",
       tagHead: "Nothing gets lost silently", tagTail: ": when we find nothing, we tell you where we looked and what to try.",
       loading: "Loading the index…", ixSub: "You can search now; results may be incomplete until we finish. The list updates by itself.",
       moreRows: "Scroll for more", searching: "Searching inside documents…", pressEnter: "Press Enter to search inside documents.",
@@ -126,7 +125,6 @@
       settings: "Settings", settingsKey: "Settings (Ctrl+,)", back: "Back to search",
       sLang: "Language", sLangNote: "The interface changes language after the program restarts.", restart: "Restart now",
       sDisplay: "Display", sDigits: "Show Arabic-Indic digits (٠١٢٣)",
-      sLook: "New look", sLookSub: "This is the program's new look. You can go back to the classic look at any time, and come back from Options › Try the new look.", classicLook: "Back to the classic look",
       app: "App", appsLabel: "Programs by this name",
       grid: "Thumbnail view (Ctrl+T)",
       compact: "Compact rows", compactSub: "One line per result, so more of them fit", showPreview: "Show the preview", hidePreview: "Hide the preview",
@@ -553,13 +551,12 @@
   }
   // Programs the search names (as the classic window's app buttons): a
   // click starts one; the page names it by its place in the list sent.
-  // Once, for someone the update switched from the classic window: what
-  // happened, and the way back in one click.
+  // Once, for someone the update moved from the classic window: what
+  // happened (the new look is the only one since 1.0).
   function showSwitched() {
     const bar = $("switched");
-    const back = btn("primary", I.back, T.classicLook, () => { bar.hidden = true; send({ op: "classic_look" }); }, { id: "switched-back" });
     const x = btn("icon", I.x, null, () => { bar.hidden = true; q.focus(); }, { "aria-label": T.dismiss, title: T.dismiss, id: "switched-x" });
-    bar.replaceChildren(h("span", null, T.switchedText), back, x);
+    bar.replaceChildren(h("span", null, T.switchedText), x);
     bar.hidden = false;
   }
   // ---------- how the results are laid out (kept in this page's storage) ----------
@@ -1132,8 +1129,7 @@
           const b = h("button", { class: "sw", type: "button", role: "switch", "aria-checked": String(on), id: "set-compact", "aria-label": T.compact }, h("span", { class: "knob" }));
           b.addEventListener("click", () => setPref("compact", !compactOn()));
           return h("div", { class: "srow" }, h("label", { for: "set-compact" }, h("span", null, T.compact), h("small", null, T.compactSub)), b);
-        })(),
-        h("div", { class: "srow" }, h("label", { for: "classic-look" }, h("span", null, T.sLook), h("small", null, T.sLookSub)), btn("", I.back, T.classicLook, () => send({ op: "classic_look" }), { id: "classic-look" }))),
+        })()),
       section(T.sSearch, sw("hide_system", T.sHideSystem, T.sHideSystemSub), sw("content_index", T.sContentIndex, T.sContentIndexSub), sw("read_cloud_files", T.sReadCloud), sw("auto_index", T.sAutoIndex), h("div", { class: "srow" }, reindex)),
       section(T.sAnywhere, sw("hotkey_quick", T.sHotkey), sw("floating", T.sFloating), sw("tray_icon", T.sTray)),
       section(T.sStartup, sw("autostart", T.sAutostart)),

@@ -235,9 +235,10 @@ jobs:
   # The new look (WebView2 main window) on a real Windows desktop
   # (ci/newlook-test.ps1): a new user gets it (the default), its page opens
   # and loads (no WebView2 failure, no blank-page fallback) and is painted;
-  # with new_ui=0 the classic window offers "Try the new look"; settings
-  # from 0.10.0 get the new look once, and "Back to the classic look" sticks
-  # after a restart. `release` waits for it.
+  # classic users are moved to it once and get no way back; BAHTH_CLASSIC=1
+  # gives the classic window with "Try the new look"; a WebView2 that fails
+  # (BAHTH_WEBUI_FAIL=1) gives the classic window for that run only.
+  # `release` waits for it.
   newlook:
     needs: exe
     runs-on: windows-latest

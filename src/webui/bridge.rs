@@ -250,9 +250,6 @@ pub enum Request {
     Web { q: String },
     /// Hide the window (Esc in an empty box).
     Hide {},
-    /// Go back to the classic window, now and from the next start («العودة
-    /// إلى الشكل القديم» in the settings).
-    ClassicLook {},
     /// Start app `id` of those offered for search `seq` ([`Outbound::Apps`]).
     App { seq: u64, id: u32 },
     /// Export the results listed now to a CSV file (Save dialog).
@@ -428,8 +425,8 @@ pub enum Outbound {
         /// Write numbers with Arabic-Indic digits.
         digits: bool,
         version: &'static str,
-        /// This start made the new look the default for someone who used
-        /// the classic window: say so once, with the way back.
+        /// This start moved someone who used the classic window to the new
+        /// look (the only one since 1.0): say so once.
         switched: bool,
     },
     Results {
@@ -1437,7 +1434,8 @@ mod tests {
         assert_eq!(req(r#""op":"lang","lang":"en""#), Ok(Request::Lang { lang: LangCode::En }));
         assert_eq!(req(r#""op":"lang","lang":"fr""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"restart""#), Ok(Request::Restart {}));
-        assert_eq!(req(r#""op":"classic_look""#), Ok(Request::ClassicLook {}));
+        // There is no way back to the classic look since 1.0.
+        assert_eq!(req(r#""op":"classic_look""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"options_menu""#), Ok(Request::OptionsMenu {}));
         assert_eq!(req(r#""op":"thumbs","seq":3,"ver":4,"ids":[0,1,2]"#), Ok(Request::Thumbs { seq: 3, ver: 4, ids: vec![0, 1, 2] }));
         assert_eq!(req(r#""op":"thumbs","seq":3,"ver":4,"ids":[]"#), Err(Rejected::Invalid));
@@ -1458,9 +1456,9 @@ mod tests {
         assert_eq!(req(r#""op":"drag","list":"results","seq":2,"ver":3,"id":1"#), Ok(Request::Drag { list: List::Results, seq: 2, ver: 3, id: 1 }));
         assert_eq!(req(r#""op":"drag","list":"results","seq":2,"ver":3,"id":1,"path":"C:\\x""#), Err(Rejected::Malformed));
         assert_eq!(req(r#""op":"options_menu","item":3"#), Err(Rejected::Malformed));
-        assert_eq!(req(r#""op":"classic_look","forever":true"#), Err(Rejected::Malformed));
-        assert_eq!(parse(r#"{"op":"classic_look"}"#, SRC, TOKEN), Err(Rejected::Token));
-        assert_eq!(parse(&format!(r#"{{"t":"{TOKEN}","op":"classic_look"}}"#), "https://evil.example/", TOKEN), Err(Rejected::Origin));
+        assert_eq!(req(r#""op":"hide","forever":true"#), Err(Rejected::Malformed));
+        assert_eq!(parse(r#"{"op":"hide"}"#, SRC, TOKEN), Err(Rejected::Token));
+        assert_eq!(parse(&format!(r#"{{"t":"{TOKEN}","op":"hide"}}"#), "https://evil.example/", TOKEN), Err(Rejected::Origin));
         assert_eq!(req(r#""op":"reindex""#), Ok(Request::Reindex {}));
         assert_eq!(req(r#""op":"stop","seq":9"#), Ok(Request::Stop { seq: 9 }));
     }
