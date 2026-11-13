@@ -1843,7 +1843,12 @@ mod tests {
 
     #[test]
     fn warm_counts_the_users_folders_first() {
-        let dir = temp_dir("warm-mine");
+        // Not in the temp folder: on Windows that is AppData\Local\Temp, a
+        // program folder, so nothing in it would count as the user's.
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target").join(format!("bahth_cc_warm-mine_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        assert!(!system_files::is_program_path(&dir.to_string_lossy()), "{}", dir.display());
+        let dir = crate::test_temp::TempPath::at(dir);
         let mut entries = Vec::new();
         for (i, sub) in ["Documents", "Desktop", "Work", "Other", "Documents"].iter().enumerate() {
             let d = dir.join(sub);

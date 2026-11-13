@@ -37,7 +37,9 @@ fs.mkdirSync(out, { recursive: true });
 
 // The CSP, read from assets.rs so the preview can't drift from the exe.
 const rs = fs.readFileSync(path.join(__dirname, "assets.rs"), "utf8");
-const CSP = rs.match(/pub const CSP: &str = "([^;]*;[\s\S]*?)";/)[1].replace(/\\\n/g, "");
+// (\r?: a Windows checkout has CRLF line ends; a CR left in the header makes
+// every page load hang.)
+const CSP = rs.match(/pub const CSP: &str = "([^;]*;[\s\S]*?)";/)[1].replace(/\\\r?\n/g, "");
 
 // A 4x4 opaque PNG, the program's thumbnails' format.
 const TEST_PNG = (() => {
@@ -386,7 +388,8 @@ const SHOTS = [
   ...[[1008, 680], [1280, 720], [900, 600], [1938, 1038]].flatMap(([w, hh]) => [1, 1.25, 1.5].map((sc) =>
     [`grid-many-${w}x${hh}-${sc * 100}-en-dark`, "en", "dark", [["type", "report"], ["key", "Control+t"], ["wait", 600]], { many: 400, width: w, height: hh, scale: sc, expect: { tiles: "ok", farAsked: 0 } }])),
   ["grid-many-scroll-ar-light", "ar", "light", [["type", "تقرير"], ["key", "Control+t"], ["wait", 300], ["scroll", 0.5], ["scroll", 1], ["scroll", 1], ["wait", 300]], { many: 400, width: 1008, height: 680, scale: 1.25, expect: { tiles: "ok" } }],
-  ["grid-many-nopreview-en-light", "en", "light", [["type", "report"], ["key", "Control+t"], ["click", "#view-preview"], ["wait", 600]], { many: 400, width: 1008, height: 680, scale: 1.25, expect: { tiles: "ok", preview: false } }],
+  // (Under 1200 px the preview starts hidden: on, then off by the user's choice.)
+  ["grid-many-nopreview-en-light", "en", "light", [["type", "report"], ["key", "Control+t"], ["click", "#view-preview"], ["click", "#view-preview"], ["wait", 600]], { many: 400, width: 1008, height: 680, scale: 1.25, expect: { tiles: "ok", preview: false } }],
   ["grid-many-narrow-ar-dark", "ar", "dark", [["type", "تقرير"], ["key", "Control+t"], ["wait", 600]], { many: 400, width: 820, height: 600, scale: 1.25, expect: { tiles: "ok", preview: false } }],
   ["grid-many-resize-en-dark", "en", "dark", [["type", "report"], ["key", "Control+t"], ["wait", 300], ["resize", 1938, 1038], ["resize", 1008, 680], ["resize", 1280, 720]], { many: 400, width: 1008, height: 680, scale: 1.25, expect: { tiles: "ok" } }],
   // A Latin search in the Arabic interface stays at the right.
