@@ -464,6 +464,44 @@ impl Index {
         out
     }
 
+    /// Makes the drive `root` (`E:\`) a root of the index, after its first
+    /// walk (a drive plugged in while watching). Anything else is no root.
+    pub fn add_root(&mut self, root: &str) {
+        let drive = root.len() == 3 && root.ends_with(":\\") && root.as_bytes()[0].is_ascii_alphabetic();
+        if drive && !self.roots.iter().any(|r| r.eq_ignore_ascii_case(root)) {
+            self.roots.push(root.to_string());
+            self.roots.sort_by_key(|r| r.to_ascii_uppercase());
+        }
+    }
+
+    /// Copies of everything below `roots`, for [`Index::keep_entries`].
+    pub fn copies_under(&self, roots: &[String]) -> Vec<Entry> {
+        roots.iter().flat_map(|r| self.descendants(r)).flat_map(|range| self.entries[range].iter().cloned()).collect()
+    }
+
+    /// Puts back what an older index had below `roots` (drives not connected
+    /// during this scan, which could not see them): `kept`, from
+    /// [`Index::copies_under`]. A root this index already has entries below
+    /// keeps those instead. The drives stay roots. Returns the entries put back.
+    pub fn keep_entries(&mut self, roots: &[String], mut kept: Vec<Entry>) -> usize {
+        let full: Vec<&String> = roots.iter().filter(|r| !self.descendants(r).is_empty()).collect();
+        kept.retain(|e| !full.iter().any(|r| is_under(&e.path, r)));
+        sort_by_path(&mut kept);
+        kept.dedup_by(|a, b| a.path == b.path);
+        let n = kept.len();
+        if n > 0 {
+            let rest = std::mem::take(&mut self.entries);
+            self.entries = merge_by_path(rest, kept);
+        }
+        for r in roots {
+            if !self.roots.iter().any(|x| x.eq_ignore_ascii_case(r)) {
+                self.roots.push(r.clone());
+            }
+        }
+        self.roots.sort_by_key(|r| r.to_ascii_uppercase());
+        n
+    }
+
     /// Replaces everything below `dir` with `found` (from `scan_subtree`,
     /// sorted by path). `dir`'s own entry is kept. Returns the new count of
     /// entries below `dir`.
@@ -949,6 +987,32 @@ mod tests {
         assert!(Change::Renamed(r"C:\x".into(), r"C:\a\y".into()).touches(r"C:\a"));
         assert!(!Change::Added(r"C:\ab\y".into()).touches(r"C:\a"));
         assert!(Change::Added(r"C:\ab\y".into()).touches(r"C:\"));
+    }
+
+    #[test]
+    fn a_drive_plugged_in_becomes_a_root_once() {
+        let mut idx = index_of(&[r"C:\a"]);
+        idx.roots = vec![r"C:\".into(), r"F:\".into()];
+        idx.add_root(r"E:\");
+        idx.add_root(r"e:\");
+        idx.add_root(r"C:\");
+        idx.add_root(r"C:\folder\"); // a folder walk, not a drive
+        assert_eq!(idx.roots, [r"C:\", r"E:\", r"F:\"]);
+    }
+
+    #[test]
+    fn a_full_scan_keeps_the_entries_of_unplugged_drives() {
+        let old = index_of(&[r"C:\old.txt", r"E:\photos", r"E:\photos\a.jpg", r"F:\x.txt"]);
+        let kept = old.copies_under(&[r"E:\".to_string(), r"F:\".to_string()]);
+        assert_eq!(kept.len(), 3);
+        // The new scan saw C: (and F:, which is back with other files).
+        let mut new = index_of(&[r"C:\new.txt", r"F:\y.txt"]);
+        new.roots = vec![r"C:\".into(), r"F:\".into()];
+        assert_eq!(new.keep_entries(&[r"E:\".to_string(), r"F:\".to_string()], kept), 2);
+        assert_eq!(paths(&new), [r"C:\new.txt", r"E:\photos", r"E:\photos\a.jpg", r"F:\y.txt"]);
+        assert!(is_sorted(&new));
+        assert_eq!(new.roots, [r"C:\", r"E:\", r"F:\"]);
+        assert_eq!(new.find(r"E:\photos\a.jpg").map(|i| &*new.entries[i].norm_name), Some("a.jpg"));
     }
 
     #[test]

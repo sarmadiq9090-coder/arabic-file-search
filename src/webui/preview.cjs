@@ -128,6 +128,8 @@ function fakeProgram(cfg) {
   };
   const row = (f, id, term) => {
     const r = { id, name: mark(f.name, term || ""), dir: f.dir, size: f.size, mtime: f.mtime, ext: f.ext, folder: f.folder };
+    // The archive drive is unplugged: its entries stay, with a quiet note.
+    if (f.dir.startsWith("D:\\Archive")) r.offline = true;
     if (f.snippet) { r.snippet = mark(f.snippet, term); r.matches = f.count; }
     return r;
   };

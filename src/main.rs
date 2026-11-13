@@ -39,6 +39,8 @@ mod content_cache;
 #[cfg(any(windows, test))]
 mod crash_log;
 #[cfg(any(windows, test))]
+mod drives;
+#[cfg(any(windows, test))]
 mod dupes;
 #[cfg(any(windows, test))]
 mod extract;

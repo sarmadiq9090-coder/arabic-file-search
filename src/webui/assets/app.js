@@ -60,7 +60,7 @@
       recycleSub: "يمكنك استعادته من سلة المحذوفات.", recycleOk: "نقل إلى سلة المحذوفات",
       matchesH: (name) => `كل التطابقات — ${name}`, line: (n) => `سطر ${num(n)}`, firstLines: (n) => `(أول الأسطر فقط، عددها: ${num(n)})`,
       matchesNone: "يُعرض هنا كل سطر يطابق البحث.",
-      gone: "نُقل إلى سلة المحذوفات",
+      gone: "نُقل إلى سلة المحذوفات", offline: "القرص غير متصل",
       // history
       history: "السجل", historyKey: "السجل (Ctrl+H)", savedH: "البحوث المحفوظة", recentH: "عمليات البحث الأخيرة", recentEmpty: "لا توجد عمليات بحث سابقة بعد",
       saveCurrent: "حفظ البحث الحالي", clearRecent: "مسح السجل والملفات الأخيرة", clearSaved: "حذف كل البحوث المحفوظة",
@@ -128,7 +128,7 @@
       recycleSub: "You can restore it from the Recycle Bin.", recycleOk: "Move to Recycle Bin",
       matchesH: (name) => `All matches — ${name}`, line: (n) => `Line ${num(n)}`, firstLines: (n) => `(first ${num(n)} lines)`,
       matchesNone: "Every line that matches the search shows here.",
-      gone: "Moved to the Recycle Bin",
+      gone: "Moved to the Recycle Bin", offline: "drive not connected",
       history: "History", historyKey: "History (Ctrl+H)", savedH: "Saved searches", recentH: "Recent searches", recentEmpty: "No recent searches yet",
       saveCurrent: "Save the current search", clearRecent: "Clear history and recent files", clearSaved: "Delete all saved searches",
       savedInside: "inside documents", savedScoped: "in a folder",
@@ -717,13 +717,18 @@
     img.addEventListener("load", () => tile.classList.add("pic"), { once: true });
     img.src = "/thumb/" + key;
   }
+  // A subtle note on a result whose drive is not connected (its entry is kept).
+  function offNote(r) {
+    return r.offline ? h("span", { class: "off" }, T.offline) : null;
+  }
   function tileEl(r, i) {
     const el = h("div", Object.assign({ class: "row tile" + (r.gone ? " gone" : "") }, rowAria(r, i, "results")));
     el.dataset.i = i;
     el.append(h("span", { class: "tpic" }, badge(r, "ft big"), h("img", { alt: "", draggable: "false" })), h("span", { class: "tname" }, nameEl(r)));
+    if (r.offline) el.append(offNote(r));
     const key = thumbKeys.get(`${S.shown}:${S.ver}:${i}`);
     if (key) showThumb(el, key);
-    else if (!r.gone) thumbSeen.observe(el);
+    else if (!r.gone && !r.offline) thumbSeen.observe(el);
     return el;
   }
   function toggleGrid() {
@@ -737,7 +742,7 @@
   // (the whole count, or -1 while a document search still finds more).
   function rowAria(r, i, listName) {
     const name = plainName(r), results = listName === "results";
-    const label = [name, r.dir, r.folder ? T.folder : size(r.size), when(r.mtime), r.matches ? T.nMatches(r.matches) : "", r.gone ? T.gone : ""].filter(Boolean).join(", ");
+    const label = [name, r.dir, r.folder ? T.folder : size(r.size), when(r.mtime), r.matches ? T.nMatches(r.matches) : "", r.gone ? T.gone : "", r.offline ? T.offline : ""].filter(Boolean).join(", ");
     return {
       role: "option", id: (results ? "r" : "rr") + i, "aria-label": label,
       "aria-selected": String(results ? i === S.sel : i === S.rsel),
@@ -748,7 +753,7 @@
     if (listName === "results" && gridOn()) return tileEl(r, i);
     const el = h("div", Object.assign({ class: "row" + (r.gone ? " gone" : "") + (r.snippet ? " doc" : "") }, rowAria(r, i, listName)));
     el.dataset.i = i;
-    const nm = h("span", { class: "nm" }, h("span", { class: "n1" }, nameEl(r), r.matches > 1 ? h("span", { class: "cnt num" }, T.nMatches(r.matches)) : null), h("span", { class: "n2" }, pathEl(r.dir)));
+    const nm = h("span", { class: "nm" }, h("span", { class: "n1" }, nameEl(r), r.matches > 1 ? h("span", { class: "cnt num" }, T.nMatches(r.matches)) : null), h("span", { class: "n2" }, pathEl(r.dir), offNote(r)));
     if (r.snippet) nm.append(h("span", { class: "n3" }, marked(r.snippet, "sn")));
     el.append(h("span", null, badge(r)), nm);
     if (listName === "results") el.append(h("span", { class: "sz num" }, r.folder ? "" : size(r.size)));

@@ -24,6 +24,9 @@ const COPY_GAP: Duration = Duration::from_secs(10);
 /// longer than this, so that a walk's result is always put in in the end.
 const SHARED_WAIT: Duration = Duration::from_secs(120);
 
+/// How often the drives are looked at, for drives plugged in or taken out.
+const DRIVE_LOOK: Duration = Duration::from_secs(5);
+
 /// What the watcher threads hand over: changes and the stats they took.
 /// Like every queue of changes here it has a size limit, past which it asks
 /// for a walk of the drive instead (`watch_pace::ChangeQueue`): before
@@ -40,6 +43,13 @@ pub(super) struct Live {
     waiting_since: Option<Instant>,
     /// Folders waiting to be walked: a few walks run at a time.
     walks: WalkQueue,
+    /// When the drives were last looked at, and the look under way (on its
+    /// own thread: an ailing USB disk must not stop the window).
+    drives_looked: Option<Instant>,
+    drive_look: Option<Arc<Mutex<Option<crate::drives::Look>>>>,
+    /// Drives plugged in while watching whose first walk has not ended;
+    /// the walk's result makes them roots of the index.
+    new_roots: Vec<String>,
 }
 
 /// A folder being walked because the watcher could not say what is inside.
@@ -106,6 +116,7 @@ impl App {
         st.changes.clear();
         st.live.rescans.clear();
         st.live.walks.clear();
+        st.live.new_roots.clear();
         st.live.waiting_since = None;
         drop(st);
         // Joins the watcher threads, which may be handing over a batch.
@@ -151,6 +162,7 @@ impl App {
     /// result was put in at once, copying the index if it was shared: three
     /// sets of a drive's entries.
     pub(super) fn apply_watched(&self) {
+        self.check_drives();
         self.start_due_rescans();
         self.start_waiting_walks();
         if !self.index_free() {
@@ -264,6 +276,69 @@ impl App {
         }
     }
 
+    /// Every few seconds: a drive plugged in since (a USB stick, an external
+    /// disk, a new partition) is watched and walked alone, without a new
+    /// full scan, and becomes a root of the index when its walk ends; the
+    /// results on drives that are not connected are marked (`crate::drives`).
+    /// Network and cloud drives are never added.
+    fn check_drives(&self) {
+        let mut st = self.state.borrow_mut();
+        let Some(look) = st.live.drive_look.take() else {
+            if st.live.drives_looked.is_none_or(|t| t.elapsed() >= DRIVE_LOOK) {
+                st.live.drives_looked = Some(Instant::now());
+                let slot = Arc::new(Mutex::new(None));
+                let s = slot.clone();
+                if crate::crash_log::spawn_named("drive-look", move || {
+                    let look = crate::drives::look();
+                    if let Ok(mut s) = s.lock() {
+                        *s = Some(look);
+                    }
+                })
+                .is_some()
+                {
+                    st.live.drive_look = Some(slot);
+                }
+            }
+            return;
+        };
+        let Some(found) = look.lock().ok().and_then(|mut l| l.take()) else {
+            st.live.drive_look = Some(look); // Still looking.
+            return;
+        };
+        let mut roots = st.index.roots.clone();
+        roots.extend(st.live.new_roots.iter().cloned());
+        let plan = crate::drives::plan(&roots, found);
+        // Added while watching only, to a finished index (a full scan sees
+        // every drive there is).
+        let add = st.watcher.is_some() && !st.index.roots.is_empty() && st.scan.is_none() && st.loading.is_none();
+        let add = if add { plan.add } else { Vec::new() };
+        for root in &add {
+            if let Some(w) = st.watcher.as_mut() {
+                w.add_root(root);
+            }
+            st.changes.add_root(root);
+            st.live.new_roots.push(root.clone());
+        }
+        drop(st);
+        if crate::drives::set_absent(plan.absent) {
+            let gone: Vec<String> = roots.iter().filter(|r| crate::drives::is_absent(r)).cloned().collect();
+            log(&format!("drives: not connected now: {}", if gone.is_empty() { "none".to_string() } else { gone.join(" ") }));
+            self.refresh_list();
+        }
+        if add.is_empty() {
+            return;
+        }
+        if let Ok(mut q) = self.watch_inbox.lock() {
+            for root in &add {
+                q.add_root(root);
+            }
+        }
+        for root in add {
+            log(&format!("drives: {root} plugged in; walking it"));
+            self.request_rescan(root);
+        }
+    }
+
     /// A walk of a whole root after lost events, paced by `RescanPace`.
     pub(super) fn request_rescan(&self, root: String) {
         let mut st = self.state.borrow_mut();
@@ -329,6 +404,9 @@ impl App {
                 let Some(found) = j.result.lock().ok().and_then(|mut r| r.take()) else { return true };
                 // The pause before the next walk of this folder counts from now.
                 live.rescans.finished(&j.dir, now);
+                // A new drive's walk ended: in the index now, or (it failed)
+                // to be added again at the next look.
+                live.new_roots.retain(|r| *r != j.dir);
                 if j.whole_root() {
                     log(&format!("rescan {}: done; the next one waits at least {} min", j.dir, live.rescans.pause_of(&j.dir).as_secs() / 60));
                 }
@@ -351,6 +429,8 @@ impl App {
                     // The folder may have gone again while it was walked.
                     if dir.ends_with('\\') || idx.find(&dir).is_some() {
                         idx.replace_subtree(&dir, found);
+                        // A drive plugged in while watching: now one of the roots.
+                        idx.add_root(&dir);
                         // Folders found here were just walked; no new scans.
                         idx.apply_changes(&replay.changes, |p| watch_pace::lookup(&replay.stats, p, watch::stat));
                     }
