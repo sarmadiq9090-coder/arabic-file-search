@@ -127,6 +127,13 @@ impl RescanPace {
         !self.deferred.is_empty()
     }
 
+    /// `path` is inside a root whose walk was asked for and is postponed:
+    /// that walk will find what is there, so `path` needs no walk of its own.
+    #[cfg_attr(not(windows), allow(dead_code))] // the Windows UI
+    pub fn covers(&self, path: &str) -> bool {
+        self.deferred.iter().any(|r| within(path, r))
+    }
+
     /// Postponed roots whose turn has come; the others stay postponed.
     pub fn due(&mut self, now: Instant, busy: impl Fn(&str) -> bool) -> Vec<String> {
         if self.deferred.is_empty() {
@@ -498,6 +505,21 @@ mod tests {
             Change::Added(String::new()),
         ];
         assert_eq!(stat_paths(&odd).collect::<Vec<_>>(), [r"C:\a", "/home/u"]);
+    }
+
+    /// A drive whose walk is postponed covers the folders in it: they wait
+    /// for that walk rather than each get a walk of its own.
+    #[test]
+    fn a_postponed_root_covers_its_folders() {
+        let mut pace = RescanPace::new(Duration::from_secs(60));
+        let t0 = Instant::now();
+        assert!(pace.request("C:\\", t0, false));
+        assert!(!pace.covers(r"C:\new\folder"), "walked now: nothing postponed");
+        assert!(!pace.request("C:\\", t0 + Duration::from_secs(5), false));
+        assert!(pace.covers(r"C:\new\folder") && pace.covers("C:\\"));
+        assert!(!pace.covers(r"D:\new") && !pace.covers(r"CC:\x"));
+        assert_eq!(pace.due(t0 + Duration::from_secs(61), |_| false), ["C:\\"]);
+        assert!(!pace.covers(r"C:\new\folder"), "its walk has started");
     }
 
     /// Random requests at random times: never panics, a deferred root is

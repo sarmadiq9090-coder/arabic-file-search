@@ -264,10 +264,12 @@ impl App {
     /// drive is walked instead (paced like every whole-drive walk).
     fn walk_folder(&self, dir: String) {
         let mut st = self.state.borrow_mut();
-        if st.subtree_scans.iter().any(|j| j.dir == dir) {
+        // Already being walked, or inside a drive whose walk is wanted
+        // anyway (after too many folders waited): that walk finds it.
+        if st.subtree_scans.iter().any(|j| j.dir == dir) || st.live.rescans.covers(&dir) {
             return;
         }
-        let running = st.subtree_scans.iter().filter(|j| !j.ready()).count();
+        let running = folder_walks(&st.subtree_scans);
         let State { index, live, .. } = &mut *st;
         let what = live.walks.ask(&dir, running, &index.roots);
         drop(st);
@@ -287,7 +289,7 @@ impl App {
     fn start_waiting_walks(&self) {
         loop {
             let mut st = self.state.borrow_mut();
-            let running = st.subtree_scans.iter().filter(|j| !j.ready()).count();
+            let running = folder_walks(&st.subtree_scans);
             let Some(dir) = st.live.walks.next(running) else { return };
             drop(st);
             self.start_subtree_scan(dir);
@@ -441,22 +443,35 @@ impl App {
         // Folders whose own queue of changes overflowed while they were
         // walked: what was dropped is found by walking them once more.
         let mut again = Vec::new();
+        // All the walks go in with one pass over the index, and the changes
+        // made meanwhile with one more (`Index::replace_subtrees`): this runs
+        // on the window's thread, and until 1.0 each walk cost passes of its
+        // own over a million entries.
         self.edit_index(
             |idx| {
+                let mut walks = Vec::new();
+                let mut replays: Vec<Change> = Vec::new();
+                let mut stats = watch_pace::Stats::new();
                 for (dir, found, replay) in done {
-                    // The folder may have gone again while it was walked.
-                    if dir.ends_with('\\') || idx.find(&dir).is_some() {
-                        idx.replace_subtree(&dir, found);
+                    // The folder may have gone again while it was walked
+                    // (or it is new, inside a folder walked just before).
+                    let known = idx.find(&dir).is_some()
+                        || walks.iter().any(|(_, f): &(String, Vec<Entry>)| f.binary_search_by(|e| (*e.path).cmp(&dir)).is_ok());
+                    if dir.ends_with('\\') || known {
                         // A drive plugged in while watching: now one of the roots.
                         idx.add_root(&dir);
-                        // Folders found here were just walked; no new scans.
-                        idx.apply_changes(&replay.changes, |p| watch_pace::lookup(&replay.stats, p, watch::stat));
+                        walks.push((dir, found));
+                        replays.extend(replay.changes);
+                        stats.extend(replay.stats);
                     }
                     if !replay.collapsed.is_empty() {
                         note_dropped(replay.dropped, &replay.collapsed);
                         again.extend(replay.collapsed);
                     }
                 }
+                idx.replace_subtrees(walks);
+                // Folders found here were just walked; no new scans.
+                idx.apply_changes(&replays, |p| watch_pace::lookup(&stats, p, watch::stat));
                 true
             },
             true,
@@ -465,6 +480,17 @@ impl App {
             self.request_rescan(dir);
         }
     }
+}
+
+/// Folder walks under way or done but not yet in the index: together at
+/// most `watch_pace::MAX_WALKS`. (Until 1.0 only the running ones counted,
+/// and `apply_watched` starts walks before it knows whether it may put
+/// finished ones in: while a save held the index, hundreds of finished walks
+/// piled up and then went in at once, one pass over the index each, for
+/// tens of seconds on the window's thread; the soak test's hang at its
+/// minute 118, most likely.) Whole-drive walks are paced on their own.
+fn folder_walks(jobs: &[SubtreeScan]) -> usize {
+    jobs.iter().filter(|j| !j.whole_root()).count()
 }
 
 /// Too many folders waited for a walk: a line in the log, at most one every

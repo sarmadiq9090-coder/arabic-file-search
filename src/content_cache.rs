@@ -39,7 +39,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Mutex, MutexGuard, RwLock};
+use std::sync::{Mutex, MutexGuard, RwLock, TryLockError};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::cloud;
@@ -200,6 +200,8 @@ pub struct ContentCache {
     reader: RwLock<Option<File>>,
     /// Content searches running now; the warm-up pauses meanwhile.
     searching: AtomicUsize,
+    /// The number of documents when last counted (for [`documents_now`](Self::documents_now)).
+    documents_seen: AtomicUsize,
     /// Markers of the extractions running now (see the module docs).
     inflight: InFlight,
     /// Files a previous run died extracting, now stored as "no text".
@@ -582,6 +584,7 @@ impl ContentCache {
             inner: Mutex::new(inner),
             reader: RwLock::new(Some(reader)),
             searching: AtomicUsize::new(0),
+            documents_seen: AtomicUsize::new(0),
             inflight: InFlight::new(dir),
             recovered: Vec::new(),
         };
@@ -1105,7 +1108,24 @@ impl ContentCache {
     }
 
     pub fn documents(&self) -> usize {
-        self.lock().map.len()
+        let n = self.lock().map.len();
+        self.documents_seen.store(n, Ordering::Relaxed);
+        n
+    }
+
+    /// [`documents`](Self::documents) for the window's thread, which must
+    /// never wait for the store's lock: a compaction holds it for as long as
+    /// it rewrites all of `content.dat` (gigabytes), and writing
+    /// `content.idx` holds it too. While another holds it, the count last seen.
+    #[cfg_attr(not(windows), allow(dead_code))] // the Windows UI
+    pub fn documents_now(&self) -> usize {
+        let n = match self.inner.try_lock() {
+            Ok(inner) => inner.map.len(),
+            Err(TryLockError::Poisoned(e)) => e.into_inner().map.len(),
+            Err(TryLockError::WouldBlock) => return self.documents_seen.load(Ordering::Relaxed),
+        };
+        self.documents_seen.store(n, Ordering::Relaxed);
+        n
     }
 
     pub fn is_full(&self) -> bool {
@@ -1477,6 +1497,29 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
         assert_eq!(ContentCache::open(&dir).unwrap().stats().documents, 0);
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn documents_now_never_waits_for_the_lock() {
+        let dir = temp_dir("docs-now");
+        let c = ContentCache::open(&dir).unwrap();
+        c.put("C:\\a.txt", 1, 1, Some("one"));
+        c.put("C:\\b.txt", 1, 1, Some("two"));
+        assert_eq!(c.documents_now(), 2);
+        let held = c.lock();
+        // Another thread holds the store (a compaction, say): the count last
+        // seen, at once.
+        let (n, took) = std::thread::scope(|s| {
+            s.spawn(|| {
+                let t = Instant::now();
+                (c.documents_now(), t.elapsed())
+            })
+            .join()
+            .unwrap()
+        });
+        drop(held);
+        assert_eq!(n, 2);
+        assert!(took < Duration::from_secs(1), "{took:?}");
     }
 
     #[test]
