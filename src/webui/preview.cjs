@@ -364,6 +364,9 @@ const SHOTS = [
   // selected result's folder (not open it), Esc cancels; the result menu has the move first.
   ["qswitch-ar-light", "ar", "light", [["eval", QS_ON.ar], ["type", "تقرير"], ["key", "ArrowDown"]], { expect: { qswitch: true } }],
   ["qswitch-enter-en-light", "en", "light", [["eval", QS_ON.en], ["type", "report"], ["key", "Enter"], ["wait", 50]], { expect: { lastSent: "switch_to", opens: 0, qswitch: false } }],
+  // FIN1 F6: nothing found while a dialog waits: no suggestion is Enter's default, Enter starts nothing.
+  ["qswitch-nores-en-light", "en", "light", [["eval", QS_ON.en], ["type", "lease 2024"], ["key", "Enter"], ["wait", 50]], { expect: { view: "view-nores", qswitch: true, q: "lease 2024", suggKbd: 0, lastSent: "search", statusText: "No result to move the dialog to. Change the search, or press Esc to cancel." } }],
+  ["qswitch-nores-ar-dark", "ar", "dark", [["eval", QS_ON.ar], ["type", "عقد الايجار 2024"], ["key", "ArrowDown"], ["key", "Enter"], ["wait", 50]], { expect: { view: "view-nores", qswitch: true, q: "عقد الايجار 2024", suggKbd: 0, lastSent: "search" } }],
   ["qswitch-esc-en-dark", "en", "dark", [["eval", QS_ON.en], ["type", "report"], ["key", "Escape"], ["wait", 50]], { expect: { lastSent: "switch_cancel", qswitch: false, q: "report" } }],
   ["qswitch-ctx-ar-dark", "ar", "dark", [["eval", QS_ON.ar], ["type", "تقرير"], ["rclick", "#r1"]], { expect: { menu: true, ctxFirst: "فتح مجلدها في نافذة الحفظ/الفتح" } }],
   // The quick popup's suggestions carry over: inside documents runs a document search, all types clears the type.
@@ -573,6 +576,8 @@ const SHOTS = [
         })(),
         updBtn: (() => { const b = document.getElementById("check-updates"); return b && visible(b) ? b.textContent + (b.getAttribute("aria-disabled") === "true" ? "|busy" : "|ready") : null; })(),
         updChecks: window.__sent.filter((m) => m.op === "check_updates").length,
+        suggKbd: document.querySelectorAll("#sugg kbd").length,
+        statusText: document.getElementById("status-text").textContent,
         trustStore: [...document.querySelectorAll('[data-i18n="trust"], .settings .muted')].filter(visible).every((el) => el.textContent.includes("Microsoft Store") && !el.textContent.includes("GitHub")),
         clearItem: (() => { const it = document.getElementById("hist-clear"); return it ? `${it.textContent}|${it.getAttribute("aria-disabled") === "true" ? "off" : "on"}` : null; })(),
         recentRows: document.querySelectorAll("#recent .row").length,
