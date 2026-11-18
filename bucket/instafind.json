@@ -1,5 +1,5 @@
 {
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "InstaFind (بحث سريع): Instant file search for Windows, in Arabic and English, even inside documents.",
     "homepage": "https://github.com/sarmadiq9090-coder/arabic-file-search",
     "license": {
@@ -14,16 +14,16 @@
     ],
     "architecture": {
         "64bit": {
-            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v1.1.0/bahth.exe",
-            "hash": "3a63a928b42b6e98d7b4331985d987d59639ff67bed17b5f62d934aa65a18c3f"
+            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v1.2.0/bahth.exe",
+            "hash": "e5a1730456f8b250170ad94f95e769204a22b75663d4ae3c3313876c72d3aeb6"
         },
         "32bit": {
-            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v1.1.0/bahth-x86.exe#/bahth.exe",
-            "hash": "a852e0c0cccfe11e0fb9259554de209492b85ccca89825a7425299b38e9ff5d9"
+            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v1.2.0/bahth-x86.exe#/bahth.exe",
+            "hash": "0ffee81c70b0c395856e5252f0ef9c185e2f66780e74c2bdc4b6bdfe2dad01cf"
         },
         "arm64": {
-            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v1.1.0/bahth-arm64.exe#/bahth.exe",
-            "hash": "0923868c7a486850224961c96496f1bc8795f372245b871bd565a27496f8cb9b"
+            "url": "https://github.com/sarmadiq9090-coder/arabic-file-search/releases/download/v1.2.0/bahth-arm64.exe#/bahth.exe",
+            "hash": "87a5be373e891d7f372f16e4f60a7519d9e532a986860a51a644aeb5a8a53572"
         }
     },
     "bin": [
