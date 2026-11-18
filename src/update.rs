@@ -205,6 +205,47 @@ pub fn missing_digest_message() -> String {
     )
 }
 
+/// What a manual check says when the update server refuses or cannot find
+/// the release (HTTP 403, 404, 429): neutral, because the cause (a rate
+/// limit, a moved or unavailable repository) is not the user's to fix, and
+/// the failed check is retried at the next hourly tick (`ui/updates.rs`).
+pub const SERVER_UNREACHABLE_AR: &str =
+    "تعذّر الوصول إلى خادم التحديثات الآن. برنامجك يعمل كالمعتاد، وسنحاول مرة أخرى لاحقاً.";
+pub const SERVER_UNREACHABLE_EN: &str =
+    "The update server can't be reached right now. Your app keeps working; we'll try again later.";
+
+/// [`SERVER_UNREACHABLE_AR`] / [`SERVER_UNREACHABLE_EN`] in the UI language.
+pub fn server_unreachable_message() -> &'static str {
+    tr!(SERVER_UNREACHABLE_AR, SERVER_UNREACHABLE_EN)
+}
+
+/// Whether `error` is the neutral "update server can't be reached" text.
+pub fn is_server_unreachable(error: &str) -> bool {
+    error == SERVER_UNREACHABLE_AR || error == SERVER_UNREACHABLE_EN
+}
+
+/// The error for a non-200 HTTP answer of the update server.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn http_status_error(status: u32) -> String {
+    match status {
+        403 | 404 | 429 => server_unreachable_message().to_string(),
+        _ => trf!("رد غير متوقع من الخادم (HTTP {status})", "unexpected answer from the server (HTTP {status})"),
+    }
+}
+
+/// The message box a failed check shows, if any. An automatic background
+/// check never shows one (it is logged and retried later); a manual check
+/// shows the neutral text on its own, any other error with its cause.
+pub fn check_failure_popup(manual: bool, error: &str) -> Option<String> {
+    if !manual {
+        return None;
+    }
+    if is_server_unreachable(error) {
+        return Some(error.to_string());
+    }
+    Some(trf!("تعذر التحقق من التحديثات:\n{error}", "Could not check for updates:\n{error}"))
+}
+
 /// A package manager that installed this copy and so owns its updates.
 /// Replacing the exe behind its back breaks its records (version, hash,
 /// winget's uninstall entry), so the self-updater stays out of the way.
@@ -712,11 +753,7 @@ mod win {
         }
         let status = query_number(&request, WINHTTP_QUERY_STATUS_CODE).unwrap_or(0);
         if status != 200 {
-            return Err(match status {
-                403 | 429 => trf!("GitHub حدّ مؤقتاً عدد الطلبات من جهازك (HTTP {status}). حاول بعد ساعة.", "GitHub is temporarily limiting requests from this computer (HTTP {status}). Try again in an hour."),
-                404 => tr!("لا يوجد إصدار منشور بعد (HTTP 404)", "no release has been published yet (HTTP 404)").into(),
-                _ => trf!("رد غير متوقع من الخادم (HTTP {status})", "unexpected answer from the server (HTTP {status})"),
-            });
+            return Err(http_status_error(status));
         }
         let length = query_number(&request, WINHTTP_QUERY_CONTENT_LENGTH).map(u64::from);
         if length.is_some_and(|n| n > max) {
@@ -1072,6 +1109,38 @@ mod tests {
         let with = SAMPLE.replace("\"size\": 4321000,", &format!("\"size\": 4321000, \"digest\": \"sha256:{h}\","));
         let r = parse_release(&with, "0.2.2").unwrap().unwrap();
         assert_eq!(r.sha256.as_deref(), Some("ab".repeat(32).as_str()));
+    }
+
+    #[test]
+    fn refused_or_missing_release_gives_the_neutral_message() {
+        // Tests run in Arabic (i18n::detect).
+        for status in [403, 404, 429] {
+            let e = http_status_error(status);
+            assert_eq!(e, SERVER_UNREACHABLE_AR, "HTTP {status}");
+            assert!(is_server_unreachable(&e));
+            // No blame on GitHub, no "try again in an hour", no status code.
+            assert!(!e.contains("GitHub") && !e.contains("ساعة") && !e.contains(&status.to_string()), "{e}");
+        }
+        assert!(SERVER_UNREACHABLE_EN.contains("The update server can't be reached right now"));
+        assert!(SERVER_UNREACHABLE_EN.contains("Your app keeps working; we'll try again later."));
+        assert!(is_server_unreachable(SERVER_UNREACHABLE_EN));
+        // Other statuses keep their own text with the code.
+        let e = http_status_error(500);
+        assert!(e.contains("HTTP 500") && !is_server_unreachable(&e), "{e}");
+    }
+
+    #[test]
+    fn only_a_manual_check_shows_a_failure() {
+        let unreachable = http_status_error(403);
+        // Automatic background checks: never a message box, whatever failed.
+        assert_eq!(check_failure_popup(false, &unreachable), None);
+        assert_eq!(check_failure_popup(false, &http_status_error(404)), None);
+        assert_eq!(check_failure_popup(false, "انتهت مهلة الاتصال"), None);
+        // Manual check: the neutral text on its own...
+        assert_eq!(check_failure_popup(true, &unreachable).as_deref(), Some(SERVER_UNREACHABLE_AR));
+        // ...other errors with their cause.
+        let other = check_failure_popup(true, "انتهت مهلة الاتصال").unwrap();
+        assert!(other.contains("تعذر التحقق من التحديثات") && other.contains("انتهت مهلة الاتصال"), "{other}");
     }
 
     #[test]

@@ -82,9 +82,16 @@ impl App {
                         self.set_status(&trf!("لديك أحدث إصدار ({v}).", "You have the latest version ({v})."));
                         nwg::modal_info_message(&self.window, title(), &trf!("لديك أحدث إصدار من البرنامج ({v}).", "You have the latest version of the program ({v})."));
                     }
-                    Err(e) if manual => {
-                        self.set_status(tr!("تعذر التحقق من التحديثات.", "Could not check for updates."));
-                        nwg::modal_error_message(&self.window, title(), &trf!("تعذر التحقق من التحديثات:\n{e}", "Could not check for updates:\n{e}"));
+                    // An automatic check stays silent: no message box.
+                    Err(e) => {
+                        if let Some(text) = crate::update::check_failure_popup(manual, &e) {
+                            self.set_status(tr!("تعذر التحقق من التحديثات.", "Could not check for updates."));
+                            if crate::update::is_server_unreachable(&e) {
+                                nwg::modal_info_message(&self.window, title(), &text);
+                            } else {
+                                nwg::modal_error_message(&self.window, title(), &text);
+                            }
+                        }
                     }
                     _ => {}
                 }
