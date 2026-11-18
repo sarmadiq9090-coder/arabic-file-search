@@ -210,6 +210,8 @@ bahth.exe -s عقد --json
 
 برنامج مجاني للاستخدام على أجهزتك، وهو برنامج مملوك (غير مفتوح المصدر): [LICENSE](LICENSE). الإصدارات المنشورة قبل 2026-11-09 (حتى 0.9.1) تبقى متاحة برخصة MIT التي نُشرت بها.
 
+اسم «InstaFind» و«بحث سريع» والأيقونة علامات تجارية لـ FastKiwi (Sarmad)، ولا تشملها الرخصة: انظر [TRADEMARKS.md](TRADEMARKS.md).
+
 </div>
 
 ---
@@ -398,3 +400,5 @@ Building from source, the code map and the release process are in [docs/DEVELOPM
 ### License
 
 Free to use on your own devices; proprietary software, see [LICENSE](LICENSE). Versions released before 2026-11-09 (up to 0.9.1) remain available under the MIT licence they were published with.
+
+The InstaFind name and icon are trademarks of FastKiwi (Sarmad) and are not covered by the licence: see [TRADEMARKS.md](TRADEMARKS.md).
