@@ -6,14 +6,14 @@ Measured by `ci/quick-shots.ps1` on a GitHub Actions runner: Microsoft Windows S
 
 | Query | 0.6.1 (ms) | this build (ms) | change | found (0.6.1 / this) |
 |---|---:|---:|---:|---:|
-| `report` | 643 | 621 | -3% | 2091 / 2091 |
-| `notepad` | 647 | 621 | -4% | 48 / 48 |
-| `احمد` | 649 | 752 | +16% | 0 / 0 |
-| `تقرير مالي` | 643 | 616 | -4% | 1 / 1 |
-| `مشكلة` | 640 | 619 | -3% | 2 / 2 |
-| `ext:dll` | 689 | 686 | +0% | 111548 / 111548 |
-| `system32 config` | 647 | 893 | +38% | 0 / 326 |
-| **all** | **4,556** | **4,808** | **+6%** | |
+| `report` | 643 | 613 | -5% | 2091 / 2091 |
+| `notepad` | 654 | 632 | -3% | 48 / 48 |
+| `احمد` | 645 | 755 | +17% | 0 / 0 |
+| `تقرير مالي` | 635 | 607 | -4% | 1 / 1 |
+| `مشكلة` | 637 | 610 | -4% | 2 / 2 |
+| `ext:dll` | 697 | 683 | -2% | 111548 / 111548 |
+| `system32 config` | 634 | 896 | +41% | 0 / 326 |
+| **all** | **4,545** | **4,796** | **+6%** | |
 
 ## Start-up of the main window (index already saved)
 
@@ -21,15 +21,15 @@ Shown = from `Start-Process` until the window is visible (measured outside). The
 
 | Phase (median ms) | 0.6.1 | this build | change |
 |---|---:|---:|---:|
-| Shown | 33 | 31 | -5% |
-| Built | 152 | 157 | +3% |
-| Layout | 150 | 156 | +4% |
-| FirstTick | 315 | 307 | -3% |
+| Shown | 32 | 34 | +6% |
+| Built | 156 | 159 | +2% |
+| Layout | 156 | 158 | +1% |
+| FirstTick | 316 | 310 | -2% |
 
 Raw phases (last run of each):
 
-- 0.6.1: `single-instance=10 init=12 font=12 settings=12 window=48 list=86 controls=112 tray=119 events=120 layout=150 built=152 loop=152 first-tick=314`
-- this build: `single-instance=14 init=16 font=17 settings=17 window=48 list=84 controls=104 tray=111 events=134 layout=156 built=156 loop=156 first-tick=305`
+- 0.6.1: `single-instance=10 init=13 font=13 settings=13 window=50 list=90 controls=116 tray=122 events=124 layout=156 built=156 loop=156 first-tick=317`
+- this build: `single-instance=13 init=15 font=15 settings=17 window=50 list=85 controls=106 tray=112 events=135 layout=157 built=157 loop=157 first-tick=308`
 
 Quick search popup (this build only): opened in a median of 9 ms over 50 openings (`quick search shown in` in log.txt).
 
@@ -40,14 +40,14 @@ Quick search popup (this build only): opened in a median of 9 ms over 50 opening
 - [ar] popup from the box at 392,552 size 480x116
 - [ar] box still opens the popup after 46 rapid clicks
 - [ar] popup empty: height 142, mean 44
-- [ar] 'المفكرة': height 253 (empty 142), sd 35.0
-- [ar] 'كروم': height 219 (empty 142), sd 35.7
-- [ar] 'واي فاي': height 285 (empty 142), sd 33.8
-- [ar] '250*12': height 219 (empty 142), sd 35.7
-- [ar] '5 kg to lb': height 219 (empty 142), sd 36.7
-- [ar] 'هجري': height 285 (empty 142), sd 34.1
-- [ar] 'يوتيوب قرآن': height 319 (empty 142), sd 33.8
-- [ar] 'اطفاء': height 285 (empty 142), sd 33.7
+- [ar] 'المفكرة': height 253 (empty 142), sd 34.9
+- [ar] 'كروم': height 219 (empty 142), sd 35.5
+- [ar] 'واي فاي': height 285 (empty 142), sd 33.7
+- [ar] '250*12': height 219 (empty 142), sd 35.6
+- [ar] '5 kg to lb': height 219 (empty 142), sd 36.6
+- [ar] 'هجري': height 285 (empty 142), sd 33.9
+- [ar] 'يوتيوب قرآن': height 319 (empty 142), sd 33.7
+- [ar] 'اطفاء': height 285 (empty 142), sd 33.6
 - [ar] 'مشكلة': height 531 (empty 142), sd 35.0
 - [ar] 'qzxwvkjh': height 319 (empty 142), sd 34.4
 - [en] floating box at 392,676 size 236x36 on a 1024x768 screen
@@ -55,30 +55,30 @@ Quick search popup (this build only): opened in a median of 9 ms over 50 opening
 - [en] popup from the box at 392,552 size 480x116
 - [en] box still opens the popup after 46 rapid clicks
 - [en] popup empty: height 142, mean 45
-- [en] 'notepad': height 365 (empty 142), sd 36.0
-- [en] 'paint': height 485 (empty 142), sd 36.4
-- [en] 'واي فاي': height 285 (empty 142), sd 35.5
-- [en] '250*12': height 219 (empty 142), sd 36.1
-- [en] '5 kg to lb': height 219 (empty 142), sd 37.2
-- [en] 'هجري': height 285 (empty 142), sd 36.1
-- [en] 'يوتيوب قرآن': height 319 (empty 142), sd 36.9
-- [en] 'اطفاء': height 285 (empty 142), sd 34.8
-- [en] 'مشكلة': height 531 (empty 142), sd 36.3
-- [en] 'qzxwvkjh': height 319 (empty 142), sd 37.3
+- [en] 'notepad': height 365 (empty 142), sd 35.9
+- [en] 'paint': height 485 (empty 142), sd 36.3
+- [en] 'واي فاي': height 285 (empty 142), sd 35.4
+- [en] '250*12': height 219 (empty 142), sd 35.9
+- [en] '5 kg to lb': height 219 (empty 142), sd 37.0
+- [en] 'هجري': height 285 (empty 142), sd 36.0
+- [en] 'يوتيوب قرآن': height 319 (empty 142), sd 36.8
+- [en] 'اطفاء': height 285 (empty 142), sd 34.7
+- [en] 'مشكلة': height 531 (empty 142), sd 36.2
+- [en] 'qzxwvkjh': height 319 (empty 142), sd 37.2
 - [ar-light] floating box at 392,676 size 236x36 on a 1024x768 screen
 - [ar-light] floating box idle vs hovered: mean difference 8.33
-- [ar-light] popup empty: height 116, mean 188
-- [ar-light] 'calculator': height 459 (empty 116), sd 71.0
-- [ar-light] '250*12': height 193 (empty 116), sd 84.8
-- [ar-light] 'مشكلة': height 531 (empty 116), sd 65.8
+- [ar-light] popup empty: height 142, mean 193
+- [ar-light] 'calculator': height 459 (empty 142), sd 71.1
+- [ar-light] '250*12': height 193 (empty 142), sd 84.8
+- [ar-light] 'مشكلة': height 505 (empty 142), sd 63.7
 - [extras] Alt+Space opened the quick search
 - [extras] Ctrl+Alt+G: quick switch: hotkey, file dialog found (box found)
 - [extras] Enter on 'device manager' started: mmc
-- [extras] Enter on 'devices and printers' started: ApplicationFrameHost, dllhost, smartscreen, svchost, SystemSettings
+- [extras] Enter on 'devices and printers' started: ApplicationFrameHost, dllhost, svchost, SystemSettings
 - [extras] hidden mode, cursor away: a click on the box's place reaches 'Progman'
-- catalog: launcher catalog: 145 apps, 188 settings pages in 244 ms
+- catalog: launcher catalog: 145 apps, 188 settings pages in 336 ms
 
 **Failed:**
 
 - 'system32 config' finds 0 with 0.6.1 but 326 now
-- the command line is slower than 0.6.1: 4,808 ms against 4,556 ms
+- the command line is slower than 0.6.1: 4,796 ms against 4,545 ms
