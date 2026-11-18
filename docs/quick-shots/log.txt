@@ -1,207 +1,211 @@
-1794985401 settings: moved to the new look (once)
-1794985401 webui: the new interface needs the MSVC build; using the classic window
-1794985401 index load: 0 entries in 0 ms
-1794985401 startup ms (v1.1.0): single-instance=23 init=26 font=26 settings=27 window=63 list=115 controls=142 tray=148 events=167 layout=200 built=201 loop=201 first-tick=343
-1794985401 memory: private 32 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
-1794985402 floating box built in 8 ms
-1794985407 launcher catalog: 145 apps, 188 settings pages in 592 ms
-1794985407 exchange rates: updated (rates of 2026-11-18)
-1794985707 index build: 1217289 entries in 305174 ms (fast walk: C:\ disk? 4 threads, D:\ disk? 4 threads)
-1794985708 index save: 1217289 entries in 982 ms (after the scan)
-1794985708 watch: C:\ D:\
-1794985713 content index open: 0 documents, 0 KB in 2 ms
-1794985713 content index: 101252 of 465625 documents to read inside
-1794985735 settings: moved to the new look (once)
-1794985735 webui: the new interface needs the MSVC build; using the classic window
-1794985735 startup ms (v1.1.0): single-instance=14 init=16 font=16 settings=18 window=51 list=101 controls=125 tray=131 events=155 layout=177 built=177 loop=177 first-tick=326
-1794985735 memory: private 178 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
-1794985735 floating box built in 5 ms
-1794985735 index load: 1217289 entries in 464 ms
-1794985735 watch: C:\ D:\
-1794985735 start: the last session ended with index changes it had not saved; scanning the drives again
-1794985740 launcher catalog: 145 apps, 188 settings pages in 267 ms
-1794985741 index build: 1217300 entries in 5931 ms (fast walk: C:\ disk? 4 threads, D:\ disk? 4 threads)
-1794985741 content index open: 8469 documents, 13179 KB in 8 ms
-1794985742 content index: 101252 of 465625 documents to read inside
-1794985742 index save: 1217300 entries in 1110 ms (after the scan)
-1794985742 watch: C:\ D:\
-1794985743 content index warm: 49 of 93062 new documents in 1378 ms on 2 threads (stopped); 0 cloud-only not read; stored 8517 (8512 with text), 13512 KB; word index: 277 added from the store, 8517 documents (0 waiting in memory), 1 segments, 5272 KB on disk, about 242 KB in memory
-1794985744 quick search window built in 2 ms
-1794985744 quick search shown in 11 ms
-1794985745 quick search shown in 9 ms
-1794985745 quick search shown in 9 ms
-1794985745 quick search shown in 9 ms
-1794985746 quick search shown in 9 ms
-1794985746 quick search shown in 9 ms
-1794985746 quick search shown in 9 ms
-1794985747 quick search shown in 9 ms
-1794985747 quick search shown in 9 ms
-1794985748 quick search shown in 9 ms
-1794985748 content index: 101252 of 465625 documents to read inside
-1794985748 quick search shown in 10 ms
-1794985749 quick search shown in 9 ms
-1794985749 quick search shown in 9 ms
-1794985750 quick search shown in 10 ms
-1794985751 quick search shown in 9 ms
-1794985751 quick search shown in 9 ms
-1794985752 quick search shown in 9 ms
-1794985753 quick search shown in 9 ms
-1794985755 quick search shown in 9 ms
-1794985756 quick search shown in 9 ms
-1794985757 quick search shown in 11 ms
-1794985761 quick search shown in 5 ms
-1794985761 quick search shown in 10 ms
-1794985762 index copy: made (another reader held the index; 1217305 entries in 644 ms)
-1794985774 index save: started gen 23
-1794985775 index save: done gen 23 in 1185 ms (1217351 entries; the next one waits 4 s)
-1794985791 settings: moved to the new look (once)
-1794985791 webui: the new interface needs the MSVC build; using the classic window
-1794985791 startup ms (v1.1.0): single-instance=14 init=16 font=18 settings=18 window=52 list=89 controls=111 tray=117 events=141 layout=161 built=161 loop=161 first-tick=313
-1794985791 memory: private 146 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
-1794985791 floating box built in 2 ms
-1794985791 index load: 1217351 entries in 448 ms
-1794985791 watch: C:\ D:\
-1794985791 start: the last session ended with index changes it had not saved; scanning the drives again
-1794985796 launcher catalog: 145 apps, 188 settings pages in 220 ms
-1794985797 index build: 1217361 entries in 6131 ms (fast walk: C:\ disk? 4 threads, D:\ disk? 4 threads)
-1794985797 content index open: 14895 documents, 22942 KB in 33 ms
-1794985797 content index: the last run stopped while reading C:\hostedtoolcache\windows\Python\3.14.10\x64\Doc\html\library\sysconfig.html; skipped until the file changes
-1794985798 content index: 101253 of 465639 documents to read inside
-1794985799 index save: 1217361 entries in 1269 ms (after the scan)
-1794985799 watch: C:\ D:\
-1794985799 content index warm: 89 of 86362 new documents in 1747 ms on 2 threads (stopped); 0 cloud-only not read; stored 14980 (14974 with text), 23554 KB; word index: 0 added from the store, 14980 documents (0 waiting in memory), 1 segments, 6865 KB on disk, about 480 KB in memory
-1794985800 quick search window built in 2 ms
-1794985800 quick search shown in 7 ms
-1794985801 quick search shown in 9 ms
-1794985801 quick search shown in 9 ms
-1794985801 quick search shown in 9 ms
-1794985801 quick search shown in 9 ms
-1794985802 quick search shown in 9 ms
-1794985802 quick search shown in 9 ms
-1794985803 quick search shown in 9 ms
-1794985803 quick search shown in 9 ms
-1794985803 quick search shown in 9 ms
-1794985804 quick search shown in 9 ms
-1794985804 content index: 101254 of 465647 documents to read inside
-1794985804 quick search shown in 10 ms
-1794985805 quick search shown in 10 ms
-1794985806 quick search shown in 10 ms
-1794985806 quick search shown in 9 ms
-1794985807 quick search shown in 10 ms
-1794985808 quick search shown in 9 ms
-1794985809 quick search shown in 10 ms
-1794985810 quick search shown in 10 ms
-1794985812 quick search shown in 10 ms
-1794985813 quick search shown in 10 ms
-1794985816 quick search shown in 6 ms
-1794985817 quick search shown in 12 ms
-1794985830 index save: started gen 18
-1794985830 index copy: made (a save was being written; 1217369 entries in 318 ms)
-1794985831 index save: done gen 18 in 1085 ms (1217369 entries; the next one waits 4 s)
-1794985846 settings: moved to the new look (once)
-1794985846 webui: the new interface needs the MSVC build; using the classic window
-1794985846 startup ms (v1.1.0): single-instance=14 init=16 font=16 settings=18 window=50 list=87 controls=109 tray=117 events=140 layout=161 built=163 loop=163 first-tick=312
-1794985846 memory: private 178 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
-1794985846 floating box built in 2 ms
-1794985847 index load: 1217369 entries in 447 ms
-1794985847 watch: C:\ D:\
-1794985847 start: the last session ended with index changes it had not saved; scanning the drives again
-1794985851 launcher catalog: 145 apps, 188 settings pages in 324 ms
-1794985853 index build: 1217379 entries in 5865 ms (fast walk: C:\ disk? 4 threads, D:\ disk? 4 threads)
-1794985853 content index open: 23867 documents, 90118 KB in 42 ms
-1794985853 content index: the last run stopped while reading C:\hostedtoolcache\windows\Python\3.13.17\x64\Doc\html\library\tarfile.html; skipped until the file changes
-1794985853 content index: the last run stopped while reading C:\hostedtoolcache\windows\Python\3.13.17\x64\Doc\html\library\telnetlib.html; skipped until the file changes
-1794985853 content index: 101254 of 465655 documents to read inside
-1794985854 index save: 1217379 entries in 1214 ms (after the scan)
-1794985854 watch: C:\ D:\
-1794985855 content index warm: 68 of 78698 new documents in 2044 ms on 2 threads (stopped); 0 cloud-only not read; stored 23930 (23771 with text), 92139 KB; word index: 1306 added from the store, 23930 documents (0 waiting in memory), 1 segments, 12555 KB on disk, about 482 KB in memory
-1794985855 quick search window built in 4 ms
-1794985855 quick search shown in 7 ms
-1794985860 content index: 101255 of 465664 documents to read inside
-1794985865 settings: moved to the new look (once)
-1794985865 webui: the new interface needs the MSVC build; using the classic window
-1794985865 startup ms (v1.1.0): single-instance=14 init=18 font=18 settings=20 window=60 list=98 controls=122 tray=130 events=158 layout=181 built=182 loop=182 first-tick=324
-1794985865 memory: private 107 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
-1794985865 floating box built in 3 ms
-1794985866 index load: 1217379 entries in 465 ms
-1794985866 watch: C:\ D:\
-1794985866 start: the last session ended with index changes it had not saved; scanning the drives again
-1794985870 quick search window built in 4 ms
-1794985870 quick search shown in 27 ms
-1794985871 launcher catalog: 145 apps, 188 settings pages in 625 ms
-1794985873 content index open: 23931 documents, 92139 KB in 182 ms
-1794985873 content index: the last run stopped while reading C:\hostedtoolcache\windows\Python\3.13.17\x64\Lib\dbm\dumb.py; skipped until the file changes
-1794985873 index build: 1217381 entries in 7863 ms (fast walk: C:\ disk? 4 threads, D:\ disk? 4 threads)
-1794985874 content index: 101255 of 465664 documents to read inside
-1794985877 index save: 1217381 entries in 3888 ms (after the scan)
-1794985877 watch: C:\ D:\
-1794985878 content index warm: 90 of 77327 new documents in 4781 ms on 2 threads (stopped); 0 cloud-only not read; stored 24019 (23859 with text), 96484 KB; word index: 0 added from the store, 24019 documents (0 waiting in memory), 2 segments, 13136 KB on disk, about 482 KB in memory
-1794985879 quick switch: hotkey, file dialog found (box found)
-1794985882 quick search shown in 21 ms
-1794985883 content index: 101256 of 465671 documents to read inside
-1794985891 quick search shown in 18 ms
-1794985892 index copy: made (another reader held the index; 1217430 entries in 532 ms)
-1794985901 settings: moved to the new look (once)
-1794985902 webui: the new interface needs the MSVC build; using the classic window
-1794985902 startup ms (v1.1.0): single-instance=14 init=17 font=17 settings=19 window=54 list=91 controls=113 tray=120 events=147 layout=169 built=170 loop=170 first-tick=315
-1794985902 memory: private 102 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
-1794985902 floating box built in 2 ms
-1794985902 index load: 1217381 entries in 532 ms
-1794985902 watch: C:\ D:\
-1794985902 start: the last session ended with index changes it had not saved; scanning the drives again
-1794985907 launcher catalog: 145 apps, 188 settings pages in 244 ms
-1794985967 startup ms (v0.6.1): single-instance=11 init=13 font=13 settings=13 window=48 list=85 controls=108 tray=117 events=119 layout=150 built=150 loop=150 first-tick=309
-1794985968 index load: 1217381 entries in 470 ms
-1794985968 watch: C:\ D:\
-1794985971 settings: moved to the new look (once)
-1794985971 webui: the new interface needs the MSVC build; using the classic window
-1794985971 startup ms (v1.1.0): single-instance=15 init=18 font=18 settings=20 window=51 list=83 controls=103 tray=111 events=133 layout=156 built=156 loop=156 first-tick=305
-1794985971 memory: private 178 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
-1794985971 floating box built in 2 ms
-1794985972 index load: 1217381 entries in 443 ms
-1794985972 watch: C:\ D:\
-1794985972 start: the last session ended with index changes it had not saved; scanning the drives again
-1794985975 startup ms (v0.6.1): single-instance=10 init=14 font=14 settings=14 window=49 list=89 controls=116 tray=123 events=125 layout=156 built=158 loop=158 first-tick=318
-1794985976 index load: 1217381 entries in 481 ms
-1794985976 watch: C:\ D:\
-1794985979 settings: moved to the new look (once)
-1794985979 webui: the new interface needs the MSVC build; using the classic window
-1794985979 startup ms (v1.1.0): single-instance=14 init=16 font=16 settings=18 window=52 list=85 controls=107 tray=113 events=136 layout=156 built=158 loop=158 first-tick=310
-1794985979 memory: private 148 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
-1794985979 floating box built in 2 ms
-1794985980 index load: 1217381 entries in 445 ms
-1794985980 watch: C:\ D:\
-1794985980 start: the last session ended with index changes it had not saved; scanning the drives again
-1794985983 startup ms (v0.6.1): single-instance=10 init=14 font=14 settings=14 window=52 list=94 controls=117 tray=124 events=125 layout=157 built=158 loop=158 first-tick=318
-1794985984 index load: 1217381 entries in 468 ms
-1794985984 watch: C:\ D:\
-1794985987 settings: moved to the new look (once)
-1794985987 webui: the new interface needs the MSVC build; using the classic window
-1794985987 startup ms (v1.1.0): single-instance=15 init=17 font=17 settings=17 window=54 list=92 controls=111 tray=119 events=145 layout=165 built=166 loop=166 first-tick=314
-1794985987 memory: private 179 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
-1794985987 floating box built in 2 ms
-1794985988 index load: 1217381 entries in 444 ms
-1794985988 watch: C:\ D:\
-1794985988 start: the last session ended with index changes it had not saved; scanning the drives again
-1794985991 startup ms (v0.6.1): single-instance=10 init=12 font=12 settings=12 window=50 list=88 controls=114 tray=120 events=122 layout=150 built=152 loop=152 first-tick=315
-1794985992 index load: 1217381 entries in 467 ms
-1794985992 watch: C:\ D:\
-1794985995 settings: moved to the new look (once)
-1794985995 webui: the new interface needs the MSVC build; using the classic window
-1794985995 startup ms (v1.1.0): single-instance=13 init=15 font=17 settings=17 window=50 list=84 controls=106 tray=112 events=136 layout=157 built=157 loop=157 first-tick=307
-1794985995 memory: private 147 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
-1794985996 floating box built in 2 ms
-1794985996 index load: 1217381 entries in 439 ms
-1794985996 watch: C:\ D:\
-1794985996 start: the last session ended with index changes it had not saved; scanning the drives again
-1794985999 startup ms (v0.6.1): single-instance=10 init=12 font=12 settings=12 window=48 list=86 controls=112 tray=119 events=120 layout=150 built=152 loop=152 first-tick=314
-1794986000 index load: 1217381 entries in 462 ms
-1794986000 watch: C:\ D:\
-1794986003 settings: moved to the new look (once)
-1794986003 webui: the new interface needs the MSVC build; using the classic window
-1794986003 startup ms (v1.1.0): single-instance=14 init=16 font=17 settings=17 window=48 list=84 controls=104 tray=111 events=134 layout=156 built=156 loop=156 first-tick=305
-1794986003 memory: private 178 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
-1794986004 floating box built in 2 ms
-1794986004 index load: 1217381 entries in 445 ms
-1794986004 watch: C:\ D:\
-1794986004 start: the last session ended with index changes it had not saved; scanning the drives again
+1794990122 settings: moved to the new look (once)
+1794990122 webui: the new interface needs the MSVC build; using the classic window
+1794990122 index load: 0 entries in 0 ms
+1794990123 startup ms (v1.1.0): single-instance=24 init=26 font=26 settings=28 window=63 list=113 controls=140 tray=147 events=163 layout=197 built=197 loop=197 first-tick=340
+1794990123 memory: private 32 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
+1794990123 floating box built in 7 ms
+1794990128 launcher catalog: 145 apps, 188 settings pages in 1030 ms
+1794990128 exchange rates: updated (rates of 2026-11-18)
+1794990572 index build: 1217287 entries in 449673 ms (fast walk: C:\ disk? 4 threads, D:\ disk? 4 threads)
+1794990573 index save: 1217287 entries in 1275 ms (after the scan)
+1794990574 watch: C:\ D:\
+1794990579 content index open: 0 documents, 0 KB in 2 ms
+1794990579 content index: 101255 of 465628 documents to read inside
+1794990601 settings: moved to the new look (once)
+1794990601 webui: the new interface needs the MSVC build; using the classic window
+1794990601 startup ms (v1.1.0): single-instance=14 init=16 font=16 settings=18 window=50 list=103 controls=127 tray=133 events=157 layout=180 built=181 loop=181 first-tick=329
+1794990601 memory: private 102 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
+1794990601 floating box built in 5 ms
+1794990601 index load: 1217287 entries in 505 ms
+1794990601 watch: C:\ D:\
+1794990601 start: the last session ended with index changes it had not saved; scanning the drives again
+1794990606 launcher catalog: 145 apps, 188 settings pages in 275 ms
+1794990607 index build: 1217340 entries in 5788 ms (fast walk: C:\ disk? 4 threads, D:\ disk? 4 threads)
+1794990608 content index open: 7324 documents, 9246 KB in 20 ms
+1794990608 content index: the last run stopped while reading C:\Miniconda\conda-meta\setuptools-84.0.0-py314haa95532_0.json; skipped until the file changes
+1794990608 content index: the last run stopped while reading C:\Miniconda\conda-meta\shellingham-1.5.4-py314haa95532_0.json; skipped until the file changes
+1794990608 content index: 101255 of 465628 documents to read inside
+1794990609 index save: 1217340 entries in 1993 ms (after the scan)
+1794990609 watch: C:\ D:\
+1794990610 content index warm: 96 of 95113 new documents in 2379 ms on 2 threads (stopped); 0 cloud-only not read; stored 7418 (7412 with text), 10382 KB; word index: 1178 added from the store, 7418 documents (0 waiting in memory), 1 segments, 4278 KB on disk, about 241 KB in memory
+1794990610 quick search window built in 2 ms
+1794990610 quick search shown in 11 ms
+1794990611 quick search shown in 9 ms
+1794990611 quick search shown in 9 ms
+1794990612 quick search shown in 9 ms
+1794990612 quick search shown in 9 ms
+1794990612 quick search shown in 9 ms
+1794990613 quick search shown in 9 ms
+1794990613 quick search shown in 9 ms
+1794990613 quick search shown in 10 ms
+1794990614 quick search shown in 9 ms
+1794990614 quick search shown in 9 ms
+1794990615 content index: 101255 of 465632 documents to read inside
+1794990615 quick search shown in 9 ms
+1794990615 quick search shown in 9 ms
+1794990616 quick search shown in 9 ms
+1794990617 quick search shown in 9 ms
+1794990618 quick search shown in 9 ms
+1794990618 quick search shown in 9 ms
+1794990619 quick search shown in 9 ms
+1794990621 quick search shown in 10 ms
+1794990622 quick search shown in 9 ms
+1794990624 quick search shown in 9 ms
+1794990627 quick search shown in 6 ms
+1794990627 quick search shown in 12 ms
+1794990630 index copy: made (another reader held the index; 1217344 entries in 487 ms)
+1794990641 index save: started gen 16
+1794990642 index save: done gen 16 in 1124 ms (1217350 entries; the next one waits 4 s)
+1794990656 settings: moved to the new look (once)
+1794990656 webui: the new interface needs the MSVC build; using the classic window
+1794990657 startup ms (v1.1.0): single-instance=14 init=16 font=16 settings=16 window=49 list=87 controls=107 tray=115 events=138 layout=158 built=159 loop=159 first-tick=310
+1794990657 memory: private 147 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
+1794990657 floating box built in 2 ms
+1794990657 index load: 1217350 entries in 449 ms
+1794990657 watch: C:\ D:\
+1794990657 start: the last session ended with index changes it had not saved; scanning the drives again
+1794990662 launcher catalog: 145 apps, 188 settings pages in 314 ms
+1794990663 index build: 1217359 entries in 5742 ms (fast walk: C:\ disk? 4 threads, D:\ disk? 4 threads)
+1794990663 content index open: 14936 documents, 22897 KB in 131 ms
+1794990663 content index: the last run stopped while reading C:\hostedtoolcache\windows\CodeQL\2.27.4\x64\codeql\qlpacks\codeql\csharp-queries\1.11.0\.codeql\libraries\codeql\csharp-all\7.4.2\ext\generated\modelgenerator\System.Runtime.Intrinsics.Arm.model.yml; skipped until the file changes
+1794990663 content index: the last run stopped while reading C:\hostedtoolcache\windows\CodeQL\2.27.4\x64\codeql\qlpacks\codeql\csharp-queries\1.11.0\.codeql\libraries\codeql\csharp-all\7.4.2\ext\generated\modelgenerator\System.Runtime.Intrinsics.Wasm.model.yml; skipped until the file changes
+1794990664 content index: 101256 of 465642 documents to read inside
+1794990664 index save: 1217359 entries in 1404 ms (after the scan)
+1794990664 watch: C:\ D:\
+1794990665 content index warm: 37 of 87696 new documents in 1727 ms on 2 threads (stopped); 0 cloud-only not read; stored 14969 (14960 with text), 23309 KB; word index: 1372 added from the store, 14969 documents (0 waiting in memory), 1 segments, 6828 KB on disk, about 480 KB in memory
+1794990665 quick search window built in 2 ms
+1794990665 quick search shown in 7 ms
+1794990666 quick search shown in 9 ms
+1794990667 quick search shown in 9 ms
+1794990667 quick search shown in 9 ms
+1794990667 quick search shown in 9 ms
+1794990667 quick search shown in 9 ms
+1794990668 quick search shown in 9 ms
+1794990668 quick search shown in 9 ms
+1794990669 quick search shown in 9 ms
+1794990669 quick search shown in 9 ms
+1794990670 quick search shown in 10 ms
+1794990670 content index: 101257 of 465650 documents to read inside
+1794990670 quick search shown in 10 ms
+1794990671 quick search shown in 9 ms
+1794990671 quick search shown in 9 ms
+1794990672 quick search shown in 9 ms
+1794990673 quick search shown in 9 ms
+1794990674 quick search shown in 9 ms
+1794990674 quick search shown in 8 ms
+1794990676 quick search shown in 10 ms
+1794990677 quick search shown in 9 ms
+1794990679 quick search shown in 9 ms
+1794990682 quick search shown in 6 ms
+1794990682 quick search shown in 9 ms
+1794990697 index copy: made (another reader held the index; 1217368 entries in 527 ms)
+1794990711 settings: moved to the new look (once)
+1794990711 webui: the new interface needs the MSVC build; using the classic window
+1794990712 startup ms (v1.1.0): single-instance=13 init=16 font=16 settings=17 window=49 list=87 controls=107 tray=114 events=138 layout=162 built=163 loop=163 first-tick=309
+1794990712 memory: private 178 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
+1794990712 floating box built in 2 ms
+1794990712 index load: 1217359 entries in 440 ms
+1794990712 watch: C:\ D:\
+1794990712 start: the last session ended with index changes it had not saved; scanning the drives again
+1794990717 launcher catalog: 145 apps, 188 settings pages in 288 ms
+1794990718 index build: 1217377 entries in 5775 ms (fast walk: C:\ disk? 4 threads, D:\ disk? 4 threads)
+1794990718 content index open: 20535 documents, 74429 KB in 220 ms
+1794990718 content index: the last run stopped while reading C:\hostedtoolcache\windows\Python\3.15.2\x64\Lib\test\test_decimal.py; skipped until the file changes
+1794990719 content index: 101257 of 465650 documents to read inside
+1794990720 quick search window built in 5 ms
+1794990720 quick search shown in 7 ms
+1794990721 index save: 1217377 entries in 3637 ms (after the scan)
+1794990721 watch: C:\ D:\
+1794990723 content index warm: 76 of 80746 new documents in 4008 ms on 2 threads (stopped); 0 cloud-only not read; stored 20610 (20596 with text), 75094 KB; word index: 20 added from the store, 20610 documents (0 waiting in memory), 1 segments, 11035 KB on disk, about 482 KB in memory
+1794990727 content index: 101258 of 465667 documents to read inside
+1794990730 settings: moved to the new look (once)
+1794990730 webui: the new interface needs the MSVC build; using the classic window
+1794990730 startup ms (v1.1.0): single-instance=14 init=16 font=16 settings=18 window=51 list=88 controls=109 tray=116 events=141 layout=162 built=163 loop=163 first-tick=311
+1794990730 memory: private 114 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
+1794990731 floating box built in 2 ms
+1794990731 index load: 1217377 entries in 459 ms
+1794990731 watch: C:\ D:\
+1794990731 start: the last session ended with index changes it had not saved; scanning the drives again
+1794990735 quick search window built in 4 ms
+1794990735 quick search shown in 7 ms
+1794990736 launcher catalog: 145 apps, 188 settings pages in 393 ms
+1794990737 index build: 1217381 entries in 5918 ms (fast walk: C:\ disk? 4 threads, D:\ disk? 4 threads)
+1794990737 content index open: 20610 documents, 75094 KB in 21 ms
+1794990737 content index: 101258 of 465667 documents to read inside
+1794990738 index save: 1217381 entries in 1368 ms (after the scan)
+1794990738 watch: C:\ D:\
+1794990738 content index warm: 73 of 80656 new documents in 1153 ms on 2 threads (stopped); 0 cloud-only not read; stored 20677 (20663 with text), 75536 KB; word index: 0 added from the store, 20677 documents (0 waiting in memory), 2 segments, 11118 KB on disk, about 482 KB in memory
+1794990740 quick switch: hotkey, file dialog found (box found)
+1794990743 quick search shown in 9 ms
+1794990744 content index: 101259 of 465674 documents to read inside
+1794990753 quick search shown in 14 ms
+1794990754 index copy: made (another reader held the index; 1217445 entries in 460 ms)
+1794990763 settings: moved to the new look (once)
+1794990763 webui: the new interface needs the MSVC build; using the classic window
+1794990763 startup ms (v1.1.0): single-instance=14 init=16 font=16 settings=16 window=50 list=84 controls=105 tray=113 events=135 layout=158 built=158 loop=158 first-tick=308
+1794990763 memory: private 178 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
+1794990763 floating box built in 3 ms
+1794990763 index load: 1217381 entries in 447 ms
+1794990764 watch: C:\ D:\
+1794990764 start: the last session ended with index changes it had not saved; scanning the drives again
+1794990768 launcher catalog: 145 apps, 188 settings pages in 336 ms
+1794990769 index build: 1217456 entries in 5795 ms (fast walk: C:\ disk? 4 threads, D:\ disk? 4 threads)
+1794990770 content index open: 20679 documents, 75536 KB in 50 ms
+1794990770 content index: the last run stopped while reading C:\hostedtoolcache\windows\Python\3.13.17\x64\NEWS.txt; skipped until the file changes
+1794990770 content index: the last run stopped while reading C:\hostedtoolcache\windows\Python\3.13.17\x64\LICENSE.txt; skipped until the file changes
+1794990770 content index: 101259 of 465674 documents to read inside
+1794990829 startup ms (v0.6.1): single-instance=10 init=12 font=12 settings=12 window=50 list=90 controls=113 tray=124 events=124 layout=157 built=157 loop=157 first-tick=316
+1794990829 index load: 1217381 entries in 477 ms
+1794990829 watch: C:\ D:\
+1794990832 settings: moved to the new look (once)
+1794990833 webui: the new interface needs the MSVC build; using the classic window
+1794990833 startup ms (v1.1.0): single-instance=12 init=16 font=16 settings=17 window=51 list=86 controls=108 tray=113 events=138 layout=158 built=159 loop=159 first-tick=310
+1794990833 memory: private 148 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
+1794990833 floating box built in 2 ms
+1794990833 index load: 1217381 entries in 443 ms
+1794990833 watch: C:\ D:\
+1794990833 start: the last session ended with index changes it had not saved; scanning the drives again
+1794990837 startup ms (v0.6.1): single-instance=10 init=12 font=12 settings=12 window=49 list=88 controls=112 tray=119 events=120 layout=150 built=151 loop=151 first-tick=313
+1794990837 index load: 1217381 entries in 462 ms
+1794990837 watch: C:\ D:\
+1794990840 settings: moved to the new look (once)
+1794990841 webui: the new interface needs the MSVC build; using the classic window
+1794990841 startup ms (v1.1.0): single-instance=15 init=17 font=17 settings=17 window=52 list=88 controls=113 tray=119 events=144 layout=165 built=165 loop=165 first-tick=314
+1794990841 memory: private 179 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
+1794990841 floating box built in 2 ms
+1794990841 index load: 1217381 entries in 453 ms
+1794990841 watch: C:\ D:\
+1794990841 start: the last session ended with index changes it had not saved; scanning the drives again
+1794990845 startup ms (v0.6.1): single-instance=10 init=12 font=12 settings=12 window=51 list=94 controls=116 tray=124 events=126 layout=156 built=156 loop=156 first-tick=318
+1794990845 index load: 1217381 entries in 478 ms
+1794990845 watch: C:\ D:\
+1794990848 settings: moved to the new look (once)
+1794990849 webui: the new interface needs the MSVC build; using the classic window
+1794990849 startup ms (v1.1.0): single-instance=14 init=16 font=16 settings=18 window=52 list=86 controls=108 tray=115 events=136 layout=158 built=158 loop=158 first-tick=309
+1794990849 memory: private 178 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
+1794990849 floating box built in 2 ms
+1794990849 index load: 1217381 entries in 452 ms
+1794990849 watch: C:\ D:\
+1794990849 start: the last session ended with index changes it had not saved; scanning the drives again
+1794990853 startup ms (v0.6.1): single-instance=10 init=12 font=12 settings=14 window=48 list=88 controls=113 tray=120 events=121 layout=153 built=153 loop=153 first-tick=315
+1794990853 index load: 1217381 entries in 476 ms
+1794990853 watch: C:\ D:\
+1794990857 settings: moved to the new look (once)
+1794990857 webui: the new interface needs the MSVC build; using the classic window
+1794990857 startup ms (v1.1.0): single-instance=13 init=15 font=15 settings=17 window=50 list=88 controls=110 tray=116 events=141 layout=161 built=163 loop=163 first-tick=311
+1794990857 memory: private 179 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
+1794990857 floating box built in 2 ms
+1794990857 index load: 1217381 entries in 448 ms
+1794990857 watch: C:\ D:\
+1794990857 start: the last session ended with index changes it had not saved; scanning the drives again
+1794990861 startup ms (v0.6.1): single-instance=10 init=13 font=13 settings=13 window=50 list=90 controls=116 tray=122 events=124 layout=156 built=156 loop=156 first-tick=317
+1794990861 index load: 1217381 entries in 475 ms
+1794990861 watch: C:\ D:\
+1794990865 settings: moved to the new look (once)
+1794990865 webui: the new interface needs the MSVC build; using the classic window
+1794990865 startup ms (v1.1.0): single-instance=13 init=15 font=15 settings=17 window=50 list=85 controls=106 tray=112 events=135 layout=157 built=157 loop=157 first-tick=308
+1794990865 memory: private 178 MB, entries 0, documents 0, queue 0 (expected about 200 MB)
+1794990865 floating box built in 2 ms
+1794990865 index load: 1217381 entries in 448 ms
+1794990865 watch: C:\ D:\
+1794990865 start: the last session ended with index changes it had not saved; scanning the drives again
