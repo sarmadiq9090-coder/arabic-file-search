@@ -75,6 +75,8 @@ mod leave;
 #[cfg(any(windows, test))]
 mod mem_guard;
 #[cfg(any(windows, test))]
+mod more_apps;
+#[cfg(any(windows, test))]
 mod normalize;
 #[cfg(any(windows, test))]
 mod quick;

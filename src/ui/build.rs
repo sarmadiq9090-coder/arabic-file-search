@@ -393,6 +393,7 @@ impl NativeUi<AppUi> for App {
         super::feedback::build_support(&app.options_menu, &mut app.support_menu, [&mut app.menu_support_mail, &mut app.menu_support_page])?;
         app.build_report_item()?;
         app.build_rating()?;
+        super::more_apps::build(&app.options_menu, &mut app.more_apps_menu, &mut app.more_apps_items)?;
         nwg::MenuSeparator::builder().parent(&app.options_menu).build(&mut app.options_seps[4])?;
 
         nwg::MenuItem::builder().text(tr!("إخفاء بجانب الساعة\tEsc", "Hide next to the clock\tEsc")).parent(&app.options_menu).build(&mut app.menu_hide)?;
@@ -531,7 +532,7 @@ impl NativeUi<AppUi> for App {
                         } else {
                             app.set_status(&autostart::change_failed_message());
                         }
-                    } else if app.on_lang_item(handle) || app.on_feedback_item(handle) || app.on_rating_item(handle) {
+                    } else if app.on_lang_item(handle) || app.on_feedback_item(handle) || app.on_rating_item(handle) || app.on_more_apps_item(handle) {
                     } else if handle == app.menu_update {
                         // The Store version is told where its updates come from.
                         app.check_for_update(true);
